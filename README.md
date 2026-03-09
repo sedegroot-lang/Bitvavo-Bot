@@ -56,6 +56,32 @@ Het dashboard draait lokaal op **http://localhost:5001**:
 | HODL | Wekelijkse DCA voor BTC/ETH |
 | Grid | Grid bot status en instellingen |
 
+### Screenshots
+
+**Portfolio overzicht**
+![Portfolio](docs/screenshots/portfolio.png)
+
+**AI scores en marktanalyse**
+![AI](docs/screenshots/ai.png)
+
+**Performance**
+![Performance](docs/screenshots/performance.png)
+
+**Analytics**
+![Analytics](docs/screenshots/analytics.png)
+
+**Instellingen**
+![Settings](docs/screenshots/settings.png)
+
+**Grid Bot**
+![Grid](docs/screenshots/grid.png)
+
+**HODL DCA**
+![HODL](docs/screenshots/hodl.png)
+
+**Rapporten**
+![Reports](docs/screenshots/reports.png)
+
 ---
 
 ## Stap 1: Bitvavo account aanmaken
