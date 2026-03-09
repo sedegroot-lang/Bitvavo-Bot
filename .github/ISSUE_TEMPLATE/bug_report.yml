@@ -1,0 +1,75 @@
+name: 🐛 Bug Report
+description: Werkt iets niet zoals verwacht? Meld het hier.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Bedankt voor het melden! Vul de velden zo volledig mogelijk in, dan kunnen we het snel oplossen.
+
+  - type: textarea
+    id: beschrijving
+    attributes:
+      label: Wat gaat er mis?
+      description: Beschrijf wat er gebeurt en wat je verwacht dat er zou moeten gebeuren.
+      placeholder: "Bijv: De bot start niet op. Het venster opent en sluit meteen."
+    validations:
+      required: true
+
+  - type: textarea
+    id: stappen
+    attributes:
+      label: Stappen om het probleem te reproduceren
+      description: Hoe kan ik het probleem zelf ook zien?
+      placeholder: |
+        1. Dubbelklik start_automated.bat
+        2. ...
+        3. Fout verschijnt
+    validations:
+      required: true
+
+  - type: textarea
+    id: foutmelding
+    attributes:
+      label: Foutmelding (kopieer exact)
+      description: Kopieer de foutmelding uit het PowerShell-venster of log.
+      render: shell
+    validations:
+      required: false
+
+  - type: input
+    id: python_versie
+    attributes:
+      label: Python versie
+      description: Voer uit in terminal → `python --version`
+      placeholder: "Python 3.13.1"
+    validations:
+      required: true
+
+  - type: input
+    id: windows_versie
+    attributes:
+      label: Windows versie
+      placeholder: "Windows 11 / Windows 10"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: modus
+    attributes:
+      label: Bot modus
+      options:
+        - Live trading (echte orders)
+        - Test mode (geen echte orders)
+        - Weet ik niet
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra informatie
+      description: Schermafbeelding, relevante log-regels, of andere context.
+    validations:
+      required: false

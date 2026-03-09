@@ -1,0 +1,47 @@
+name: 💡 Feature Request
+description: Heb je een idee voor een nieuwe functie of verbetering?
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Goed idee! Beschrijf zo concreet mogelijk wat je wilt — dan staat het op de roadmap.
+
+  - type: textarea
+    id: idee
+    attributes:
+      label: Wat wil je toevoegen?
+      description: Beschrijf het gewenste gedrag zo concreet mogelijk.
+      placeholder: "Bijv: Een melding via WhatsApp als een order wordt gevuld."
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Waarom is dit nuttig?
+      description: Welk probleem lost het op? Voor welke gebruikers?
+      placeholder: "Dit helpt mensen die geen Telegram gebruiken maar wel notificaties willen."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatieven
+    attributes:
+      label: Alternatieven die je al hebt overwogen
+      description: Wat doe je nu als workaround?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: prioriteit
+    attributes:
+      label: Hoe belangrijk is dit voor jou?
+      options:
+        - Essentieel — zonder dit gebruik ik de bot niet
+        - Groot — zou de bot veel beter maken
+        - Middel — nice to have
+        - Klein — kleine verbetering
+    validations:
+      required: false

@@ -1,5 +1,12 @@
 ﻿# 🤖 Bitvavo Trading Bot
 
+[![GitHub stars](https://img.shields.io/github/stars/sedegroot-lang/Bitvavo-Bot?style=social)](https://github.com/sedegroot-lang/Bitvavo-Bot/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/sedegroot-lang/Bitvavo-Bot)](https://github.com/sedegroot-lang/Bitvavo-Bot/issues)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)](#installatie)
+[![Release](https://img.shields.io/github/v/release/sedegroot-lang/Bitvavo-Bot)](https://github.com/sedegroot-lang/Bitvavo-Bot/releases)
+
 > **Laat de bot je crypto handelen — terwijl jij leeft.**
 
 Volledig geautomatiseerde crypto trading bot voor Bitvavo, speciaal gebouwd voor de Nederlandse markt. 100% gratis, open source, en draait op je eigen PC.
