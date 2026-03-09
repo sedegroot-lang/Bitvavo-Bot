@@ -23,7 +23,7 @@ De bot koopt en verkoopt crypto voor je op [Bitvavo](https://bitvavo.com/invite?
 De bot koopt in als de AI een goed instapmoment herkent. Zodra de prijs stijgt, beweegt de stop mee omhoog. Daalt de prijs na een stijging? Automatisch verkopen met winst. Je winst wordt beschermd, verliezen worden beperkt.
 
 **2. 💧 DCA Safety Buys (Dollar Cost Averaging)**
-Als een munt daalt na aankoop, koopt de bot automatisch bij op lagere niveaus — zodat je gemiddelde aankoopprijs daalt. Tot 9 bijkopen mogelijk. Bij herstel van de prijs staat de bot daardoor sneller in de winst.
+Als een munt daalt na aankoop, koopt de bot automatisch bij op lagere niveaus — zodat je gemiddelde aankoopprijs daalt. Bijkopen is vrij instelbaar, hoevaak, hoeveel. Bij herstel van de prijs staat de bot daardoor sneller in de winst.
 
 **3. 📊 Grid Bot**
 In zijwaartse markten verdient de bot door te kopen op support-niveaus en te verkopen op resistance-niveaus. Pakt kleine winsten bij elk op-en-neer.
