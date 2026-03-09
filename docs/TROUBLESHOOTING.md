@@ -12,9 +12,11 @@ Common issues and solutions for the Bitvavo Trading Bot.
 # Remove stale PID files
 Remove-Item -Path "data\*.pid" -Force
 Remove-Item -Path "locks\*.lock" -Force
+```
 
-# Restart bot
-python scripts\startup\start_bot.py
+Start de bot opnieuw via:
+```
+start_automated.bat
 ```
 
 ### Problem: Import errors
@@ -46,19 +48,22 @@ BITVAVO_API_SECRET=your_secret_here
 ## 📊 Dashboard Issues
 
 ### Problem: Dashboard won't load
-**Cause:** Port conflict or Streamlit not installed.
+**Cause:** Port conflict of Flask niet gestart.
 
 **Solution:**
 ```powershell
-# Check if port 8501 is in use
-netstat -an | Select-String ":8501"
+# Check if port 5001 is in use
+netstat -an | Select-String ":5001"
 
 # Kill conflicting process
 Stop-Process -Id <PID> -Force
-
-# Restart dashboard
-.\.venv\Scripts\streamlit run tools\dashboard\dashboard_streamlit.py
 ```
+
+Start de bot opnieuw (dashboard start mee):
+```
+start_automated.bat
+```
+Dashboard: **http://localhost:5001**
 
 ### Problem: Dashboard is slow
 **Cause:** Too many API calls or large data files.
@@ -186,7 +191,7 @@ python ai\xgb_auto_train.py
 **Solution:**
 ```powershell
 # Force sync
-python scripts\helpers\sync_from_bitvavo.py
+python scripts\quick_sync_bitvavo.py
 
 # Check sync settings
 # SYNC_ENABLED: true
@@ -312,8 +317,8 @@ Get-Content logs\bot_log.txt -Wait -Tail 50
 2. **Check heartbeat:** `data/heartbeat.json`
 3. **Run diagnostics:**
    ```powershell
-   python scripts\helpers\check_processes.py
-   python scripts\helpers\analyze_bot_deep.py
+   python check_orders.py
+   python check_balance.py
    ```
 4. **Review recent changes:** `git log --oneline -10`
 
@@ -335,7 +340,7 @@ Remove-Item locks\* -Force
 '{"open_trades":{},"closed_trades":[]}' | Out-File data\trade_log.json -Encoding utf8
 
 # Restart
-python scripts\startup\start_bot.py
+start_automated.bat
 ```
 
 ### Factory Reset (fresh install)

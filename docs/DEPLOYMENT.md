@@ -67,7 +67,7 @@ start_automated.bat
 Dit start:
 1. `trailing_bot.py` — hoofdbot
 2. `ai/ai_supervisor.py` — AI parameter tuner
-3. `modules/dashboard_service.py` — web dashboard (port 5000)
+3. Flask dashboard (port 5001) — automatisch gestart
 
 ### Handmatig
 
@@ -87,7 +87,7 @@ Zie `docker-compose.yml` voor services en ports.
 
 ## Dashboard
 
-Open `http://localhost:5000` na starten. Features:
+Open `http://localhost:5001` na starten. Features:
 - Live trades overzicht
 - P&L grafiek
 - Config editor

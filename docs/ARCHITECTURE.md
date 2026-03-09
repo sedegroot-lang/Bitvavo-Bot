@@ -66,6 +66,7 @@ Zie [docs/CONFIG_REFERENCE.md](CONFIG_REFERENCE.md) voor alle keys.
 
 ## Dashboard
 
-- Flask-based web dashboard op port 5000
+- Flask-based web dashboard op port **5001**
 - Real-time trade status, P&L, market scores
 - Config editor met save functionaliteit
+- Access: **http://localhost:5001**
