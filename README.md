@@ -86,7 +86,7 @@ Het dashboard draait lokaal op **http://localhost:5001**:
 
 ## Stap 1: Bitvavo account aanmaken
 
-Registreer via [bitvavo.com/invite?a=B8942E4528](https://bitvavo.com/invite?a=B8942E4528) (affiliate link, voor jou verandert er niets).
+Registreer via [bitvavo.com/invite?a=B8942E4528](https://bitvavo.com/invite?a=B8942E4528) (affiliate link — je eerste €10.000 aan trades zijn zonder kosten).
 
 Bitvavo is de grootste Nederlandse cryptobeurs, met lage kosten (0,00% tot 0,25%) en een DNB-vergunning. Registratie is gratis en binnen 5 minuten klaar.
 
