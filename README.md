@@ -2,7 +2,20 @@
 
 Geautomatiseerde cryptocurrency trading bot voor het Bitvavo platform met AI-gestuurde strategie optimalisatie — DCA, trailing stop, grid trading en XGBoost-gebaseerde entry signals.
 
-> ⚠️ **Vereiste:** Je hebt een Bitvavo account nodig om deze bot te kunnen gebruiken.
+---
+
+## 🏦 Nog geen Bitvavo account?
+
+> ### 👉 [Registreer GRATIS via onze link](https://bitvavo.com/invite?a=B8942E4528)
+> **https://bitvavo.com/invite?a=B8942E4528**
+>
+> - ✅ 100% gratis — geen kosten voor registratie
+> - ✅ Bitvavo is de **#1 crypto exchange van Nederland**
+> - ✅ Laagste handelskosten: **0,00% – 0,25%**
+> - ✅ Gereguleerd en veilig (DNB-vergunning)
+> - ✅ Vereist voor gebruik van deze bot
+>
+> **Al een account?** Ga direct naar installatie hieronder.
 
 ---
 
@@ -10,7 +23,7 @@ Geautomatiseerde cryptocurrency trading bot voor het Bitvavo platform met AI-ges
 
 ### Installatie — 2 stappen
 
-**Stap 1** — [Download de bot](https://github.com/sedegroot-lang/bitvavo-bot/archive/refs/heads/main.zip) en pak het ZIP-bestand uit
+**Stap 1** — [Download de bot](https://github.com/sedegroot-lang/Bitvavo-Bot/archive/refs/heads/main.zip) en pak het ZIP-bestand uit
 
 **Stap 2** — Dubbelklik **`setup.bat`**
 
@@ -21,14 +34,7 @@ De wizard regelt de rest:
 - ✅ Maakt `.env` aan
 - ✅ Vraagt of je de bot direct wil starten
 
-> **Vereiste:** Python 3.11+ — [download hier](https://www.python.org/downloads/) (vink "Add to PATH" aan)
-
----
-
-### Geen Bitvavo account?
-
-Registreer gratis via: 👉 **[https://bitvavo.com/invite?a=B8942E4528](https://bitvavo.com/invite?a=B8942E4528)**
-Bitvavo is de #1 crypto exchange van Nederland (0,00%–0,25% kosten).
+> **Vereiste:** Python 3.11+ — [download hier](https://www.python.org/downloads/) (vink "Add to PATH" aan bij installatie)
 
 ---
 
