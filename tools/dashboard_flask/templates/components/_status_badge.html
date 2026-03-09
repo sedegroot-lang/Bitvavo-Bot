@@ -1,0 +1,48 @@
+{# Status Badge Component #}
+
+{% macro badge(text, variant='neutral', size='md') %}
+<span class="badge badge--{{ variant }} badge--{{ size }}">
+    {{ text }}
+</span>
+{% endmacro %}
+
+
+{% macro status_badge(status, show_dot=True) %}
+{% set variants = {
+    'online': {'class': 'success', 'text': 'Online', 'icon': '🟢'},
+    'offline': {'class': 'danger', 'text': 'Offline', 'icon': '🔴'},
+    'active': {'class': 'success', 'text': 'Active', 'icon': '✓'},
+    'trailing': {'class': 'info', 'text': 'Trailing', 'icon': '📈'},
+    'dca': {'class': 'warning', 'text': 'DCA', 'icon': '🔄'},
+    'pending': {'class': 'warning', 'text': 'Pending', 'icon': '⏳'},
+    'error': {'class': 'danger', 'text': 'Error', 'icon': '⚠️'},
+    'paused': {'class': 'muted', 'text': 'Paused', 'icon': '⏸️'},
+} %}
+{% set config = variants.get(status, {'class': 'neutral', 'text': status, 'icon': ''}) %}
+
+<span class="status-badge status-badge--{{ config.class }}">
+    {% if show_dot %}
+    <span class="status-badge__dot"></span>
+    {% endif %}
+    <span class="status-badge__text">{{ config.text }}</span>
+</span>
+{% endmacro %}
+
+
+{% macro connection_indicator(connected=True) %}
+<span class="connection-indicator connection-indicator--{{ 'online' if connected else 'offline' }}" id="connection-status">
+    <span class="connection-indicator__dot"></span>
+    <span class="connection-indicator__text">{{ 'Connected' if connected else 'Disconnected' }}</span>
+</span>
+{% endmacro %}
+
+
+{% macro pnl_badge(value, show_percent=False, percent=0) %}
+{% set is_positive = value >= 0 %}
+<span class="pnl-badge pnl-badge--{{ 'positive' if is_positive else 'negative' }}">
+    {{ '+' if is_positive else '' }}€{{ "%.2f"|format(value) }}
+    {% if show_percent %}
+    <span class="pnl-badge__pct">({{ '+' if percent >= 0 else '' }}{{ "%.1f"|format(percent) }}%)</span>
+    {% endif %}
+</span>
+{% endmacro %}

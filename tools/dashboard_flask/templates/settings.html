@@ -1,0 +1,1123 @@
+{% extends "base.html" %}
+
+{% block title %}⚙️ Settings - Bitvavo Bot{% endblock %}
+
+{% block content %}
+<div class="glass-panel hero-banner">
+    <div class="hero-content">
+        <div class="hero-subtitle">CONFIGURATION & PREFERENCES</div>
+        <h1 class="hero-title">⚙️ Settings & Preferences</h1>
+        <div class="hero-tags">
+            <span class="hero-tag tag-charts">🎨 Theme</span>
+            <span class="hero-tag tag-live">📐 Layout</span>
+            <span class="hero-tag tag-alerts">🔧 Preferences</span>
+        </div>
+    </div>
+</div>
+
+<!-- Security & API Status -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>🔐 Security & API Status</h2>
+    </div>
+    
+    <div class="settings-section">
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>🔑 Bitvavo API Key</h4>
+                <p>API key status for exchange connection</p>
+            </div>
+            <div class="setting-control">
+                {% if api_key_status %}
+                <span class="status-badge status-success">
+                    <span class="status-dot"></span>
+                    ✅ Configured
+                </span>
+                {% else %}
+                <span class="status-badge status-error">
+                    <span class="status-dot"></span>
+                    ❌ Not Set
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>🔒 API Secret</h4>
+                <p>Secret key for authenticated requests</p>
+            </div>
+            <div class="setting-control">
+                {% if api_secret_status %}
+                <span class="status-badge status-success">
+                    <span class="status-dot"></span>
+                    ✅ Configured
+                </span>
+                {% else %}
+                <span class="status-badge status-error">
+                    <span class="status-dot"></span>
+                    ❌ Not Set
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>📡 Exchange Connection</h4>
+                <p>Live connection to Bitvavo exchange</p>
+            </div>
+            <div class="setting-control">
+                {% if exchange_connected %}
+                <span class="status-badge status-success">
+                    <span class="status-dot pulse"></span>
+                    🟢 Connected
+                </span>
+                {% else %}
+                <span class="status-badge status-warning">
+                    <span class="status-dot"></span>
+                    🟡 Disconnected
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>🤖 Bot Status</h4>
+                <p>Trading bot heartbeat status</p>
+            </div>
+            <div class="setting-control">
+                {% if bot_online %}
+                <span class="status-badge status-success">
+                    <span class="status-dot pulse"></span>
+                    🟢 Online
+                </span>
+                {% else %}
+                <span class="status-badge status-error">
+                    <span class="status-dot"></span>
+                    🔴 Offline
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>🧠 AI Supervisor</h4>
+                <p>AI analysis service status</p>
+            </div>
+            <div class="setting-control">
+                {% if ai_online %}
+                <span class="status-badge status-success">
+                    <span class="status-dot pulse"></span>
+                    🟢 Active
+                </span>
+                {% else %}
+                <span class="status-badge status-warning">
+                    <span class="status-dot"></span>
+                    🟡 Inactive
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>📋 .env File</h4>
+                <p>Environment configuration file</p>
+            </div>
+            <div class="setting-control">
+                {% if env_file_exists %}
+                <span class="status-badge status-success">
+                    ✅ Present
+                </span>
+                {% else %}
+                <span class="status-badge status-error">
+                    ❌ Missing
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Deposit Management -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>💰 Stortingen Beheren</h2>
+        <div class="section-actions">
+            <button class="btn btn-sm btn-secondary" onclick="syncDepositsFromBitvavo()">🔄 Sync met Bitvavo</button>
+            <button class="btn btn-sm btn-success" onclick="showAddDepositModal()">➕ Storting Toevoegen</button>
+        </div>
+    </div>
+    
+    <div class="settings-section">
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Totaal Gestort</h4>
+                <p>Som van alle stortingen op Bitvavo</p>
+            </div>
+            <div class="setting-control">
+                <span class="value-large" id="total-deposited-display">€{{ "%.2f"|format(total_deposited or 0) }}</span>
+            </div>
+        </div>
+        
+        <!-- Deposits Table -->
+        <div class="deposits-table-container" style="margin-top: 1rem;">
+            <table class="deposits-table" id="deposits-table">
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Bedrag</th>
+                        <th>Notitie</th>
+                        <th>Acties</th>
+                    </tr>
+                </thead>
+                <tbody id="deposits-tbody">
+                    {% for dep in deposits %}
+                    <tr data-timestamp="{{ dep.timestamp }}">
+                        <td>{{ dep.date }}</td>
+                        <td>€{{ "%.2f"|format(dep.amount) }}</td>
+                        <td>{{ dep.note or '-' }}</td>
+                        <td>
+                            <button class="btn btn-xs btn-secondary" onclick="editDeposit({{ dep.timestamp }}, {{ dep.amount }}, '{{ dep.date }}', '{{ dep.note|default('', true)|replace("'", "\\'") }}')" title="Bewerken">✏️</button>
+                            <button class="btn btn-xs btn-danger" onclick="deleteDeposit({{ dep.timestamp }})" title="Verwijderen">🗑️</button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: #94a3b8;">Geen stortingen gevonden</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- Add/Edit Deposit Modal -->
+<div id="deposit-modal" class="modal" style="display: none;">
+    <div class="modal-content glass-panel" style="max-width: 400px;">
+        <div class="modal-header">
+            <h3 id="deposit-modal-title">💰 Storting Toevoegen</h3>
+            <button class="modal-close" onclick="closeDepositModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="deposit-timestamp" value="">
+            <div class="form-group">
+                <label for="deposit-amount">Bedrag (€)</label>
+                <input type="number" id="deposit-amount" class="form-control" step="0.01" min="0.01" placeholder="100.00" required>
+            </div>
+            <div class="form-group">
+                <label for="deposit-date">Datum</label>
+                <input type="date" id="deposit-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="deposit-note">Notitie (optioneel)</label>
+                <input type="text" id="deposit-note" class="form-control" placeholder="Bijv: Maandelijkse storting">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeDepositModal()">Annuleren</button>
+            <button class="btn btn-success" onclick="saveDeposit()">💾 Opslaan</button>
+        </div>
+    </div>
+</div>
+
+<!-- Theme Settings -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>🎨 Appearance</h2>
+    </div>
+    
+    <div class="settings-section">
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Theme</h4>
+                <p>Choose your preferred color theme</p>
+            </div>
+            <div class="setting-control">
+                <div class="theme-selector">
+                    <button class="theme-option {{ 'active' if current_theme == 'dark' else '' }}" 
+                            data-theme="dark" 
+                            onclick="setTheme('dark')">
+                        <div class="theme-preview dark-preview"></div>
+                        <span>🌙 Dark</span>
+                    </button>
+                    <button class="theme-option {{ 'active' if current_theme == 'light' else '' }}" 
+                            data-theme="light" 
+                            onclick="setTheme('light')">
+                        <div class="theme-preview light-preview"></div>
+                        <span>☀️ Light</span>
+                    </button>
+                    <button class="theme-option {{ 'active' if current_theme == 'auto' else '' }}" 
+                            data-theme="auto" 
+                            onclick="setTheme('auto')">
+                        <div class="theme-preview auto-preview"></div>
+                        <span>🔄 Auto</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Accent Color</h4>
+                <p>Primary accent color for highlights and buttons</p>
+            </div>
+            <div class="setting-control">
+                <div class="color-picker">
+                    <button class="color-swatch" style="background: #3B82F6" onclick="setAccentColor('#3B82F6')"></button>
+                    <button class="color-swatch" style="background: #10B981" onclick="setAccentColor('#10B981')"></button>
+                    <button class="color-swatch" style="background: #F59E0B" onclick="setAccentColor('#F59E0B')"></button>
+                    <button class="color-swatch" style="background: #EF4444" onclick="setAccentColor('#EF4444')"></button>
+                    <button class="color-swatch" style="background: #8B5CF6" onclick="setAccentColor('#8B5CF6')"></button>
+                    <button class="color-swatch" style="background: #EC4899" onclick="setAccentColor('#EC4899')"></button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Font Size</h4>
+                <p>Adjust text size for better readability</p>
+            </div>
+            <div class="setting-control">
+                <select class="form-select" id="font-size-select" onchange="setFontSize(this.value)">
+                    <option value="small">Small</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="large">Large</option>
+                    <option value="xlarge">Extra Large</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Layout Settings -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📐 Layout</h2>
+    </div>
+    
+    <div class="settings-section">
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Sidebar</h4>
+                <p>Show or hide navigation sidebar</p>
+            </div>
+            <div class="setting-control">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-sidebar" checked onchange="toggleSidebar()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Compact Mode</h4>
+                <p>Reduce spacing for more content on screen</p>
+            </div>
+            <div class="setting-control">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-compact" onchange="toggleCompact()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Dashboard Cards</h4>
+                <p>Number of columns for card grid layout</p>
+            </div>
+            <div class="setting-control">
+                <select class="form-select" id="card-columns-select" onchange="setCardColumns(this.value)">
+                    <option value="2">2 Columns</option>
+                    <option value="3" selected>3 Columns</option>
+                    <option value="4">4 Columns</option>
+                    <option value="auto">Auto</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Live Price Updates</h4>
+                <p>Auto-refresh interval for live prices</p>
+            </div>
+            <div class="setting-control">
+                <select class="form-select" id="refresh-interval-select" onchange="setRefreshInterval(this.value)">
+                    <option value="5">5 seconds</option>
+                    <option value="10" selected>10 seconds</option>
+                    <option value="30">30 seconds</option>
+                    <option value="60">1 minute</option>
+                    <option value="0">Disabled</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Dashboard Preferences -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>🔧 Dashboard Preferences</h2>
+    </div>
+    
+    <div class="settings-section">
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Default Page</h4>
+                <p>Page to open when dashboard loads</p>
+            </div>
+            <div class="setting-control">
+                <select class="form-select" id="default-page-select">
+                    <option value="/">Dashboard</option>
+                    <option value="/portfolio">Portfolio</option>
+                    <option value="/performance">Performance</option>
+                    <option value="/analytics">Analytics</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Show Tooltips</h4>
+                <p>Display helpful tooltips on hover</p>
+            </div>
+            <div class="setting-control">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-tooltips" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Animations</h4>
+                <p>Enable smooth transitions and animations</p>
+            </div>
+            <div class="setting-control">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-animations" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Number Format</h4>
+                <p>Currency and number display format</p>
+            </div>
+            <div class="setting-control">
+                <select class="form-select" id="number-format-select">
+                    <option value="eu">European (1.234,56 €)</option>
+                    <option value="us">US ($1,234.56)</option>
+                    <option value="uk">UK (£1,234.56)</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Chart Style</h4>
+                <p>Default chart visualization style</p>
+            </div>
+            <div class="setting-control">
+                <select class="form-select" id="chart-style-select">
+                    <option value="line">Line Charts</option>
+                    <option value="area">Area Charts</option>
+                    <option value="bar">Bar Charts</option>
+                    <option value="candlestick">Candlestick</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Data & Privacy -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>🔒 Data & Privacy</h2>
+    </div>
+    
+    <div class="settings-section">
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Cache Data</h4>
+                <p>Store data locally for faster loading</p>
+            </div>
+            <div class="setting-control">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-cache" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Clear Cache</h4>
+                <p>Remove all cached data and force refresh</p>
+            </div>
+            <div class="setting-control">
+                <button class="btn btn-secondary" onclick="clearCache()">🗑️ Clear Cache</button>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Export Settings</h4>
+                <p>Download your current settings as JSON</p>
+            </div>
+            <div class="setting-control">
+                <button class="btn btn-secondary" onclick="exportSettings()">📥 Export</button>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Import Settings</h4>
+                <p>Restore settings from JSON file</p>
+            </div>
+            <div class="setting-control">
+                <input type="file" id="import-settings-file" accept=".json" style="display: none;" onchange="importSettings(this)">
+                <button class="btn btn-secondary" onclick="document.getElementById('import-settings-file').click()">📤 Import</button>
+            </div>
+        </div>
+        
+        <div class="setting-row">
+            <div class="setting-info">
+                <h4>Reset Settings</h4>
+                <p>Restore all settings to default values</p>
+            </div>
+            <div class="setting-control">
+                <button class="btn btn-danger" onclick="resetSettings()">↺ Reset to Defaults</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+.settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.setting-row:last-child {
+    border-bottom: none;
+}
+
+.setting-info {
+    flex: 1;
+}
+
+.setting-info h4 {
+    margin: 0 0 var(--spacing-xs);
+    font-size: 0.95rem;
+}
+
+.setting-info p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.setting-control {
+    flex-shrink: 0;
+}
+
+.theme-selector {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.theme-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm);
+    background: var(--bg-card);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.theme-option:hover {
+    border-color: var(--accent-primary);
+}
+
+.theme-option.active {
+    border-color: var(--accent-primary);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.theme-preview {
+    width: 60px;
+    height: 40px;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+.dark-preview {
+    background: linear-gradient(135deg, #1F2937 50%, #111827 50%);
+}
+
+.light-preview {
+    background: linear-gradient(135deg, #F3F4F6 50%, #FFFFFF 50%);
+}
+
+.auto-preview {
+    background: linear-gradient(135deg, #1F2937 50%, #F3F4F6 50%);
+}
+
+.color-picker {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.color-swatch {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid var(--border-color);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+    border-color: white;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #4B5563;
+    transition: 0.4s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+    background-color: var(--accent-primary);
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
+
+.form-select {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #DC2626;
+}
+
+/* Security Status Badge Styles */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.status-badge.status-success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10B981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-badge.status-error {
+    background: rgba(239, 68, 68, 0.15);
+    color: #EF4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.status-badge.status-warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #F59E0B;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.status-dot.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+/* Deposits Management Styles */
+.section-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.value-large {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--success);
+}
+
+.deposits-table-container {
+    overflow-x: auto;
+}
+
+.deposits-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.deposits-table th,
+.deposits-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.deposits-table th {
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+}
+
+.deposits-table tbody tr:hover {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.btn-xs {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 4px;
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    padding: 1.5rem;
+    border-radius: 12px;
+    width: 90%;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.modal-body {
+    margin-bottom: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+</style>
+
+<script>
+// Load saved settings on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadSettings();
+});
+
+function loadSettings() {
+    const settings = JSON.parse(localStorage.getItem('dashboard_settings') || '{}');
+    
+    // Apply saved theme
+    if (settings.theme) {
+        setTheme(settings.theme, false);
+    }
+    
+    // Apply saved font size
+    if (settings.fontSize) {
+        const fontSelect = document.getElementById('font-size-select');
+        if (fontSelect) fontSelect.value = settings.fontSize;
+        setFontSize(settings.fontSize, false);
+    }
+    
+    // Apply saved accent color
+    if (settings.accentColor) {
+        setAccentColor(settings.accentColor, false);
+    }
+    
+    // Apply compact mode
+    if (settings.compactMode) {
+        document.body.classList.add('compact-mode');
+    }
+    
+    // Apply card columns
+    if (settings.cardColumns) {
+        document.documentElement.style.setProperty('--card-columns', settings.cardColumns === 'auto' ? 'auto-fit' : settings.cardColumns);
+    }
+    
+    // Apply refresh interval
+    if (settings.refreshInterval) {
+        window.priceRefreshInterval = parseInt(settings.refreshInterval) * 1000;
+    }
+    
+    console.log('[Settings] Loaded:', Object.keys(settings).length, 'settings');
+}
+
+function setTheme(theme, save = true) {
+    document.querySelectorAll('.theme-option').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-theme="${theme}"]`).classList.add('active');
+    
+    if (theme === 'auto') {
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    } else {
+        document.documentElement.setAttribute('data-theme', theme);
+    }
+    
+    if (save) {
+        saveSettings({ theme });
+    }
+}
+
+function setAccentColor(color, save = true) {
+    document.documentElement.style.setProperty('--accent-primary', color);
+    
+    if (save) {
+        saveSettings({ accentColor: color });
+    }
+}
+
+function setFontSize(size, save = true) {
+    const fontSizes = {
+        small: '14px',
+        medium: '16px',
+        large: '18px',
+        xlarge: '20px'
+    };
+    
+    document.documentElement.style.fontSize = fontSizes[size] || '16px';
+    
+    if (save) {
+        saveSettings({ fontSize: size });
+    }
+}
+
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+        sidebar.classList.toggle('hidden');
+    }
+}
+
+function toggleCompact() {
+    document.body.classList.toggle('compact-mode');
+    saveSettings({ compactMode: document.body.classList.contains('compact-mode') });
+}
+
+function setCardColumns(columns) {
+    document.documentElement.style.setProperty('--card-columns', columns === 'auto' ? 'auto-fit' : columns);
+    saveSettings({ cardColumns: columns });
+}
+
+function setRefreshInterval(seconds) {
+    window.priceRefreshInterval = parseInt(seconds) * 1000;
+    saveSettings({ refreshInterval: seconds });
+}
+
+async function clearCache() {
+    const ok = await apexConfirm('Cache wissen', 'Alle gecachte data verwijderen? De pagina wordt herladen.');
+    if (ok) {
+        localStorage.clear();
+        sessionStorage.clear();
+        location.reload();
+    }
+}
+
+function exportSettings() {
+    const settings = JSON.parse(localStorage.getItem('dashboard_settings') || '{}');
+    const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'dashboard_settings.json';
+    a.click();
+}
+
+function importSettings(input) {
+    const file = input.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const settings = JSON.parse(e.target.result);
+                localStorage.setItem('dashboard_settings', JSON.stringify(settings));
+                apexToast('Instellingen ge\u00EFmporteerd! Pagina wordt herladen...', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } catch (error) {
+                apexToast('Ongeldig instellingenbestand', 'error');
+            }
+        };
+        reader.readAsText(file);
+    }
+}
+
+async function resetSettings() {
+    const ok = await apexConfirm('Standaardwaarden', 'Alle instellingen terugzetten naar standaard? De pagina wordt herladen.');
+    if (ok) {
+        localStorage.removeItem('dashboard_settings');
+        location.reload();
+    }
+}
+
+function saveSettings(updates) {
+    const settings = JSON.parse(localStorage.getItem('dashboard_settings') || '{}');
+    Object.assign(settings, updates);
+    localStorage.setItem('dashboard_settings', JSON.stringify(settings));
+    console.log('[Settings] Saved:', settings);
+}
+
+// =====================================================
+// DEPOSIT MANAGEMENT FUNCTIONS
+// =====================================================
+
+function showAddDepositModal() {
+    document.getElementById('deposit-modal-title').textContent = '💰 Storting Toevoegen';
+    document.getElementById('deposit-timestamp').value = '';
+    document.getElementById('deposit-amount').value = '';
+    document.getElementById('deposit-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('deposit-note').value = '';
+    document.getElementById('deposit-modal').style.display = 'flex';
+}
+
+function editDeposit(timestamp, amount, date, note) {
+    document.getElementById('deposit-modal-title').textContent = '✏️ Storting Bewerken';
+    document.getElementById('deposit-timestamp').value = timestamp;
+    document.getElementById('deposit-amount').value = amount;
+    document.getElementById('deposit-date').value = date;
+    document.getElementById('deposit-note').value = note || '';
+    document.getElementById('deposit-modal').style.display = 'flex';
+}
+
+function closeDepositModal() {
+    document.getElementById('deposit-modal').style.display = 'none';
+}
+
+async function saveDeposit() {
+    const timestamp = document.getElementById('deposit-timestamp').value;
+    const amount = parseFloat(document.getElementById('deposit-amount').value);
+    const date = document.getElementById('deposit-date').value;
+    const note = document.getElementById('deposit-note').value;
+    
+    if (!amount || amount <= 0) {
+        apexToast('Voer een geldig bedrag in', 'warning');
+        return;
+    }
+    if (!date) {
+        apexToast('Selecteer een datum', 'warning');
+        return;
+    }
+    
+    try {
+        const endpoint = timestamp ? '/api/deposits/update' : '/api/deposits/add';
+        const payload = { amount, date, note };
+        if (timestamp) payload.timestamp = parseInt(timestamp);
+        
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        const result = await response.json();
+        if (result.status === 'ok') {
+            closeDepositModal();
+            apexToast('Storting opgeslagen!', 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            apexToast('Fout: ' + (result.error || 'Onbekende fout'), 'error');
+        }
+    } catch (error) {
+        console.error('Save deposit error:', error);
+        apexToast('Fout bij opslaan: ' + error.message, 'error');
+    }
+}
+
+async function deleteDeposit(timestamp) {
+    const ok = await apexConfirm('Storting verwijderen', 'Weet je zeker dat je deze storting wilt verwijderen?');
+    if (!ok) return;
+    
+    try {
+        const response = await fetch('/api/deposits/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timestamp })
+        });
+        
+        const result = await response.json();
+        if (result.status === 'ok') {
+            apexToast('Storting verwijderd', 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            apexToast('Fout: ' + (result.error || 'Onbekende fout'), 'error');
+        }
+    } catch (error) {
+        console.error('Delete deposit error:', error);
+        apexToast('Fout bij verwijderen: ' + error.message, 'error');
+    }
+}
+
+async function syncDepositsFromBitvavo(event) {
+    try {
+        const btn = event?.target || document.querySelector('[onclick*="syncDeposits"]');
+        btn.disabled = true;
+        btn.textContent = '⏳ Synchroniseren...';
+        
+        const response = await fetch('/api/deposits/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const result = await response.json();
+        if (result.status === 'ok') {
+            apexToast('Stortingen gesynchroniseerd! Totaal: €' + result.total_deposited_eur.toFixed(2), 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            apexToast('Fout: ' + (result.error || 'Onbekende fout'), 'error');
+            btn.disabled = false;
+            btn.textContent = '🔄 Sync met Bitvavo';
+        }
+    } catch (error) {
+        console.error('Sync deposits error:', error);
+        apexToast('Fout bij synchroniseren: ' + error.message, 'error');
+    }
+}
+
+// Close modal when clicking outside
+document.getElementById('deposit-modal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeDepositModal();
+});
+</script>
+{% endblock %}

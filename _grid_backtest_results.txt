@@ -1,0 +1,23 @@
+﻿======================================================================
+GRID BOT BACKTEST - COMPREHENSIVE ANALYSIS
+======================================================================
+python : Traceback (most recent call last):
+At line:1 char:53
++ ... neDrive\Dokumente\Bitvavo Bot"; python _grid_backtest.py 2>&1 | Out-F ...
++                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], Remote 
+   Exception
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\Sedeg\OneDrive\Dokumente\Bitvavo Bot\_grid_backtest.py", line 764, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\Sedeg\OneDrive\Dokumente\Bitvavo Bot\_grid_backtest.py", line 521, in main
+    print(f"\n{'\u2500' * 60}")
+    ~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sedeg\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, i
+n encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 2-61: character maps to <un
+defined>

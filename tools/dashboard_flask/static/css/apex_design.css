@@ -1,0 +1,1064 @@
+/* =====================================================
+   APEX DESIGN SYSTEM v1.0
+   Next-generation trading dashboard UI
+   Inspired by: Linear, Raycast, Arc Browser, Stripe
+   ===================================================== */
+
+/* =====================================================
+   1. ANIMATED PARTICLE NETWORK BACKGROUND
+   ===================================================== */
+
+#particle-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.4;
+}
+
+[data-theme="light"] #particle-canvas {
+    opacity: 0.15;
+}
+
+/* =====================================================
+   2. LIVE TICKER TAPE
+   ===================================================== */
+
+.ticker-tape-wrapper {
+    width: 100%;
+    overflow: hidden;
+    background: linear-gradient(90deg,
+        var(--bg-secondary) 0%,
+        rgba(22, 27, 34, 0.95) 5%,
+        rgba(22, 27, 34, 0.95) 95%,
+        var(--bg-secondary) 100%
+    );
+    border-bottom: 1px solid var(--border-primary, rgba(240, 246, 252, 0.1));
+    height: 36px;
+    display: flex;
+    align-items: center;
+    position: relative;
+    z-index: 50;
+}
+
+[data-theme="light"] .ticker-tape-wrapper {
+    background: linear-gradient(90deg,
+        var(--bg-secondary) 0%,
+        rgba(246, 248, 250, 0.95) 5%,
+        rgba(246, 248, 250, 0.95) 95%,
+        var(--bg-secondary) 100%
+    );
+}
+
+.ticker-tape-track {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    animation: ticker-slide 60s linear infinite;
+    will-change: transform;
+}
+
+.ticker-tape-track:hover {
+    animation-play-state: paused;
+}
+
+.ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 20px;
+    font-size: 0.75rem;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    white-space: nowrap;
+    border-right: 1px solid var(--border-primary, rgba(240, 246, 252, 0.06));
+    height: 36px;
+    cursor: default;
+    transition: background 0.15s ease;
+}
+
+.ticker-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.ticker-symbol {
+    font-weight: 600;
+    color: var(--text-primary, #f0f6fc);
+    font-size: 0.7rem;
+}
+
+.ticker-price {
+    color: var(--text-secondary, #8b949e);
+}
+
+.ticker-change {
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+}
+
+.ticker-change.up {
+    color: #16c784;
+    background: rgba(22, 199, 132, 0.1);
+}
+
+.ticker-change.down {
+    color: #ea3943;
+    background: rgba(234, 57, 67, 0.1);
+}
+
+.ticker-logo {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+}
+
+@keyframes ticker-slide {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+/* =====================================================
+   3. NOTIFICATION CENTER
+   ===================================================== */
+
+.notification-bell {
+    position: relative;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 8px;
+    transition: background 0.15s ease;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary, #8b949e);
+    font-size: 1.1rem;
+}
+
+.notification-bell:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary, #f0f6fc);
+}
+
+.notification-bell .badge-count {
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    background: #ea3943;
+    color: white;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-primary, #0d1117);
+    animation: badge-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes badge-pop {
+    0% { transform: scale(0); }
+    100% { transform: scale(1); }
+}
+
+.notification-panel {
+    position: fixed;
+    top: 0;
+    right: -380px;
+    width: 380px;
+    height: 100vh;
+    background: var(--bg-secondary, #161b22);
+    border-left: 1px solid var(--border-primary, rgba(240, 246, 252, 0.1));
+    z-index: 10001;
+    transition: right 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
+}
+
+.notification-panel.open {
+    right: 0;
+}
+
+.notification-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-primary, rgba(240, 246, 252, 0.1));
+}
+
+.notification-panel-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary, #f0f6fc);
+    margin: 0;
+}
+
+.notification-panel-close {
+    background: none;
+    border: none;
+    color: var(--text-tertiary, #6e7681);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+}
+
+.notification-panel-close:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary, #f0f6fc);
+}
+
+.notification-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.notification-entry {
+    display: flex;
+    gap: 12px;
+    padding: 14px 12px;
+    border-radius: 10px;
+    transition: background 0.15s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+.notification-entry:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.notification-entry.unread::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: var(--accent, #3861fb);
+    border-radius: 50%;
+}
+
+.notification-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.notification-icon.trade {
+    background: rgba(22, 199, 132, 0.12);
+}
+
+.notification-icon.alert {
+    background: rgba(234, 57, 67, 0.12);
+}
+
+.notification-icon.info {
+    background: rgba(56, 97, 251, 0.12);
+}
+
+.notification-icon.ai {
+    background: rgba(139, 92, 246, 0.12);
+}
+
+.notification-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-title {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-primary, #f0f6fc);
+    margin-bottom: 2px;
+}
+
+.notification-text {
+    font-size: 0.72rem;
+    color: var(--text-tertiary, #6e7681);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.notification-time {
+    font-size: 0.65rem;
+    color: var(--text-muted, #484f58);
+    margin-top: 4px;
+}
+
+.notification-panel-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.notification-panel-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* =====================================================
+   4. PAGE TRANSITION OVERLAY
+   ===================================================== */
+
+.page-transition-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9998;
+    pointer-events: none;
+    background: var(--bg-primary, #0d1117);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.page-transition-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* Content fade-in on load */
+.main-content {
+    animation: content-reveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes content-reveal {
+    0% {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Stagger child animations */
+.main-content > *:nth-child(1) { animation-delay: 0.05s; }
+.main-content > *:nth-child(2) { animation-delay: 0.1s; }
+.main-content > *:nth-child(3) { animation-delay: 0.15s; }
+.main-content > *:nth-child(4) { animation-delay: 0.2s; }
+.main-content > *:nth-child(5) { animation-delay: 0.25s; }
+.main-content > *:nth-child(6) { animation-delay: 0.3s; }
+
+.main-content > * {
+    animation: stagger-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes stagger-in {
+    0% {
+        opacity: 0;
+        transform: translateY(16px) scale(0.98);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* =====================================================
+   5. AMBIENT P&L GLOW
+   ===================================================== */
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 200px;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.6;
+    transition: background 1s ease;
+    background: radial-gradient(ellipse at 50% -20%, transparent 60%, transparent 100%);
+}
+
+body.pnl-positive::before {
+    background: radial-gradient(ellipse at 50% -20%, rgba(22, 199, 132, 0.08) 0%, transparent 60%);
+}
+
+body.pnl-negative::before {
+    background: radial-gradient(ellipse at 50% -20%, rgba(234, 57, 67, 0.08) 0%, transparent 60%);
+}
+
+/* =====================================================
+   6. SPARKLINE MINI CHARTS
+   ===================================================== */
+
+.sparkline-container {
+    width: 120px;
+    height: 40px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.sparkline-container canvas {
+    width: 100%;
+    height: 100%;
+}
+
+/* =====================================================
+   7. ENHANCED HERO CARDS - 3D Depth
+   ===================================================== */
+
+.hero-card {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gradient-primary, linear-gradient(135deg, #10b981 0%, #3b82f6 100%));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.hero-card:hover::before {
+    opacity: 1;
+}
+
+.hero-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+
+/* Hero card shimmer on hover */
+.hero-card::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+        45deg,
+        transparent 40%,
+        rgba(255, 255, 255, 0.03) 50%,
+        transparent 60%
+    );
+    transform: rotate(45deg) translateY(100%);
+    transition: transform 0.6s ease;
+    pointer-events: none;
+}
+
+.hero-card:hover::after {
+    transform: rotate(45deg) translateY(-100%);
+}
+
+/* Typed hero value glow */
+.hero-value {
+    position: relative;
+    text-shadow: 0 0 30px rgba(255, 255, 255, 0.08);
+}
+
+/* =====================================================
+   8. ENHANCED NAVIGATION - Pill Indicator
+   ===================================================== */
+
+.nav-tab {
+    position: relative;
+}
+
+.nav-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 2px;
+    background: var(--accent, #3861fb);
+    border-radius: 2px;
+    animation: pill-expand 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pill-expand {
+    0% { width: 0; opacity: 0; }
+    100% { width: 60%; opacity: 1; }
+}
+
+/* Nav hover effect */
+.nav-tab:not(.active):hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-tab:not(.active):hover::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20%;
+    height: 2px;
+    background: var(--text-muted, #484f58);
+    border-radius: 2px;
+    opacity: 0.5;
+}
+
+/* =====================================================
+   9. MODERNIZED STATUS BAR - Quantum Style
+   ===================================================== */
+
+.status-bar-quantum {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 8px 24px;
+    background: linear-gradient(180deg,
+        rgba(13, 17, 23, 0.95) 0%,
+        rgba(22, 27, 34, 0.9) 100%
+    );
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(240, 246, 252, 0.06);
+    font-size: 0.75rem;
+    z-index: 51;
+    position: relative;
+}
+
+[data-theme="light"] .status-bar-quantum {
+    background: linear-gradient(180deg,
+        rgba(255, 255, 255, 0.98) 0%,
+        rgba(246, 248, 250, 0.95) 100%
+    );
+}
+
+.status-bar-quantum .status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary, #8b949e);
+    font-size: 0.72rem;
+    background: none;
+    border: none;
+    padding: 4px 0;
+}
+
+.status-bar-quantum .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-bar-quantum .status-dot.active {
+    background: #16c784;
+    box-shadow: 0 0 8px rgba(22, 199, 132, 0.6);
+    animation: dot-breathe 2.5s ease-in-out infinite;
+}
+
+.status-bar-quantum .status-dot.inactive {
+    background: #484f58;
+}
+
+@keyframes dot-breathe {
+    0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(22, 199, 132, 0.6); }
+    50% { opacity: 0.6; box-shadow: 0 0 4px rgba(22, 199, 132, 0.3); }
+}
+
+/* =====================================================
+   10. QUANTUM TITLE - Premium Gradient Text
+   ===================================================== */
+
+.quantum-title-container {
+    text-align: center;
+    padding: 18px 0 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.quantum-title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    background: linear-gradient(
+        135deg,
+        #16c784 0%,
+        #3861fb 30%,
+        #8b5cf6 60%,
+        #f0b90b 100%
+    );
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradient-shift 8s ease infinite;
+    margin: 0;
+    display: inline-block;
+}
+
+@keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    25% { background-position: 100% 50%; }
+    50% { background-position: 100% 0%; }
+    75% { background-position: 0% 100%; }
+}
+
+/* Subtle underline decoration */
+.quantum-title-container::after {
+    content: '';
+    display: block;
+    width: 80px;
+    height: 2px;
+    margin: 8px auto 0;
+    background: linear-gradient(90deg, transparent, var(--accent, #3861fb), transparent);
+    border-radius: 2px;
+}
+
+/* =====================================================
+   11. SCROLL PROGRESS INDICATOR
+   ===================================================== */
+
+.scroll-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #16c784, #3861fb, #8b5cf6);
+    z-index: 10001;
+    transition: width 0.1s ease;
+    width: 0;
+}
+
+/* =====================================================
+   12. ENHANCED FOOTER
+   ===================================================== */
+
+.dashboard-footer {
+    background: linear-gradient(180deg,
+        var(--bg-secondary, #161b22) 0%,
+        var(--bg-primary, #0d1117) 100%
+    );
+    border-top: 1px solid var(--border-primary, rgba(240, 246, 252, 0.1));
+    padding: 12px 24px;
+    font-size: 0.72rem;
+    color: var(--text-muted, #484f58);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.footer-shortcuts kbd {
+    padding: 2px 6px;
+    background: var(--bg-tertiary, #21262d);
+    border: 1px solid var(--border-primary, rgba(240, 246, 252, 0.1));
+    border-radius: 4px;
+    font-family: var(--font-sans);
+    font-size: 0.65rem;
+    color: var(--text-tertiary, #6e7681);
+}
+
+/* =====================================================
+   13. DONUT CHART - Mini Allocation Visual
+   ===================================================== */
+
+.donut-chart-container {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.donut-chart-container canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.donut-center-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-primary, #f0f6fc);
+}
+
+/* =====================================================
+   14. CURSOR GLOW TRAIL
+   ===================================================== */
+
+.cursor-glow {
+    position: fixed;
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle,
+        rgba(56, 97, 251, 0.06) 0%,
+        transparent 70%
+    );
+    pointer-events: none;
+    z-index: -1;
+    transform: translate(-50%, -50%);
+    transition: left 0.3s ease, top 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+}
+
+.cursor-glow.active {
+    opacity: 1;
+}
+
+[data-theme="light"] .cursor-glow {
+    background: radial-gradient(
+        circle,
+        rgba(56, 97, 251, 0.03) 0%,
+        transparent 70%
+    );
+}
+
+/* =====================================================
+   15. ANIMATED DATA TABLE ROWS
+   ===================================================== */
+
+.data-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.data-table tbody tr:hover {
+    background: rgba(56, 97, 251, 0.04);
+    transform: scale(1.002);
+}
+
+.data-table tbody tr td {
+    transition: color 0.2s ease;
+}
+
+/* Flash row on update */
+.data-table tbody tr.flash-update {
+    animation: row-flash 0.6s ease;
+}
+
+@keyframes row-flash {
+    0% { background: rgba(56, 97, 251, 0.15); }
+    100% { background: transparent; }
+}
+
+/* =====================================================
+   16. GLASS PANEL ENHANCED
+   ===================================================== */
+
+.glass-panel {
+    background: linear-gradient(
+        135deg,
+        rgba(22, 27, 34, 0.9) 0%,
+        rgba(22, 27, 34, 0.7) 100%
+    );
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    border: 1px solid rgba(240, 246, 252, 0.08);
+    border-radius: 16px;
+    box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+[data-theme="light"] .glass-panel {
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.9) 0%,
+        rgba(255, 255, 255, 0.7) 100%
+    );
+    border-color: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.glass-panel:hover {
+    border-color: rgba(56, 97, 251, 0.15);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* =====================================================
+   17. STATUS CARDS ENHANCED ROW
+   ===================================================== */
+
+.status-cards-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.status-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-card, rgba(22, 27, 34, 0.8));
+    border: 1px solid var(--border-primary, rgba(240, 246, 252, 0.1));
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.status-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.status-card.status-online {
+    border-color: rgba(22, 199, 132, 0.2);
+}
+
+.status-card.status-online::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #16c784, #0ecb81);
+}
+
+.status-card.status-offline {
+    border-color: rgba(234, 57, 67, 0.15);
+}
+
+.status-card.status-offline::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #ea3943;
+    opacity: 0.5;
+}
+
+/* =====================================================
+   18. BUTTON SYSTEM ENHANCED
+   ===================================================== */
+
+.btn {
+    position: relative;
+    overflow: hidden;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn:active {
+    transform: scale(0.96);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #3861fb 0%, #5b7cfc 100%);
+    border: none;
+    color: white;
+    box-shadow: 0 2px 12px rgba(56, 97, 251, 0.3);
+}
+
+.btn-primary:hover {
+    box-shadow: 0 4px 20px rgba(56, 97, 251, 0.45);
+    transform: translateY(-1px);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #16c784 0%, #0ecb81 100%);
+    border: none;
+    color: white;
+    box-shadow: 0 2px 12px rgba(22, 199, 132, 0.3);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ea3943 0%, #f6465d 100%);
+    border: none;
+    color: white;
+    box-shadow: 0 2px 12px rgba(234, 57, 67, 0.3);
+}
+
+/* =====================================================
+   19. LIVE CLOCK
+   ===================================================== */
+
+.live-clock {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 0.72rem;
+    color: var(--text-tertiary, #6e7681);
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+/* =====================================================
+   20. PULSING LIVE INDICATOR
+   ===================================================== */
+
+.live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: rgba(22, 199, 132, 0.08);
+    border: 1px solid rgba(22, 199, 132, 0.2);
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #16c784;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.live-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #16c784;
+    animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+/* =====================================================
+   21. TRADE CARD SPARKLINE AREA
+   ===================================================== */
+
+.trade-card-chart-area {
+    padding: 0;
+    height: 60px;
+    position: relative;
+    overflow: hidden;
+    border-top: 1px solid var(--border-primary, rgba(240, 246, 252, 0.05));
+}
+
+.trade-card-chart-area canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* =====================================================
+   22. RESPONSIVE BREAKPOINTS ENHANCED
+   ===================================================== */
+
+@media (max-width: 1024px) {
+    .ticker-tape-wrapper {
+        height: 32px;
+    }
+    
+    .ticker-item {
+        padding: 0 14px;
+        font-size: 0.68rem;
+    }
+    
+    .notification-panel {
+        width: 320px;
+        right: -320px;
+    }
+}
+
+@media (max-width: 768px) {
+    .ticker-tape-wrapper {
+        display: none;
+    }
+    
+    .cursor-glow {
+        display: none;
+    }
+    
+    .notification-panel {
+        width: 100%;
+        right: -100%;
+    }
+    
+    .hero-card:hover {
+        transform: none;
+    }
+}
+
+/* =====================================================
+   23. PRINT STYLES
+   ===================================================== */
+
+@media print {
+    #particle-canvas,
+    .cursor-glow,
+    .ticker-tape-wrapper,
+    .scroll-progress,
+    .notification-panel,
+    .notification-panel-backdrop {
+        display: none !important;
+    }
+    
+    body::before {
+        display: none;
+    }
+    
+    .main-content > * {
+        animation: none !important;
+    }
+}
+
+/* =====================================================
+   24. CUSTOM SCROLLBAR (GLOBAL)
+   ===================================================== */
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+}

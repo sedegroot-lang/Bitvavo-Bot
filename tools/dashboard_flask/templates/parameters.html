@@ -1,0 +1,2168 @@
+{% extends "base.html" %}
+
+{% block title %}⚙️ Strategie & Parameters - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+
+{% block content %}
+<!-- Hero Banner - Quantum style -->
+<div class="glass-panel hero-banner">
+    <div class="hero-content">
+        <div class="hero-subtitle">BOT CONFIGURATION CENTER</div>
+        <div class="hero-title">⚙️ Strategie & Parameters</div>
+        <div class="hero-description">Trading strategy profiles • Parameter optimization • Risk settings</div>
+        <div class="hero-tags">
+            <span class="hero-tag tag-count">{{ strategy_profiles|length if strategy_profiles else '3' }} profiles</span>
+            <span class="hero-tag tag-trailing">{{ active_strategy|default('DCA Conservative', true) }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Hero Stats Grid -->
+<div class="hero-grid">
+    <div class="hero-card">
+        <div class="hero-label">🎯 ACTIVE STRATEGY</div>
+        <div class="hero-value" id="active-strategy">{{ active_strategy|default('DCA', true) }}</div>
+        <div class="hero-sub">Current profile</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">💾 PROFILES</div>
+        <div class="hero-value">{{ strategy_profiles|length if strategy_profiles else '3' }}</div>
+        <div class="hero-sub">Saved configurations</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">📊 RISK LEVEL</div>
+        <div class="hero-value">{{ risk_level if risk_level else 'MEDIUM' }}</div>
+        <div class="hero-sub">Current setting</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">⏰ LAST MODIFIED</div>
+        <div class="hero-value" id="last-modified">{{ last_modified|default('Today', true) }}</div>
+        <div class="hero-sub">Configuration change</div>
+    </div>
+</div>
+
+<!-- Strategy Profiles -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📋 Strategy Profiles</h2>
+        <button class="btn btn-primary btn-sm" onclick="createProfile()">➕ New Profile</button>
+    </div>
+    
+    <div class="profiles-grid">
+        {% for profile in strategy_profiles %}
+        <div class="profile-card {{ 'active' if profile.active }}">
+            <div class="profile-header">
+                <div class="profile-info">
+                    <h3>{{ profile.name }}</h3>
+                    <span class="profile-desc">{{ profile.description }}</span>
+                </div>
+                {% if profile.active %}
+                <span class="active-badge">✅ Active</span>
+                {% endif %}
+            </div>
+            <div class="profile-stats">
+                <div class="profile-stat">
+                    <span class="label">Win Rate</span>
+                    <span class="value">{{ "%.1f"|format(profile.win_rate|default(0, true)) }}%</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="label">Avg ROI</span>
+                    <span class="value">{{ "%.2f"|format(profile.avg_roi|default(0, true)) }}%</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="label">Trades</span>
+                    <span class="value">{{ profile.total_trades|default(0, true) }}</span>
+                </div>
+            </div>
+            <div class="profile-actions">
+                {% if not profile.active %}
+                <button class="btn btn-primary btn-sm" onclick="activateProfile('{{ profile.id }}')">
+                    ✅ Activate
+                </button>
+                {% endif %}
+                <button class="btn btn-secondary btn-sm" onclick="editProfile('{{ profile.id }}')">
+                    ✏️ Edit
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="deleteProfile('{{ profile.id }}')">
+                    🗑️ Delete
+                </button>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">No strategy profiles found. Create one to get started.</div>
+        {% endfor %}
+    </div>
+</section>
+
+<form class="params-form" id="strategy-form">
+<!-- Bot Identification & Core Settings -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>🤖 Bot Identificatie & Core Settings</h2>
+    </div>
+    
+    <div class="params-grid">
+        <!-- Bot Identification -->
+        <div class="param-field">
+            <div class="param-label-row">
+                <label class="form-label">🤖 Bot Identificatie</label>
+            </div>
+            <input type="text" class="form-input" name="bot_id" value="{{ params.bot_id|default('Bitvavo DCA Bot', true) }}">
+        </div>
+        
+        <div class="param-field">
+            <div class="param-label-row">
+                <label class="form-label">📊 Max Open Trades</label>
+                <div class="ai-toggle">
+                    <input type="checkbox" id="ai_max_trades" class="ai-checkbox" {{ 'checked' if 'max_open_trades' in ai_controlled }}>
+                    <label for="ai_max_trades" class="ai-switch"></label>
+                </div>
+            </div>
+            <div class="input-row">
+                <input type="number" class="form-input" name="max_open_trades" value="{{ params.max_open_trades|default(6, true) }}" min="1" max="20">
+                <div class="input-controls">
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('max_open_trades', -1)">−</button>
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('max_open_trades', 1)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="params-grid">
+        <!-- Start Order -->
+        <div class="param-field">
+            <div class="param-label-row">
+                <label class="form-label">💰 Start Order (EUR)</label>
+                <div class="ai-toggle">
+                    <input type="checkbox" id="ai_start_order" class="ai-checkbox" {{ 'checked' if 'start_order_eur' in ai_controlled }}>
+                    <label for="ai_start_order" class="ai-switch"></label>
+                </div>
+            </div>
+            <div class="input-row">
+                <input type="number" class="form-input" name="start_order_eur" value="{{ params.start_order_eur|default(7.2, true) }}" step="0.1">
+                <div class="input-controls">
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('start_order_eur', -0.5)">−</button>
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('start_order_eur', 0.5)">+</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Min Score Entry -->
+        <div class="param-field">
+            <div class="param-label-row">
+                <label class="form-label">📈 Min Score Entry (1-10)</label>
+                <div class="ai-toggle">
+                    <input type="checkbox" id="ai_min_score" class="ai-checkbox" {{ 'checked' if 'min_score_entry' in ai_controlled }}>
+                    <label for="ai_min_score" class="ai-switch"></label>
+                </div>
+            </div>
+            <div class="input-row">
+                <input type="number" class="form-input" name="min_score_entry" value="{{ params.min_score_entry|default(5, true) }}" min="1" max="10">
+                <div class="input-controls">
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('min_score_entry', -1)">−</button>
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('min_score_entry', 1)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="params-grid">
+        <!-- Minimale Entry -->
+        <div class="param-field">
+            <div class="param-label-row">
+                <label class="form-label">💵 Minimale Entry (EUR)</label>
+                <div class="ai-toggle">
+                    <input type="checkbox" id="ai_min_entry" class="ai-checkbox" {{ 'checked' if 'min_entry_eur' in ai_controlled }}>
+                    <label for="ai_min_entry" class="ai-switch"></label>
+                </div>
+            </div>
+            <div class="input-row">
+                <input type="number" class="form-input" name="min_entry_eur" value="{{ params.min_entry_eur|default(5, true) }}" step="0.5">
+                <div class="input-controls">
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('min_entry_eur', -0.5)">−</button>
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('min_entry_eur', 0.5)">+</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Max Exposure -->
+        <div class="param-field">
+            <div class="param-label-row">
+                <label class="form-label">📊 Max Exposure (EUR)</label>
+                <div class="ai-toggle">
+                    <input type="checkbox" id="ai_max_exposure" class="ai-checkbox" {{ 'checked' if 'max_exposure_eur' in ai_controlled }}>
+                    <label for="ai_max_exposure" class="ai-switch"></label>
+                </div>
+            </div>
+            <div class="input-row">
+                <input type="number" class="form-input" name="max_exposure_eur" value="{{ params.max_exposure_eur|default(350, true) }}" step="10">
+                <div class="input-controls">
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('max_exposure_eur', -10)">−</button>
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('max_exposure_eur', 10)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="params-grid">
+        <!-- Exchange Min Order -->
+        <div class="param-field">
+            <div class="param-label-row">
+                <label class="form-label">🏦 Exchange Min Order (EUR)</label>
+            </div>
+            <div class="input-row">
+                <input type="number" class="form-input" name="exchange_min_order" value="{{ params.exchange_min_order|default(5, true) }}" step="0.5">
+            </div>
+        </div>
+        
+        <!-- Min Balance Reserve -->
+        <div class="param-field">
+            <div class="param-label-row">
+                <label class="form-label">💰 Min Balance Reserve (EUR)</label>
+                <div class="ai-toggle">
+                    <input type="checkbox" id="ai_min_balance" class="ai-checkbox" {{ 'checked' if 'min_balance_eur' in ai_controlled }}>
+                    <label for="ai_min_balance" class="ai-switch"></label>
+                </div>
+            </div>
+            <div class="input-row">
+                <input type="number" class="form-input" name="min_balance_eur" value="{{ params.min_balance_eur|default(5, true) }}" step="1">
+                <div class="input-controls">
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('min_balance_eur', -1)">−</button>
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('min_balance_eur', 1)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="params-grid">
+        <!-- Maximale Entry -->
+        <div class="param-field">
+            <div class="param-label-row">
+                <label class="form-label">📈 Maximale Entry (EUR)</label>
+                <div class="ai-toggle">
+                    <input type="checkbox" id="ai_max_entry" class="ai-checkbox" {{ 'checked' if 'max_entry_eur' in ai_controlled }}>
+                    <label for="ai_max_entry" class="ai-switch"></label>
+                </div>
+            </div>
+            <div class="input-row">
+                <input type="number" class="form-input" name="max_entry_eur" value="{{ params.max_entry_eur|default(14.4, true) }}" step="0.5">
+                <div class="input-controls">
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('max_entry_eur', -0.5)">−</button>
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('max_entry_eur', 0.5)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="params-grid single">
+        <!-- Scan Interval -->
+        <div class="param-field">
+            <div class="param-label-row">
+                <label class="form-label">⏱️ Scan Interval (seconden)</label>
+            </div>
+            <div class="input-row">
+                <input type="number" class="form-input" name="scan_interval" value="{{ params.scan_interval|default(10, true) }}" min="5" max="300">
+                <div class="input-controls">
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('scan_interval', -5)">−</button>
+                    <button type="button" class="ctrl-btn" onclick="adjustValue('scan_interval', 5)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- RSI & Technical Indicators -->
+<section class="glass-panel collapsible" id="section-rsi">
+    <div class="section-header" onclick="toggleSection('section-rsi')">
+        <h2>📈 RSI & Technische Indicatoren</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Configuratie voor technische analyse signalen</p>
+        
+        <div class="params-grid">
+            <!-- RSI Min (Oversold) -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">RSI Min (Oversold)</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_rsi_min" class="ai-checkbox" {{ 'checked' if 'rsi_oversold' in ai_controlled }}>
+                        <label for="ai_rsi_min" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="rsi_oversold" value="{{ params.rsi_oversold|default(30, true) }}" min="10" max="40">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_oversold', -1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_oversold', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- RSI Max (Overbought) -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">RSI Max (Overbought)</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_rsi_max" class="ai-checkbox" {{ 'checked' if 'rsi_overbought' in ai_controlled }}>
+                        <label for="ai_rsi_max" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="rsi_overbought" value="{{ params.rsi_overbought|default(65, true) }}" min="60" max="90">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_overbought', -1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_overbought', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- RSI Max DCA -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">RSI Max DCA</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_rsi_dca" class="ai-checkbox" {{ 'checked' if 'rsi_max_dca' in ai_controlled }}>
+                        <label for="ai_rsi_dca" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="rsi_max_dca" value="{{ params.rsi_max_dca|default(55, true) }}" min="30" max="70">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_max_dca', -1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_max_dca', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <!-- RSI Range Visual -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">RSI Range</label>
+                </div>
+                <div class="range-display">
+                    <span class="range-value" id="rsi-min-display">30</span>
+                    <div class="range-bar">
+                        <div class="range-fill" id="rsi-range-fill" style="left: 30%; width: 35%;"></div>
+                    </div>
+                    <span class="range-value" id="rsi-max-display">65</span>
+                </div>
+            </div>
+            
+            <!-- Min Volume 1m -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">📊 Min Volume 1m</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_min_volume" class="ai-checkbox" {{ 'checked' if 'min_volume_1m' in ai_controlled }}>
+                        <label for="ai_min_volume" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="min_volume_1m" value="{{ params.min_volume_1m|default(5, true) }}" step="0.5">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('min_volume_1m', -0.5)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('min_volume_1m', 0.5)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Max Spread -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">📉 Max Spread %</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="max_spread_pct" value="{{ params.max_spread_pct|default(0.0020, true) }}" step="0.0001">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('max_spread_pct', -0.0001)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('max_spread_pct', 0.0001)">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- DCA (Dollar Cost Averaging) -->
+<section class="glass-panel collapsible" id="section-dca">
+    <div class="section-header" onclick="toggleSection('section-dca')">
+        <h2>📊 DCA (Dollar Cost Averaging)</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Safety orders voor kostenmiddeling bij daling</p>
+        
+        <div class="toggle-row">
+            <div class="master-toggle">
+                <input type="checkbox" id="dca_enabled" class="toggle-checkbox" name="dca_enabled" {{ 'checked' if params.dca_enabled|default(true, true) }}>
+                <label for="dca_enabled" class="toggle-label danger">⚡ DCA Ingeschakeld</label>
+            </div>
+            <div class="ai-toggle">
+                <input type="checkbox" id="ai_dca" class="ai-checkbox" {{ 'checked' if 'dca_enabled' in ai_controlled }}>
+                <label for="ai_dca" class="ai-switch"></label>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <!-- Max DCA Orders -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Max DCA Orders</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_max_dca" class="ai-checkbox" {{ 'checked' if 'max_dca_orders' in ai_controlled }}>
+                        <label for="ai_max_dca" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="max_dca_orders" value="{{ params.max_dca_orders|default(4, true) }}" min="1" max="10">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('max_dca_orders', -1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('max_dca_orders', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- DCA Bedrag -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">DCA Bedrag (EUR)</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_dca_amount" class="ai-checkbox" {{ 'checked' if 'dca_amount_eur' in ai_controlled }}>
+                        <label for="ai_dca_amount" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="dca_amount_eur" value="{{ params.dca_amount_eur|default(5, true) }}" step="0.5">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('dca_amount_eur', -0.5)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('dca_amount_eur', 0.5)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Max per Cyclus -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Max per Cyclus</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_max_cycle" class="ai-checkbox" {{ 'checked' if 'max_per_cycle' in ai_controlled }}>
+                        <label for="ai_max_cycle" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="max_per_cycle" value="{{ params.max_per_cycle|default(3, true) }}" min="1" max="10">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('max_per_cycle', -1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('max_per_cycle', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <!-- Trigger Daling % -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Trigger Daling %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_trigger_drop" class="ai-checkbox" {{ 'checked' if 'dca_trigger_pct' in ai_controlled }}>
+                        <label for="ai_trigger_drop" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="dca_trigger_pct" value="{{ params.dca_trigger_pct|default(0.060, true) }}" step="0.001">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('dca_trigger_pct', -0.005)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('dca_trigger_pct', 0.005)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Size Multiplier -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Size Multiplier</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_size_mult" class="ai-checkbox" {{ 'checked' if 'dca_size_multiplier' in ai_controlled }}>
+                        <label for="ai_size_mult" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="dca_size_multiplier" value="{{ params.dca_size_multiplier|default(1.5, true) }}" step="0.1" min="1" max="5">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('dca_size_multiplier', -0.1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('dca_size_multiplier', 0.1)">+</button>
+                    </div>
+                </div>
+                <span class="ai-suggestion">🤖 AI suggereert: 1.5</span>
+            </div>
+            
+            <!-- Step Multiplier -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Step Multiplier</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_step_mult" class="ai-checkbox" {{ 'checked' if 'dca_step_multiplier' in ai_controlled }}>
+                        <label for="ai_step_mult" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="dca_step_multiplier" value="{{ params.dca_step_multiplier|default(1.2, true) }}" step="0.1" min="1" max="3">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('dca_step_multiplier', -0.1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('dca_step_multiplier', 0.1)">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="toggle-row">
+            <div class="master-toggle">
+                <input type="checkbox" id="dynamic_dca" class="toggle-checkbox" name="dynamic_dca" {{ 'checked' if params.dynamic_dca }}>
+                <label for="dynamic_dca" class="toggle-label info">📊 Dynamische DCA</label>
+            </div>
+            <div class="ai-toggle">
+                <input type="checkbox" id="ai_dynamic_dca" class="ai-checkbox" {{ 'checked' if 'dynamic_dca' in ai_controlled }}>
+                <label for="ai_dynamic_dca" class="ai-switch"></label>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Trailing Stop -->
+<section class="glass-panel collapsible" id="section-trailing">
+    <div class="section-header" onclick="toggleSection('section-trailing')">
+        <h2>📉 Trailing Stop</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Trailing stop configuratie voor winstbescherming</p>
+        
+        <div class="params-grid">
+            <!-- Take Profit -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">🎯 Take Profit %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_take_profit" class="ai-checkbox" {{ 'checked' if 'take_profit_pct' in ai_controlled }}>
+                        <label for="ai_take_profit" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="take_profit_pct" value="{{ params.take_profit_pct|default(5.0, true) }}" step="0.1">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('take_profit_pct', -0.5)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('take_profit_pct', 0.5)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stop Loss -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">🛑 Stop Loss %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_stop_loss" class="ai-checkbox" {{ 'checked' if 'stop_loss_pct' in ai_controlled }}>
+                        <label for="ai_stop_loss" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="stop_loss_pct" value="{{ params.stop_loss_pct|default(10.0, true) }}" step="0.1">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('stop_loss_pct', -0.5)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('stop_loss_pct', 0.5)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Trailing Stop -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">📊 Trailing Stop %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_trailing" class="ai-checkbox" {{ 'checked' if 'trailing_stop_pct' in ai_controlled }}>
+                        <label for="ai_trailing" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="trailing_stop_pct" value="{{ params.trailing_stop_pct|default(2.0, true) }}" step="0.1">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('trailing_stop_pct', -0.1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('trailing_stop_pct', 0.1)">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Risk Management -->
+<section class="glass-panel collapsible" id="section-risk">
+    <div class="section-header" onclick="toggleSection('section-risk')">
+        <h2>🛡️ Risk Management</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Risicobeheer parameters</p>
+        
+        <div class="params-grid">
+            <!-- Max Portfolio Risk -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Max Portfolio Risk %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_max_risk" class="ai-checkbox" {{ 'checked' if 'max_portfolio_risk' in ai_controlled }}>
+                        <label for="ai_max_risk" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="max_portfolio_risk" value="{{ params.max_portfolio_risk|default(10, true) }}" min="1" max="50">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('max_portfolio_risk', -1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('max_portfolio_risk', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Max Trade Size -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Max Trade Size %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_trade_size" class="ai-checkbox" {{ 'checked' if 'max_trade_size_pct' in ai_controlled }}>
+                        <label for="ai_trade_size" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="max_trade_size_pct" value="{{ params.max_trade_size_pct|default(15, true) }}" min="1" max="50">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('max_trade_size_pct', -1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('max_trade_size_pct', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Min Balance Reserve -->
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Min Balance Reserve (EUR)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="min_balance_reserve" value="{{ params.min_balance_reserve|default(50, true) }}" step="10">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('min_balance_reserve', -10)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('min_balance_reserve', 10)">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Advanced Technical Indicators -->
+<section class="glass-panel collapsible" id="section-indicators">
+    <div class="section-header" onclick="toggleSection('section-indicators')">
+        <h2>📊 Technische Indicatoren (MACD, SMA, Bollinger)</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Geavanceerde technische indicator configuratie</p>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">MACD Fast Period</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_macd_fast" class="ai-checkbox" {{ 'checked' if 'macd_fast' in ai_controlled }}>
+                        <label for="ai_macd_fast" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="macd_fast" value="{{ params.macd_fast|default(12, true) }}" min="5" max="50">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('macd_fast', -1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('macd_fast', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">MACD Slow Period</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_macd_slow" class="ai-checkbox" {{ 'checked' if 'macd_slow' in ai_controlled }}>
+                        <label for="ai_macd_slow" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="macd_slow" value="{{ params.macd_slow|default(26, true) }}" min="10" max="100">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('macd_slow', -1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('macd_slow', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">MACD Signal Period</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_macd_signal" class="ai-checkbox" {{ 'checked' if 'macd_signal' in ai_controlled }}>
+                        <label for="ai_macd_signal" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="macd_signal" value="{{ params.macd_signal|default(9, true) }}" min="5" max="30">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('macd_signal', -1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('macd_signal', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">SMA Short Period</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="sma_short" value="{{ params.sma_short|default(7, true) }}" min="3" max="50">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">SMA Long Period</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="sma_long" value="{{ params.sma_long|default(25, true) }}" min="10" max="200">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Bollinger Window</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="bollinger_window" value="{{ params.bollinger_window|default(20, true) }}" min="10" max="50">
+                </div>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Stochastic Window</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="stoch_window" value="{{ params.stoch_window|default(14, true) }}" min="5" max="30">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">ATR Period</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="atr_period" value="{{ params.atr_period|default(14, true) }}" min="5" max="30">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Partial Take-Profit -->
+<section class="glass-panel collapsible" id="section-partial-tp">
+    <div class="section-header" onclick="toggleSection('section-partial-tp')">
+        <h2>🎯 Partial Take-Profit Levels</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Gedeeltelijke winst nemen op meerdere niveaus</p>
+        
+        <div class="toggle-row">
+            <div class="master-toggle">
+                <input type="checkbox" id="partial_tp_enabled" class="toggle-checkbox" name="partial_tp_enabled" {{ 'checked' if params.partial_tp_enabled|default(true, true) }}>
+                <label for="partial_tp_enabled" class="toggle-label success">✅ Partial TP Ingeschakeld</label>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">🥇 Level 1 Target %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_tp1" class="ai-checkbox" {{ 'checked' if 'tp_target_1' in ai_controlled }}>
+                        <label for="ai_tp1" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="tp_target_1" value="{{ params.tp_target_1|default(2.5, true) }}" step="0.1">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('tp_target_1', -0.5)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('tp_target_1', 0.5)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Level 1 Verkoop %</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="tp_sell_pct_1" value="{{ params.tp_sell_pct_1|default(40, true) }}" min="0" max="100">
+                </div>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">🥈 Level 2 Target %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_tp2" class="ai-checkbox" {{ 'checked' if 'tp_target_2' in ai_controlled }}>
+                        <label for="ai_tp2" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="tp_target_2" value="{{ params.tp_target_2|default(4.0, true) }}" step="0.1">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('tp_target_2', -0.5)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('tp_target_2', 0.5)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Level 2 Verkoop %</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="tp_sell_pct_2" value="{{ params.tp_sell_pct_2|default(35, true) }}" min="0" max="100">
+                </div>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">🥉 Level 3 Target %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_tp3" class="ai-checkbox" {{ 'checked' if 'tp_target_3' in ai_controlled }}>
+                        <label for="ai_tp3" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="tp_target_3" value="{{ params.tp_target_3|default(6.5, true) }}" step="0.1">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('tp_target_3', -0.5)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('tp_target_3', 0.5)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Level 3 Verkoop %</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="tp_sell_pct_3" value="{{ params.tp_sell_pct_3|default(25, true) }}" min="0" max="100">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Exit Strategy Extended -->
+<section class="glass-panel collapsible" id="section-exit-extended">
+    <div class="section-header" onclick="toggleSection('section-exit-extended')">
+        <h2>🚪 Exit Strategie (Extended)</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Geavanceerde exit parameters</p>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Trailing Activatie %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_trail_activ" class="ai-checkbox" {{ 'checked' if 'trailing_activation_pct' in ai_controlled }}>
+                        <label for="ai_trail_activ" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="trailing_activation_pct" value="{{ params.trailing_activation_pct|default(2.0, true) }}" step="0.1">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('trailing_activation_pct', -0.1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('trailing_activation_pct', 0.1)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Default Trailing %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_default_trail" class="ai-checkbox" {{ 'checked' if 'default_trailing' in ai_controlled }}>
+                        <label for="ai_default_trail" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="default_trailing" value="{{ params.default_trailing|default(1.2, true) }}" step="0.1">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('default_trailing', -0.1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('default_trailing', 0.1)">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="toggle-row">
+            <div class="master-toggle">
+                <input type="checkbox" id="stop_loss_enabled" class="toggle-checkbox" name="stop_loss_enabled" {{ 'checked' if params.stop_loss_enabled|default(true, true) }}>
+                <label for="stop_loss_enabled" class="toggle-label danger">🛑 Stop-Loss Actief</label>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Hard SL Altcoins %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_hard_sl_alt" class="ai-checkbox" {{ 'checked' if 'hard_sl_alt_pct' in ai_controlled }}>
+                        <label for="ai_hard_sl_alt" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="hard_sl_alt_pct" value="{{ params.hard_sl_alt_pct|default(15, true) }}" step="0.5">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('hard_sl_alt_pct', -0.5)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('hard_sl_alt_pct', 0.5)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Hard SL BTC/ETH %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_hard_sl_btc" class="ai-checkbox" {{ 'checked' if 'hard_sl_btceth_pct' in ai_controlled }}>
+                        <label for="ai_hard_sl_btc" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="hard_sl_btceth_pct" value="{{ params.hard_sl_btceth_pct|default(12, true) }}" step="0.5">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('hard_sl_btceth_pct', -0.5)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('hard_sl_btceth_pct', 0.5)">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Trailing Entry -->
+<section class="glass-panel collapsible" id="section-trailing-entry">
+    <div class="section-header" onclick="toggleSection('section-trailing-entry')">
+        <h2>📈 Trailing Entry</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Instappen via trailing na signaal</p>
+        
+        <div class="toggle-row">
+            <div class="master-toggle">
+                <input type="checkbox" id="trailing_entry_enabled" class="toggle-checkbox" name="trailing_entry_enabled" {{ 'checked' if params.trailing_entry_enabled|default(true, true) }}>
+                <label for="trailing_entry_enabled" class="toggle-label info">✅ Trailing Entry Actief</label>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Pullback %</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="ai_entry_pullback" class="ai-checkbox" {{ 'checked' if 'trailing_entry_pullback_pct' in ai_controlled }}>
+                        <label for="ai_entry_pullback" class="ai-switch"></label>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="trailing_entry_pullback_pct" value="{{ params.trailing_entry_pullback_pct|default(1.0, true) }}" step="0.1">
+                    <div class="input-controls">
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('trailing_entry_pullback_pct', -0.1)">−</button>
+                        <button type="button" class="ctrl-btn" onclick="adjustValue('trailing_entry_pullback_pct', 0.1)">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Timeout (seconden)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="trailing_entry_timeout_s" value="{{ params.trailing_entry_timeout_s|default(120, true) }}" min="10">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Performance Filter -->
+<section class="glass-panel collapsible" id="section-performance-filter">
+    <div class="section-header" onclick="toggleSection('section-performance-filter')">
+        <h2>📊 Performance Filter</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Filter coins op basis van historische prestaties</p>
+        
+        <div class="toggle-row">
+            <div class="master-toggle">
+                <input type="checkbox" id="performance_filter_enabled" class="toggle-checkbox" name="performance_filter_enabled" {{ 'checked' if params.performance_filter_enabled|default(true, true) }}>
+                <label for="performance_filter_enabled" class="toggle-label warning">✅ Performance Filter Actief</label>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Min Trades</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="performance_filter_min_trades" value="{{ params.performance_filter_min_trades|default(5, true) }}" min="1">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Min Winrate (0-1)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="performance_filter_min_winrate" value="{{ params.performance_filter_min_winrate|default(0.3, true) }}" min="0" max="1" step="0.05">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Max Verlies Streak</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="performance_filter_max_consec_losses" value="{{ params.performance_filter_max_consec_losses|default(4, true) }}" min="1">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Watchlist Settings -->
+<section class="glass-panel collapsible" id="section-watchlist">
+    <div class="section-header" onclick="toggleSection('section-watchlist')">
+        <h2>👁️ AI Watchlist Instellingen</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">AI Watchlist sizing en confidence drempels</p>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Micro Size (EUR)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="watchlist_micro_size_eur" value="{{ params.watchlist_micro_size_eur|default(5.0, true) }}" step="0.5">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Confidence Drempel (0-1)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="watchlist_confidence_threshold" value="{{ params.watchlist_confidence_threshold|default(0.6, true) }}" min="0" max="1" step="0.05">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Reinvest & Balance -->
+<section class="glass-panel collapsible" id="section-reinvest">
+    <div class="section-header" onclick="toggleSection('section-reinvest')">
+        <h2>💹 Herinvesteren & Saldo Beheer</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Automatisch winsten herinvesteren</p>
+        
+        <div class="toggle-row">
+            <div class="master-toggle">
+                <input type="checkbox" id="reinvest_enabled" class="toggle-checkbox" name="reinvest_enabled" {{ 'checked' if params.reinvest_enabled|default(true, true) }}>
+                <label for="reinvest_enabled" class="toggle-label success">♻️ Herinvesteren Actief</label>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Reinvest Portie (0-1)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="reinvest_portion" value="{{ params.reinvest_portion|default(0.5, true) }}" min="0" max="1" step="0.05">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Min Trades</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="reinvest_min_trades" value="{{ params.reinvest_min_trades|default(3, true) }}" min="0">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Min Winst (EUR)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="reinvest_min_profit" value="{{ params.reinvest_min_profit|default(5.0, true) }}" step="0.5">
+                </div>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Max Verhoging %</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="reinvest_max_increase_pct" value="{{ params.reinvest_max_increase_pct|default(20, true) }}" min="0" max="100">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Cap (EUR)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="reinvest_cap" value="{{ params.reinvest_cap|default(200, true) }}" step="10">
+                </div>
+            </div>
+        </div>
+        
+        <h4 style="margin-top: var(--spacing-lg);">💰 Full Balance Mode</h4>
+        <div class="toggle-row">
+            <div class="master-toggle">
+                <input type="checkbox" id="auto_use_full_balance" class="toggle-checkbox" name="auto_use_full_balance" {{ 'checked' if params.auto_use_full_balance }}>
+                <label for="auto_use_full_balance" class="toggle-label danger">Auto Full Balance</label>
+            </div>
+        </div>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Saldo Portie (0-1)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="full_balance_portion" value="{{ params.full_balance_portion|default(0.95, true) }}" min="0" max="1" step="0.05">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Max per Trade (EUR)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="full_balance_max_eur" value="{{ params.full_balance_max_eur|default(2000, true) }}" step="50">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Market Filters -->
+<section class="glass-panel collapsible" id="section-market-filters">
+    <div class="section-header" onclick="toggleSection('section-market-filters')">
+        <h2>🔍 Market Selectie Filters</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Filters voor markt selectie</p>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Min Daily Volume (EUR)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="min_daily_volume_eur" value="{{ params.min_daily_volume_eur|default(0, true) }}" step="1000">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Min Prijs (EUR)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="min_price_eur" value="{{ params.min_price_eur|default(0, true) }}" step="0.01">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Max Prijs (EUR) <small>(0 = geen limiet)</small></label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="max_price_eur" value="{{ params.max_price_eur|default(0, true) }}" step="100">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Order Settings -->
+<section class="glass-panel collapsible" id="section-order-settings">
+    <div class="section-header" onclick="toggleSection('section-order-settings')">
+        <h2>📝 Order Instellingen</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Order types en timing configuratie</p>
+        
+        <div class="params-grid">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Order Type</label>
+                </div>
+                <select class="form-select" name="order_type">
+                    <option value="auto" {{ 'selected' if params.order_type == 'auto' }}>Auto (Smart)</option>
+                    <option value="market" {{ 'selected' if params.order_type == 'market' }}>Market</option>
+                    <option value="limit" {{ 'selected' if params.order_type == 'limit' }}>Limit</option>
+                </select>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Cooldown (seconden)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="open_trade_cooldown_seconds" value="{{ params.open_trade_cooldown_seconds|default(0, true) }}" min="0">
+                </div>
+            </div>
+            
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Config Reload (sec) <small>(0 = uit)</small></label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="config_hot_reload_seconds" value="{{ params.config_hot_reload_seconds|default(0, true) }}" min="0">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Synchronization -->
+<section class="glass-panel collapsible" id="section-sync">
+    <div class="section-header" onclick="toggleSection('section-sync')">
+        <h2>🔄 Synchronisatie</h2>
+        <span class="collapse-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="section-description">Bot synchronisatie met exchange</p>
+        
+        <div class="toggle-row">
+            <div class="master-toggle">
+                <input type="checkbox" id="sync_enabled" class="toggle-checkbox" name="sync_enabled" {{ 'checked' if params.sync_enabled }}>
+                <label for="sync_enabled" class="toggle-label info">Auto Sync Actief</label>
+            </div>
+        </div>
+        
+        <div class="params-grid single">
+            <div class="param-field">
+                <div class="param-label-row">
+                    <label class="form-label">Sync Interval (seconden)</label>
+                </div>
+                <div class="input-row">
+                    <input type="number" class="form-input" name="sync_interval_seconds" value="{{ params.sync_interval_seconds|default(60, true) }}" min="10">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Save Actions -->
+<div class="form-actions-sticky">
+    <button type="submit" class="btn btn-primary btn-lg">💾 Save Parameters</button>
+    <button type="button" class="btn btn-ai" onclick="getAIOptimization()">
+        <span class="btn-icon">🤖</span> AI Optimize All
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="resetDefaults()">🔄 Reset to Defaults</button>
+    <button type="button" class="btn btn-secondary" onclick="exportParams()">📥 Export</button>
+</div>
+</form>
+
+<!-- Market Whitelist/Blacklist -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📋 Market Filters</h2>
+    </div>
+    
+    <div class="market-filters">
+        <div class="filter-column">
+            <h4>✅ Whitelist (Trade Only These)</h4>
+            <div class="market-list" id="whitelist">
+                {% for market in whitelist %}
+                <div class="market-chip">
+                    <span>{{ market }}</span>
+                    <button class="remove-btn" onclick="removeFromList('whitelist', '{{ market }}')">×</button>
+                </div>
+                {% else %}
+                <span class="empty-text">No markets whitelisted</span>
+                {% endfor %}
+            </div>
+            <div class="add-market">
+                <select id="add-whitelist-select" class="form-select">
+                    <option value="">Add market...</option>
+                    {% for market in available_markets %}
+                    <option value="{{ market }}">{{ market }}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn btn-sm btn-secondary" onclick="addToWhitelist()">➕</button>
+            </div>
+        </div>
+        
+        <div class="filter-column">
+            <h4>🚫 Blacklist (Never Trade)</h4>
+            <div class="market-list" id="blacklist">
+                {% for market in blacklist %}
+                <div class="market-chip blacklist">
+                    <span>{{ market }}</span>
+                    <button class="remove-btn" onclick="removeFromList('blacklist', '{{ market }}')">×</button>
+                </div>
+                {% else %}
+                <span class="empty-text">No markets blacklisted</span>
+                {% endfor %}
+            </div>
+            <div class="add-market">
+                <select id="add-blacklist-select" class="form-select">
+                    <option value="">Add market...</option>
+                    {% for market in available_markets %}
+                    <option value="{{ market }}">{{ market }}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn btn-sm btn-secondary" onclick="addToBlacklist()">➕</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   PARAMETERS PAGE - PREMIUM STYLING
+   Professional hierarchy, color coding, enhanced visuals
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Section Hierarchy Colors */
+.glass-panel:has(#section-rsi) { border-left: 4px solid #3b82f6; }  /* Blue - Technical */
+.glass-panel:has(#section-dca) { border-left: 4px solid #f59e0b; }  /* Amber - DCA */
+.glass-panel:has(#section-risk) { border-left: 4px solid #ef4444; }  /* Red - Risk */
+.glass-panel:has(#section-trailing) { border-left: 4px solid #10b981; }  /* Green - TP */
+.glass-panel:has(#section-exit) { border-left: 4px solid #a855f7; }  /* Purple - Exit */
+.glass-panel:has(#section-ai) { border-left: 4px solid #06b6d4; }  /* Cyan - AI */
+
+/* Parameter Categories - Premium Cards */
+.param-field {
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(15, 23, 42, 0.8) 100%);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.param-field::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.param-field:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.param-field:hover::before {
+    opacity: 1;
+}
+
+/* Premium Form Labels */
+.form-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Input Fields - Premium Styling */
+.form-input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.15);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+/* Control Buttons - Modern Design */
+.ctrl-btn {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    font-weight: bold;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ctrl-btn:hover {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: var(--bg-primary);
+    transform: scale(1.1);
+}
+
+.ctrl-btn:active {
+    transform: scale(0.95);
+}
+
+/* Params Grid */
+.params-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.params-grid.single {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+}
+
+.param-field {
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+}
+
+.param-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.input-row {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+}
+
+.input-row .form-input {
+    flex: 1;
+}
+
+.input-controls {
+    display: flex;
+    gap: 2px;
+}
+
+.ctrl-btn {
+    width: 32px;
+    height: 32px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.ctrl-btn:hover {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+/* AI Toggle Switch */
+.ai-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.ai-checkbox {
+    display: none;
+}
+
+.ai-switch {
+    position: relative;
+    width: 42px;
+    height: 22px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.ai-switch::before {
+    content: '🤖';
+    position: absolute;
+    font-size: 12px;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.5;
+}
+
+.ai-switch::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    left: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: all 0.3s;
+}
+
+.ai-checkbox:checked + .ai-switch {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-color: #3b82f6;
+}
+
+.ai-checkbox:checked + .ai-switch::after {
+    left: 22px;
+    background: white;
+}
+
+.ai-checkbox:checked + .ai-switch::before {
+    opacity: 0;
+}
+
+/* Toggle Row with Master Toggle */
+.toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-lg);
+}
+
+.master-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.toggle-checkbox {
+    display: none;
+}
+
+.toggle-label {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.toggle-checkbox:checked + .toggle-label.danger {
+    background: var(--success-bg);
+    color: var(--success);
+    border-color: var(--success);
+}
+
+.toggle-checkbox:checked + .toggle-label.info {
+    background: var(--info-bg);
+    color: var(--info);
+    border-color: var(--info);
+}
+
+/* AI Suggestion */
+.ai-suggestion {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--accent-primary);
+    margin-top: var(--spacing-xs);
+}
+
+/* Range Display */
+.range-display {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.range-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    position: relative;
+}
+
+.range-fill {
+    position: absolute;
+    height: 100%;
+    background: linear-gradient(90deg, var(--success), var(--warning));
+    border-radius: 4px;
+}
+
+.range-value {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    min-width: 30px;
+    text-align: center;
+}
+
+/* Collapsible Sections */
+.collapsible .section-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.collapsible .section-header:hover {
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    margin: calc(-1 * var(--spacing-md));
+    padding: var(--spacing-md);
+}
+
+.collapse-icon {
+    font-size: 0.8rem;
+    transition: transform 0.3s;
+}
+
+.collapsible.collapsed .collapse-icon {
+    transform: rotate(-90deg);
+}
+
+.collapsible.collapsed .section-content {
+    display: none;
+}
+
+.section-description {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* Form Actions Sticky */
+.form-actions-sticky {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-primary);
+    padding: var(--spacing-md);
+    margin: var(--spacing-lg) calc(-1 * var(--spacing-lg));
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: center;
+    z-index: 100;
+}
+
+/* Profile Cards */
+.profiles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.profile-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+}
+
+.profile-card.active {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 15px rgba(0, 212, 170, 0.2);
+}
+
+.profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--spacing-md);
+}
+
+.profile-info h3 {
+    margin: 0 0 var(--spacing-xs);
+    font-size: 1rem;
+}
+
+.profile-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.active-badge {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--success-bg);
+    color: var(--success);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.profile-stats {
+    display: flex;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+.profile-stat {
+    display: flex;
+    flex-direction: column;
+}
+
+.profile-stat .label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.profile-stat .value {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.profile-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* Market Filters */
+.market-filters {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-xl);
+}
+
+.filter-column h4 {
+    margin: 0 0 var(--spacing-md);
+    font-size: 0.9rem;
+}
+
+.market-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    min-height: 80px;
+    padding: var(--spacing-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-md);
+}
+
+.market-chip {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--success-bg);
+    color: var(--success);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.market-chip.blacklist {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+.remove-btn {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.add-market {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.empty-state, .empty-text {
+    color: var(--text-muted);
+    font-style: italic;
+    padding: var(--spacing-md);
+}
+
+/* AI Button */
+.btn-ai {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: white;
+    border: none;
+}
+
+.btn-ai:hover {
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+    .market-filters {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions-sticky {
+        flex-wrap: wrap;
+    }
+}
+</style>
+
+<script>
+// Collapsible sections
+function toggleSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    section.classList.toggle('collapsed');
+}
+
+// Value adjustment
+function adjustValue(fieldName, delta) {
+    const input = document.querySelector(`[name="${fieldName}"]`);
+    if (input) {
+        const step = parseFloat(input.step) || 1;
+        const min = parseFloat(input.min) || -Infinity;
+        const max = parseFloat(input.max) || Infinity;
+        let newValue = parseFloat(input.value) + delta;
+        newValue = Math.max(min, Math.min(max, newValue));
+        input.value = Number.isInteger(step) ? Math.round(newValue) : newValue.toFixed(String(step).split('.')[1]?.length || 0);
+        
+        // Update RSI range display
+        if (fieldName === 'rsi_oversold' || fieldName === 'rsi_overbought') {
+            updateRSIRange();
+        }
+    }
+}
+
+function updateRSIRange() {
+    const min = parseFloat(document.querySelector('[name="rsi_oversold"]')?.value || 30);
+    const max = parseFloat(document.querySelector('[name="rsi_overbought"]')?.value || 65);
+    const fill = document.getElementById('rsi-range-fill');
+    const minDisplay = document.getElementById('rsi-min-display');
+    const maxDisplay = document.getElementById('rsi-max-display');
+    
+    if (fill) {
+        fill.style.left = min + '%';
+        fill.style.width = (max - min) + '%';
+    }
+    if (minDisplay) minDisplay.textContent = min;
+    if (maxDisplay) maxDisplay.textContent = max;
+}
+
+// Form submission
+document.getElementById('strategy-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    showNotification('💾 Saving parameters...', 'info');
+    
+    const formData = new FormData(this);
+    const data = {};
+    
+    // Collect all form fields
+    formData.forEach((value, key) => {
+        data[key] = value;
+    });
+    
+    // Convert checkboxes (they only appear in formData if checked)
+    data.dca_enabled = formData.has('dca_enabled');
+    data.dynamic_dca = formData.has('dynamic_dca');
+    data.use_market_orders = formData.has('use_market_orders');
+    data.allow_weekend_trading = formData.has('allow_weekend_trading');
+    
+    // Collect AI-controlled params
+    const aiControlled = [];
+    document.querySelectorAll('.ai-checkbox:checked').forEach(cb => {
+        const paramName = cb.id.replace('ai_', '');
+        aiControlled.push(paramName);
+    });
+    data.ai_controlled = aiControlled;
+    
+    console.log('Saving parameters:', data);
+    
+    try {
+        const response = await fetch('/api/strategy/save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showNotification(`✅ ${result.message || 'Parameters saved successfully!'}`, 'success');
+            clearDirtyState();
+            console.log('Save success:', result);
+        } else {
+            showNotification(`❌ ${result.error || 'Failed to save parameters'}`, 'error');
+            console.error('Save failed:', result);
+        }
+    } catch (error) {
+        console.error('Save error:', error);
+        showNotification('⚠️ Error saving parameters: ' + error.message, 'error');
+    }
+});
+
+// Profile management
+async function createProfile() {
+    const name = await apexPrompt('Nieuw profiel', 'Profielnaam:', '', 'Mijn strategie');
+    if (!name || name.trim() === '') return;
+    
+    const description = await apexPrompt('Beschrijving', 'Profielbeschrijving (optioneel):', 'Custom profile');
+    
+    apexToast('Profiel wordt aangemaakt...', 'info', 2000);
+    
+    fetch('/api/strategy/profile', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: name.trim(),
+            description: description.trim()
+        })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.status === 'ok') {
+            showNotification('✅ Profile created!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification('❌ ' + (result.error || 'Failed to create profile'), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Create profile error:', error);
+        showNotification('⚠️ Error: ' + error.message, 'error');
+    });
+}
+
+function activateProfile(id) {
+    showNotification('Activating profile...', 'info');
+    
+    fetch('/api/strategy/profile/' + id + '/activate', {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.status === 'ok') {
+            showNotification('✅ Profile activated!', 'success');
+            if (result.restart_required) {
+                showNotification('⚠️ Bot restart required for changes to take effect', 'info');
+            }
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showNotification('❌ ' + (result.error || 'Failed to activate'), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Activate error:', error);
+        showNotification('⚠️ Error: ' + error.message, 'error');
+    });
+}
+
+function editProfile(id) {
+    location.href = '/parameters?edit=' + id;
+}
+
+async function deleteProfile(id) {
+    const ok = await apexConfirm('Profiel verwijderen', 'Weet je zeker dat je dit profiel wilt verwijderen?');
+    if (ok) {
+        fetch('/api/strategy/profile/' + id, {method: 'DELETE'})
+            .then(r => r.ok && location.reload());
+    }
+}
+
+// Reset defaults
+async function resetDefaults() {
+    const ok = await apexConfirm('Standaardwaarden', 'Alle parameters terugzetten naar standaardwaarden?');
+    if (ok) {
+        fetch('/api/strategy/reset', {method: 'POST'})
+            .then(r => r.ok && location.reload());
+    }
+}
+
+// Export parameters
+function exportParams() {
+    fetch('/api/strategy/export')
+        .then(r => r.blob())
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'strategy_params_' + new Date().toISOString().split('T')[0] + '.json';
+            a.click();
+        });
+}
+
+// Market filters
+function addToWhitelist() {
+    const select = document.getElementById('add-whitelist-select');
+    const market = select.value;
+    if (market) {
+        fetch('/api/strategy/whitelist/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({market})
+        }).then(r => r.ok && location.reload());
+    }
+}
+
+function addToBlacklist() {
+    const select = document.getElementById('add-blacklist-select');
+    const market = select.value;
+    if (market) {
+        fetch('/api/strategy/blacklist/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({market})
+        }).then(r => r.ok && location.reload());
+    }
+}
+
+function removeFromList(listType, market) {
+    fetch('/api/strategy/' + listType + '/remove', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({market})
+    }).then(r => r.ok && location.reload());
+}
+
+// AI Optimization
+function getAIOptimization() {
+    showNotification('🤖 Analyzing your trading history...', 'info');
+    
+    fetch('/api/ai/parameter-suggestions')
+        .then(response => response.json())
+        .then(data => {
+            if (data.suggestions && data.suggestions.length > 0) {
+                data.suggestions.forEach(s => {
+                    const input = document.querySelector(`[name="${s.field}"]`);
+                    if (input) {
+                        input.value = s.recommended;
+                        input.classList.add('ai-updated');
+                        setTimeout(() => input.classList.remove('ai-updated'), 3000);
+                    }
+                });
+                showNotification('✨ AI suggestions applied! Review and save.', 'success');
+            } else {
+                showNotification('✨ Your parameters are already optimized!', 'success');
+            }
+        })
+        .catch(error => {
+            console.error('AI Error:', error);
+            showNotification('⚠️ Could not fetch AI suggestions', 'error');
+        });
+}
+
+// Notification helper - delegates to global apex unified toast
+function showNotification(message, type) {
+    apexToast(message, type);
+}
+
+// Initialize
+let formDirty = false;
+document.addEventListener('DOMContentLoaded', function() {
+    updateRSIRange();
+    
+    // Track form dirty state
+    const form = document.getElementById('strategy-form');
+    if (form) {
+        form.addEventListener('input', function() {
+            if (!formDirty) {
+                formDirty = true;
+                showDirtySaveBar();
+            }
+        });
+        form.addEventListener('change', function() {
+            if (!formDirty) {
+                formDirty = true;
+                showDirtySaveBar();
+            }
+        });
+    }
+    
+    // Warn on navigate away with unsaved changes
+    window.addEventListener('beforeunload', function(e) {
+        if (formDirty) {
+            e.preventDefault();
+            e.returnValue = 'Je hebt onopgeslagen wijzigingen. Weet je zeker dat je wilt vertrekken?';
+        }
+    });
+});
+
+function showDirtySaveBar() {
+    if (document.getElementById('dirty-save-bar')) return;
+    const bar = document.createElement('div');
+    bar.id = 'dirty-save-bar';
+    bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:var(--bg-secondary,#1e293b);border-top:2px solid var(--accent-primary,#3b82f6);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;z-index:999;backdrop-filter:blur(8px);';
+    bar.innerHTML = `
+        <span style="color:var(--text-secondary,#94a3b8);">⚠️ Je hebt onopgeslagen wijzigingen</span>
+        <button class="btn btn-primary" onclick="document.getElementById('strategy-form').dispatchEvent(new Event('submit',{cancelable:true}));document.getElementById('strategy-form').requestSubmit();" style="padding:8px 20px;">
+            💾 Opslaan
+        </button>
+    `;
+    document.body.appendChild(bar);
+}
+
+function clearDirtyState() {
+    formDirty = false;
+    const bar = document.getElementById('dirty-save-bar');
+    if (bar) bar.remove();
+}
+</script>
+{% endblock %}

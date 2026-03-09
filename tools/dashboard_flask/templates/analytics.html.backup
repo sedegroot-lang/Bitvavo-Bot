@@ -1,0 +1,793 @@
+{% extends "base.html" %}
+
+{% block title %}📊 Analytics Studio - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+
+{% block content %}
+<!-- Hero Banner - Quantum style -->
+<div class="glass-panel hero-banner">
+    <div class="hero-content">
+        <div class="hero-subtitle">DEEP TRADING ANALYTICS</div>
+        <div class="hero-title">📊 Analytics Studio</div>
+        <div class="hero-description">Advanced metrics • Pattern detection • Performance insights</div>
+        <div class="hero-tags">
+            <span class="hero-tag tag-count">{{ total_trades if total_trades else '0' }} trades</span>
+            <span class="hero-tag tag-trailing">{{ "%.1f"|format(win_rate if win_rate else 0) }}% win rate</span>
+        </div>
+    </div>
+</div>
+
+<!-- Hero Stats Grid -->
+<div class="hero-grid">
+    <div class="hero-card">
+        <div class="hero-label">📈 WIN RATE</div>
+        <div class="hero-value">{{ "%.1f"|format(win_rate if win_rate else 0) }}%</div>
+        <div class="hero-sub">Overall success</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">🎯 WINNING TRADES</div>
+        <div class="hero-value text-success">{{ winning_trades if winning_trades else '0' }}</div>
+        <div class="hero-sub">Profitable positions</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">📉 LOSING TRADES</div>
+        <div class="hero-value text-danger">{{ losing_trades if losing_trades else '0' }}</div>
+        <div class="hero-sub">Loss positions</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">💹 AVG TRADE</div>
+        <div class="hero-value">€{{ "%.2f"|format(avg_trade_value if avg_trade_value else 0) }}</div>
+        <div class="hero-sub">Average trade size</div>
+    </div>
+</div>
+
+<!-- Quick Analytics -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>⚡ Quick Analytics</h2>
+    </div>
+    
+    <div class="quick-analytics-grid">
+        <div class="analytics-card">
+            <h4>🎯 Trade Frequency</h4>
+            <div class="frequency-bars">
+                {% for day in trade_frequency %}
+                <div class="freq-bar-container">
+                    <div class="freq-bar" style="height: {{ (day.count / max_trades_day * 100)|int }}%">
+                        <span class="freq-value">{{ day.count }}</span>
+                    </div>
+                    <span class="freq-label">{{ day.name }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="analytics-card">
+            <h4>💰 Portfolio Distribution</h4>
+            <div class="distribution-list">
+                {% for dist in portfolio_distribution %}
+                <div class="dist-item">
+                    <span class="dist-label">{{ dist.market }}</span>
+                    <div class="dist-bar">
+                        <div class="dist-fill" style="width: {{ dist.percentage }}%"></div>
+                    </div>
+                    <span class="dist-value">{{ "%.1f"|format(dist.percentage) }}%</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="analytics-card">
+            <h4>📊 P/L Distribution</h4>
+            <div class="pnl-distribution">
+                <div class="pnl-bar-group">
+                    <div class="pnl-section profit" style="width: {{ profit_pct }}%">
+                        <span>{{ "%.0f"|format(profit_pct) }}% Profit</span>
+                    </div>
+                    <div class="pnl-section loss" style="width: {{ loss_pct }}%">
+                        <span>{{ "%.0f"|format(loss_pct) }}% Loss</span>
+                    </div>
+                </div>
+                <div class="pnl-stats">
+                    <div class="pnl-stat profit">
+                        <span class="label">Winning Trades</span>
+                        <span class="value">{{ winning_trades }}</span>
+                    </div>
+                    <div class="pnl-stat loss">
+                        <span class="label">Losing Trades</span>
+                        <span class="value">{{ losing_trades }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Advanced Metrics -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>🎓 Advanced Metrics</h2>
+    </div>
+    
+    <div class="advanced-metrics-grid">
+        <div class="metric-detail-card">
+            <div class="metric-detail-header">
+                <span class="metric-icon">📉</span>
+                <h4>Max Drawdown</h4>
+            </div>
+            <div class="metric-detail-value text-danger">-{{ "%.2f"|format(max_drawdown) }}%</div>
+            <div class="metric-detail-info">
+                <span>Peak: €{{ "%.2f"|format(drawdown_peak) }}</span>
+                <span>Trough: €{{ "%.2f"|format(drawdown_trough) }}</span>
+            </div>
+        </div>
+        
+        <div class="metric-detail-card">
+            <div class="metric-detail-header">
+                <span class="metric-icon">📊</span>
+                <h4>Sharpe Ratio</h4>
+            </div>
+            <div class="metric-detail-value {{ 'text-success' if sharpe_ratio > 1 else 'text-warning' }}">
+                {{ "%.3f"|format(sharpe_ratio) }}
+            </div>
+            <div class="metric-detail-info">
+                <span>{{ 'Excellent' if sharpe_ratio > 2 else 'Good' if sharpe_ratio > 1 else 'Moderate' }}</span>
+            </div>
+        </div>
+        
+        <div class="metric-detail-card">
+            <div class="metric-detail-header">
+                <span class="metric-icon">🎯</span>
+                <h4>Sortino Ratio</h4>
+            </div>
+            <div class="metric-detail-value {{ 'text-success' if sortino_ratio > 1 else 'text-warning' }}">
+                {{ "%.3f"|format(sortino_ratio) }}
+            </div>
+            <div class="metric-detail-info">
+                <span>Downside risk adjusted</span>
+            </div>
+        </div>
+        
+        <div class="metric-detail-card">
+            <div class="metric-detail-header">
+                <span class="metric-icon">💎</span>
+                <h4>Calmar Ratio</h4>
+            </div>
+            <div class="metric-detail-value {{ 'text-success' if calmar_ratio > 1 else 'text-warning' }}">
+                {{ "%.3f"|format(calmar_ratio) }}
+            </div>
+            <div class="metric-detail-info">
+                <span>Return vs drawdown</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Trade Analysis -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>🔍 Trade Analysis</h2>
+    </div>
+    
+    <div class="trade-analysis-tabs">
+        <button class="tab-btn active" onclick="switchAnalysisTab('duration')">⏱️ By Duration</button>
+        <button class="tab-btn" onclick="switchAnalysisTab('size')">💰 By Size</button>
+        <button class="tab-btn" onclick="switchAnalysisTab('time')">🕐 By Time</button>
+    </div>
+    
+    <div class="analysis-content" id="analysis-duration">
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>Duration Range</th>
+                    <th>Trades</th>
+                    <th>Win Rate</th>
+                    <th>Avg P/L</th>
+                    <th>Total P/L</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for range in duration_analysis %}
+                <tr>
+                    <td>{{ range.label }}</td>
+                    <td>{{ range.trades }}</td>
+                    <td>{{ "%.1f"|format(range.win_rate) }}%</td>
+                    <td class="{{ 'text-success' if range.avg_pnl >= 0 else 'text-danger' }}">
+                        {{ '+' if range.avg_pnl >= 0 else '' }}€{{ "%.2f"|format(range.avg_pnl) }}
+                    </td>
+                    <td class="{{ 'text-success' if range.total_pnl >= 0 else 'text-danger' }}">
+                        {{ '+' if range.total_pnl >= 0 else '' }}€{{ "%.2f"|format(range.total_pnl) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="analysis-content" id="analysis-size" style="display: none;">
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>Size Range</th>
+                    <th>Trades</th>
+                    <th>Win Rate</th>
+                    <th>Avg P/L</th>
+                    <th>Total P/L</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for range in size_analysis %}
+                <tr>
+                    <td>{{ range.label }}</td>
+                    <td>{{ range.trades }}</td>
+                    <td>{{ "%.1f"|format(range.win_rate) }}%</td>
+                    <td class="{{ 'text-success' if range.avg_pnl >= 0 else 'text-danger' }}">
+                        {{ '+' if range.avg_pnl >= 0 else '' }}€{{ "%.2f"|format(range.avg_pnl) }}
+                    </td>
+                    <td class="{{ 'text-success' if range.total_pnl >= 0 else 'text-danger' }}">
+                        {{ '+' if range.total_pnl >= 0 else '' }}€{{ "%.2f"|format(range.total_pnl) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="analysis-content" id="analysis-time" style="display: none;">
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>Time of Day</th>
+                    <th>Trades</th>
+                    <th>Win Rate</th>
+                    <th>Avg P/L</th>
+                    <th>Total P/L</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for period in time_analysis %}
+                <tr>
+                    <td>{{ period.label }}</td>
+                    <td>{{ period.trades }}</td>
+                    <td>{{ "%.1f"|format(period.win_rate) }}%</td>
+                    <td class="{{ 'text-success' if period.avg_pnl >= 0 else 'text-danger' }}">
+                        {{ '+' if period.avg_pnl >= 0 else '' }}€{{ "%.2f"|format(period.avg_pnl) }}
+                    </td>
+                    <td class="{{ 'text-success' if period.total_pnl >= 0 else 'text-danger' }}">
+                        {{ '+' if period.total_pnl >= 0 else '' }}€{{ "%.2f"|format(period.total_pnl) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- Correlation Matrix -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>🔗 Market Correlation</h2>
+        <span class="badge">7-day average</span>
+    </div>
+    
+    <div class="chart-container">
+        <canvas id="correlation-heatmap" width="600" height="400"></canvas>
+    </div>
+</section>
+
+<!-- Trade Frequency & Time Analysis Charts -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📊 Visual Analytics</h2>
+    </div>
+    
+    <div class="analytics-charts-grid">
+        <div class="chart-container">
+            <h3>📈 Trade Frequency (Daily)</h3>
+            <canvas id="frequency-chart" width="500" height="250"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <h3>🕐 Time-of-Day Performance</h3>
+            <canvas id="time-chart" width="500" height="250"></canvas>
+        </div>
+    </div>
+</section>
+
+<!-- Export Section -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📥 Export Analytics</h2>
+    </div>
+    
+    <div class="export-options">
+        <button class="btn btn-secondary" onclick="exportAnalytics('csv')">
+            📄 Export to CSV
+        </button>
+        <button class="btn btn-secondary" onclick="exportAnalytics('json')">
+            📋 Export to JSON
+        </button>
+        <button class="btn btn-secondary" onclick="exportAnalytics('pdf')">
+            📑 Generate PDF Report
+        </button>
+    </div>
+</section>
+
+<style>
+.quick-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.analytics-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+}
+
+.analytics-card h4 {
+    margin: 0 0 var(--spacing-md);
+    font-size: 0.9rem;
+}
+
+.frequency-bars {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    height: 120px;
+    gap: var(--spacing-xs);
+}
+
+.freq-bar-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+}
+
+.freq-bar {
+    width: 100%;
+    background: var(--accent-primary);
+    border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: var(--spacing-xs);
+    min-height: 10%;
+}
+
+.freq-value {
+    font-size: 0.7rem;
+    color: var(--bg-primary);
+    font-weight: 600;
+}
+
+.freq-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+}
+
+.distribution-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.dist-item {
+    display: grid;
+    grid-template-columns: 80px 1fr 50px;
+    gap: var(--spacing-sm);
+    align-items: center;
+}
+
+.dist-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.dist-bar {
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.dist-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+}
+
+.dist-value {
+    font-size: 0.75rem;
+    text-align: right;
+}
+
+.pnl-distribution {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.pnl-bar-group {
+    display: flex;
+    height: 40px;
+    border-radius: var(--border-radius-sm);
+    overflow: hidden;
+}
+
+.pnl-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.pnl-section.profit {
+    background: var(--success);
+    color: white;
+}
+
+.pnl-section.loss {
+    background: var(--danger);
+    color: white;
+}
+
+.pnl-stats {
+    display: flex;
+    justify-content: space-around;
+}
+
+.pnl-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.pnl-stat .label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.pnl-stat .value {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.pnl-stat.profit .value {
+    color: var(--success);
+}
+
+.pnl-stat.loss .value {
+    color: var(--danger);
+}
+
+.advanced-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.metric-detail-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    text-align: center;
+}
+
+.metric-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.metric-detail-header h4 {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+.metric-detail-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: var(--spacing-sm);
+}
+
+.metric-detail-info {
+    display: flex;
+    justify-content: space-around;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.trade-analysis-tabs {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-md);
+}
+
+.tab-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.tab-btn:hover {
+    background: var(--bg-card);
+}
+
+.tab-btn.active {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+    border-color: var(--accent-primary);
+}
+
+.correlation-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 2px;
+}
+
+.correlation-table th {
+    background: var(--bg-tertiary);
+    padding: var(--spacing-sm);
+    font-size: 0.75rem;
+}
+
+.correlation-cell {
+    padding: 0;
+}
+
+.correlation-value {
+    padding: var(--spacing-sm);
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.correlation-legend {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--spacing-md);
+    font-size: 0.75rem;
+}
+
+.legend-gradient {
+    flex: 1;
+    height: 20px;
+    margin: 0 var(--spacing-md);
+    background: linear-gradient(90deg, #dc2626 0%, #fbbf24 50%, #16a34a 100%);
+    border-radius: var(--border-radius-sm);
+}
+
+.export-options {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.analytics-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: var(--spacing-md);
+}
+
+/* Hard cap chart sizing to prevent runaway growth on some viewports */
+.analytics-charts-grid .chart-container {
+    height: 320px;
+    max-height: 320px;
+    position: relative;
+}
+
+#frequency-chart,
+#time-chart,
+#correlation-heatmap {
+    width: 100% !important;
+    height: 240px !important;
+    max-height: 240px !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initAnalyticsCharts();
+});
+
+const analyticsCharts = {
+    corr: null,
+    freq: null,
+    time: null,
+};
+
+function destroyIfExists(chartRef) {
+    if (chartRef && typeof chartRef.destroy === 'function') {
+        chartRef.destroy();
+    }
+}
+
+function baseChartOptions(overrides) {
+    return Object.assign({
+        responsive: true,
+        maintainAspectRatio: false,
+        resizeDelay: 200,
+        animation: false,
+        responsiveAnimationDuration: 0,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)'
+            }
+        }
+    }, overrides || {});
+}
+
+function initAnalyticsCharts() {
+    // Correlation Heatmap
+    const correlationCtx = document.getElementById('correlation-heatmap');
+    if (correlationCtx) {
+        const corrData = {{ correlation_chart_data|tojson|safe if correlation_chart_data else '{}' }};
+        destroyIfExists(analyticsCharts.corr);
+        analyticsCharts.corr = new Chart(correlationCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: corrData.labels || [],
+                datasets: corrData.datasets || []
+            },
+            options: baseChartOptions({
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        min: -1,
+                        max: 1,
+                        ticks: { color: '#9CA3AF' },
+                        grid: { color: 'rgba(75, 85, 99, 0.2)' }
+                    },
+                    y: {
+                        ticks: { color: '#9CA3AF' },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        callbacks: {
+                            label: (ctx) => 'Correlation: ' + ctx.parsed.x.toFixed(2)
+                        }
+                    }
+                }
+            })
+        });
+    }
+    
+    // Trade Frequency Bar Chart
+    const frequencyCtx = document.getElementById('frequency-chart');
+    if (frequencyCtx) {
+        const freqData = {{ trade_frequency|tojson|safe if trade_frequency else '[]' }};
+        destroyIfExists(analyticsCharts.freq);
+        analyticsCharts.freq = new Chart(frequencyCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: freqData.map(d => d.name),
+                datasets: [{
+                    label: 'Trades',
+                    data: freqData.map(d => d.count),
+                    backgroundColor: '#3B82F6',
+                    borderColor: '#2563EB',
+                    borderWidth: 1
+                }]
+            },
+            options: baseChartOptions({
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#9CA3AF',
+                            stepSize: 1
+                        },
+                        grid: { color: 'rgba(75, 85, 99, 0.2)' }
+                    },
+                    x: {
+                        ticks: { color: '#9CA3AF' },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        callbacks: {
+                            label: (ctx) => 'Trades: ' + ctx.parsed.y
+                        }
+                    }
+                }
+            })
+        });
+    }
+    
+    // Time-of-Day Performance Chart
+    const timeCtx = document.getElementById('time-chart');
+    if (timeCtx) {
+        const timeData = {{ time_chart_data|tojson|safe if time_chart_data else '{}' }};
+        destroyIfExists(analyticsCharts.time);
+        analyticsCharts.time = new Chart(timeCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: timeData.labels || [],
+                datasets: [{
+                    label: 'Avg P/L (€)',
+                    data: timeData.pnl_values || [],
+                    borderColor: '#10B981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 3,
+                    pointHoverRadius: 4,
+                    cubicInterpolationMode: 'monotone'
+                }]
+            },
+            options: baseChartOptions({
+                scales: {
+                    y: {
+                        ticks: {
+                            color: '#9CA3AF',
+                            callback: (value) => '€' + value.toFixed(0)
+                        },
+                        grid: { color: 'rgba(75, 85, 99, 0.2)' }
+                    },
+                    x: {
+                        ticks: { color: '#9CA3AF' },
+                        grid: { color: 'rgba(75, 85, 99, 0.2)' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        callbacks: {
+                            label: (ctx) => 'Avg P/L: €' + ctx.parsed.y.toFixed(2)
+                        }
+                    }
+                }
+            })
+        });
+    }
+}
+
+function switchAnalysisTab(tab) {
+    // Hide all tabs
+    document.querySelectorAll('.analysis-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    
+    // Show selected tab
+    document.getElementById('analysis-' + tab).style.display = 'block';
+    event.target.classList.add('active');
+}
+
+async function exportAnalytics(format) {
+    try {
+        const response = await fetch('/api/analytics/export?format=' + format);
+        const blob = await response.blob();
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'analytics_' + new Date().toISOString().split('T')[0] + '.' + format;
+        a.click();
+    } catch (error) {
+        console.error('Export error:', error);
+        alert('Export failed');
+    }
+}
+</script>
+{% endblock %}

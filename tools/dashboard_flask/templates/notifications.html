@@ -1,0 +1,493 @@
+{% extends "base.html" %}
+
+{% block title %}🔔 Notifications - Bitvavo Bot{% endblock %}
+
+{% block content %}
+<div class="glass-panel hero-banner">
+    <div class="hero-content">
+        <h1 class="hero-title">🔔 Notifications & Alerts</h1>
+        <div class="hero-tags">
+            <span class="hero-tag tag-live">🔴 Live Alerts</span>
+            <span class="hero-tag tag-charts">📋 Audit Log</span>
+            <span class="hero-tag tag-alerts">⚙️ Settings</span>
+        </div>
+    </div>
+    <div class="hero-stats">
+        <div class="hero-stat">
+            <span class="stat-label">Unread</span>
+            <span class="stat-value">{{ unread_count }}</span>
+        </div>
+        <div class="hero-stat">
+            <span class="stat-label">Today</span>
+            <span class="stat-value">{{ today_count }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Notification Settings -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>⚙️ Notification Settings</h2>
+    </div>
+    
+    <div class="settings-grid">
+        <div class="setting-card">
+            <div class="setting-header">
+                <h4>📊 Trade Alerts</h4>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-trade-alerts" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-options">
+                <label class="checkbox-label">
+                    <input type="checkbox" checked> Entry executed
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" checked> Stop-loss triggered
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" checked> Take-profit hit
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox"> DCA triggers
+                </label>
+            </div>
+        </div>
+        
+        <div class="setting-card">
+            <div class="setting-header">
+                <h4>🎯 Performance Alerts</h4>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-performance-alerts" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-options">
+                <label class="checkbox-label">
+                    <input type="checkbox" checked> Daily P/L milestone
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox"> Win streak (3+)
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox"> Loss streak (3+)
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" checked> Drawdown warning
+                </label>
+            </div>
+        </div>
+        
+        <div class="setting-card">
+            <div class="setting-header">
+                <h4>🔧 System Alerts</h4>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-system-alerts" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-options">
+                <label class="checkbox-label">
+                    <input type="checkbox" checked> Bot status changes
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" checked> Connection errors
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox"> Balance updates
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" checked> Critical errors
+                </label>
+            </div>
+        </div>
+        
+        <div class="setting-card">
+            <div class="setting-header">
+                <h4>🔊 Notification Channels</h4>
+            </div>
+            <div class="setting-options">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="channel-browser" checked> Browser notifications
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="channel-sound"> Sound alerts
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="channel-telegram"> Telegram bot
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="channel-email"> Email notifications
+                </label>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Live Alerts Feed -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>🔴 Live Alerts</h2>
+        <div class="header-actions">
+            <button class="btn btn-sm btn-secondary" onclick="markAllRead()">✓ Mark All Read</button>
+            <button class="btn btn-sm btn-secondary" onclick="clearAlerts()">🗑️ Clear</button>
+        </div>
+    </div>
+    
+    <div id="alerts-feed" class="alerts-feed">
+        {% if alerts %}
+            {% for alert in alerts %}
+            <div class="alert-item {{ 'unread' if not alert.read else '' }} alert-{{ alert.type }}">
+                <div class="alert-icon">{{ alert.icon }}</div>
+                <div class="alert-content">
+                    <div class="alert-title">{{ alert.title }}</div>
+                    <div class="alert-message">{{ alert.message }}</div>
+                    <div class="alert-time">{{ alert.timestamp }}</div>
+                </div>
+                <button class="alert-dismiss" onclick="dismissAlert('{{ alert.id }}')">✕</button>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">🔕</div>
+                <div class="empty-text">No alerts</div>
+                <div class="empty-hint">You'll see notifications here when events occur</div>
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Audit Log -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📋 Audit Log</h2>
+        <div class="header-actions">
+            <select class="form-select-sm" id="log-filter">
+                <option value="all">All Events</option>
+                <option value="trade">Trades</option>
+                <option value="system">System</option>
+                <option value="error">Errors</option>
+            </select>
+            <button class="btn btn-sm btn-secondary" onclick="exportLogs()">📥 Export</button>
+        </div>
+    </div>
+    
+    <div class="audit-log">
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Event</th>
+                    <th>Details</th>
+                    <th>User/System</th>
+                </tr>
+            </thead>
+            <tbody id="audit-log-body">
+                {% if audit_log %}
+                    {% for entry in audit_log %}
+                    <tr class="log-entry log-{{ entry.type }}">
+                        <td class="log-time">{{ entry.timestamp }}</td>
+                        <td class="log-type">
+                            <span class="badge badge-{{ entry.type }}">{{ entry.type }}</span>
+                        </td>
+                        <td class="log-event">{{ entry.event }}</td>
+                        <td class="log-details">{{ entry.details }}</td>
+                        <td class="log-user">{{ entry.user }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">No audit entries</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<style>
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.setting-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+}
+
+.setting-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.setting-header h4 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #4B5563;
+    transition: 0.4s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+    background-color: var(--accent-primary);
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
+
+.setting-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.checkbox-label input {
+    margin-right: var(--spacing-xs);
+}
+
+.alerts-feed {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.alert-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.2s;
+}
+
+.alert-item.unread {
+    background: rgba(59, 130, 246, 0.05);
+    border-left: 3px solid var(--accent-primary);
+}
+
+.alert-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.alert-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.alert-content {
+    flex: 1;
+}
+
+.alert-title {
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+}
+
+.alert-message {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-xs);
+}
+
+.alert-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.alert-dismiss {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.alert-dismiss:hover {
+    color: var(--text-primary);
+}
+
+.audit-log {
+    overflow-x: auto;
+}
+
+.log-table {
+    width: 100%;
+    font-size: 0.85rem;
+}
+
+.log-table thead {
+    background: var(--bg-tertiary);
+}
+
+.log-table th,
+.log-table td {
+    padding: var(--spacing-sm);
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.log-time {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-trade {
+    background: rgba(59, 130, 246, 0.2);
+    color: #3B82F6;
+}
+
+.badge-system {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10B981;
+}
+
+.badge-error {
+    background: rgba(239, 68, 68, 0.2);
+    color: #EF4444;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+        document.getElementById('channel-browser').addEventListener('change', function() {
+            if (this.checked) {
+                Notification.requestPermission();
+            }
+        });
+    }
+    
+    // WebSocket live alerts
+    if (window.socket) {
+        window.socket.on('alert', function(data) {
+            addLiveAlert(data);
+            if (document.getElementById('channel-browser').checked && Notification.permission === 'granted') {
+                showBrowserNotification(data);
+            }
+            if (document.getElementById('channel-sound').checked) {
+                playAlertSound();
+            }
+        });
+    }
+});
+
+function addLiveAlert(data) {
+    const feed = document.getElementById('alerts-feed');
+    const alertHtml = `
+        <div class="alert-item unread alert-${data.type}">
+            <div class="alert-icon">${data.icon || '🔔'}</div>
+            <div class="alert-content">
+                <div class="alert-title">${data.title}</div>
+                <div class="alert-message">${data.message}</div>
+                <div class="alert-time">${new Date().toLocaleTimeString()}</div>
+            </div>
+            <button class="alert-dismiss" onclick="dismissAlert('${data.id}')">✕</button>
+        </div>
+    `;
+    feed.insertAdjacentHTML('afterbegin', alertHtml);
+}
+
+function showBrowserNotification(data) {
+    new Notification(data.title, {
+        body: data.message,
+        icon: '/static/favicon.ico',
+        badge: data.icon
+    });
+}
+
+function playAlertSound() {
+    // Play notification sound
+    const audio = new Audio('/static/alert.mp3');
+    audio.play().catch(e => console.log('Audio play failed:', e));
+}
+
+function dismissAlert(id) {
+    event.target.closest('.alert-item').remove();
+}
+
+function markAllRead() {
+    document.querySelectorAll('.alert-item.unread').forEach(el => {
+        el.classList.remove('unread');
+    });
+}
+
+async function clearAlerts() {
+    const ok = await apexConfirm('Clear Alerts', 'Clear all alerts?');
+    if (!ok) return;
+    document.getElementById('alerts-feed').innerHTML = `
+        <div class="empty-state">
+            <div class="empty-icon">🔕</div>
+            <div class="empty-text">No alerts</div>
+        </div>
+    `;
+}
+
+function exportLogs() {
+    window.location.href = '/api/notifications/export';
+}
+</script>
+{% endblock %}

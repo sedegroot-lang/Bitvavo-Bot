@@ -1,0 +1,633 @@
+{% extends "base.html" %}
+
+{% block title %}📋 Reports & Logs - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+
+{% block content %}
+<!-- Hero Banner - Quantum style -->
+<div class="glass-panel hero-banner">
+    <div class="hero-content">
+        <div class="hero-subtitle">TRADING HISTORY & SYSTEM LOGS</div>
+        <div class="hero-title">📋 Reports & Logs</div>
+        <div class="hero-description">Complete trade history • System activity logs • Performance reports</div>
+        <div class="hero-tags">
+            <span class="hero-tag tag-count">{{ trade_log|length if trade_log else '0' }} trades</span>
+            <span class="hero-tag tag-trailing">Complete history</span>
+        </div>
+    </div>
+</div>
+
+<!-- Hero Stats Grid -->
+<div class="hero-grid">
+    <div class="hero-card">
+        <div class="hero-label">📊 TOTAL TRADES</div>
+        <div class="hero-value">{{ trade_log|length if trade_log else '0' }}</div>
+        <div class="hero-sub">All time trades</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">✅ CLOSED TRADES</div>
+        <div class="hero-value">{{ closed_trades if closed_trades else '0' }}</div>
+        <div class="hero-sub">Completed trades</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">📈 OPEN TRADES</div>
+        <div class="hero-value">{{ open_trades if open_trades else '0' }}</div>
+        <div class="hero-sub">Active positions</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">📁 LOG FILES</div>
+        <div class="hero-value">{{ log_files|length if log_files else '5' }}</div>
+        <div class="hero-sub">Available logs</div>
+    </div>
+</div>
+
+<!-- Trade Log -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📊 Trade Log</h2>
+        <div class="header-actions">
+            <select class="form-select" id="filter-status" onchange="filterTrades()">
+                <option value="all">All Trades</option>
+                <option value="open">Open Only</option>
+                <option value="closed">Closed Only</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="exportTrades()">📥 Export</button>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="summary-table" id="trades-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Market</th>
+                    <th>Type</th>
+                    <th>Entry Time</th>
+                    <th>Amount</th>
+                    <th>Buy Price</th>
+                    <th>Current/Sell</th>
+                    <th>P/L</th>
+                    <th>P/L %</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for trade in trade_log %}
+                <tr class="trade-row {{ trade.get('status', 'unknown') }}" data-status="{{ trade.get('status', 'unknown') }}">
+                    <td><code>{{ trade.get('id', 'N/A')[:8] }}</code></td>
+                    <td><strong>{{ trade.market }}</strong></td>
+                    <td>
+                        <span class="badge {{ 'badge-success' if trade.side == 'buy' else 'badge-danger' }}">
+                            {{ trade.side|upper }}
+                        </span>
+                    </td>
+                    <td>{{ trade.get('entry_time', 'N/A') }}</td>
+                    <td>{{ "%.8f"|format(trade.get('amount', 0)) }}</td>
+                    <td>€{{ "%.2f"|format(trade.get('buy_price', 0)) }}</td>
+                    <td>€{{ "%.2f"|format(trade.get('sell_price', 0) if trade.get('status') == 'closed' else trade.get('current_price', 0)) }}</td>
+                    <td class="{{ 'text-success' if trade.get('pnl', 0) >= 0 else 'text-danger' }}">
+                        {{ '+' if trade.get('pnl', 0) >= 0 else '' }}€{{ "%.2f"|format(trade.get('pnl', 0)) }}
+                    </td>
+                    <td class="{{ 'text-success' if trade.get('pnl_pct', 0) >= 0 else 'text-danger' }}">
+                        {{ '+' if trade.get('pnl_pct', 0) >= 0 else '' }}{{ "%.2f"|format(trade.get('pnl_pct', 0)) }}%
+                    </td>
+                    <td>
+                        <span class="badge {{ 'badge-info' if trade.get('status') == 'open' else 'badge-neutral' }}">
+                            {{ trade.get('status', 'unknown')|upper }}
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="text-center" style="color: var(--text-muted); padding: 2rem;">
+                        No trades in log
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="pagination">
+        <button class="btn btn-sm btn-secondary" onclick="prevPage()" id="prev-btn">← Previous</button>
+        <span id="page-info">Page 1 of {{ total_pages }}</span>
+        <button class="btn btn-sm btn-secondary" onclick="nextPage()" id="next-btn">Next →</button>
+    </div>
+</section>
+
+<!-- System Logs -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>🔍 System Logs</h2>
+        <div class="header-actions">
+            <select class="form-select" id="log-level" onchange="filterLogs()">
+                <option value="all">All Levels</option>
+                <option value="error">Errors Only</option>
+                <option value="warning">Warnings Only</option>
+                <option value="info">Info Only</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="refreshLogs()">🔄 Refresh</button>
+        </div>
+    </div>
+    
+    <div class="log-viewer" id="log-viewer">
+        {% for log in system_logs[-50:] %}
+        <div class="log-entry {{ log.level.lower() }}" data-level="{{ log.level.lower() }}">
+            <span class="log-time">{{ log.timestamp }}</span>
+            <span class="log-level {{ log.level.lower() }}">{{ log.level }}</span>
+            <span class="log-source">{{ log.source }}</span>
+            <span class="log-message">{{ log.message }}</span>
+        </div>
+        {% else %}
+        <div class="log-entry info">
+            <span class="log-message">No logs available</span>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="log-controls">
+        <button class="btn btn-sm btn-secondary" onclick="scrollToBottom()">⬇️ Scroll to Bottom</button>
+        <button class="btn btn-sm btn-secondary" onclick="clearLogDisplay()">🗑️ Clear Display</button>
+        <button class="btn btn-sm btn-secondary" onclick="downloadLogs()">📥 Download Logs</button>
+    </div>
+</section>
+
+<!-- Bot Heartbeat -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>💓 Bot Heartbeat</h2>
+    </div>
+    
+    <div class="heartbeat-grid">
+        <div class="heartbeat-card">
+            <div class="heartbeat-header">
+                <span class="heartbeat-icon">🤖</span>
+                <h4>Trading Bot</h4>
+            </div>
+            <div class="heartbeat-status {{ 'online' if bot_heartbeat.online else 'offline' }}">
+                {{ 'Online' if bot_heartbeat.online else 'Offline' }}
+            </div>
+            <div class="heartbeat-details">
+                <div class="detail-item">
+                    <span class="label">Last Seen</span>
+                    <span class="value">{{ bot_heartbeat.last_seen }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Uptime</span>
+                    <span class="value">{{ bot_heartbeat.uptime }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Memory</span>
+                    <span class="value">{{ bot_heartbeat.memory_mb }} MB</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="heartbeat-card">
+            <div class="heartbeat-header">
+                <span class="heartbeat-icon">🧠</span>
+                <h4>AI Supervisor</h4>
+            </div>
+            <div class="heartbeat-status {{ 'online' if ai_heartbeat.online else 'offline' }}">
+                {{ 'Active' if ai_heartbeat.online else 'Inactive' }}
+            </div>
+            <div class="heartbeat-details">
+                <div class="detail-item">
+                    <span class="label">Last Analysis</span>
+                    <span class="value">{{ ai_heartbeat.last_analysis }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Predictions</span>
+                    <span class="value">{{ ai_heartbeat.predictions_made }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Accuracy</span>
+                    <span class="value">{{ "%.1f"|format(ai_heartbeat.get('accuracy', 0)) }}%</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="heartbeat-card">
+            <div class="heartbeat-header">
+                <span class="heartbeat-icon">📊</span>
+                <h4>Dashboard</h4>
+            </div>
+            <div class="heartbeat-status online">
+                Online
+            </div>
+            <div class="heartbeat-details">
+                <div class="detail-item">
+                    <span class="label">WebSocket</span>
+                    <span class="value" id="ws-connection-status">Connected</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Last Update</span>
+                    <span class="value" id="last-data-update">Just now</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Active Users</span>
+                    <span class="value">{{ active_users }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Performance Reports -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📈 Performance Reports</h2>
+    </div>
+    
+    <div class="reports-list">
+        {% for report in available_reports %}
+        <div class="report-card">
+            <div class="report-icon">{{ report.icon }}</div>
+            <div class="report-info">
+                <h4>{{ report.name }}</h4>
+                <p>{{ report.description }}</p>
+                <div class="report-meta">
+                    <span>{{ report.period }}</span>
+                    <span>•</span>
+                    <span>Generated: {{ report.generated }}</span>
+                </div>
+            </div>
+            <div class="report-actions">
+                <button class="btn btn-sm btn-secondary" onclick="viewReport('{{ report.id }}')">
+                    👁️ View
+                </button>
+                <button class="btn btn-sm btn-secondary" onclick="downloadReport('{{ report.id }}')">
+                    📥 Download
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <button class="btn btn-primary" onclick="generateReport()">📊 Generate New Report</button>
+</section>
+
+<style>
+.table-responsive {
+    overflow-x: auto;
+}
+
+.trade-row {
+    transition: background var(--transition-fast);
+}
+
+.trade-row:hover {
+    background: var(--bg-tertiary);
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.log-viewer {
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.8rem;
+}
+
+.log-entry {
+    display: grid;
+    grid-template-columns: 90px 60px 120px 1fr;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-time {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.log-level {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.log-level.error {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+.log-level.warning {
+    background: var(--warning-bg);
+    color: var(--warning);
+}
+
+.log-level.info {
+    background: var(--info-bg);
+    color: var(--info);
+}
+
+.log-level.debug {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+}
+
+.log-source {
+    color: var(--accent-secondary);
+    font-size: 0.75rem;
+}
+
+.log-message {
+    color: var(--text-primary);
+}
+
+.log-controls {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+}
+
+.heartbeat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.heartbeat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+}
+
+.heartbeat-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.heartbeat-icon {
+    font-size: 1.5rem;
+}
+
+.heartbeat-header h4 {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.heartbeat-status {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: var(--spacing-md);
+    text-align: center;
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
+}
+
+.heartbeat-status.online {
+    background: var(--success-bg);
+    color: var(--success);
+}
+
+.heartbeat-status.offline {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+.heartbeat-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+}
+
+.detail-item .label {
+    color: var(--text-muted);
+}
+
+.detail-item .value {
+    font-weight: 600;
+}
+
+.reports-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.report-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+}
+
+.report-icon {
+    font-size: 2rem;
+}
+
+.report-info {
+    flex: 1;
+}
+
+.report-info h4 {
+    margin: 0 0 var(--spacing-xs);
+    font-size: 0.95rem;
+}
+
+.report-info p {
+    margin: 0 0 var(--spacing-xs);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.report-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.report-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+@media (max-width: 768px) {
+    .log-entry {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-xs);
+    }
+    
+    .report-card {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+</style>
+
+<script>
+let currentPage = 1;
+let currentFilter = 'all';
+let currentLogLevel = 'all';
+
+// Trade filtering
+function filterTrades() {
+    currentFilter = document.getElementById('filter-status').value;
+    const rows = document.querySelectorAll('.trade-row');
+    
+    rows.forEach(row => {
+        if (currentFilter === 'all' || row.dataset.status === currentFilter) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Log filtering
+function filterLogs() {
+    currentLogLevel = document.getElementById('log-level').value;
+    const entries = document.querySelectorAll('.log-entry');
+    
+    entries.forEach(entry => {
+        if (currentLogLevel === 'all' || entry.dataset.level === currentLogLevel) {
+            entry.style.display = '';
+        } else {
+            entry.style.display = 'none';
+        }
+    });
+}
+
+// Log controls
+function refreshLogs() {
+    location.reload();
+}
+
+function scrollToBottom() {
+    const viewer = document.getElementById('log-viewer');
+    viewer.scrollTop = viewer.scrollHeight;
+}
+
+function clearLogDisplay() {
+    document.getElementById('log-viewer').innerHTML = '<div class="log-entry info"><span class="log-message">Display cleared</span></div>';
+}
+
+async function downloadLogs() {
+    try {
+        const response = await fetch('/api/logs/download');
+        const blob = await response.blob();
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'bot_logs_' + new Date().toISOString().split('T')[0] + '.txt';
+        a.click();
+    } catch (error) {
+        console.error('Download error:', error);
+    }
+}
+
+// Exports
+async function exportTrades() {
+    try {
+        const response = await fetch('/api/trades/export?status=' + currentFilter);
+        const blob = await response.blob();
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'trades_' + new Date().toISOString().split('T')[0] + '.csv';
+        a.click();
+    } catch (error) {
+        console.error('Export error:', error);
+    }
+}
+
+// Pagination
+function prevPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        loadPage(currentPage);
+    }
+}
+
+function nextPage() {
+    currentPage++;
+    loadPage(currentPage);
+}
+
+function loadPage(page) {
+    window.location.href = '/reports?page=' + page;
+}
+
+// Reports
+function viewReport(id) {
+    window.open('/api/reports/' + id + '/view', '_blank');
+}
+
+async function downloadReport(id) {
+    try {
+        const response = await fetch('/api/reports/' + id + '/download');
+        const blob = await response.blob();
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'report_' + id + '.pdf';
+        a.click();
+    } catch (error) {
+        console.error('Download error:', error);
+    }
+}
+
+function generateReport() {
+    const period = prompt('Report period (7d, 30d, all):', '30d');
+    if (period) {
+        fetch('/api/reports/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({period})
+        }).then(r => {
+            if (r.ok) {
+                alert('Report generation started. Refresh page in a moment.');
+            }
+        });
+    }
+}
+
+// Update last data update time
+setInterval(() => {
+    if (DashboardApp.lastUpdate) {
+        const seconds = Math.floor((new Date() - DashboardApp.lastUpdate) / 1000);
+        const el = document.getElementById('last-data-update');
+        if (el) {
+            if (seconds < 10) el.textContent = 'Just now';
+            else if (seconds < 60) el.textContent = seconds + 's ago';
+            else el.textContent = Math.floor(seconds / 60) + 'm ago';
+        }
+    }
+}, 1000);
+</script>
+{% endblock %}

@@ -1,0 +1,72 @@
+name: Release ZIP
+
+# Triggered by pushing a version tag: git tag v1.2.3 && git push --tags
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Build release ZIP
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          DIRNAME="bitvavo-bot-${VERSION}"
+
+          # Kopieer alles behalve dev/runtime bestanden naar een tijdelijke map
+          rsync -av --progress . "${DIRNAME}/" \
+            --exclude ".git" \
+            --exclude ".venv" \
+            --exclude "__pycache__" \
+            --exclude "*.pyc" \
+            --exclude ".env" \
+            --exclude "logs/" \
+            --exclude "data/" \
+            --exclude "backups/" \
+            --exclude "metrics/" \
+            --exclude "reports/" \
+            --exclude "models/" \
+            --exclude "*.db" \
+            --exclude "*.sqlite" \
+            --exclude "ai/*.json" \
+            --exclude "ai/training_data/" \
+            --exclude "ai/logs/"
+
+          # Maak ZIP aan
+          zip -r "bitvavo-bot-${VERSION}.zip" "${DIRNAME}/"
+          echo "ZIP created: bitvavo-bot-${VERSION}.zip"
+          ls -lh "bitvavo-bot-${VERSION}.zip"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Bitvavo Bot ${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## Bitvavo Trading Bot ${{ steps.version.outputs.VERSION }}
+
+            ### Installatie (Windows)
+            1. Download `bitvavo-bot-${{ steps.version.outputs.VERSION }}.zip` hieronder
+            2. Pak het ZIP-bestand uit
+            3. Dubbelklik **`setup.bat`** — de wizard regelt de rest
+
+            ### Vereiste
+            - [Python 3.11+](https://www.python.org/downloads/) — vink "Add to PATH" aan bij installatie
+            - Een [Bitvavo account](https://bitvavo.com/invite?a=B8942E4528)
+
+            ### Steun de bot
+            Vind je de bot waardevol? Doneer via BTC: `1DUCu4ZGgKHZr22DvAxuWKBujcfpCLJoNy`
+          files: "bitvavo-bot-${{ steps.version.outputs.VERSION }}.zip"
+          draft: false
+          prerelease: false

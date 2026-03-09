@@ -1,0 +1,724 @@
+{% extends "base.html" %}
+
+{% block title %}🧠 AI Copilot - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+
+{% block content %}
+<!-- Hero Banner -->
+<div class="glass-panel hero-banner">
+    <div class="hero-content">
+        <div class="hero-subtitle">MACHINE LEARNING INTELLIGENCE</div>
+        <div class="hero-title">🧠 AI Operations Center</div>
+        <div class="hero-description">XGBoost predictions • Regime analysis • Automated parameter tuning</div>
+    </div>
+</div>
+
+<!-- Hero Stats Grid -->
+<div class="hero-grid" id="ai-hero-grid">
+    <div class="hero-card">
+        <div class="hero-label">🤖 SUPERVISOR</div>
+        <div class="hero-value" id="hero-ai-status">Loading...</div>
+        <div class="hero-sub">AI engine status</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">💡 SUGGESTIONS</div>
+        <div class="hero-value" id="hero-ai-suggestions">-</div>
+        <div class="hero-sub">Open proposals</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">📊 REGIME</div>
+        <div class="hero-value" id="hero-ai-regime">-</div>
+        <div class="hero-sub">Market state</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">🔄 AUTO-APPLY</div>
+        <div class="hero-value" id="hero-ai-autoapply">-</div>
+        <div class="hero-sub">Automation mode</div>
+    </div>
+</div>
+
+<!-- Dynamic Content -->
+<div id="ai-content">
+    <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p>Loading AI data...</p>
+    </div>
+</div>
+
+<style>
+.ai-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.ai-metric-card {
+    background: rgba(20, 20, 35, 0.6);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.ai-metric-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.ai-metric-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--neon-cyan);
+}
+
+.ai-metric-value.status-active {
+    color: #00d4aa;
+}
+
+.ai-metric-value.status-inactive {
+    color: #ff6b6b;
+}
+
+.automation-controls {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.control-group {
+    background: rgba(20, 20, 35, 0.4);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.control-group h4 {
+    margin: 0 0 1rem;
+    color: var(--neon-blue);
+    font-size: 1rem;
+}
+
+.suggestions-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+}
+
+.suggestions-table th,
+.suggestions-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.suggestions-table th {
+    font-weight: 600;
+    color: var(--neon-blue);
+    font-size: 0.9rem;
+}
+
+.suggestions-table tbody tr:hover {
+    background: rgba(0, 212, 255, 0.05);
+}
+
+.delta-positive {
+    color: #00d4aa;
+}
+
+.delta-negative {
+    color: #ff6b6b;
+}
+
+.ml-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.feature-importance-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.feature-importance-table th,
+.feature-importance-table td {
+    padding: 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.importance-bar {
+    height: 20px;
+    background: rgba(0, 212, 255, 0.3);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+.importance-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00d4ff, #00d4aa);
+    transition: width 0.3s;
+}
+
+.history-entry {
+    background: rgba(20, 20, 35, 0.3);
+    border-left: 3px solid rgba(0, 212, 255, 0.5);
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+    border-radius: 4px;
+}
+
+.history-entry .timestamp {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-right: 0.5rem;
+}
+
+.insights-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.insights-table th,
+.insights-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.insights-table th {
+    font-weight: 600;
+    color: var(--neon-blue);
+    font-size: 0.9rem;
+}
+
+.section-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.3), transparent);
+    margin: 2.5rem 0;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .ai-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .ml-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .automation-controls { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+    .ai-metrics-grid { grid-template-columns: 1fr; }
+    .ml-metrics-grid { grid-template-columns: 1fr; }
+}
+</style>
+
+<script>
+let aiData = null;
+
+async function loadAIData() {
+    try {
+        const response = await fetch('/api/ai/status');
+        if (!response.ok) throw new Error('Failed to fetch AI data');
+        
+        aiData = await response.json();
+        renderAIContent(aiData);
+    } catch (error) {
+        console.error('Error loading AI data:', error);
+        document.getElementById('ai-content').innerHTML = `
+            <div class="glass-panel">
+                <div style="text-align: center; padding: 2rem; color: var(--danger);">
+                    <h3>⚠️ Kon AI data niet laden</h3>
+                    <p>${error.message}</p>
+                    <button class="btn btn-secondary" onclick="loadAIData()">🔄 Opnieuw proberen</button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function renderAIContent(data) {
+    const container = document.getElementById('ai-content');
+    
+    // Update hero stats
+    const heroStatus = document.getElementById('hero-ai-status');
+    if (heroStatus) {
+        heroStatus.textContent = data.ai_active ? 'ONLINE' : 'OFFLINE';
+        heroStatus.className = 'hero-value ' + (data.ai_active ? 'text-success' : 'text-danger');
+    }
+    const heroSugg = document.getElementById('hero-ai-suggestions');
+    if (heroSugg) heroSugg.textContent = (data.suggestions || []).length;
+    const heroRegime = document.getElementById('hero-ai-regime');
+    if (heroRegime) heroRegime.textContent = (data.regime || 'ONBEKEND').toUpperCase();
+    const heroAuto = document.getElementById('hero-ai-autoapply');
+    if (heroAuto) {
+        heroAuto.textContent = data.config.auto_apply ? 'AAN' : 'UIT';
+        heroAuto.className = 'hero-value ' + (data.config.auto_apply ? 'text-success' : 'text-warning');
+    }
+    
+    let html = '';
+    
+    // Status Metrics
+    html += `
+        <section class="glass-panel">
+            <div class="section-header">
+                <h2>AI Supervisor Status</h2>
+            </div>
+            <div class="ai-metrics-grid">
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">🤖 Supervisor</div>
+                    <div class="ai-metric-value ${data.ai_active ? 'status-active' : 'status-inactive'}">
+                        ${data.ai_active ? 'ONLINE' : 'OFFLINE'}
+                    </div>
+                </div>
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">⏰ Laatste heartbeat</div>
+                    <div class="ai-metric-value" style="font-size: 1rem;">${data.last_update || 'N/A'}</div>
+                </div>
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">🔄 Auto-apply</div>
+                    <div class="ai-metric-value" style="font-size: 1.2rem;">
+                        ${data.config.auto_apply ? 'AAN' : 'UIT'}
+                    </div>
+                </div>
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">💡 Open voorstellen</div>
+                    <div class="ai-metric-value">${data.suggestions.length}</div>
+                </div>
+            </div>
+        </section>
+    `;
+    
+    // Automation Controls
+    html += '<div class="section-divider"></div>';
+    html += `
+        <section class="glass-panel">
+            <div class="section-header">
+                <h2>Automation controls</h2>
+            </div>
+            <form id="ai-settings-form" class="automation-controls">
+                <div class="control-group">
+                    <h4>AI Instellingen</h4>
+                    <div class="form-group-hodl">
+                        <label>
+                            <input type="checkbox" name="auto_apply" ${data.config.auto_apply ? 'checked' : ''}>
+                            AI auto-apply inschakelen
+                        </label>
+                    </div>
+                    <div class="form-group-hodl">
+                        <label>
+                            <input type="checkbox" name="regime_recommendations" ${data.config.regime_recommendations ? 'checked' : ''}>
+                            Regime-aanbevelingen inschakelen
+                        </label>
+                    </div>
+                    <div class="form-group-hodl" style="margin-top: 1rem;">
+                        <label>Auto-apply cooldown (minuten)</label>
+                        <input type="number" name="cooldown_min" value="${data.config.cooldown_min}" 
+                               min="10" step="5" class="form-input">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <h4>Toegestane parameters</h4>
+                    <div id="allowed-params-list">
+                        ${renderParamCheckboxes(data.config.allowed_params)}
+                    </div>
+                </div>
+            </form>
+            <button class="btn btn-primary" onclick="saveAISettings()">💾 AI-instellingen opslaan</button>
+        </section>
+    `;
+    
+    // Market Insights & Regime
+    html += '<div class="section-divider"></div>';
+    html += `
+        <section class="glass-panel">
+            <div class="section-header">
+                <h2>Marktinzichten & regime</h2>
+            </div>
+            <div class="ai-metrics-grid" style="grid-template-columns: 1fr 3fr;">
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">AI Regime</div>
+                    <div class="ai-metric-value" style="font-size: 1.3rem;">${(data.regime || 'ONBEKEND').toUpperCase()}</div>
+                </div>
+                <div class="ai-metric-card" style="text-align: left;">
+                    <div class="ai-metric-label">Regime Stats</div>
+                    <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                        ${Object.entries(data.regime_stats || {}).map(([k, v]) => 
+                            `${k}: ${typeof v === 'number' ? v.toFixed(3) : v}`
+                        ).join(' • ')}
+                    </div>
+                </div>
+            </div>
+            ${data.insights && data.insights.length > 0 ? renderInsightsTable(data.insights) : '<p class="info-message">Nog geen actuele AI-inzichten beschikbaar.</p>'}
+        </section>
+    `;
+    
+    // Parameter Suggestions
+    html += '<div class="section-divider"></div>';
+    html += `
+        <section class="glass-panel">
+            <div class="section-header">
+                <h2>Parameter suggesties</h2>
+            </div>
+    `;
+    
+    if (data.suggestions && data.suggestions.length > 0) {
+        html += renderSuggestionsTable(data.suggestions);
+        html += '<button class="btn btn-primary" style="margin-top: 1rem;" onclick="applyAllSuggestions()">✅ Alle AI-suggesties toepassen</button>';
+    } else {
+        html += '<p class="info-message">Geen AI-suggesties beschikbaar. Start ai_supervisor.py of wacht even.</p>';
+    }
+    
+    html += '</section>';
+    
+    // ML Signal Distribution
+    if (data.ml_metrics && Object.keys(data.ml_metrics).length > 0) {
+        html += '<div class="section-divider"></div>';
+        html += renderMLMetrics(data.ml_metrics);
+    }
+    
+    // AI Change History
+    html += '<div class="section-divider"></div>';
+    html += renderChangeHistory(data.change_history || []);
+    
+    container.innerHTML = html;
+}
+
+function renderParamCheckboxes(allowedParams) {
+    const allParams = [
+        'DEFAULT_TRAILING',
+        'TRAILING_ACTIVATION_PCT',
+        'RSI_MIN_BUY',
+        'DCA_SIZE_MULTIPLIER',
+        'BASE_AMOUNT_EUR',
+        'DCA_AMOUNT_EUR',
+        'OPEN_TRADE_COOLDOWN_SECONDS',
+        'MAX_OPEN_TRADES'
+    ];
+    
+    return allParams.map(param => `
+        <div style="margin: 0.5rem 0;">
+            <label>
+                <input type="checkbox" name="allowed_params[]" value="${param}" 
+                       ${allowedParams && allowedParams.includes(param) ? 'checked' : ''}>
+                ${param}
+            </label>
+        </div>
+    `).join('');
+}
+
+function renderInsightsTable(insights) {
+    let html = `
+        <table class="insights-table">
+            <thead>
+                <tr>
+                    <th>Market</th>
+                    <th>Score</th>
+                    <th>Spread %</th>
+                    <th>Liquidity</th>
+                    <th>Volume ratio</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    insights.forEach(insight => {
+        const spread = insight.spread_pct ? (insight.spread_pct * 100).toFixed(2) : 'N/A';
+        const liquidity = insight.liquidity_score ? insight.liquidity_score.toFixed(2) : 'N/A';
+        const volumeRatio = insight.volume_ratio ? insight.volume_ratio.toFixed(2) : 'N/A';
+        
+        html += `
+            <tr>
+                <td><strong>${insight.market}</strong></td>
+                <td>${insight.score || 'N/A'}</td>
+                <td>${spread}%</td>
+                <td>${liquidity}</td>
+                <td>${volumeRatio}</td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table>';
+    return html;
+}
+
+function renderSuggestionsTable(suggestions) {
+    let html = `
+        <table class="suggestions-table">
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Huidig</th>
+                    <th>Voorstel</th>
+                    <th>Delta</th>
+                    <th>Reden</th>
+                    <th>Confidence</th>
+                    <th>Actie</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    suggestions.forEach((sugg, idx) => {
+        const delta = typeof sugg.to === 'number' && typeof sugg.from === 'number' 
+            ? (sugg.to - sugg.from).toFixed(3) 
+            : 'N/A';
+        const deltaClass = delta > 0 ? 'delta-positive' : 'delta-negative';
+        
+        html += `
+            <tr>
+                <td><strong>${sugg.param}</strong></td>
+                <td>${sugg.from}</td>
+                <td>${sugg.to}</td>
+                <td class="${deltaClass}">${delta > 0 ? '+' : ''}${delta}</td>
+                <td>${sugg.reason || ''}</td>
+                <td>${sugg.confidence || 'N/A'}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="applySingleSuggestion('${sugg.param}', ${sugg.to}, this)">
+                        Toepassen
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table>';
+    return html;
+}
+
+function renderMLMetrics(mlMetrics) {
+    const accuracy = mlMetrics.accuracy || mlMetrics.test_accuracy || 0;
+    const precision = mlMetrics.precision || 0;
+    const recall = mlMetrics.recall || 0;
+    const f1 = mlMetrics.f1_score || mlMetrics.f1 || 0;
+    
+    let html = `
+        <section class="glass-panel">
+            <div class="section-header">
+                <h2>📊 ML Signal Distribution</h2>
+            </div>
+            <div class="ml-metrics-grid">
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">Model Accuracy</div>
+                    <div class="ai-metric-value">${(accuracy * 100).toFixed(1)}%</div>
+                </div>
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">Precision</div>
+                    <div class="ai-metric-value">${(precision * 100).toFixed(1)}%</div>
+                </div>
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">Recall</div>
+                    <div class="ai-metric-value">${(recall * 100).toFixed(1)}%</div>
+                </div>
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">F1 Score</div>
+                    <div class="ai-metric-value">${f1.toFixed(3)}</div>
+                </div>
+            </div>
+    `;
+    
+    // Feature importance
+    if (mlMetrics.feature_importance) {
+        const features = Object.entries(mlMetrics.feature_importance)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10);
+        
+        if (features.length > 0) {
+            html += `
+                <h4 style="margin: 1.5rem 0 0.5rem;">Top Feature Importance</h4>
+                <table class="feature-importance-table">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Importance</th>
+                            <th width="200">Bar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            const maxImportance = features[0][1];
+            features.forEach(([feature, importance]) => {
+                const percentage = (importance / maxImportance) * 100;
+                html += `
+                    <tr>
+                        <td>${feature}</td>
+                        <td>${importance.toFixed(4)}</td>
+                        <td>
+                            <div class="importance-bar">
+                                <div class="importance-fill" style="width: ${percentage}%"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+        }
+    }
+    
+    html += '</section>';
+    return html;
+}
+
+function renderChangeHistory(changes) {
+    let html = `
+        <section class="glass-panel">
+            <div class="section-header">
+                <h2>📜 AI Wijzigingshistorie</h2>
+            </div>
+    `;
+    
+    if (!changes || changes.length === 0) {
+        html += '<p class="info-message">Nog geen AI-wijzigingen doorgevoerd.</p>';
+    } else {
+        html += `
+            <div style="max-height: 400px; overflow-y: auto;">
+                <table class="suggestions-table">
+                    <thead>
+                        <tr>
+                            <th>🕐 Tijdstip</th>
+                            <th>Parameter</th>
+                            <th>Van</th>
+                            <th>Naar</th>
+                            <th>Reden</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        changes.forEach(ch => {
+            const fromVal = typeof ch.from_value === 'number' ? ch.from_value.toFixed(4) : ch.from_value;
+            const toVal = typeof ch.to_value === 'number' ? ch.to_value.toFixed(4) : ch.to_value;
+            const delta = typeof ch.from_value === 'number' && typeof ch.to_value === 'number' 
+                ? ch.to_value - ch.from_value : null;
+            const deltaClass = delta !== null ? (delta > 0 ? 'delta-positive' : 'delta-negative') : '';
+            
+            html += `
+                <tr>
+                    <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-muted);">${ch.timestamp}</td>
+                    <td><strong>${ch.param}</strong></td>
+                    <td>${fromVal}</td>
+                    <td class="${deltaClass}">${toVal}</td>
+                    <td style="font-size: 0.85rem;">${ch.reason || '-'}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    html += '</section>';
+    return html;
+}
+
+async function saveAISettings() {
+    const form = document.getElementById('ai-settings-form');
+    const formData = new FormData(form);
+    
+    const allowedParams = [];
+    form.querySelectorAll('input[name="allowed_params[]"]:checked').forEach(cb => {
+        allowedParams.push(cb.value);
+    });
+    
+    const data = {
+        auto_apply: formData.get('auto_apply') === 'on',
+        regime_recommendations: formData.get('regime_recommendations') === 'on',
+        cooldown_min: parseInt(formData.get('cooldown_min')),
+        allowed_params: allowedParams
+    };
+    
+    try {
+        const response = await fetch('/api/ai/save_settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            apexToast('✅ AI-instellingen opgeslagen!', 'success');
+            setTimeout(() => loadAIData(), 500);
+        } else {
+            throw new Error('Save failed');
+        }
+    } catch (error) {
+        console.error('Error saving AI settings:', error);
+        apexToast('❌ Kon instellingen niet opslaan', 'error');
+    }
+}
+
+async function applySingleSuggestion(param, value, btnElement) {
+    const origText = btnElement ? btnElement.textContent : '';
+    try {
+        if (btnElement) { btnElement.disabled = true; btnElement.textContent = '⏳'; }
+        const response = await fetch('/api/ai/apply_suggestion', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ param, value })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            apexToast(`✅ ${param} → ${result.value}`, 'success');
+            // Mark row as applied
+            if (btnElement) {
+                const row = btnElement.closest('tr');
+                if (row) { row.style.opacity = '0.5'; row.style.textDecoration = 'line-through'; }
+                btnElement.textContent = '✅';
+                btnElement.disabled = true;
+            }
+            setTimeout(() => loadAIData(), 1500);
+        } else {
+            throw new Error('Apply failed');
+        }
+    } catch (error) {
+        console.error('Error applying suggestion:', error);
+        apexToast('❌ Kon suggestie niet toepassen', 'error');
+        if (btnElement) { btnElement.disabled = false; btnElement.textContent = origText; }
+    }
+}
+
+async function applyAllSuggestions() {
+    if (!aiData || !aiData.suggestions || aiData.suggestions.length === 0) {
+        apexToast('Geen suggesties om toe te passen', 'warning');
+        return;
+    }
+    
+    const btn = document.querySelector('[onclick*="applyAllSuggestions"]');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Toepassen...'; }
+    
+    let successCount = 0;
+    for (const sugg of aiData.suggestions) {
+        try {
+            const response = await fetch('/api/ai/apply_suggestion', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ param: sugg.param, value: sugg.to })
+            });
+            
+            if (response.ok) successCount++;
+        } catch (error) {
+            console.error(`Error applying ${sugg.param}:`, error);
+        }
+    }
+    
+    apexToast(`✅ ${successCount}/${aiData.suggestions.length} suggesties toegepast!`, 'success');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Alle AI-suggesties toepassen'; }
+    setTimeout(() => loadAIData(), 1000);
+}
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', loadAIData);
+
+// Auto-refresh every 30 seconds (visibility-aware)
+if (typeof apexSetInterval === 'function') {
+    apexSetInterval(loadAIData, 30000);
+} else {
+    setInterval(loadAIData, 30000);
+}
+</script>
+{% endblock %}

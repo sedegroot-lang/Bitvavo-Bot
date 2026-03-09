@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}</title>
+    
+    <!-- Fonts - Inter for FAANG-level premium design -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js for analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <!-- Chart.js Annotation Plugin for trade card markers -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    
+    <!-- Register annotation plugin -->
+    <script>
+        if (typeof Chart !== 'undefined' && typeof window.ChartAnnotation !== 'undefined') {
+            Chart.register(window.ChartAnnotation);
+            console.log('[Charts] Annotation plugin registered');
+        } else if (typeof Chart !== 'undefined') {
+            // Plugin may auto-register in newer versions
+            console.log('[Charts] Chart.js loaded, annotation plugin should auto-register');
+        }
+    </script>
+    
+    <!-- Socket.IO for live updates -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <!-- Premium Trading Theme CSS - TradingView/CoinGecko inspired -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/premium_trading.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/premium_cards.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/grid-chart.css') }}">
+    
+    <!-- FAANG-Level UI/UX Upgrades -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/faang_upgrades.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/faang_ultimate.css') }}">
+    
+    <!-- Apex Design System - Next-gen UI -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/apex_design.css') }}">
+    
+    <!-- Apex Charts - TradingView-level chart enhancements -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/apex_charts.css') }}">
+    
+    <!-- Apex Unified - Cross-tab consistency -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/apex_unified.css') }}">
+    
+    <!-- PWA Support -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#0d1117">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="{{ url_for('static', filename='js/faang_upgrades.js') }}" as="script">
+    <link rel="preload" href="{{ url_for('static', filename='js/faang_ultimate.js') }}" as="script">
+    <link rel="preload" href="{{ url_for('static', filename='js/apex_interactions.js') }}" as="script">
+    
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <!-- Skip to content - Accessibility -->
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
+    
+    <!-- Scroll Progress Indicator -->
+    <!-- Handled by JS -->
+    
+    <!-- Particle Network Background (hidden on mobile for performance) -->
+    <canvas id="particle-canvas" aria-hidden="true"></canvas>
+    
+    <!-- Cursor Glow Effect -->
+    <!-- Handled by JS -->
+
+    <!-- Live Ticker Tape -->
+    <div class="ticker-tape-wrapper" id="ticker-tape">
+        <div class="ticker-tape-track">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <!-- Support Banner -->
+    <div class="affiliate-banner" id="affiliate-banner">
+        <span class="affiliate-text">
+            <span class="banner-item">
+                🚀 <strong>Geen Bitvavo account?</strong>
+                <a href="https://bitvavo.com/invite?a=B8942E4528" target="_blank" rel="noopener" class="affiliate-link">Registreer gratis via onze link →</a>
+            </span>
+            <span class="banner-divider">|</span>
+            <span class="banner-item">
+                ₿ <strong>Steun de bot:</strong>
+                <span class="btc-address" onclick="copyBtc(this)" title="Klik om te kopiëren">1DUCu4ZGgKHZr22DvAxuWKBujcfpCLJoNy</span>
+                <span class="btc-copied" id="btc-copied" style="display:none;color:#16c784;font-size:0.7rem">✓ Gekopieerd!</span>
+            </span>
+        </span>
+        <button class="affiliate-close" onclick="dismissAffiliateBanner()" aria-label="Sluiten">×</button>
+    </div>
+    <style>
+    .affiliate-banner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 9px 16px;
+        background: linear-gradient(90deg, rgba(59,130,246,0.15), rgba(99,102,241,0.15));
+        border-bottom: 1px solid rgba(99,102,241,0.3);
+        font-size: 0.8125rem;
+        position: relative;
+    }
+    .affiliate-banner.hidden { display: none; }
+    .affiliate-text { display: flex; align-items: center; gap: 10px; }
+    .affiliate-link {
+        color: #79c0ff;
+        font-weight: 700;
+        text-decoration: none;
+        border-bottom: 1px solid rgba(121,192,255,0.4);
+        padding-bottom: 1px;
+        transition: color 0.15s;
+    }
+    .affiliate-link:hover { color: #a5d6ff; }
+    .affiliate-sub { font-size: 0.7rem; color: #6e7681; }
+    .banner-item { display: flex; align-items: center; gap: 6px; }
+    .banner-divider { color: #30363d; font-size: 1rem; margin: 0 6px; }
+    .btc-address {
+        font-family: monospace;
+        font-size: 0.7rem;
+        color: #f7931a;
+        cursor: pointer;
+        border-bottom: 1px dotted rgba(247,147,26,0.4);
+        padding-bottom: 1px;
+        transition: color 0.15s;
+    }
+    .btc-address:hover { color: #ffb347; }
+    .affiliate-close {
+        position: absolute;
+        right: 12px;
+        background: none;
+        border: none;
+        color: #6e7681;
+        font-size: 1.2rem;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0 4px;
+    }
+    .affiliate-close:hover { color: #e6edf3; }
+    </style>
+    <script>
+    (function() {
+        if (localStorage.getItem('affiliate_banner_dismissed') === '1') {
+            var b = document.getElementById('affiliate-banner');
+            if (b) b.classList.add('hidden');
+        }
+    })();
+    function dismissAffiliateBanner() {
+        localStorage.setItem('affiliate_banner_dismissed', '1');
+        var b = document.getElementById('affiliate-banner');
+        if (b) b.classList.add('hidden');
+    }
+    function copyBtc(el) {
+        navigator.clipboard.writeText(el.innerText).then(function() {
+            var c = document.getElementById('btc-copied');
+            if (c) { c.style.display = 'inline'; setTimeout(function(){ c.style.display='none'; }, 2000); }
+        });
+    }
+    </script>
+
+    <!-- Quantum Title - FAANG Premium Header -->
+    <div class="quantum-title-container">
+        <h1 class="quantum-title">Bitvavo Trading Bot</h1>
+    </div>
+
+    <!-- Status Bar - Streamlit process status bar -->
+    <div class="status-bar-quantum" role="region" aria-label="System Status">
+        <div class="status-item">
+            <span class="status-dot {% if bot_running %}active{% else %}inactive{% endif %}" id="bot-dot" aria-hidden="true"></span>
+            <span>Bot: <strong id="bot-status-text" aria-live="polite">{% if bot_running %}Online{% else %}Offline{% endif %}</strong></span>
+        </div>
+        <div class="status-item">
+            <span class="status-dot {% if ai_running %}active{% else %}inactive{% endif %}" id="ai-dot" aria-hidden="true"></span>
+            <span>AI Supervisor: <strong id="ai-status-text" aria-live="polite">{% if ai_running %}Active{% else %}Inactive{% endif %}</strong></span>
+        </div>
+        <div class="status-item">
+            <span class="status-dot active" id="ws-dot" aria-hidden="true"></span>
+            <span>WebSocket: <strong id="ws-status-text" aria-live="polite">Connected</strong></span>
+        </div>
+        <div class="status-item">
+            <span>Trades: <strong id="status-trade-count" aria-live="polite">0</strong></span>
+        </div>
+    </div>
+
+    <!-- Navigation Header -->
+    <nav class="nav-header" role="navigation" aria-label="Main Navigation">
+        <div class="nav-brand">
+            <span class="brand-text">Trading Bot</span>
+        </div>
+        
+        <!-- Mobile hamburger toggle -->
+        <button class="nav-hamburger" id="nav-hamburger" onclick="toggleMobileNav()" aria-label="Toggle navigation menu" aria-expanded="false">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+        </button>
+        
+        <div class="nav-tabs" id="nav-tabs" role="tablist">
+            <a href="{{ url_for('portfolio') }}" class="nav-tab {% if active_tab == 'portfolio' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'portfolio' %}true{% else %}false{% endif %}" aria-label="Portfolio tab, press 1">
+                Portfolio
+            </a>
+            <a href="{{ url_for('hodl') }}" class="nav-tab {% if active_tab == 'hodl' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'hodl' %}true{% else %}false{% endif %}" aria-label="HODL tab, press 2">
+                HODL
+            </a>
+            <a href="{{ url_for('hedge') }}" class="nav-tab {% if active_tab == 'hedge' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'hedge' %}true{% else %}false{% endif %}" aria-label="Hedge tab, press 3">
+                Hedge
+            </a>
+            <a href="{{ url_for('grid') }}" class="nav-tab {% if active_tab == 'grid' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'grid' %}true{% else %}false{% endif %}" aria-label="Grid Bot tab, press 4">
+                Grid Bot
+            </a>
+            <a href="{{ url_for('ai_copilot') }}" class="nav-tab {% if active_tab == 'ai' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'ai' %}true{% else %}false{% endif %}" aria-label="AI Copilot tab, press 5">
+                AI Copilot
+            </a>
+            <a href="{{ url_for('parameters') }}" class="nav-tab {% if active_tab == 'parameters' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'parameters' %}true{% else %}false{% endif %}" aria-label="Parameters tab, press 6">
+                Parameters
+            </a>
+            <a href="{{ url_for('performance') }}" class="nav-tab {% if active_tab == 'performance' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'performance' %}true{% else %}false{% endif %}" aria-label="Performance tab, press 7">
+                Performance
+            </a>
+            <a href="{{ url_for('analytics') }}" class="nav-tab {% if active_tab == 'analytics' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'analytics' %}true{% else %}false{% endif %}" aria-label="Analytics tab, press 8">
+                Analytics
+            </a>
+            <a href="{{ url_for('reports') }}" class="nav-tab {% if active_tab == 'reports' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'reports' %}true{% else %}false{% endif %}" aria-label="Reports tab, press 9">
+                Reports
+            </a>
+            <a href="{{ url_for('settings') }}" class="nav-tab {% if active_tab == 'settings' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'settings' %}true{% else %}false{% endif %}" aria-label="Settings tab">
+                Settings
+            </a>
+        </div>
+        
+        <div class="nav-status">
+            <span id="exchange-status" class="status-indicator" title="Exchange API Status">
+                <span class="status-dot online" aria-hidden="true"></span>
+                <span class="status-text">Bitvavo</span>
+            </span>
+            
+            <!-- Theme Toggle Button -->
+            <button id="theme-toggle" class="btn btn-secondary btn-sm" onclick="toggleTheme()" title="Toggle Light/Dark Mode" aria-label="Toggle Light/Dark Mode">
+                <span id="theme-icon" aria-hidden="true">☀️</span>
+            </button>
+            
+            <button id="refresh-btn" class="btn btn-secondary btn-sm" onclick="requestRefresh()" title="Refresh Data (Press R)" aria-label="Refresh Data">
+                ↻
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content" id="main-content" role="main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="dashboard-footer" role="contentinfo">
+        <span>Bitvavo Trading Bot • Flask v2.0 • 
+        <span id="connection-status" aria-live="polite">Live</span> • 
+        <span id="last-update-footer">-</span></span>
+        <span class="footer-shortcuts" style="margin-left: auto; opacity: 0.6;">Press <kbd>Ctrl+K</kbd> for commands • <kbd>?</kbd> for shortcuts</span>
+    </footer>
+
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/grid-chart.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    
+    <!-- FAANG-Level Upgrades JS -->
+    <script src="{{ url_for('static', filename='js/faang_upgrades.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/faang_ultimate.js') }}"></script>
+    
+    <!-- Apex Interactions - Advanced UI/UX -->
+    <script src="{{ url_for('static', filename='js/apex_interactions.js') }}"></script>
+    
+    <!-- Apex Charts - Premium Chart Plugins & Enhancements -->
+    <script src="{{ url_for('static', filename='js/apex_charts.js') }}"></script>
+    
+    <!-- Apex Unified - Shared utilities (toast, modal, formatEuro, etc.) -->
+    <script src="{{ url_for('static', filename='js/apex_unified.js') }}"></script>
+    
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
+                .then(reg => console.log('[PWA] Service worker registered'))
+                .catch(err => console.log('[PWA] SW registration skipped:', err.message));
+        }
+    </script>
+    
+    <script>
+        // Update status indicators from WebSocket data
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize socket connection
+            if (typeof io !== 'undefined') {
+                const socket = io();
+                
+                socket.on('connect', function() {
+                    document.getElementById('ws-dot').classList.add('active');
+                    document.getElementById('ws-dot').classList.remove('inactive');
+                    document.getElementById('ws-status-text').textContent = 'Connected';
+                    document.getElementById('connection-status').textContent = 'Live';
+                });
+                
+                socket.on('disconnect', function() {
+                    document.getElementById('ws-dot').classList.remove('active');
+                    document.getElementById('ws-dot').classList.add('inactive');
+                    document.getElementById('ws-status-text').textContent = 'Disconnected';
+                    document.getElementById('connection-status').textContent = 'Offline';
+                });
+                
+                socket.on('status_update', function(data) {
+                    // Update bot status
+                    if (data.bot_running !== undefined) {
+                        const botDot = document.getElementById('bot-dot');
+                        const botText = document.getElementById('bot-status-text');
+                        if (data.bot_running) {
+                            botDot.classList.add('active');
+                            botDot.classList.remove('inactive');
+                            botText.textContent = 'Online';
+                        } else {
+                            botDot.classList.remove('active');
+                            botDot.classList.add('inactive');
+                            botText.textContent = 'Offline';
+                        }
+                    }
+                    
+                    // Update AI status
+                    if (data.ai_running !== undefined) {
+                        const aiDot = document.getElementById('ai-dot');
+                        const aiText = document.getElementById('ai-status-text');
+                        if (data.ai_running) {
+                            aiDot.classList.add('active');
+                            aiDot.classList.remove('inactive');
+                            aiText.textContent = 'Active';
+                        } else {
+                            aiDot.classList.remove('active');
+                            aiDot.classList.add('inactive');
+                            aiText.textContent = 'Inactive';
+                        }
+                    }
+                    
+                    // Update trade count
+                    if (data.open_trades !== undefined) {
+                        document.getElementById('status-trade-count').textContent = data.open_trades;
+                    }
+                    
+                    // Update timestamp
+                    if (data.timestamp) {
+                        document.getElementById('last-update-footer').textContent = new Date(data.timestamp).toLocaleTimeString();
+                    }
+                });
+            }
+        });
+        
+        function requestRefresh() {
+            location.reload();
+        }
+        
+        // Theme Toggle Functionality
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+        
+        function updateThemeIcon(theme) {
+            const icon = document.getElementById('theme-icon');
+            if (icon) {
+                icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+            }
+        }
+        
+        // Load saved theme on page load
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+        })();
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

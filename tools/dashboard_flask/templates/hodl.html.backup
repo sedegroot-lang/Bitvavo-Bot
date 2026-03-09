@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+
+{% block title %}💎 HODL Planner - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+
+{% block content %}
+<!-- Hero Banner - Quantum style -->
+<div class="glass-panel hero-banner">
+    <div class="hero-content">
+        <div class="hero-subtitle">LONG-TERM WEALTH BUILDING</div>
+        <div class="hero-title">💎 HODL Planner</div>
+        <div class="hero-description">Diamond hands strategy • Target levels • DCA scheduling</div>
+        <div class="hero-tags">
+            <span class="hero-tag tag-count">{{ hodl_count }} positions</span>
+            <span class="hero-tag tag-trailing">€{{ "%.2f"|format(hodl_value) }} total</span>
+        </div>
+    </div>
+</div>
+
+<!-- Hero Stats Grid -->
+<div class="hero-grid">
+    <div class="hero-card">
+        <div class="hero-label">💎 HODL POSITIONS</div>
+        <div class="hero-value" id="hodl-count">{{ hodl_count }}</div>
+        <div class="hero-sub">Active long-term holds</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">💰 TOTAL HODL VALUE</div>
+        <div class="hero-value" id="hodl-value">€{{ "%.2f"|format(hodl_value) }}</div>
+        <div class="hero-sub">Current market value</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">📊 PROJECTIONS</div>
+        <div class="hero-value">{{ "%.1f"|format(projections.month_3_pct) if projections else '0' }}%</div>
+        <div class="hero-sub">3-month outlook</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">🎯 TARGET LEVELS</div>
+        <div class="hero-value">{{ hodl_targets_count if hodl_targets_count else '0' }}</div>
+        <div class="hero-sub">Active price alerts</div>
+    </div>
+</div>
+
+<!-- HODL Strategy Section -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>🎯 HODL Strategies</h2>
+        <span class="badge">Configure your long-term holds</span>
+    </div>
+    
+    <div class="hodl-grid">
+        {% if hodl_positions %}
+            {% for position in hodl_positions %}
+            <div class="hodl-card">
+                <div class="hodl-card-header">
+                    <div class="hodl-info">
+                        <h3>{{ position.market }}</h3>
+                        <span class="hodl-type">{{ position.strategy }}</span>
+                    </div>
+                    <div class="hodl-status {{ 'active' if position.active else 'inactive' }}">
+                        {{ '✅ Active' if position.active else '⏸️ Paused' }}
+                    </div>
+                </div>
+                <div class="hodl-card-body">
+                    <div class="hodl-stats">
+                        <div class="hodl-stat">
+                            <span class="label">Amount</span>
+                            <span class="value">{{ position.amount }}</span>
+                        </div>
+                        <div class="hodl-stat">
+                            <span class="label">Avg. Buy</span>
+                            <span class="value">€{{ "%.2f"|format(position.avg_buy) }}</span>
+                        </div>
+                        <div class="hodl-stat">
+                            <span class="label">Current</span>
+                            <span class="value live-price" data-market="{{ position.market }}">€{{ "%.2f"|format(position.current_price) }}</span>
+                        </div>
+                        <div class="hodl-stat">
+                            <span class="label">P/L</span>
+                            <span class="value {{ 'text-success' if position.pnl >= 0 else 'text-danger' }}">
+                                {{ '+' if position.pnl >= 0 else '' }}€{{ "%.2f"|format(position.pnl) }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="hodl-targets">
+                        <h4>📌 Target Levels</h4>
+                        {% for target in position.targets %}
+                        <div class="target-level">
+                            <span class="target-price">€{{ "%.2f"|format(target.price) }}</span>
+                            <span class="target-action">{{ target.action }}</span>
+                            <span class="target-amount">{{ target.amount }}%</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">💎</div>
+                <div class="empty-text">No HODL positions configured</div>
+                <div class="empty-hint">Add your first long-term position below</div>
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Add HODL Position -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>➕ Add HODL Position</h2>
+    </div>
+    
+    <form class="hodl-form" id="add-hodl-form">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Market</label>
+                <select class="form-select" name="market" required>
+                    <option value="">Select market...</option>
+                    {% for market in available_markets %}
+                    <option value="{{ market }}">{{ market }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Strategy</label>
+                <select class="form-select" name="strategy" required>
+                    <option value="long_term">Long Term (1+ year)</option>
+                    <option value="medium_term">Medium Term (3-12 months)</option>
+                    <option value="accumulate">DCA Accumulation</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Amount</label>
+                <input type="number" class="form-input" name="amount" step="0.00000001" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Average Buy Price (€)</label>
+                <input type="number" class="form-input" name="avg_buy" step="0.01" required>
+            </div>
+        </div>
+        
+        <h4 style="margin: 1rem 0 0.5rem;">🎯 Target Levels (optional)</h4>
+        <div class="form-row targets-row">
+            <div class="form-group">
+                <label class="form-label">Target 1 Price</label>
+                <input type="number" class="form-input" name="target1_price" step="0.01">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Action</label>
+                <select class="form-select" name="target1_action">
+                    <option value="sell_25">Sell 25%</option>
+                    <option value="sell_50">Sell 50%</option>
+                    <option value="sell_100">Sell All</option>
+                </select>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">💎 Add HODL Position</button>
+    </form>
+</section>
+
+<!-- HODL Projections -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📊 Value Projections</h2>
+        <span class="badge">Based on historical performance</span>
+    </div>
+    
+    <div class="projections-grid">
+        <div class="projection-card">
+            <div class="projection-header">
+                <span class="projection-icon">📅</span>
+                <span class="projection-period">1 Month</span>
+            </div>
+            <div class="projection-value" id="projection-1m">
+                €{{ "%.2f"|format(projections.month_1) if projections else '—' }}
+            </div>
+            <div class="projection-change {{ 'positive' if projections and projections.month_1_pct > 0 else 'negative' }}">
+                {{ ('+' if projections and projections.month_1_pct > 0 else '') }}{{ "%.1f"|format(projections.month_1_pct) if projections else '0' }}%
+            </div>
+        </div>
+        
+        <div class="projection-card">
+            <div class="projection-header">
+                <span class="projection-icon">📅</span>
+                <span class="projection-period">3 Months</span>
+            </div>
+            <div class="projection-value" id="projection-3m">
+                €{{ "%.2f"|format(projections.month_3) if projections else '—' }}
+            </div>
+            <div class="projection-change {{ 'positive' if projections and projections.month_3_pct > 0 else 'negative' }}">
+                {{ ('+' if projections and projections.month_3_pct > 0 else '') }}{{ "%.1f"|format(projections.month_3_pct) if projections else '0' }}%
+            </div>
+        </div>
+        
+        <div class="projection-card">
+            <div class="projection-header">
+                <span class="projection-icon">📅</span>
+                <span class="projection-period">1 Year</span>
+            </div>
+            <div class="projection-value" id="projection-1y">
+                €{{ "%.2f"|format(projections.year_1) if projections else '—' }}
+            </div>
+            <div class="projection-change {{ 'positive' if projections and projections.year_1_pct > 0 else 'negative' }}">
+                {{ ('+' if projections and projections.year_1_pct > 0 else '') }}{{ "%.1f"|format(projections.year_1_pct) if projections else '0' }}%
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+.hodl-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.hodl-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+}
+
+.hodl-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.hodl-info h3 {
+    margin: 0 0 var(--spacing-xs);
+    font-size: 1.1rem;
+}
+
+.hodl-type {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.hodl-status {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.hodl-status.active {
+    background: var(--success-bg);
+    color: var(--success);
+}
+
+.hodl-status.inactive {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+}
+
+.hodl-card-body {
+    padding: var(--spacing-md);
+}
+
+.hodl-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.hodl-stat {
+    display: flex;
+    flex-direction: column;
+}
+
+.hodl-stat .label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.hodl-stat .value {
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.hodl-targets {
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-sm);
+}
+
+.hodl-targets h4 {
+    margin: 0 0 var(--spacing-sm);
+    font-size: 0.85rem;
+}
+
+.target-level {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--spacing-xs) 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.8rem;
+}
+
+.target-level:last-child {
+    border-bottom: none;
+}
+
+.target-price {
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+.target-action {
+    color: var(--text-secondary);
+}
+
+.target-amount {
+    color: var(--text-muted);
+}
+
+/* Form Styles */
+.hodl-form {
+    max-width: 600px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+/* Projections */
+.projections-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.projection-card {
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    text-align: center;
+}
+
+.projection-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.projection-icon {
+    font-size: 1.2rem;
+}
+
+.projection-period {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.projection-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+}
+
+.projection-change {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.projection-change.positive {
+    color: var(--success);
+}
+
+.projection-change.negative {
+    color: var(--danger);
+}
+</style>
+
+<script>
+document.getElementById('add-hodl-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
+    
+    try {
+        const response = await fetch('/api/hodl/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Failed to add HODL position');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error adding position');
+    }
+});
+</script>
+{% endblock %}

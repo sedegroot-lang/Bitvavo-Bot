@@ -1,0 +1,84 @@
+{
+  "suggestions": [
+    {
+      "market": "LDO-EUR",
+      "reason": "LDO - DeFi protocol",
+      "ts": 1764332376
+    },
+    {
+      "market": "GMX-EUR",
+      "reason": "GMX - DeFi protocol",
+      "ts": 1764332376
+    },
+    {
+      "market": "CRV-EUR",
+      "reason": "CRV - DeFi protocol",
+      "ts": 1764332376
+    },
+    {
+      "market": "MKR-EUR",
+      "reason": "MKR - DeFi protocol",
+      "ts": 1764332376
+    },
+    {
+      "market": "GRT-EUR",
+      "reason": "GRT - Unexplored market, worth testing",
+      "ts": 1764332376
+    },
+    {
+      "market": "FTM-EUR",
+      "reason": "FTM - Established Layer 1 blockchain",
+      "ts": 1764689700
+    },
+    {
+      "market": "BNB-EUR",
+      "reason": "BNB - Unexplored market, worth testing",
+      "ts": 1764689700
+    },
+    {
+      "market": "MATIC-EUR",
+      "reason": "MATIC - Unexplored market, worth testing",
+      "ts": 1764689700
+    },
+    {
+      "market": "ARB-EUR",
+      "reason": "ARB - Unexplored market, worth testing",
+      "ts": 1764689700
+    },
+    {
+      "market": "INJ-EUR",
+      "reason": "INJ - Unexplored market, worth testing",
+      "ts": 1764689700
+    },
+    {
+      "market": "SNX-EUR",
+      "reason": "SNX - Unexplored market, worth testing",
+      "ts": 1764689700
+    },
+    {
+      "market": "UNI-EUR",
+      "reason": "UNI - Unexplored market, worth testing",
+      "ts": 1765185630
+    },
+    {
+      "market": "BTC-EUR",
+      "reason": "BTC - Unexplored market, worth testing",
+      "ts": 1766141662
+    },
+    {
+      "market": "ETH-EUR",
+      "reason": "ETH - Unexplored market, worth testing",
+      "ts": 1766141662
+    },
+    {
+      "market": "ALGO-EUR",
+      "reason": "ALGO - Established Layer 1 blockchain",
+      "ts": 1771056304
+    },
+    {
+      "market": "NEAR-EUR",
+      "reason": "NEAR - Established Layer 1 blockchain",
+      "ts": 1771757416
+    }
+  ]
+}

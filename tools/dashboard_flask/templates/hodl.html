@@ -1,0 +1,691 @@
+{% extends "base.html" %}
+
+{% block title %}💎 HODL Planner - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+
+{% block content %}
+<!-- Hero Banner -->
+<div class="glass-panel hero-banner">
+    <div class="hero-content">
+        <div class="hero-subtitle">LONG-TERM WEALTH BUILDING</div>
+        <div class="hero-title">💎 HODL Planner</div>
+        <div class="hero-description">Professionele weergave van vaste DCA-schedules • Loopt volledig los van DCA Trailing Bot</div>
+    </div>
+</div>
+
+<!-- Dynamic Content Container -->
+<div id="hodl-content">
+    <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p>Loading HODL data...</p>
+    </div>
+</div>
+
+<style>
+/* Loading Spinner */
+.loading-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    color: var(--text-muted);
+}
+
+.spinner {
+    border: 3px solid rgba(0, 212, 255, 0.1);
+    border-top: 3px solid var(--neon-blue);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* HODL Assets Grid */
+.hodl-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.hodl-metric-card {
+    background: rgba(20, 20, 35, 0.6);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.hodl-metric-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.hodl-metric-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--neon-cyan);
+}
+
+.hodl-assets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.asset-card {
+    background: rgba(20, 20, 35, 0.8);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    transition: border-color 0.3s;
+}
+
+.asset-card:hover {
+    border-color: rgba(0, 212, 255, 0.5);
+}
+
+.asset-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.asset-symbol {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--neon-blue);
+}
+
+.asset-amount {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.asset-value {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--neon-cyan);
+    margin: 0.5rem 0;
+}
+
+.asset-price {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Schedules Table */
+.schedules-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+}
+
+.schedules-table th,
+.schedules-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.schedules-table th {
+    font-weight: 600;
+    color: var(--neon-blue);
+    font-size: 0.9rem;
+}
+
+.schedules-table tbody tr:hover {
+    background: rgba(0, 212, 255, 0.05);
+}
+
+/* Configuration Form */
+.config-form {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.form-group-hodl {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group-hodl label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.form-group-hodl input[type="checkbox"] {
+    width: auto;
+    margin-right: 0.5rem;
+}
+
+/* Pie Chart Container */
+.pie-chart-container {
+    width: 100%;
+    max-width: 500px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    background: rgba(20, 20, 35, 0.4);
+    border-radius: 12px;
+}
+
+/* Info Message */
+.info-message {
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    color: var(--text-secondary);
+    margin: 1rem 0;
+}
+
+/* Section Divider */
+.section-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.3), transparent);
+    margin: 2.5rem 0;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .hodl-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .config-form { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .hodl-metrics-grid { grid-template-columns: 1fr; }
+    .config-form { grid-template-columns: 1fr; }
+    .hodl-assets-grid { grid-template-columns: 1fr; }
+    .hodl-metric-value { font-size: 1.4rem; }
+}
+
+/* Schedule Editor Cards */
+.schedule-editor-card {
+    background: rgba(20, 20, 35, 0.6);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.schedule-editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.schedule-editor-header h4 {
+    margin: 0;
+    color: var(--neon-blue);
+    font-size: 1.1rem;
+}
+
+.schedule-editor-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.schedule-editor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.schedule-editor-info {
+    display: flex;
+    gap: 1.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.schedule-editor-info small {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+</style>
+
+<script>
+let hodlData = null;
+
+// Load HODL data from API
+async function loadHODLData() {
+    try {
+        const response = await fetch('/api/hodl/data');
+        if (!response.ok) throw new Error('Failed to fetch HODL data');
+        
+        hodlData = await response.json();
+        renderHODLContent(hodlData);
+    } catch (error) {
+        console.error('Error loading HODL data:', error);
+        document.getElementById('hodl-content').innerHTML = `
+            <div class="glass-panel">
+                <div style="text-align: center; padding: 2rem; color: var(--danger);">
+                    <h3>⚠️ Kon HODL data niet laden</h3>
+                    <p>${error.message}</p>
+                    <button class="btn btn-secondary" onclick="loadHODLData()">🔄 Opnieuw proberen</button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function renderHODLContent(data) {
+    const container = document.getElementById('hodl-content');
+    
+    let html = '';
+    
+    // HODL Portfolio Section
+    html += `
+        <section class="glass-panel">
+            <div class="section-header">
+                <h2>💰 HODL Portfolio - Assets & Waarde</h2>
+            </div>
+    `;
+    
+    if (data.assets && data.assets.length > 0) {
+        // Metrics
+        html += `
+            <div class="hodl-metrics-grid">
+                <div class="hodl-metric-card">
+                    <div class="hodl-metric-label">💎 Totale HODL Waarde</div>
+                    <div class="hodl-metric-value">€${data.total_value.toFixed(2)}</div>
+                </div>
+                <div class="hodl-metric-card">
+                    <div class="hodl-metric-label">🪙 Aantal Assets</div>
+                    <div class="hodl-metric-value">${data.assets.length}</div>
+                </div>
+                <div class="hodl-metric-card">
+                    <div class="hodl-metric-label">🏆 Grootste Positie</div>
+                    <div class="hodl-metric-value">${data.top_asset || 'N/A'}</div>
+                </div>
+                <div class="hodl-metric-card">
+                    <div class="hodl-metric-label">📊 Diversificatie</div>
+                    <div class="hodl-metric-value">${data.assets.length > 1 ? 'Goed' : 'Laag'}</div>
+                </div>
+            </div>
+            
+            <div class="hodl-assets-grid">
+        `;
+        
+        data.assets.forEach(asset => {
+            html += `
+                <div class="asset-card">
+                    <div class="asset-header">
+                        <span class="asset-symbol">${asset.symbol}</span>
+                        <span class="asset-amount">${asset.amount}</span>
+                    </div>
+                    <div class="asset-value">€${asset.value.toFixed(2)}</div>
+                    <div class="asset-price">@ €${asset.price.toFixed(2)}</div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        
+        // Pie chart
+        if (data.assets.length > 1) {
+            html += `
+                <div class="pie-chart-container">
+                    <canvas id="portfolio-pie-chart"></canvas>
+                </div>
+            `;
+        }
+    } else {
+        html += `
+            <div class="info-message">
+                <p>📭 Nog geen HODL assets gevonden. De eerste aankoop wordt uitgevoerd volgens het schema hieronder.</p>
+            </div>
+        `;
+    }
+    
+    html += '</section>';
+    
+    // Schedules Section - EDITABLE
+    html += '<div class="section-divider"></div>';
+    html += `
+        <section class="glass-panel">
+            <div class="section-header">
+                <h2>Schema details (bewerken)</h2>
+                <button class="btn btn-sm btn-primary" onclick="addNewSchedule()">➕ Nieuw schema</button>
+            </div>
+    `;
+    
+    if (data.schedules && data.schedules.length > 0) {
+        html += '<div id="schedules-list">';
+        
+        data.schedules.forEach((schedule, idx) => {
+            const statusClass = schedule.status === 'live' ? 'badge-success' : 'badge-warning';
+            const intervalDays = schedule.interval.includes('d') ? parseFloat(schedule.interval) : 1;
+            const isDryRun = schedule.mode === 'DRY-RUN';
+            
+            html += `
+                <div class="schedule-editor-card" id="schedule-${idx}">
+                    <div class="schedule-editor-header">
+                        <h4>${schedule.market}</h4>
+                        <button class="btn btn-sm btn-danger" onclick="deleteSchedule(${idx})">🗑️</button>
+                    </div>
+                    <div class="schedule-editor-body">
+                        <div class="schedule-editor-grid">
+                            <div class="form-group-hodl">
+                                <label>Market</label>
+                                <input type="text" class="form-input" value="${schedule.market}" id="market-${idx}">
+                            </div>
+                            <div class="form-group-hodl">
+                                <label>Bedrag (EUR)</label>
+                                <input type="number" class="form-input" value="${schedule.amount}" step="1" id="amount-${idx}">
+                            </div>
+                            <div class="form-group-hodl">
+                                <label>Interval (dagen)</label>
+                                <input type="number" class="form-input" value="${intervalDays}" step="0.001" id="interval-${idx}">
+                            </div>
+                            <div class="form-group-hodl">
+                                <label>
+                                    <input type="checkbox" ${isDryRun ? 'checked' : ''} id="dryrun-${idx}">
+                                    Dry-run mode
+                                </label>
+                            </div>
+                            <div class="form-group-hodl">
+                                <label>Notitie (optioneel)</label>
+                                <input type="text" class="form-input" value="${schedule.note || ''}" id="note-${idx}">
+                            </div>
+                        </div>
+                        <div class="schedule-editor-info">
+                            <small>Status: <span class="badge ${statusClass}">${schedule.status.toUpperCase()}</span></small>
+                            <small>Laatste run: ${schedule.last_run}</small>
+                            <small>Volgende run: ${schedule.next_run}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        html += '<button class="btn btn-primary" style="margin-top: 1rem;" onclick="saveAllSchedules()">💾 Alle schema\'s opslaan</button>';
+    } else {
+        html += '<p class="info-message">Er zijn nog geen schema\'s gedefinieerd. Klik op "Nieuw schema" om te beginnen.</p>';
+    }
+    
+    html += '</section>';
+    
+    // Configuration Overview
+    html += '<div class="section-divider"></div>';
+    html += `
+        <section class="glass-panel">
+            <div class="section-header">
+                <h2>Configuratie-overzicht</h2>
+            </div>
+            <div class="hodl-metrics-grid">
+                <div class="hodl-metric-card">
+                    <div class="hodl-metric-label">Live schema's</div>
+                    <div class="hodl-metric-value">${data.summary?.live_count || 0}</div>
+                </div>
+                <div class="hodl-metric-card">
+                    <div class="hodl-metric-label">Dry-run schema's</div>
+                    <div class="hodl-metric-value">${data.summary?.dry_count || 0}</div>
+                </div>
+                <div class="hodl-metric-card">
+                    <div class="hodl-metric-label">Overdue schema's</div>
+                    <div class="hodl-metric-value">${data.summary?.overdue_count || 0}</div>
+                </div>
+                <div class="hodl-metric-card">
+                    <div class="hodl-metric-label">Volgende uitvoering</div>
+                    <div class="hodl-metric-value" style="font-size: 1.2rem;">${data.summary?.next_run || 'N/A'}</div>
+                </div>
+            </div>
+        </section>
+    `;
+    
+    // Settings Form
+    html += '<div class="section-divider"></div>';
+    html += `
+        <section class="glass-panel">
+            <div class="section-header">
+                <h2>Planner instellingen (bewerken)</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Pas direct vanuit het dashboard bedragen en intervallen aan. Opslaan schrijft naar bot_config.json.</p>
+            </div>
+            
+            <form id="hodl-settings-form" class="config-form">
+                <div class="form-group-hodl">
+                    <label>
+                        <input type="checkbox" name="enabled" ${data.config?.enabled ? 'checked' : ''}>
+                        Scheduler actief
+                    </label>
+                </div>
+                <div class="form-group-hodl">
+                    <label>
+                        <input type="checkbox" name="dry_run" ${data.config?.dry_run ? 'checked' : ''}>
+                        Standaard dry-run
+                    </label>
+                </div>
+                <div class="form-group-hodl">
+                    <label>Poll interval (seconden)</label>
+                    <input type="number" name="poll_interval" value="${data.config?.poll_interval_seconds || 300}" 
+                           min="60" step="30" class="form-input">
+                </div>
+            </form>
+            
+            <button class="btn btn-primary" onclick="saveHODLSettings()">💾 HODL-instellingen opslaan</button>
+        </section>
+    `;
+    
+    container.innerHTML = html;
+    
+    // Render pie chart if needed
+    if (data.assets && data.assets.length > 1) {
+        renderPieChart(data.assets);
+    }
+}
+
+let hodlPieChart = null;
+function renderPieChart(assets) {
+    const ctx = document.getElementById('portfolio-pie-chart');
+    if (!ctx) return;
+    
+    // Destroy old chart instance to prevent memory leak
+    if (hodlPieChart) { hodlPieChart.destroy(); hodlPieChart = null; }
+    
+    hodlPieChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: assets.map(a => a.symbol),
+            datasets: [{
+                data: assets.map(a => a.value),
+                backgroundColor: [
+                    'rgba(0, 212, 255, 0.7)',
+                    'rgba(0, 212, 170, 0.7)',
+                    'rgba(99, 102, 241, 0.7)',
+                    'rgba(139, 92, 246, 0.7)',
+                    'rgba(236, 72, 153, 0.7)',
+                    'rgba(251, 191, 36, 0.7)',
+                ],
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: 'rgba(232, 238, 255, 0.9)',
+                        font: {
+                            size: 12,
+                            family: "'Inter', sans-serif"
+                        },
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: €${value.toFixed(2)} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+async function saveHODLSettings() {
+    const form = document.getElementById('hodl-settings-form');
+    const formData = new FormData(form);
+    
+    const data = {
+        enabled: formData.get('enabled') === 'on',
+        dry_run: formData.get('dry_run') === 'on',
+        poll_interval: parseInt(formData.get('poll_interval'))
+    };
+    
+    try {
+        const response = await fetch('/api/hodl/save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            apexToast('✅ HODL-instellingen opgeslagen!', 'success');
+            setTimeout(() => loadHODLData(), 500);
+        } else {
+            throw new Error('Save failed');
+        }
+    } catch (error) {
+        console.error('Error saving HODL settings:', error);
+        apexToast('❌ Kon instellingen niet opslaan', 'error');
+    }
+}
+
+async function saveAllSchedules() {
+    if (!hodlData || !hodlData.schedules) {
+        apexToast('Geen schedules om op te slaan', 'error');
+        return;
+    }
+    
+    const schedules = [];
+    
+    for (let i = 0; i < hodlData.schedules.length; i++) {
+        const marketEl = document.getElementById(`market-${i}`);
+        const amountEl = document.getElementById(`amount-${i}`);
+        const intervalEl = document.getElementById(`interval-${i}`);
+        const dryrunEl = document.getElementById(`dryrun-${i}`);
+        const noteEl = document.getElementById(`note-${i}`);
+        
+        if (!marketEl || !amountEl || !intervalEl) continue;
+        
+        const intervalDays = parseFloat(intervalEl.value);
+        const intervalMinutes = Math.round(intervalDays * 1440);
+        
+        schedules.push({
+            market: marketEl.value.trim().toUpperCase(),
+            amount_eur: parseFloat(amountEl.value),
+            interval_minutes: intervalMinutes,
+            dry_run: dryrunEl ? dryrunEl.checked : false,
+            note: noteEl ? noteEl.value.trim() : ''
+        });
+    }
+    
+    try {
+        const config = await fetch('/api/config').then(r => r.json());
+        config.HODL_SCHEDULER = config.HODL_SCHEDULER || {};
+        config.HODL_SCHEDULER.schedules = schedules;
+        
+        const response = await fetch('/api/config/save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+        
+        if (response.ok) {
+            apexToast('✅ Alle schedules opgeslagen!', 'success');
+            setTimeout(() => loadHODLData(), 500);
+        } else {
+            throw new Error('Save failed');
+        }
+    } catch (error) {
+        console.error('Error saving schedules:', error);
+        showNotification('❌ Kon schedules niet opslaan: ' + error.message, 'error');
+    }
+}
+
+async function addNewSchedule() {
+    const market = await apexPrompt('Nieuw Schema', 'Market (bijv. BTC-EUR):', '', 'BTC-EUR');
+    if (!market) return;
+    
+    const amount = await apexPrompt('Bedrag', 'Bedrag in EUR:', '25', '25');
+    if (!amount) return;
+    
+    const intervalDays = await apexPrompt('Interval', 'Interval in dagen:', '7', '7');
+    if (!intervalDays) return;
+    
+    const dryRun = await apexConfirm('Modus', 'Dry-run mode activeren?');
+    
+    const newSchedule = {
+        market: market.trim().toUpperCase(),
+        amount_eur: parseFloat(amount),
+        interval_minutes: Math.round(parseFloat(intervalDays) * 1440),
+        dry_run: dryRun,
+        note: ''
+    };
+    
+    if (!hodlData) hodlData = { schedules: [] };
+    if (!hodlData.schedules) hodlData.schedules = [];
+    
+    hodlData.schedules.push({
+        market: newSchedule.market,
+        mode: newSchedule.dry_run ? 'DRY-RUN' : 'LIVE',
+        amount: newSchedule.amount_eur,
+        interval: `${(newSchedule.interval_minutes / 1440).toFixed(2)}d`,
+        last_run: 'Nooit',
+        next_run: 'N/A',
+        status: newSchedule.dry_run ? 'dry' : 'live',
+        note: ''
+    });
+    
+    renderHODLContent(hodlData);
+    apexToast('Vergeet niet op te slaan!', 'warning');
+}
+
+async function deleteSchedule(index) {
+    const ok = await apexConfirm('Schema verwijderen', 'Weet je zeker dat je dit schema wilt verwijderen?');
+    if (!ok) return;
+    
+    if (hodlData && hodlData.schedules) {
+        hodlData.schedules.splice(index, 1);
+        renderHODLContent(hodlData);
+        apexToast('Schema verwijderd. Klik op "Alle schemas opslaan" om te bevestigen.', 'warning');
+    }
+}
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', loadHODLData);
+
+// Auto-refresh every 30 seconds (visibility-aware - pauses when tab hidden)
+if (typeof apexSetInterval === 'function') {
+    apexSetInterval(loadHODLData, 30000);
+} else {
+    setInterval(loadHODLData, 30000);
+}
+</script>
+{% endblock %}

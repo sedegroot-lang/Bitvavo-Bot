@@ -1,0 +1,2719 @@
+{% extends "base.html" %}
+
+{% block title %}Portfolio - Bitvavo Trading Bot{% endblock %}
+
+{% block content %}
+<!-- Hero Metrics Grid - Premium Design -->
+<div class="hero-grid">
+    <div class="hero-card">
+        <div class="hero-label">Total Deposited</div>
+        <div class="hero-value" id="hero-total-deposited">€{{ "%.2f"|format(totals.total_deposited) }}</div>
+        <div class="hero-sub">Deposits on Bitvavo</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">Account Value</div>
+        <div class="hero-value" id="hero-account-value">€{{ "%.2f"|format(totals.account_value) }}</div>
+        <div class="hero-sub">Positions + EUR balance</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">Realized P/L</div>
+        <div class="hero-value {% if totals.real_profit >= 0 %}text-success{% else %}text-danger{% endif %}" id="hero-real-profit">{% if totals.real_profit >= 0 %}+{% endif %}€{{ "%.2f"|format(totals.real_profit) }}</div>
+        <div class="hero-sub" id="hero-real-profit-pct">{{ "%.2f"|format(totals.real_profit_pct) }}% return</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">Available</div>
+        <div class="hero-value" id="hero-eur-balance">€{{ "%.2f"|format(totals.eur_balance) }}</div>
+        <div class="hero-sub">Ready for entries</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">Position Value</div>
+        <div class="hero-value" id="hero-total-current">€{{ "%.2f"|format(totals.total_current) }}</div>
+        <div class="hero-sub" id="hero-trade-count">{{ totals.trade_count }} active positions</div>
+    </div>
+</div>
+
+<!-- System Status Cards -->
+<div class="status-cards-row">
+    <div class="status-card {% if bot_running %}status-online{% else %}status-offline{% endif %}">
+        <div class="status-card-icon">⬢</div>
+        <div class="status-card-content">
+            <div class="status-card-title">Trading Bot</div>
+            <div class="status-card-status">{% if bot_running %}Online{% else %}Offline{% endif %}</div>
+        </div>
+    </div>
+    <div class="status-card {% if ai_running %}status-online{% else %}status-offline{% endif %}">
+        <div class="status-card-icon">◎</div>
+        <div class="status-card-content">
+            <div class="status-card-title">AI Supervisor</div>
+            <div class="status-card-status">{% if ai_running %}Active{% else %}Inactive{% endif %}</div>
+        </div>
+    </div>
+    <div class="status-card status-info">
+        <div class="status-card-icon">▣</div>
+        <div class="status-card-content">
+            <div class="status-card-title">Open Trades</div>
+            <div class="status-card-status" id="status-open-trades">{{ totals.trade_count }} / {{ config.get('MAX_OPEN_TRADES', 5) }}</div>
+        </div>
+    </div>
+    <div class="status-card status-info">
+        <div class="status-card-icon">◈</div>
+        <div class="status-card-content">
+            <div class="status-card-title">EUR Balance</div>
+            <div class="status-card-status" id="status-eur-balance">€{{ "%.2f"|format((heartbeat.eur_balance if heartbeat else 0) or 0) }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Budget Verdeling Panel -->
+{% set budget = config.get('BUDGET_RESERVATION', {}) %}
+{% set eur_bal = (heartbeat.eur_balance if heartbeat else 0) or 0 %}
+{% set total_account = totals.account_value if totals else eur_bal %}
+{% set trail_pct = budget.get('trailing_pct', 60) %}
+{% set grid_pct = budget.get('grid_pct', 15) %}
+{% set reserve_pct = budget.get('reserve_pct', 25) %}
+{% set trail_eur = (total_account * trail_pct / 100) %}
+{% set grid_eur = (total_account * grid_pct / 100) %}
+{% set reserve_eur = budget.get('min_reserve_eur', 30) %}
+{% set hodl_cfg = config.get('HODL_SCHEDULER', {}) %}
+{% set hodl_weekly = namespace(total=0) %}
+{% for s in hodl_cfg.get('schedules', []) %}{% set hodl_weekly.total = hodl_weekly.total + s.get('amount_eur', 0) %}{% endfor %}
+<div class="glass-panel" style="margin-bottom: 1.5rem; padding: 1rem 1.2rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem;">
+        <span style="font-size: 1.1rem;">💼</span>
+        <h3 style="margin: 0; font-size: 0.95rem; color: var(--text-primary);">Budget Verdeling</h3>
+        <span style="font-size: 0.75rem; color: var(--text-tertiary); margin-left: auto;">{{ budget.get('mode', 'dynamic') }} mode · totaal €{{ "%.0f"|format(total_account) }}</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 1.2rem;">
+        <!-- Donut Chart -->
+        <div class="donut-chart-container" id="budget-donut" style="flex-shrink: 0;">
+            <!-- Rendered by JS -->
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; flex: 1;">
+        <!-- Trailing Bot -->
+        <div style="background: rgba(99,179,136,0.08); border: 1px solid rgba(99,179,136,0.2); border-radius: 8px; padding: 0.7rem;">
+            <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 0.25rem;">🤖 Trailing Bot</div>
+            <div style="font-size: 1.05rem; font-weight: 600; color: #63b388;">{{ trail_pct }}%</div>
+            <div style="font-size: 0.78rem; color: #94a3b8;">≈ €{{ "%.0f"|format(trail_eur) }}</div>
+            <div style="margin-top: 0.4rem; background: rgba(255,255,255,0.06); border-radius: 4px; height: 4px; overflow: hidden;">
+                <div style="width: {{ trail_pct }}%; height: 100%; background: #63b388; border-radius: 4px;"></div>
+            </div>
+        </div>
+        <!-- Grid Bot -->
+        <div style="background: rgba(99,130,220,0.08); border: 1px solid rgba(99,130,220,0.2); border-radius: 8px; padding: 0.7rem;">
+            <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 0.25rem;">▦ Grid Bot</div>
+            <div style="font-size: 1.05rem; font-weight: 600; color: #6382dc;">{{ grid_pct }}%</div>
+            <div style="font-size: 0.78rem; color: #94a3b8;">≈ €{{ "%.0f"|format(grid_eur) }}</div>
+            <div style="margin-top: 0.4rem; background: rgba(255,255,255,0.06); border-radius: 4px; height: 4px; overflow: hidden;">
+                <div style="width: {{ grid_pct }}%; height: 100%; background: #6382dc; border-radius: 4px;"></div>
+            </div>
+        </div>
+        <!-- HODL DCA -->
+        <div style="background: rgba(220,180,60,0.08); border: 1px solid rgba(220,180,60,0.2); border-radius: 8px; padding: 0.7rem;">
+            <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 0.25rem;">🪙 HODL DCA</div>
+            <div style="font-size: 1.05rem; font-weight: 600; color: #dcb43c;">€{{ "%.0f"|format(hodl_weekly.total) }}</div>
+            <div style="font-size: 0.78rem; color: #94a3b8;">per week · {{ hodl_cfg.get('schedules', [])|length }} assets</div>
+            <div style="margin-top: 0.4rem; font-size: 0.7rem; color: #64748b;">
+                {% for s in hodl_cfg.get('schedules', []) %}{{ s.get('market', '') }} €{{ s.get('amount_eur', 0)|int }}{% if not loop.last %} · {% endif %}{% endfor %}
+            </div>
+        </div>
+        <!-- Reserve -->
+        <div style="background: rgba(148,163,184,0.08); border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 0.7rem;">
+            <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 0.25rem;">🛡️ Reserve</div>
+            <div style="font-size: 1.05rem; font-weight: 600; color: #94a3b8;">{{ reserve_pct }}%</div>
+            <div style="font-size: 0.78rem; color: #94a3b8;">min €{{ "%.0f"|format(reserve_eur) }} vloer</div>
+            <div style="margin-top: 0.4rem; font-size: 0.7rem; color: #64748b;">Circuit breaker buffer</div>
+        </div>
+    </div>
+    </div>
+</div>
+<script>
+    // Render budget donut chart
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof DonutChart !== 'undefined') {
+            DonutChart.create(document.getElementById('budget-donut'), [
+                { value: {{ trail_pct }}, color: '#63b388' },
+                { value: {{ grid_pct }}, color: '#6382dc' },
+                { value: Math.max({{ reserve_pct }}, 1), color: '#94a3b8' }
+            ], { size: 90, lineWidth: 10, centerText: '€{{ "%.0f"|format(total_account) }}' });
+        }
+    });
+</script>
+
+<!-- Trade Readiness Panel -->
+<div class="glass-panel trade-readiness-panel" data-readiness-color="{{ trade_readiness.color if trade_readiness else '#64748b' }}">
+    <div class="trade-readiness-header">
+        <span class="readiness-icon">{{ trade_readiness.icon if trade_readiness else '○' }}</span>
+        <div class="readiness-info">
+            <span class="readiness-label" data-label-color="{{ trade_readiness.color if trade_readiness else '#94a3b8' }}">{{ trade_readiness.label if trade_readiness else 'Status Unknown' }}</span>
+            <span class="readiness-message">{{ trade_readiness.message if trade_readiness else 'Bot inactive or data unavailable' }}</span>
+        </div>
+    </div>
+    {% if trade_readiness and trade_readiness.details and trade_readiness.details|length > 0 %}
+    <div class="readiness-details" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-subtle);">
+        {% for detail in trade_readiness.details %}
+        <div class="detail-item" style="font-size: 0.8rem; color: var(--text-tertiary); margin-bottom: 0.25rem;">
+            <span class="detail-bullet" data-bullet-color="{{ trade_readiness.color }}">•</span> {{ detail }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Pending Orders Section -->
+<div id="pending-orders-section" class="glass-panel pending-orders-panel" style="display: none; margin-bottom: 1.5rem;">
+    <div class="section-header" style="margin-bottom: 1rem;">
+        <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+            <span class="pending-icon">⏳</span>
+            Openstaande Orders
+            <span id="pending-orders-count" class="badge badge-warning">0</span>
+        </h3>
+        <div class="pending-orders-stats" style="display: flex; gap: 1rem; font-size: 0.85rem; color: #94a3b8;">
+            <span>Slots: <strong id="pending-slots-used">0</strong>/<strong id="pending-max-trades">6</strong></span>
+            <span>Timeout: <strong id="pending-timeout">60m</strong></span>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="pending-orders-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
+                    <th style="text-align: left; padding: 0.5rem; color: #94a3b8; font-weight: 500;">Market</th>
+                    <th style="text-align: right; padding: 0.5rem; color: #94a3b8; font-weight: 500;">Hoeveelheid</th>
+                    <th style="text-align: right; padding: 0.5rem; color: #94a3b8; font-weight: 500;">Prijs</th>
+                    <th style="text-align: right; padding: 0.5rem; color: #94a3b8; font-weight: 500;">Waarde</th>
+                    <th style="text-align: center; padding: 0.5rem; color: #94a3b8; font-weight: 500;">Leeftijd</th>
+                    <th style="text-align: center; padding: 0.5rem; color: #94a3b8; font-weight: 500;">Status</th>
+                </tr>
+            </thead>
+            <tbody id="pending-orders-tbody">
+                <!-- Rows populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="pending-orders-footer" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(148, 163, 184, 0.2); display: flex; justify-content: space-between; align-items: center;">
+        <span class="pending-info" style="font-size: 0.8rem; color: #64748b;">
+            ⚠️ Deze orders tellen mee voor MAX_OPEN_TRADES limiet
+        </span>
+        <span id="pending-last-update" style="font-size: 0.8rem; color: #64748b;"></span>
+    </div>
+</div>
+
+<!-- Trade Cards Grid -->
+<div class="section-header">
+    <h2>Open Positions</h2>
+    <div class="section-controls">
+        <span class="badge">{{ cards|length }} active</span>
+        <div class="sort-controls">
+            <label class="sort-label">Sort:</label>
+            <select id="sort-trades" class="form-select form-select-sm" onchange="sortTradeCards(this.value)" aria-label="Sort trades">
+                <option value="pnl-pct-desc" selected>P/L % (High → Low)</option>
+                <option value="pnl-desc">P/L (High → Low)</option>
+                <option value="pnl-asc">P/L (Low → High)</option>
+                <option value="value-desc">Value (High → Low)</option>
+                <option value="symbol-asc">Asset (A-Z)</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="trade-cards-container" class="trade-cards-grid" style="min-height: 100px;">
+    {% for card in cards %}
+    <div class="trade-card-simple {% if card.pnl >= 0 %}card-profit{% else %}card-loss{% endif %}" data-market="{{ card.market }}" data-pnl="{{ card.pnl }}" data-pnl-pct="{{ card.pnl_pct }}" data-value="{{ card.current_value }}" data-symbol="{{ card.symbol }}">
+        <!-- Header: Logo + Symbol + Status -->
+        <div class="card-header-simple">
+            <div class="card-asset">
+                <img src="{{ card.logo_url }}" alt="{{ card.symbol }}" class="card-logo"
+                     onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;40&quot; height=&quot;40&quot;><rect width=&quot;40&quot; height=&quot;40&quot; rx=&quot;8&quot; fill=&quot;%233B82F6&quot;/><text x=&quot;50%&quot; y=&quot;50%&quot; text-anchor=&quot;middle&quot; dy=&quot;.35em&quot; font-size=&quot;18&quot; fill=&quot;white&quot; font-family=&quot;Arial&quot;>{{ card.symbol[0] }}</text></svg>'">
+                <div class="card-asset-info">
+                    <span class="card-symbol">{{ card.symbol }}</span>
+                    <span class="card-name">{{ card.crypto_name }}</span>
+                </div>
+            </div>
+            <span class="card-status {% if card.trailing_activated %}status-trailing{% elif card.status == 'external' %}status-external{% else %}status-active{% endif %}">
+                {% if card.trailing_activated %}TRAILING ACTIEF{% elif card.status == 'external' %}EXTERNE POSITIE{% else %}ACTIEF{% endif %}
+            </span>
+            {% if card.pnl >= 0 %}<span class="card-tag tag-profit">WINST</span>{% endif %}
+        </div>
+        
+        <!-- Hero P/L - Big and Bold -->
+        <div class="card-pnl-hero {% if card.pnl >= 0 %}pnl-positive{% else %}pnl-negative{% endif %}">
+            <span class="pnl-amount" data-pnl="{{ card.market }}">€{% if card.pnl >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl) }}</span>
+            <span class="pnl-percent" data-pnl-pct="{{ card.market }}">{% if card.pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl_pct) }}%</span>
+        </div>
+        
+        <!-- Values Row: Invest / Nu -->
+        <div class="card-values-row">
+            <div class="card-value-item">
+                <span class="value-icon">💰</span>
+                <span class="value-label">INVEST</span>
+                <span class="value-amount">€{{ "%.2f"|format(card.invested) }}</span>
+            </div>
+            <div class="card-value-item">
+                <span class="value-icon">📊</span>
+                <span class="value-label">NU</span>
+                <span class="value-amount" data-current="{{ card.market }}">€{{ "%.2f"|format(card.current_value) }}</span>
+            </div>
+        </div>
+        
+        <!-- Price Row: Entry → Live -->
+        <div class="card-price-row">
+            <div class="price-entry">
+                <span class="price-dot entry-dot"></span>
+                <span class="price-label">ENTRY PRICE</span>
+                <span class="price-value">€{{ "%.6f"|format(card.buy_price) if card.buy_price < 0.01 else ("%.4f"|format(card.buy_price) if card.buy_price < 1 else "%.2f"|format(card.buy_price)) }}</span>
+            </div>
+            <span class="price-arrow">→</span>
+            <div class="price-live">
+                <span class="price-dot live-dot"></span>
+                <span class="price-label">LIVE PRICE</span>
+                <span class="price-value live-pulse" data-live-price="{{ card.market }}">€{{ "%.6f"|format(card.live_price) if card.live_price and card.live_price < 0.01 else ("%.4f"|format(card.live_price) if card.live_price and card.live_price < 1 else ("%.2f"|format(card.live_price) if card.live_price else "-")) }}</span>
+            </div>
+        </div>
+        
+        <!-- Trailing Progress (compact) -->
+        <div class="card-trailing-row" data-market="{{ card.market }}">
+            <span class="trailing-label">
+                {% if card.trailing_activated %}🎯 Trailing actief{% else %}⏳ Naar activatie{% endif %}
+            </span>
+            {% set trail_pct = card.trailing_progress|default(0, true)|float %}
+            {% set safe_trail_pct = [0, [trail_pct, 100]|min]|max %}  {# Clamp between 0-100 #}
+            <div class="trailing-bar-simple" title="Voortgang naar trailing activatie - {{ "%.1f"|format(safe_trail_pct) }}%">
+                 <div class="trailing-fill {% if card.trailing_activated %}fill-active{% elif safe_trail_pct >= 80 %}fill-near{% elif safe_trail_pct >= 50 %}fill-mid{% else %}fill-early{% endif %}" 
+                     style="width: 0%; min-width: 0%;"
+                     data-trailing-fill="{{ card.market }}"
+                     data-trailing-width="{{ safe_trail_pct }}"
+                     data-trailing-min="{% if safe_trail_pct > 0 and safe_trail_pct < 5 %}5{% else %}0{% endif %}"
+                     data-buy-price="{{ card.buy_price }}"
+                     data-activation-price="{{ card.activation_price|default(0, true) }}"></div>
+            </div>
+            <span class="trailing-pct" data-trailing-pct="{{ card.market }}">{% if safe_trail_pct >= 100 %}✓{% else %}{{ "%.0f"|format(safe_trail_pct) }}%{% endif %}</span>
+        </div>
+        
+        <!-- DCA Info - Always show to display progress (X of Y) -->
+        {% set dca_level = card.dca_level|default(0, true)|int %}
+        {% set dca_max = card.dca_max_levels|default(0, true)|int %}
+        {% if dca_max > 0 %}
+        {% set dca_pct = [0, [(dca_level / dca_max * 100)|round(0), 100]|min]|max if dca_max else 0 %}
+        {% set dca_remaining = [0, dca_max - dca_level]|max %}
+        {% set dca_next_price = card.dca_next_price|default(0, true)|float %}
+        {% set dca_buy_amount = card.dca_buy_amount|default(5, true)|float %}
+        <div class="card-dca-row" data-market="{{ card.market }}">
+            <div class="dca-header">
+                <span class="dca-label">📊 DCA Safety Buys</span>
+                <span class="dca-value">{{ dca_level }} / {{ dca_max }} uitgevoerd</span>
+                <span class="dca-remaining {% if dca_remaining == 0 %}text-muted{% endif %}">{{ dca_remaining }} over</span>
+            </div>
+            <div class="dca-progress" title="DCA progress: {{ dca_level }} of {{ dca_max }}">
+                <div class="dca-progress-fill {% if dca_level >= dca_max %}fill-complete{% elif dca_level > 0 %}fill-active{% endif %}" style="width: 0%;" data-dca-fill="{{ card.market }}" data-dca-width="{{ dca_pct }}"></div>
+            </div>
+            {% if dca_remaining > 0 and dca_next_price > 0 %}
+            <div class="dca-details">
+                <span class="dca-detail-item" title="Prijs voor volgende DCA activatie">
+                    🎯 Activatie: <strong>€{{ "%.6f"|format(dca_next_price) if dca_next_price < 0.01 else ("%.4f"|format(dca_next_price) if dca_next_price < 1 else "%.2f"|format(dca_next_price)) }}</strong>
+                </span>
+                <span class="dca-detail-item" title="Bedrag per DCA buy">
+                    💰 Koop: <strong>€{{ "%.2f"|format(dca_buy_amount) }}</strong>
+                </span>
+                {% if card.pyramid_price and card.pyramid_price > 0 %}
+                <span class="dca-detail-item" title="Prijs voor pyramid-up activatie">
+                    🔼 Pyramid: <strong>€{{ "%.6f"|format(card.pyramid_price) if card.pyramid_price < 0.01 else ("%.4f"|format(card.pyramid_price) if card.pyramid_price < 1 else "%.2f"|format(card.pyramid_price)) }}</strong>
+                </span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- LIVE PRICE CHART - Premium Interactive with Apex Enhancements -->
+        <div class="card-chart-container">
+            <div class="chart-header">
+                <span class="chart-title">Price Chart</span>
+                <div class="chart-controls">
+                    <!-- Timeframe Selector (replaced by pills via JS) -->
+                    <select class="timeframe-selector" 
+                            id="timeframe-{{ card.market }}" 
+                            data-market="{{ card.market }}"
+                            onchange="changeTimeframe('{{ card.market }}', this.value)">
+                        <option value="live" selected>Live</option>
+                        <option value="5m">5m</option>
+                        <option value="15m">15m</option>
+                        <option value="1h">1h</option>
+                        <option value="6h">6h</option>
+                        <option value="24h">24h</option>
+                        <option value="7d">7d</option>
+                        <option value="30d">30d</option>
+                    </select>
+                    <span class="chart-live-badge">
+                        <span class="live-dot-pulse"></span>
+                        Live
+                    </span>
+                </div>
+            </div>
+            <div style="position: relative; height: 160px; width: 100%; overflow: hidden;">
+                <canvas id="chart-{{ card.market }}" 
+                        class="trade-card-chart" 
+                        style="display: block !important; width: 100% !important; height: 160px !important;"
+                        data-market="{{ card.market }}"
+                        data-buy-price="{{ card.buy_price }}"
+                        data-amount="{{ card.amount|default(0, true) }}"
+                        data-activation-price="{{ card.activation_price|default(0, true) }}"
+                        data-dca-price="{{ card.dca_next_price|default(0, true) }}"
+                        data-pyramid-price="{{ card.pyramid_price|default(0, true) }}"
+                        data-dca-mode="{{ card.dca_mode|default('average_down', true) }}"
+                        data-trailing-stop="{{ card.trailing_stop|default(0, true) }}"
+                        data-trailing-active="{{ 'true' if card.trailing_activated else 'false' }}"
+                        data-highest-price="{{ card.highest_price|default(card.buy_price, true) }}"></canvas>
+            </div>
+            
+            <!-- Chart Legend - Dynamisch gegenereerd door JavaScript -->
+            <div class="chart-legend" id="legend-{{ card.market }}"></div>
+        </div>
+        
+        <!-- Expandable Details Section -->
+        <button class="card-expand-btn" onclick="toggleCardDetails('{{ card.market }}')">
+            <span class="expand-icon" id="expand-icon-{{ card.market }}">▼</span>
+            <span class="expand-text">Meer Details</span>
+        </button>
+        
+        <div class="card-details-panel" id="details-{{ card.market }}" style="display: none;">
+            <!-- Trade Metrics Grid -->
+            <div class="details-grid">
+                <div class="detail-item">
+                    <span class="detail-icon">🕐</span>
+                    <span class="detail-label">Tijd in Trade</span>
+                    <span class="detail-value">
+                        {% if card.bought_at %}
+                            {% set hours = ((now() | float) - card.bought_at) / 3600 %}
+                            {% if hours < 24 %}
+                                {{ "%.1f"|format(hours) }}h
+                            {% else %}
+                                {{ "%.1f"|format(hours / 24) }} dagen
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <div class="detail-item">
+                    <span class="detail-icon">📈</span>
+                    <span class="detail-label">Hoogste Prijs</span>
+                    <span class="detail-value">€{{ "%.6f"|format(card.highest_price) if card.highest_price and card.highest_price < 0.01 else ("%.4f"|format(card.highest_price) if card.highest_price and card.highest_price < 1 else ("%.2f"|format(card.highest_price) if card.highest_price else "-")) }}</span>
+                </div>
+                
+                <div class="detail-item">
+                    <span class="detail-icon">💎</span>
+                    <span class="detail-label">Totaal Coins</span>
+                    <span class="detail-value">{{ "%.8f"|format(card.amount) if card.amount < 1 else ("%.4f"|format(card.amount) if card.amount < 100 else "%.2f"|format(card.amount)) }}</span>
+                </div>
+                
+                <div class="detail-item">
+                    <span class="detail-icon">⚡</span>
+                    <span class="detail-label">ROI</span>
+                    <span class="detail-value {% if card.pnl_pct >= 0 %}text-success{% else %}text-danger{% endif %}" data-roi-detail="{{ card.market }}">
+                        {% if card.pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl_pct) }}%
+                    </span>
+                </div>
+                
+                {% if card.activation_price and card.activation_price > 0 %}
+                <div class="detail-item">
+                    <span class="detail-icon">🎯</span>
+                    <span class="detail-label">TP Activatie</span>
+                    <span class="detail-value">€{{ "%.6f"|format(card.activation_price) if card.activation_price < 0.01 else ("%.4f"|format(card.activation_price) if card.activation_price < 1 else "%.2f"|format(card.activation_price)) }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-icon">💎</span>
+                    <span class="detail-label">Asset Waarde @TP</span>
+                    <span class="detail-value">€{{ "%.2f"|format(card.activation_price * card.amount) }}</span>
+                </div>
+                {% endif %}
+                
+                {% if card.trailing_stop and card.trailing_stop > 0 %}
+                <div class="detail-item">
+                    <span class="detail-icon">🛑</span>
+                    <span class="detail-label">Stop Loss</span>
+                    <span class="detail-value text-danger">€{{ "%.6f"|format(card.trailing_stop) if card.trailing_stop < 0.01 else ("%.4f"|format(card.trailing_stop) if card.trailing_stop < 1 else "%.2f"|format(card.trailing_stop)) }}</span>
+                </div>
+                {% endif %}
+                
+                <div class="detail-item">
+                    <span class="detail-icon">📊</span>
+                    <span class="detail-label">Gem. Prijs</span>
+                    <span class="detail-value">€{{ "%.6f"|format(card.buy_price) if card.buy_price < 0.01 else ("%.4f"|format(card.buy_price) if card.buy_price < 1 else "%.2f"|format(card.buy_price)) }}</span>
+                </div>
+                
+                <div class="detail-item">
+                    <span class="detail-icon">💰</span>
+                    <span class="detail-label">Geïnvesteerd</span>
+                    <span class="detail-value">€{{ "%.2f"|format(card.invested) }}</span>
+                </div>
+            </div>
+            
+            <!-- Risk Metrics -->
+            <div class="risk-metrics">
+                <div class="risk-title">🔍 Risico Analyse</div>
+                <div class="risk-items">
+                    {% set risk_pct = ((card.buy_price - (card.trailing_stop or (card.buy_price * 0.9))) / card.buy_price * 100) if card.trailing_stop else 10 %}
+                    <div class="risk-item">
+                        <span class="risk-label">Stop Loss Afstand:</span>
+                        <span class="risk-value {% if risk_pct > 15 %}text-danger{% elif risk_pct > 8 %}text-warning{% else %}text-success{% endif %}">
+                            {{ "%.1f"|format(risk_pct) }}%
+                        </span>
+                    </div>
+                    
+                    {% set position_size_pct = (card.invested / (380.0) * 100) %}
+                    <div class="risk-item">
+                        <span class="risk-label">Positie Grootte:</span>
+                        <span class="risk-value {% if position_size_pct > 20 %}text-warning{% else %}text-success{% endif %}">
+                            {{ "%.1f"|format(position_size_pct) }}% van portfolio
+                        </span>
+                    </div>
+                    
+                    <div class="risk-item">
+                        <span class="risk-label">Status:</span>
+                        <span class="risk-value">
+                            {% if card.trailing_activated %}
+                                <span class="badge-success">✓ Trailing Actief</span>
+                            {% elif card.pnl_pct >= 5 %}
+                                <span class="badge-warning">⚠ Overweeg TP Activatie</span>
+                            {% elif card.pnl_pct <= -10 %}
+                                <span class="badge-danger">⚠ Hoog Verlies</span>
+                            {% else %}
+                                <span class="badge-info">⏳ Actieve Trade</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- AI Suggestie (Placeholder - kan later uitgebreid worden) -->
+            <div class="ai-suggestion">
+                <div class="ai-header">
+                    <span class="ai-icon">🤖</span>
+                    <span class="ai-title">AI Analyse</span>
+                </div>
+                <div class="ai-content">
+                    {% if card.trailing_activated %}
+                        ✅ <strong>Positief:</strong> Trailing stop is actief en beschermt je winst. Laat de trade lopen.
+                    {% elif card.pnl_pct >= 10 %}
+                        🎯 <strong>Suggestie:</strong> Overweeg trailing activatie - je hebt +{{ "%.1f"|format(card.pnl_pct) }}% winst.
+                    {% elif card.pnl_pct <= -8 %}
+                        ⚠️ <strong>Waarschuwing:</strong> Verlies loopt op tot {{ "%.1f"|format(card.pnl_pct) }}%. Monitor de situatie nauwkeurig.
+                    {% else %}
+                        ℹ️ <strong>Neutraal:</strong> Trade ontwikkelt zich normaal. Houd koers vast naar target.
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer Stats -->
+        <div class="card-footer-simple">
+            <span class="footer-item" title="Aantal coins">📦 {{ "%.4f"|format(card.amount) if card.amount < 1 else "%.2f"|format(card.amount) }}</span>
+            <span class="footer-item" title="Hoogste prijs">📈 €{{ "%.4f"|format(card.highest_price) if card.highest_price and card.highest_price < 1 else ("%.2f"|format(card.highest_price) if card.highest_price else "-") }}</span>
+            <span class="footer-item" title="Live koers">💹 €<span class="live-price-text" data-market="{{ card.market }}">{{ "%.4f"|format(card.live_price) if card.live_price and card.live_price < 1 else ("%.2f"|format(card.live_price) if card.live_price else "-.--") }}</span></span>
+        </div>
+    </div>
+    {% endfor %}
+    
+    {% if not cards %}
+    <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <div class="empty-text">Geen open posities</div>
+        <div class="empty-hint">De bot zal automatisch nieuwe trades openen wanneer er signalen zijn.</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Unified Portfolio Overview -->
+<div class="glass-panel">
+    <div class="section-header">
+        <h2>Portfolio Overview</h2>
+        <div class="chart-controls" style="display: flex; gap: 8px; align-items: center;">
+            <button class="sort-action-btn" onclick="togglePortfolioView()" title="Switch between value and P&L view">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9-9a9 9 0 0 0-9 9m9-9v18"/></svg>
+                Switch View
+            </button>
+        </div>
+    </div>
+    
+    <div class="portfolio-charts-grid">
+        <!-- Combined Value Chart -->
+        <div class="chart-container" style="height: 300px; max-height: 300px; overflow: hidden;">
+            <h3>Total Portfolio Value</h3>
+            <canvas id="portfolio-combined-chart" style="max-height: 250px;"></canvas>
+        </div>
+        
+        <!-- Allocation Pie Chart -->
+        <div class="chart-container" style="height: 300px; max-height: 300px; overflow: hidden;">
+            <h3>Asset Allocation</h3>
+            <canvas id="portfolio-allocation-chart" style="max-height: 250px;"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Table -->
+{% if cards %}
+<div class="summary-section glass-panel">
+    <h3>Portfolio Samenvatting</h3>
+    <table class="summary-table">
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Waarde</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Totaal Geïnvesteerd</td>
+                <td>€{{ "%.2f"|format(totals.total_invested) }}</td>
+            </tr>
+            <tr>
+                <td>Huidige Waarde</td>
+                <td>€{{ "%.2f"|format(totals.total_current) }}</td>
+            </tr>
+            <tr class="{% if totals.total_pnl >= 0 %}row-positive{% else %}row-negative{% endif %}">
+                <td>Unrealized P/L</td>
+                <td>{% if totals.total_pnl >= 0 %}+{% endif %}€{{ "%.2f"|format(totals.total_pnl) }} ({{ "%.2f"|format(totals.total_pnl_pct) }}%)</td>
+            </tr>
+            <tr>
+                <td>Winning Trades</td>
+                <td class="text-success">{{ totals.winning_trades }}</td>
+            </tr>
+            <tr>
+                <td>Losing Trades</td>
+                <td class="text-danger">{{ totals.losing_trades }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Closed Trades Table - Last 10 -->
+<div class="glass-panel">
+    <div class="section-header">
+        <h2>📕 Laatste 10 Gesloten Trades</h2>
+    </div>
+    {% if closed_trades and closed_trades|length > 0 %}
+    <div class="table-responsive">
+        <table class="closed-trades-table">
+            <thead>
+                <tr>
+                    <th>Market</th>
+                    <th>Reden</th>
+                    <th>Invested</th>
+                    <th>Verkocht voor</th>
+                    <th>P/L</th>
+                    <th>Buy Price</th>
+                    <th>Sell Price</th>
+                    <th>Datum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for trade in closed_trades %}
+                <tr class="{% if trade.profit >= 0 %}row-positive{% else %}row-negative{% endif %}">
+                    <td><strong>{{ trade.market }}</strong></td>
+                    <td>
+                        <span class="reason-badge reason-{{ trade.reason|replace('_', '-') }}">
+                            {% if trade.reason == 'trailing_tp' %}🎯 Trailing TP
+                            {% elif trade.reason == 'saldo_flood_guard' %}🛡️ Flood Guard
+                            {% elif trade.reason == 'sync_removed' %}🔄 Sync Removed
+                            {% elif trade.reason == 'auto_free_slot' %}🔓 Auto Free Slot
+                            {% elif trade.reason == 'stop_loss' %}🛑 Stop Loss
+                            {% elif trade.reason == 'manual' %}✋ Manual
+                            {% else %}{{ trade.reason }}{% endif %}
+                        </span>
+                    </td>
+                    <td>€{{ "%.2f"|format(trade.invested) }}</td>
+                    <td>€{{ "%.2f"|format(trade.sold_for) if trade.sold_for > 0 else '-' }}</td>
+                    <td class="{% if trade.profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {% if trade.profit >= 0 %}+{% endif %}€{{ "%.2f"|format(trade.profit) }}
+                        <small>({{ "%.1f"|format(trade.profit_pct) }}%)</small>
+                    </td>
+                    <td>€{{ "%.6f"|format(trade.buy_price) if trade.buy_price < 0.01 else ("%.4f"|format(trade.buy_price) if trade.buy_price < 1 else "%.2f"|format(trade.buy_price)) }}</td>
+                    <td>€{{ "%.6f"|format(trade.sell_price) if trade.sell_price < 0.01 else ("%.4f"|format(trade.sell_price) if trade.sell_price < 1 else "%.2f"|format(trade.sell_price)) if trade.sell_price > 0 else '-' }}</td>
+                    <td>{{ trade.closed_date }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="padding: 20px; text-align: center; color: #94a3b8;">
+        <p>📭 Geen gesloten trades gevonden</p>
+        <p style="font-size: 0.85rem;">Er zijn nog geen trades afgesloten, of de data is niet beschikbaar.</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script id="portfolio-cards-data" type="application/json">{{ cards|tojson|safe if cards else '[]' }}</script>
+<script id="portfolio-totals-data" type="application/json">{{ totals|tojson|safe if totals else '{}' }}</script>
+<script id="portfolio-combined-data" type="application/json">{{ portfolio_combined_data|tojson|safe if portfolio_combined_data else '{}' }}</script>
+<script id="portfolio-allocation-data" type="application/json">{{ portfolio_allocation|tojson|safe if portfolio_allocation else '{}' }}</script>
+<script id="portfolio-config-data" type="application/json">{{ config|tojson|safe if config else '{}' }}</script>
+<script>
+// Read config from JSON data block (avoids VS Code linter errors with Jinja syntax)
+var portfolioConfig = document.getElementById('portfolio-config-data') ? JSON.parse(document.getElementById('portfolio-config-data').textContent) : {};
+var TRAILING_ACTIVATION_PCT = portfolioConfig.TRAILING_ACTIVATION_PCT || 0.02;
+// Sparkline charts storage
+const sparklineCharts = {};
+
+// Formatting helpers for consistent Euro/price display
+// formatEuro is already defined globally in main.js, use window.formatEuro
+const formatPriceCompact = (price) => {
+    const p = Number(price || 0);
+    if (p < 0.01) return `€${p.toFixed(6)}`;
+    if (p < 1) return `€${p.toFixed(4)}`;
+    return `€${p.toFixed(2)}`;
+};
+const clampPct = (value) => Math.max(0, Math.min(100, Number(value || 0)));
+
+// Current sort preference (saved in localStorage)
+let currentSortMode = localStorage.getItem('tradeCardSort') || 'pnl-pct-desc';
+let lastSortOrder = [];
+let sortDebounceTimer = null;
+
+// Sort trade cards function - called by dropdown and after updates
+function sortTradeCards(sortBy, force = false) {
+    if (sortBy) {
+        currentSortMode = sortBy;
+        localStorage.setItem('tradeCardSort', sortBy);
+        force = true; // Always sort immediately on manual change
+    }
+    
+    const container = document.getElementById('trade-cards-container');
+    if (!container) return;
+    
+    const cards = Array.from(container.querySelectorAll('.trade-card-simple, .trade-card'));
+    if (cards.length < 2) return;
+    
+    // Calculate new order
+    const sortedCards = [...cards].sort((a, b) => {
+        const aVal = {
+            pnl: parseFloat(a.dataset.pnl || 0),
+            pnlPct: parseFloat(a.dataset.pnlPct || 0),
+            value: parseFloat(a.dataset.value || 0),
+            symbol: (a.dataset.symbol || '').toLowerCase()
+        };
+        const bVal = {
+            pnl: parseFloat(b.dataset.pnl || 0),
+            pnlPct: parseFloat(b.dataset.pnlPct || 0),
+            value: parseFloat(b.dataset.value || 0),
+            symbol: (b.dataset.symbol || '').toLowerCase()
+        };
+        
+        switch (currentSortMode) {
+            case 'pnl-pct-desc': return bVal.pnlPct - aVal.pnlPct;
+            case 'pnl-desc': return bVal.pnl - aVal.pnl;
+            case 'pnl-asc': return aVal.pnl - bVal.pnl;
+            case 'value-desc': return bVal.value - aVal.value;
+            case 'symbol-asc': return aVal.symbol.localeCompare(bVal.symbol);
+            default: return bVal.pnlPct - aVal.pnlPct;
+        }
+    });
+    
+    // Check if order actually changed
+    const newOrder = sortedCards.map(c => c.dataset.market);
+    const orderChanged = force || newOrder.some((m, i) => m !== lastSortOrder[i]);
+    
+    if (!orderChanged) return; // Don't re-render if order is the same
+    
+    lastSortOrder = newOrder;
+    
+    // Re-append in sorted order with smooth animation
+    sortedCards.forEach(card => container.appendChild(card));
+}
+
+// Debounced auto-sort - only sort every 15 seconds max during live updates
+// This prevents jarring card movement during rapid price changes
+function autoSortCards() {
+    if (sortDebounceTimer) return; // Already scheduled
+    
+    sortDebounceTimer = setTimeout(() => {
+        sortDebounceTimer = null;
+        sortTradeCards(currentSortMode);
+    }, 15000); // Wait 15 seconds before re-sorting (reduced from 5s for smoother UX)
+}
+
+function hydrateInitialCardStyles(cards) {
+    const initialCards = Array.isArray(cards) ? cards : [];
+
+    // Apply readiness panel styles from data attributes
+    const readinessPanel = document.querySelector('.trade-readiness-panel');
+    if (readinessPanel) {
+        const borderColor = readinessPanel.dataset.readinessColor || '#64748b';
+        readinessPanel.style.borderLeft = `4px solid ${borderColor}`;
+    }
+    
+    const readinessLabel = document.querySelector('.readiness-label');
+    if (readinessLabel) {
+        const labelColor = readinessLabel.dataset.labelColor || '#94a3b8';
+        readinessLabel.style.color = labelColor;
+        readinessLabel.style.fontWeight = '700';
+        readinessLabel.style.fontSize = '1.1rem';
+    }
+    
+    const readinessIcon = document.querySelector('.readiness-icon');
+    if (readinessIcon) {
+        readinessIcon.style.fontSize = '1.5rem';
+    }
+    
+    // Apply bullet colors for readiness details
+    document.querySelectorAll('.detail-bullet').forEach((bullet) => {
+        const color = bullet.dataset.bulletColor || '#94a3b8';
+        bullet.style.color = color;
+    });
+
+    // Apply data-driven styles for server-rendered cards
+    document.querySelectorAll('[data-trailing-fill]').forEach((el) => {
+        const rawPct = Number(el.dataset.trailingWidth || 0);
+        const minWidth = Number(el.dataset.trailingMin || 0);
+        const pct = clampPct(rawPct);
+        const width = pct > 0 && pct < 5 ? Math.max(pct, minWidth || 5) : pct;
+        el.style.width = `${width}%`;
+        el.style.minWidth = `${minWidth}%`;
+    });
+
+    document.querySelectorAll('[data-dca-fill]').forEach((el) => {
+        const pct = clampPct(el.dataset.dcaWidth || 0);
+        el.style.width = `${pct}%`;
+    });
+
+    // Sync textual data using initial cards
+    initialCards.forEach((card) => {
+        if (!card || !card.market) return;
+        const cardEl = document.querySelector(`.trade-card-simple[data-market="${card.market}"], .trade-card[data-market="${card.market}"]`);
+        if (cardEl) updateCardFromData(cardEl, card);
+    });
+}
+
+// Throttle rapid price updates to a single animation frame
+let queuedPriceUpdates = null;
+let priceUpdateFrame = null;
+function queuePriceUpdate(prices) {
+    if (!prices || typeof prices !== 'object') return;
+    queuedPriceUpdates = { ...(queuedPriceUpdates || {}), ...prices };
+    if (priceUpdateFrame) return;
+    const scheduler = window.requestAnimationFrame || function(cb) { return setTimeout(cb, 16); };
+    priceUpdateFrame = scheduler(() => {
+        const payload = queuedPriceUpdates || {};
+        queuedPriceUpdates = null;
+        priceUpdateFrame = null;
+        if (Object.keys(payload).length) {
+            updateTradeCards(payload);
+            updateSparklines(payload);
+            updateTradeCardCharts(payload); // Update live charts
+            autoSortCards(); // Re-sort after price updates
+        }
+    });
+}
+
+// LIVE DATA: Full portfolio refresh - updates all metrics, trades, status
+function refreshFullPortfolio() {
+    console.log('[Portfolio] Refreshing full portfolio data...');
+    
+    // Fetch open trades with all totals
+    fetch('/api/trades/open')
+        .then(resp => resp.json())
+        .then(data => {
+            if (data.cards) {
+                // Sync trade cards - add new, remove closed, update existing
+                syncTradeCardsLive(data.cards);
+            }
+            if (data.totals) {
+                applyTotals(data.totals);
+            }
+        })
+        .catch(err => console.warn('[Portfolio] Refresh failed:', err));
+    
+    // Fetch heartbeat for status updates
+    fetch('/api/heartbeat')
+        .then(resp => resp.json())
+        .then(data => {
+            updateSystemStatus(data);
+        })
+        .catch(err => console.warn('[Portfolio] Heartbeat failed:', err));
+    
+    // Fetch pending orders
+    loadPendingOrders();
+}
+
+// Update system status cards from heartbeat
+function updateSystemStatus(data) {
+    if (!data) return;
+    
+    const botCard = document.querySelector('.status-card:nth-child(1)');
+    const aiCard = document.querySelector('.status-card:nth-child(2)');
+    const openTradesStatus = document.getElementById('status-open-trades');
+    const eurBalanceStatus = document.getElementById('status-eur-balance');
+    
+    // Update bot status
+    if (botCard) {
+        const isOnline = data.bot_online;
+        botCard.classList.toggle('status-online', isOnline);
+        botCard.classList.toggle('status-offline', !isOnline);
+        const statusText = botCard.querySelector('.status-card-status');
+        if (statusText) statusText.textContent = isOnline ? 'ONLINE' : 'OFFLINE';
+    }
+    
+    // Update AI status
+    if (aiCard) {
+        const isOnline = data.ai_online;
+        aiCard.classList.toggle('status-online', isOnline);
+        aiCard.classList.toggle('status-offline', !isOnline);
+        const statusText = aiCard.querySelector('.status-card-status');
+        if (statusText) statusText.textContent = isOnline ? 'ONLINE' : 'OFFLINE';
+    }
+    
+    // Update EUR balance from heartbeat
+    if (eurBalanceStatus && data.heartbeat && data.heartbeat.eur_balance !== undefined) {
+        eurBalanceStatus.textContent = formatEuro(data.heartbeat.eur_balance);
+    }
+}
+
+// Enhanced sync that handles adding/removing trade cards
+function syncTradeCardsLive(cards) {
+    const container = document.getElementById('trade-cards-container');
+    if (!container) return;
+
+    // Build map of existing cards
+    const existing = new Map();
+    container.querySelectorAll('.trade-card-simple, .trade-card').forEach((el) => {
+        existing.set(el.dataset.market, el);
+    });
+    
+    // Track which markets are in new data
+    const newMarkets = new Set(cards.map(c => c.market));
+
+    // Add or update cards
+    cards.forEach((card) => {
+        if (!card || !card.market) return;
+        let cardEl = existing.get(card.market);
+        if (!cardEl) {
+            // NEW TRADE - add with animation
+            cardEl = buildTradeCardElement(card);
+            cardEl.style.animation = 'fadeIn 0.5s ease-out';
+            container.appendChild(cardEl);
+            console.log('[Portfolio] New trade added:', card.market);
+        }
+        updateCardFromData(cardEl, card);
+        cardEl.style.display = '';
+        cardEl.style.visibility = 'visible';
+        cardEl.style.opacity = '1';
+    });
+    
+    // Remove closed trades with animation
+    existing.forEach((el, market) => {
+        if (!newMarkets.has(market)) {
+            console.log('[Portfolio] Trade closed, removing:', market);
+            el.style.animation = 'fadeOut 0.3s ease-out';
+            setTimeout(() => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            }, 300);
+        }
+    });
+
+    window.tradeCards = cards;
+    
+    // Auto-sort cards after update
+    autoSortCards();
+    
+    // Update trade count in status
+    const openTradesStatus = document.getElementById('status-open-trades');
+    if (openTradesStatus) {
+        const maxTrades = window.portfolioTotals?.max_open_trades || 6;
+        openTradesStatus.textContent = `${cards.length} / ${maxTrades}`;
+    }
+}
+
+function applyTotals(totals) {
+    if (!totals || typeof totals !== 'object') return;
+    window.portfolioTotals = totals;
+
+    const depositedEl = document.getElementById('hero-total-deposited');
+    const accountEl = document.getElementById('hero-account-value');
+    const realProfitEl = document.getElementById('hero-real-profit');
+    const realProfitPctEl = document.getElementById('hero-real-profit-pct');
+    const eurEl = document.getElementById('hero-eur-balance');
+    const currentEl = document.getElementById('hero-total-current');
+    const tradeCountEl = document.getElementById('hero-trade-count');
+    const openTradeStatus = document.getElementById('status-open-trades');
+    const eurStatus = document.getElementById('status-eur-balance');
+
+    if (depositedEl) depositedEl.textContent = formatEuro(totals.total_deposited || 0);
+    if (accountEl) accountEl.textContent = formatEuro(totals.account_value || 0);
+
+    if (realProfitEl) {
+        const value = Number(totals.real_profit || 0);
+        realProfitEl.textContent = `${value >= 0 ? '+' : ''}${formatEuro(value).replace('€', '€')}`;
+        realProfitEl.classList.toggle('text-success', value >= 0);
+        realProfitEl.classList.toggle('text-danger', value < 0);
+    }
+
+    if (realProfitPctEl) {
+        const pct = Number(totals.real_profit_pct || 0);
+        realProfitPctEl.textContent = `${pct.toFixed(2)}% rendement`;
+    }
+
+    if (eurEl) eurEl.textContent = formatEuro(totals.eur_balance || 0);
+    if (currentEl) currentEl.textContent = formatEuro(totals.total_current || 0);
+    if (tradeCountEl && totals.trade_count !== undefined) tradeCountEl.textContent = `${totals.trade_count} actieve posities`;
+    if (openTradeStatus && totals.trade_count !== undefined) openTradeStatus.textContent = `${totals.trade_count} / ${totals.max_open_trades || ''}`;
+    if (eurStatus && totals.eur_balance !== undefined) eurStatus.textContent = formatEuro(totals.eur_balance);
+}
+
+function buildTradeCardElement(card) {
+    const symbol = card.symbol || (card.market || '').split('-')[0] || 'ASSET';
+    const pnlClass = (Number(card.pnl) || 0) >= 0 ? 'pnl-positive' : 'pnl-negative';
+    const trailingPct = clampPct(card.trailing_progress);
+    const trailingFillClass = card.trailing_activated ? 'fill-active' : (trailingPct >= 80 ? 'fill-near' : trailingPct >= 50 ? 'fill-mid' : 'fill-early');
+    const dcaLevel = Number(card.dca_level || 0);
+    const dcaMax = Number(card.dca_max_levels || 0);
+    const dcaPct = clampPct(card.dca_progress_pct);
+    const dcaRemaining = card.dca_remaining ?? (dcaMax ? Math.max(dcaMax - dcaLevel, 0) : 0);
+    const dcaMarkup = dcaLevel > 0
+        ? [
+            '<div class="card-dca-row" data-market="' + card.market + '">',
+                '<div class="dca-header">',
+                    '<span class="dca-label">DCA</span>',
+                    '<span class="dca-value">Level ' + dcaLevel + (dcaMax ? ' / ' + dcaMax : '') + '</span>',
+                    '<span class="dca-remaining">' + dcaRemaining + ' remaining</span>',
+                '</div>',
+                '<div class="dca-progress" title="DCA progress ' + dcaPct.toFixed(0) + '%">',
+                    '<div class="dca-progress-fill" style="width: ' + dcaPct + '%;" data-dca-fill="' + card.market + '"></div>',
+                '</div>',
+            '</div>'
+        ].join('')
+        : '';
+
+    const el = document.createElement('div');
+    el.className = 'trade-card-simple';
+    el.dataset.market = card.market;
+    el.dataset.pnl = (Number(card.pnl) || 0).toFixed(2);
+    el.dataset.pnlPct = (Number(card.pnl_pct) || 0).toFixed(2);
+    el.dataset.value = (Number(card.current_value) || 0).toFixed(2);
+    el.dataset.symbol = symbol;
+
+    el.innerHTML = `
+        <div class="card-header-simple">
+            <div class="card-asset">
+                <img src="${card.logo_url || ''}" alt="${symbol}" class="card-logo"
+                     onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;40&quot; height=&quot;40&quot;><rect width=&quot;40&quot; height=&quot;40&quot; rx=&quot;8&quot; fill=&quot;%233B82F6&quot;/><text x=&quot;50%&quot; y=&quot;50%&quot; text-anchor=&quot;middle&quot; dy=&quot;.35em&quot; font-size=&quot;18&quot; fill=&quot;white&quot; font-family=&quot;Arial&quot;>${symbol[0] || 'A'}</text></svg>'">
+                <div class="card-asset-info">
+                    <span class="card-symbol">${symbol}</span>
+                    <span class="card-name">${card.crypto_name || card.market || ''}</span>
+                </div>
+            </div>
+            <span class="card-status ${card.trailing_activated ? 'status-trailing' : (card.status === 'external' ? 'status-external' : 'status-active')}">
+                ${card.trailing_activated ? 'TRAILING ACTIEF' : (card.status === 'external' ? 'EXTERNE POSITIE' : 'ACTIEF')}
+            </span>
+            <button class="card-edit-btn" onclick="openTradeEditor('${card.market}', ${card.buy_price || 0}, ${card.invested || 0}, ${card.amount || 0})" title="Edit trade">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+            </button>
+            ${(Number(card.pnl) || 0) >= 0 ? '<span class="card-tag tag-profit">WINST</span>' : ''}
+        </div>
+
+        <div class="card-pnl-hero ${pnlClass}">
+            <span class="pnl-amount" data-pnl="${card.market}">${(Number(card.pnl) || 0) >= 0 ? '+' : ''}${formatEuro(card.pnl || 0)}</span>
+            <span class="pnl-percent" data-pnl-pct="${card.market}">${(Number(card.pnl_pct) || 0) >= 0 ? '+' : ''}${(Number(card.pnl_pct) || 0).toFixed(2)}%</span>
+        </div>
+
+        <div class="card-values-row">
+            <div class="card-value-item">
+                <span class="value-icon">💰</span>
+                <span class="value-label">INVEST</span>
+                <span class="value-amount">${formatEuro(card.invested || 0)}</span>
+            </div>
+            <div class="card-value-item">
+                <span class="value-icon">📊</span>
+                <span class="value-label">NU</span>
+                <span class="value-amount" data-current="${card.market}">${formatEuro(card.current_value || 0)}</span>
+            </div>
+        </div>
+
+        <div class="card-price-row">
+            <div class="price-entry">
+                <span class="price-dot entry-dot"></span>
+                <span class="price-label">ENTRY PRICE</span>
+                <span class="price-value">${formatPriceCompact(card.buy_price)}</span>
+            </div>
+            <span class="price-arrow">→</span>
+            <div class="price-live">
+                <span class="price-dot live-dot"></span>
+                <span class="price-label">LIVE PRICE</span>
+                <span class="price-value live-pulse" data-live-price="${card.market}">${card.live_price ? formatPriceCompact(card.live_price) : '-'}</span>
+            </div>
+        </div>
+
+        <div class="card-trailing-row" data-market="${card.market}">
+            <span class="trailing-label">${card.trailing_activated ? '🎯 Trailing actief' : '⏳ Naar activatie'}</span>
+            <div class="trailing-bar-simple" title="Voortgang naar trailing activatie - ${trailingPct.toFixed(1)}%">
+                <div class="trailing-fill ${trailingFillClass}"
+                    style="width: ${trailingPct > 0 && trailingPct < 5 ? 5 : trailingPct}%; min-width: ${trailingPct > 0 && trailingPct < 5 ? 5 : 0}%;"
+                    data-trailing-fill="${card.market}"
+                    data-buy-price="${card.buy_price || 0}"
+                    data-activation-price="${card.activation_price || 0}"></div>
+            </div>
+            <span class="trailing-pct" data-trailing-pct="${card.market}">${trailingPct >= 100 ? '✓' : `${Math.floor(trailingPct)}%`}</span>
+        </div>
+
+        ${dcaMarkup}
+
+        <div class="card-footer-simple">
+            <span class="footer-item" title="Aantal coins">📦 ${(Number(card.amount) || 0) < 1 ? (Number(card.amount) || 0).toFixed(4) : (Number(card.amount) || 0).toFixed(2)}</span>
+            <span class="footer-item" title="Hoogste prijs">📈 ${card.highest_price ? formatPriceCompact(card.highest_price) : '-'}</span>
+            <span class="footer-item sparkline-mini" data-market="${card.market}">📊</span>
+        </div>
+    `;
+
+    return el;
+}
+
+function updateCardFromData(cardEl, cardData) {
+    if (!cardEl || !cardData) return;
+    const pnlVal = Number(cardData.pnl) || 0;
+    cardEl.dataset.pnl = pnlVal.toFixed(2);
+    cardEl.dataset.pnlPct = (Number(cardData.pnl_pct) || 0).toFixed(2);
+    cardEl.dataset.value = (Number(cardData.current_value) || 0).toFixed(2);
+    cardEl.dataset.symbol = cardEl.dataset.symbol || cardData.symbol || '';
+
+    const pnlAmount = cardEl.querySelector(`[data-pnl="${cardData.market}"]`);
+    if (pnlAmount) pnlAmount.textContent = `${pnlVal >= 0 ? '+' : ''}${formatEuro(cardData.pnl || 0)}`;
+
+    const pnlPctEl = cardEl.querySelector(`[data-pnl-pct="${cardData.market}"]`);
+    if (pnlPctEl) pnlPctEl.textContent = `${(Number(cardData.pnl_pct) || 0) >= 0 ? '+' : ''}${(Number(cardData.pnl_pct) || 0).toFixed(2)}%`;
+
+    // Update P/L color class (fix: was missing, caused stale red/green)
+    const pnlSection = cardEl.querySelector('.card-pnl-hero');
+    if (pnlSection) {
+        pnlSection.classList.remove('pnl-positive', 'pnl-negative');
+        pnlSection.classList.add(pnlVal >= 0 ? 'pnl-positive' : 'pnl-negative');
+    }
+    // Keep ROI detail span in sync on full-card refresh
+    const roiDetailEl = cardEl.querySelector(`[data-roi-detail="${cardData.market}"]`);
+    if (roiDetailEl) {
+        const pnlPctVal = Number(cardData.pnl_pct) || 0;
+        roiDetailEl.classList.toggle('text-success', pnlPctVal >= 0);
+        roiDetailEl.classList.toggle('text-danger', pnlPctVal < 0);
+        roiDetailEl.textContent = `${pnlPctVal >= 0 ? '+' : ''}${pnlPctVal.toFixed(2)}%`;
+    }
+    // Update WINST tag visibility
+    const winstTag = cardEl.querySelector('.tag-profit');
+    if (winstTag) winstTag.style.display = pnlVal >= 0 ? '' : 'none';
+
+    const currentEl = cardEl.querySelector(`[data-current="${cardData.market}"]`);
+    if (currentEl) currentEl.textContent = formatEuro(cardData.current_value || 0);
+
+    const liveEl = cardEl.querySelector(`[data-live-price="${cardData.market}"]`);
+    if (liveEl && cardData.live_price !== undefined) liveEl.textContent = formatPriceCompact(cardData.live_price);
+
+    const trailingFill = cardEl.querySelector(`[data-trailing-fill="${cardData.market}"]`);
+    const trailingPctEl = cardEl.querySelector(`[data-trailing-pct="${cardData.market}"]`);
+    if (trailingFill) {
+        const trailPct = clampPct(cardData.trailing_progress);
+        trailingFill.style.width = `${trailPct > 0 && trailPct < 5 ? 5 : trailPct}%`;
+        trailingFill.style.minWidth = `${trailPct > 0 && trailPct < 5 ? 5 : 0}%`;
+        trailingFill.dataset.buyPrice = cardData.buy_price || 0;
+        trailingFill.dataset.activationPrice = cardData.activation_price || 0;
+        trailingFill.className = `trailing-fill ${cardData.trailing_activated ? 'fill-active' : trailPct >= 80 ? 'fill-near' : trailPct >= 50 ? 'fill-mid' : 'fill-early'}`;
+        if (trailingPctEl) trailingPctEl.textContent = trailPct >= 100 ? '✓' : `${Math.floor(trailPct)}%`;
+    }
+
+    const dcaRow = cardEl.querySelector(`.card-dca-row[data-market="${cardData.market}"]`);
+    if (dcaRow) {
+        const level = Number(cardData.dca_level) || 0;
+        const maxLevels = Number(cardData.dca_max_levels) || 0;
+        const dcaPct = clampPct(cardData.dca_progress_pct);
+        const remaining = cardData.dca_remaining ?? (maxLevels ? Math.max(maxLevels - level, 0) : 0);
+        const dcaValueEl = dcaRow.querySelector('.dca-value');
+        if (dcaValueEl) dcaValueEl.textContent = `Level ${level}${maxLevels ? ` / ${maxLevels}` : ''}`;
+        const remainingEl = dcaRow.querySelector('.dca-remaining');
+        if (remainingEl) remainingEl.textContent = `${remaining} remaining`;
+        const dcaFill = dcaRow.querySelector(`[data-dca-fill="${cardData.market}"]`);
+        if (dcaFill) dcaFill.style.width = `${dcaPct}%`;
+    }
+
+    // Update trailing stop line on chart dynamically
+    const chartData = tradeCardCharts[cardData.market];
+    if (chartData && chartData.chart) {
+        const trailingStop = parseFloat(cardData.trailing_stop) || 0;
+        const trailingActive = !!cardData.trailing_activated;
+        const annotations = chartData.chart.options.plugins.annotation?.annotations;
+        if (annotations) {
+            if (trailingStop > 0 && trailingActive) {
+                annotations.stopLine = {
+                    type: 'line',
+                    yMin: trailingStop,
+                    yMax: trailingStop,
+                    borderColor: '#EF4444',
+                    borderWidth: 1.5,
+                    borderDash: [4, 4],
+                    label: {
+                        display: true,
+                        content: `Stop €${trailingStop >= 1 ? trailingStop.toFixed(2) : trailingStop.toFixed(4)}`,
+                        position: 'end',
+                        backgroundColor: 'rgba(239, 68, 68, 0.85)',
+                        color: '#fff',
+                        font: { size: 9, weight: '600' },
+                        padding: { top: 2, bottom: 2, left: 4, right: 4 },
+                        borderRadius: 3
+                    }
+                };
+            } else {
+                delete annotations.stopLine;
+            }
+            chartData.chart.update('none');
+        }
+    }
+}
+
+function handleDataSnapshot(payload) {
+    if (!payload) return;
+    const cards = payload.cards || [];
+    const totals = payload.totals || null;
+
+    if (totals) applyTotals(totals);
+    if (Array.isArray(cards) && cards.length) {
+        syncTradeCards(cards);
+        // NOTE: Do NOT call updateTradeCards(priceMap) here.
+        // syncTradeCards → updateCardFromData already sets all colors, live prices,
+        // pnl values, and trailing bars from the authoritative server-calculated
+        // card.pnl value. A second recalculation via updateTradeCards(price*amount-invested)
+        // risks floating-point mismatch that can flip a barely-positive pnl to negative,
+        // causing the card color to oscillate red↔green on every snapshot.
+    }
+}
+
+function syncTradeCards(cards) {
+    const container = document.getElementById('trade-cards-container');
+    if (!container) return;
+
+    const existing = new Map();
+    container.querySelectorAll('.trade-card-simple, .trade-card').forEach((el) => {
+        existing.set(el.dataset.market, el);
+    });
+
+    cards.forEach((card) => {
+        if (!card || !card.market) return;
+        let cardEl = existing.get(card.market);
+        if (!cardEl) {
+            cardEl = buildTradeCardElement(card);
+            container.appendChild(cardEl);
+        }
+        updateCardFromData(cardEl, card);
+        cardEl.style.display = '';
+        cardEl.style.visibility = 'visible';
+        cardEl.style.opacity = '1';
+    });
+
+    // CRITICAL: keep window.tradeCards in sync so updateTradeCards (called right
+    // after in handleDataSnapshot) uses fresh invested/amount/buy_price values.
+    // Without this, stale window.tradeCards caused wrong pnl recalculation which
+    // overwrote the correct colors set by updateCardFromData above.
+    window.tradeCards = cards;
+}
+
+// Initialize portfolio-specific functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Cards data for live updates
+    var cardsEl = document.getElementById('portfolio-cards-data');
+    var totalsEl = document.getElementById('portfolio-totals-data');
+    window.tradeCards = cardsEl ? JSON.parse(cardsEl.textContent) : [];
+    const initialTotals = totalsEl ? JSON.parse(totalsEl.textContent) : {};
+    applyTotals(initialTotals);
+    hydrateInitialCardStyles(window.tradeCards);
+    
+    // Restore sort preference and apply initial sort (forced)
+    const sortDropdown = document.getElementById('sort-trades');
+    if (sortDropdown) {
+        sortDropdown.value = currentSortMode;
+    }
+    sortTradeCards(currentSortMode, true); // Force initial sort
+    
+    console.log('[Portfolio] Initialized with', window.tradeCards.length, 'trade cards');
+    
+    // Initialize pending orders section
+    loadPendingOrders();
+    setInterval(loadPendingOrders, 60000); // Refresh every 60 seconds (reduced for performance)
+    
+    // Initialize portfolio charts
+    initPortfolioCharts();
+    
+    // Initialize sparklines for each trade card
+    initSparklines();
+    
+    // Initialize trade card live charts (NEW - Premium Feature)
+    setTimeout(() => {
+        console.log('[Portfolio] Initializing trade card charts...');
+        initTradeCardCharts();
+        console.log('[Portfolio] Trade card charts initialized');
+    }, 500); // Small delay to ensure DOM is ready
+    
+    // Listen for price updates - wait for socket to be ready
+    function setupSocketListeners() {
+        if (window.socket && window.socket.connected) {
+            console.log('[Portfolio] Setting up WebSocket listeners');
+            
+            window.socket.on('price_update', function(data) {
+                console.log('[Portfolio] Received price_update event:', data);
+                if (data && data.prices) {
+                    queuePriceUpdate(data.prices);
+                }
+            });
+
+            window.socket.on('initial_data', handleDataSnapshot);
+            window.socket.on('data_refresh', handleDataSnapshot);
+        } else if (window.socket) {
+            console.log('[Portfolio] Socket exists but not connected yet, waiting...');
+            window.socket.once('connect', setupSocketListeners);
+        } else {
+            console.warn('[Portfolio] WebSocket not available, retrying in 100ms...');
+            setTimeout(setupSocketListeners, 100);
+        }
+    }
+    
+    setupSocketListeners();
+
+    // If cards failed to render, pull a fresh snapshot to avoid empty state
+    if ((!window.tradeCards || window.tradeCards.length === 0) && window.fetch) {
+        fetch('/api/trades/open').then((resp) => resp.json()).then(handleDataSnapshot).catch(() => {});
+    }
+    
+    // LIVE DATA: Reduced polling for better performance (every 30 seconds)
+    // WebSocket handles real-time price updates, this is just for sync
+    setInterval(function() {
+        refreshFullPortfolio();
+    }, 30000);
+    
+    // Initial refresh after 3 seconds (delayed to reduce initial load)
+    setTimeout(refreshFullPortfolio, 3000);
+});
+
+// Initialize mini sparkline charts for each trade card
+function initSparklines() {
+    document.querySelectorAll('.sparkline-container').forEach(container => {
+        const market = container.dataset.market;
+        const canvas = container.querySelector('.sparkline-chart');
+        
+        if (!canvas) return;
+        
+        // Destroy existing chart if present
+        if (sparklineCharts[market] && sparklineCharts[market].chart) {
+            sparklineCharts[market].chart.destroy();
+        }
+        
+        // Initialize with empty data
+        sparklineCharts[market] = {
+            chart: new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 1.5,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: { x: { display: false }, y: { display: false } },
+                    animation: { duration: 300 }
+                }
+            }),
+            prices: []
+        };
+    });
+}
+
+// Trade Card Live Charts - Premium Interactive
+const tradeCardCharts = {};
+
+function initTradeCardCharts() {
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.error('[Charts] Chart.js not loaded!');
+        return;
+    }
+    
+    console.log('[Charts] Chart.js available, version:', Chart.version);
+    
+    const canvases = document.querySelectorAll('.trade-card-chart');
+    console.log(`[Charts] Found ${canvases.length} chart canvases`);
+    
+    if (canvases.length === 0) {
+        console.log('[Charts] No chart canvases found - no open trades?');
+        return;
+    }
+    
+    canvases.forEach(canvas => {
+        try {
+            const market = canvas.dataset.market;
+            const buyPrice = parseFloat(canvas.dataset.buyPrice) || 0;
+            const amount = parseFloat(canvas.dataset.amount) || 0;
+            const dcaPrice = parseFloat(canvas.dataset.dcaPrice) || 0;
+            const activationPrice = parseFloat(canvas.dataset.activationPrice) || 0;
+            const trailingStop = parseFloat(canvas.dataset.trailingStop) || 0;
+            const trailingActive = canvas.dataset.trailingActive === 'true';
+            const pyramidPrice = parseFloat(canvas.dataset.pyramidPrice || 0);
+            const dcaMode = canvas.dataset.dcaMode || 'average_down';
+            
+            console.log(`[Chart ${market}] Creating chart with buyPrice=${buyPrice}, dcaPrice=${dcaPrice}, activationPrice=${activationPrice}, pyramidPrice=${pyramidPrice}, dcaMode=${dcaMode}`);
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error(`[Chart ${market}] Could not get canvas context`);
+                return;
+            }
+            
+            // Get current price from DOM
+            const liveEl = document.querySelector(`[data-live-price="${market}"]`);
+            let currentPrice = buyPrice;
+            if (liveEl) {
+                currentPrice = parseFloat(liveEl.textContent.replace('€', '')) || buyPrice;
+            }
+            
+            // Calculate P&L to determine color
+            const pnl = currentPrice - buyPrice;
+            const isProfit = pnl >= 0;
+            
+            // TradingView/CoinGecko style colors
+            const profitColor = '#16c784';  // Green
+            const lossColor = '#ea3943';    // Red
+            const chartColor = isProfit ? profitColor : lossColor;
+            const chartBgColor = isProfit ? 'rgba(22, 199, 132, 0.08)' : 'rgba(234, 57, 67, 0.08)';
+            
+            // Simple price history simulation
+            const priceHistory = [];
+            const timeLabels = [];
+            // Collect all key price levels for Y-axis range
+            const priceLevels = [buyPrice, currentPrice];
+            if (dcaPrice > 0) priceLevels.push(dcaPrice);
+            if (activationPrice > 0) priceLevels.push(activationPrice);
+            if (trailingStop > 0 && trailingActive) priceLevels.push(trailingStop);
+            if (pyramidPrice > 0 && (dcaMode === 'hybrid' || dcaMode === 'pyramid')) priceLevels.push(pyramidPrice);
+            const yMin = Math.min(...priceLevels) * 0.97;
+            const yMax = Math.max(...priceLevels) * 1.03;
+            for (let i = 30; i >= 0; i--) {
+                const variance = (Math.random() - 0.5) * 0.04;
+                priceHistory.push(buyPrice * (1 + variance));
+                timeLabels.push(`-${i}m`);
+            }
+            
+            // Build annotation lines for key price levels (Entry, TP, Stop)
+            // DCA line uses a separate dataset for maximum reliability
+            const annotations = {};
+            
+            // Buy price line (always shown)
+            if (buyPrice > 0) {
+                annotations.buyLine = {
+                    type: 'line',
+                    yMin: buyPrice,
+                    yMax: buyPrice,
+                    borderColor: '#3B82F6',
+                    borderWidth: 1.5,
+                    borderDash: [6, 3],
+                    label: {
+                        display: true,
+                        content: `Entry €${buyPrice >= 1 ? buyPrice.toFixed(2) : buyPrice.toFixed(4)}`,
+                        position: 'start',
+                        backgroundColor: 'rgba(59, 130, 246, 0.85)',
+                        color: '#fff',
+                        font: { size: 9, weight: '600' },
+                        padding: { top: 2, bottom: 2, left: 4, right: 4 },
+                        borderRadius: 3
+                    }
+                };
+            }
+            
+            // TP Activation line (green dashed)
+            if (activationPrice > 0) {
+                annotations.tpLine = {
+                    type: 'line',
+                    yMin: activationPrice,
+                    yMax: activationPrice,
+                    borderColor: '#10B981',
+                    borderWidth: 1.5,
+                    borderDash: [6, 3],
+                    label: {
+                        display: true,
+                        content: `TP €${activationPrice >= 1 ? activationPrice.toFixed(2) : activationPrice.toFixed(4)}`,
+                        position: 'end',
+                        backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                        color: '#fff',
+                        font: { size: 9, weight: '600' },
+                        padding: { top: 2, bottom: 2, left: 4, right: 4 },
+                        borderRadius: 3
+                    }
+                };
+            }
+            
+            // Trailing stop line (red dashed, only when trailing is active)
+            if (trailingStop > 0 && trailingActive) {
+                annotations.stopLine = {
+                    type: 'line',
+                    yMin: trailingStop,
+                    yMax: trailingStop,
+                    borderColor: '#EF4444',
+                    borderWidth: 1.5,
+                    borderDash: [4, 4],
+                    label: {
+                        display: true,
+                        content: `Stop €${trailingStop >= 1 ? trailingStop.toFixed(2) : trailingStop.toFixed(4)}`,
+                        position: 'end',
+                        backgroundColor: 'rgba(239, 68, 68, 0.85)',
+                        color: '#fff',
+                        font: { size: 9, weight: '600' },
+                        padding: { top: 2, bottom: 2, left: 4, right: 4 },
+                        borderRadius: 3
+                    }
+                };
+            }
+            
+            // Pyramid-up line (cyan dashed) - annotation for reliability
+            if (pyramidPrice > 0 && (dcaMode === 'hybrid' || dcaMode === 'pyramid')) {
+                annotations.pyramidLine = {
+                    type: 'line',
+                    yMin: pyramidPrice,
+                    yMax: pyramidPrice,
+                    borderColor: '#06B6D4',
+                    borderWidth: 1.5,
+                    borderDash: [4, 4],
+                    label: {
+                        display: true,
+                        content: `Pyramid ▲ €${pyramidPrice >= 1 ? pyramidPrice.toFixed(2) : pyramidPrice.toFixed(4)}`,
+                        position: 'start',
+                        backgroundColor: 'rgba(6, 182, 212, 0.85)',
+                        color: '#fff',
+                        font: { size: 9, weight: '600' },
+                        padding: { top: 2, bottom: 2, left: 4, right: 4 },
+                        borderRadius: 3
+                    }
+                };
+            }
+            
+            // Create premium chart with dynamic colors and annotation lines
+            // Build datasets: main price line + optional DCA/TP/Stop reference lines
+            const datasets = [{
+                label: market,
+                data: priceHistory,
+                borderColor: chartColor,
+                backgroundColor: (context) => {
+                    const chart = context.chart;
+                    const {ctx, chartArea} = chart;
+                    if (!chartArea) return chartBgColor;
+                    
+                    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                    if (isProfit) {
+                        gradient.addColorStop(0, 'rgba(22, 199, 132, 0.25)');
+                        gradient.addColorStop(0.5, 'rgba(22, 199, 132, 0.08)');
+                        gradient.addColorStop(1, 'rgba(22, 199, 132, 0)');
+                    } else {
+                        gradient.addColorStop(0, 'rgba(234, 57, 67, 0.25)');
+                        gradient.addColorStop(0.5, 'rgba(234, 57, 67, 0.08)');
+                        gradient.addColorStop(1, 'rgba(234, 57, 67, 0)');
+                    }
+                    return gradient;
+                },
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 0,
+                pointHoverRadius: 5,
+                pointHoverBackgroundColor: chartColor,
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 2,
+            }];
+            
+            // DCA Grens line (orange dashed) - flat dataset line for reliability
+            if (dcaPrice > 0) {
+                datasets.push({
+                    label: 'DCA Grens',
+                    data: priceHistory.map(() => dcaPrice),
+                    borderColor: '#F97316',
+                    borderWidth: 1.5,
+                    borderDash: [4, 4],
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    fill: false,
+                    tension: 0
+                });
+            }
+            
+            // Pyramid-up line now uses annotation (above) for reliable rendering
+            
+            // Destroy existing chart if present
+            if (tradeCardCharts[market] && tradeCardCharts[market].chart) {
+                tradeCardCharts[market].chart.destroy();
+            }
+            
+            tradeCardCharts[market] = {
+                chart: new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: timeLabels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            annotation: {
+                                annotations: annotations
+                            },
+                            tooltip: {
+                                enabled: true,
+                                backgroundColor: 'rgba(13, 17, 23, 0.95)',
+                                titleColor: '#f0f6fc',
+                                bodyColor: '#8b949e',
+                                borderColor: chartColor,
+                                borderWidth: 1,
+                                padding: 12,
+                                cornerRadius: 8,
+                                displayColors: false,
+                                titleFont: { size: 13, weight: '600' },
+                                bodyFont: { size: 12 },
+                                callbacks: {
+                                    title: () => market,
+                                    label: (context) => {
+                                        // Skip DCA dataset from tooltip
+                                        if (context.datasetIndex > 0) return null;
+                                        const price = context.parsed.y;
+                                        const pricePnl = price - buyPrice;
+                                        const pnlPct = ((price - buyPrice) / buyPrice * 100).toFixed(2);
+                                        return [
+                                            `Price: €${price >= 1 ? price.toFixed(4) : price.toFixed(6)}`,
+                                            `P/L: ${pricePnl >= 0 ? '+' : ''}€${pricePnl.toFixed(4)} (${pricePnl >= 0 ? '+' : ''}${pnlPct}%)`
+                                        ];
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                display: true,
+                                grid: { display: false },
+                                ticks: { 
+                                    color: '#6e7681', 
+                                    maxTicksLimit: 5,
+                                    font: { size: 10, family: 'Inter' }
+                                },
+                                border: { display: false }
+                            },
+                            y: {
+                                display: true,
+                                position: 'right',
+                                suggestedMin: yMin,
+                                suggestedMax: yMax,
+                                grid: { 
+                                    color: 'rgba(240, 246, 252, 0.06)',
+                                    drawBorder: false
+                                },
+                                ticks: { 
+                                    color: '#8b949e',
+                                    font: { size: 10, family: 'JetBrains Mono' },
+                                    callback: (v) => v >= 1 ? `\u20AC${v.toFixed(2)}` : `\u20AC${v.toFixed(4)}`
+                                },
+                                border: { display: false }
+                            }
+                        },
+                        animation: { 
+                            duration: 500, 
+                            easing: 'easeOutQuart',
+                            onComplete: function() {
+                                // Trigger chart glow after initial render
+                                if (typeof ChartBorderGlow !== 'undefined') {
+                                    ChartBorderGlow.update(market, isProfit);
+                                }
+                            }
+                        }
+                    }
+                }),
+                priceHistory: priceHistory,
+                timeLabels: timeLabels,
+                buyPrice: buyPrice,
+                dcaPrice: dcaPrice,
+                activationPrice: activationPrice,
+                trailingStop: trailingStop,
+                isLiveMode: true,
+                currentTimeframe: 'live',
+                maxDataPoints: 100
+            };
+            
+            // Build chart legend with price values
+            const legendEl = document.getElementById(`legend-${market}`);
+            if (legendEl) {
+                const fmtP = (p) => p >= 1 ? `€${p.toFixed(2)}` : `€${p.toFixed(4)}`;
+                let legendHTML = '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0;font-size:10px;">';
+                legendHTML += `<span style="color:#3B82F6;">━ Entry ${fmtP(buyPrice)}</span>`;
+                if (dcaPrice > 0) legendHTML += `<span style="color:#F97316;font-weight:600;">╌ DCA ▼ ${fmtP(dcaPrice)}</span>`;
+                if (pyramidPrice > 0 && (dcaMode === 'hybrid' || dcaMode === 'pyramid')) legendHTML += `<span style="color:#06B6D4;font-weight:600;">╌ Pyramid ▲ ${fmtP(pyramidPrice)}</span>`;
+                if (activationPrice > 0) legendHTML += `<span style="color:#10B981;">━ TP ${fmtP(activationPrice)}</span>`;
+                if (trailingStop > 0 && trailingActive) legendHTML += `<span style="color:#EF4444;">╌ Stop ${fmtP(trailingStop)}</span>`;
+                legendHTML += '</div>';
+                legendEl.innerHTML = legendHTML;
+            }
+            
+            console.log(`[Charts] ✓ Chart created for ${market} (${isProfit ? 'profit' : 'loss'}), dcaPrice=${dcaPrice}, datasets=${datasets.length}`);
+        } catch (err) {
+            console.error(`[Charts] Error creating chart for ${canvas.dataset?.market}:`, err);
+        }
+    });
+    
+    console.log(`[Charts] Done. Created ${Object.keys(tradeCardCharts).length} charts.`);
+}
+
+// Update trade card charts with live prices - dynamic color change
+function updateTradeCardCharts(prices) {
+    for (const [market, price] of Object.entries(prices)) {
+        const chartData = tradeCardCharts[market];
+        if (!chartData) continue;
+        
+        // Skip updates if chart is in aggregated timeframe mode (not live)
+        if (chartData.isLiveMode === false) {
+            continue;
+        }
+        
+        // Add new price point
+        chartData.priceHistory.push(price);
+        chartData.timeLabels.push('now');
+        
+        // Keep max 100 points
+        if (chartData.priceHistory.length > 100) {
+            chartData.priceHistory.shift();
+            chartData.timeLabels.shift();
+        }
+        
+        // Dynamic color update based on P&L
+        const buyPrice = chartData.buyPrice || 0;
+        const isProfit = price >= buyPrice;
+        const profitColor = '#16c784';
+        const lossColor = '#ea3943';
+        const newColor = isProfit ? profitColor : lossColor;
+        
+        // Update chart color and gradient if P&L status changed
+        const currentColor = chartData.chart.data.datasets[0].borderColor;
+        if (currentColor !== newColor) {
+            chartData.chart.data.datasets[0].borderColor = newColor;
+            chartData.chart.data.datasets[0].pointHoverBackgroundColor = newColor;
+            chartData.chart.options.plugins.tooltip.borderColor = newColor;
+            
+            // Update gradient fill dynamically
+            chartData.chart.data.datasets[0].backgroundColor = (context) => {
+                const chart = context.chart;
+                const {ctx, chartArea} = chart;
+                if (!chartArea) return isProfit ? 'rgba(22, 199, 132, 0.08)' : 'rgba(234, 57, 67, 0.08)';
+                
+                const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                if (isProfit) {
+                    gradient.addColorStop(0, 'rgba(22, 199, 132, 0.25)');
+                    gradient.addColorStop(0.5, 'rgba(22, 199, 132, 0.08)');
+                    gradient.addColorStop(1, 'rgba(22, 199, 132, 0)');
+                } else {
+                    gradient.addColorStop(0, 'rgba(234, 57, 67, 0.25)');
+                    gradient.addColorStop(0.5, 'rgba(234, 57, 67, 0.08)');
+                    gradient.addColorStop(1, 'rgba(234, 57, 67, 0)');
+                }
+                return gradient;
+            };
+            
+            console.log(`[Chart ${market}] Color changed to ${isProfit ? 'GREEN (profit)' : 'RED (loss)'}`);
+        }
+        
+        // Update chart data
+        chartData.chart.data.labels = chartData.timeLabels;
+        chartData.chart.data.datasets[0].data = chartData.priceHistory;
+        
+        // Keep DCA dataset (index 1) in sync with data length
+        if (chartData.dcaPrice > 0 && chartData.chart.data.datasets.length > 1) {
+            const dcaDs = chartData.chart.data.datasets[1];
+            // Add data point to match priceHistory length
+            while (dcaDs.data.length < chartData.priceHistory.length) {
+                dcaDs.data.push(chartData.dcaPrice);
+            }
+            // Trim to max length
+            while (dcaDs.data.length > chartData.priceHistory.length) {
+                dcaDs.data.shift();
+            }
+        }
+        
+        chartData.chart.update('none');
+    }
+}
+
+// (Removed duplicate function - using the one above with dynamic color support)
+
+// Update sparkline with new price
+function updateSparklines(prices) {
+    for (const [market, price] of Object.entries(prices)) {
+        const sparkData = sparklineCharts[market];
+        if (!sparkData) continue;
+        
+        // Add price to history (max 20 points)
+        sparkData.prices.push(price);
+        if (sparkData.prices.length > 20) sparkData.prices.shift();
+        
+        // Update chart
+        sparkData.chart.data.labels = sparkData.prices.map((_, i) => i);
+        sparkData.chart.data.datasets[0].data = sparkData.prices;
+        
+        // Color based on trend
+        const isUp = sparkData.prices.length > 1 && sparkData.prices[sparkData.prices.length-1] >= sparkData.prices[0];
+        sparkData.chart.data.datasets[0].borderColor = isUp ? '#10b981' : '#ef4444';
+        sparkData.chart.data.datasets[0].backgroundColor = isUp ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
+        
+        sparkData.chart.update('none');
+    }
+}
+
+// Portfolio Charts
+let combinedChart = null;
+let allocationChart = null;
+let portfolioViewMode = 'value'; // 'value' or 'pnl'
+
+// Toggle card details
+function toggleCardDetails(market) {
+    const panel = document.getElementById('details-' + market);
+    const icon = document.getElementById('expand-icon-' + market);
+    
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        icon.classList.add('rotated');
+    } else {
+        panel.style.display = 'none';
+        icon.classList.remove('rotated');
+    }
+}
+
+function initPortfolioCharts() {
+    console.log('[Portfolio] Initializing portfolio charts');
+    
+    // Combined Value Chart
+    const combinedCtx = document.getElementById('portfolio-combined-chart');
+    if (combinedCtx) {
+        var combinedEl = document.getElementById('portfolio-combined-data');
+        const combinedData = combinedEl ? JSON.parse(combinedEl.textContent) : {};
+        
+        console.log('[Portfolio] Combined chart data:', {
+            labels: combinedData.labels?.length || 0,
+            active_values: combinedData.active_values?.length || 0,
+            hodl_values: combinedData.hodl_values?.length || 0,
+            total_values: combinedData.total_values?.length || 0,
+            sample_data: combinedData.total_values?.slice(0, 3)
+        });
+        
+        if (!combinedData.labels || combinedData.labels.length === 0) {
+            console.warn('[Portfolio] Combined chart has no data labels - chart will be empty');
+        }
+        
+        if (combinedChart) { combinedChart.destroy(); combinedChart = null; }
+        combinedChart = new Chart(combinedCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: combinedData.labels || [],
+                datasets: [
+                    {
+                        label: 'Active Trades',
+                        data: combinedData.active_values || [],
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'HODL Positions',
+                        data: combinedData.hodl_values || [],
+                        borderColor: '#10B981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'Total Portfolio',
+                        data: combinedData.total_values || [],
+                        borderColor: '#F59E0B',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        tension: 0.4,
+                        borderWidth: 2,
+                        fill: false,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#E5E7EB',
+                            font: { size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        titleColor: '#E5E7EB',
+                        bodyColor: '#E5E7EB',
+                        borderColor: '#374151',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': €' + context.parsed.y.toFixed(2);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#9CA3AF',
+                            callback: function(value) {
+                                return '€' + value.toFixed(0);
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(75, 85, 99, 0.2)'
+                        }
+                    },
+                    x: {
+                        ticks: { color: '#9CA3AF' },
+                        grid: { color: 'rgba(75, 85, 99, 0.2)' }
+                    }
+                }
+            }
+        });
+        
+        console.log('[Portfolio] Combined chart created successfully with', combinedData.labels?.length || 0, 'data points');
+    } else {
+        console.error('[Portfolio] Combined chart canvas element not found');
+    }
+    
+    // Allocation Pie Chart
+    const allocationCtx = document.getElementById('portfolio-allocation-chart');
+    if (allocationCtx) {
+        var allocationEl = document.getElementById('portfolio-allocation-data');
+        const allocationData = allocationEl ? JSON.parse(allocationEl.textContent) : {};
+        
+        console.log('[Portfolio] Allocation chart data:', {
+            labels: allocationData.labels?.length || 0,
+            values: allocationData.values?.length || 0,
+            total_value: allocationData.values?.reduce((a, b) => a + b, 0) || 0,
+            assets: allocationData.labels
+        });
+        
+        if (!allocationData.labels || allocationData.labels.length === 0) {
+            console.warn('[Portfolio] Allocation chart has no data - chart will be empty');
+        }
+        
+        if (allocationChart) { allocationChart.destroy(); allocationChart = null; }
+        allocationChart = new Chart(allocationCtx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: allocationData.labels || [],
+                datasets: [{
+                    data: allocationData.values || [],
+                    backgroundColor: [
+                        '#3B82F6', // Blue
+                        '#10B981', // Green
+                        '#F59E0B', // Orange
+                        '#EF4444', // Red
+                        '#8B5CF6', // Purple
+                        '#EC4899', // Pink
+                        '#14B8A6', // Teal
+                        '#F97316', // Orange-red
+                    ],
+                    borderColor: '#1F2937',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: '#E5E7EB',
+                            font: { size: 11 },
+                            generateLabels: function(chart) {
+                                const data = chart.data;
+                                if (data.labels.length && data.datasets.length) {
+                                    return data.labels.map((label, i) => {
+                                        const value = data.datasets[0].data[i];
+                                        return {
+                                            text: `${label}: €${value.toFixed(2)}`,
+                                            fillStyle: data.datasets[0].backgroundColor[i],
+                                            hidden: false,
+                                            index: i
+                                        };
+                                    });
+                                }
+                                return [];
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: €${value.toFixed(2)} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        console.log('[Portfolio] Allocation chart created successfully with', allocationData.labels?.length || 0, 'assets');
+    } else {
+        console.error('[Portfolio] Allocation chart canvas element not found');
+    }
+    
+    console.log('[Portfolio] Portfolio charts initialization complete');
+}
+
+function togglePortfolioView() {
+    portfolioViewMode = portfolioViewMode === 'value' ? 'pnl' : 'value';
+    
+    // TODO: Switch between value and P/L view
+    console.log('[Portfolio] Switched to', portfolioViewMode, 'view');
+}
+
+function updateTradeCards(prices) {
+    if (!prices || typeof prices !== 'object') {
+        console.warn('[Portfolio] Invalid prices data received');
+        return;
+    }
+    
+    console.debug('[Portfolio] Updating trade cards with', Object.keys(prices).length, 'prices');
+    
+    for (const [market, price] of Object.entries(prices)) {
+        // Find card for this market (supports both old .trade-card and new .trade-card-simple)
+        const card = document.querySelector(`.trade-card-simple[data-market="${market}"], .trade-card[data-market="${market}"]`);
+        if (!card) {
+            console.debug('[Portfolio] Card not found for market:', market);
+            continue;
+        }
+        
+        // Find original card data
+        const cardData = window.tradeCards.find(c => c.market === market);
+        if (!cardData) {
+            console.debug('[Portfolio] Card data not found for market:', market);
+            continue;
+        }
+        
+        // Validate card data has required fields
+        if (!cardData.amount || !cardData.invested) {
+            console.warn('[Portfolio] Invalid card data for market:', market);
+            continue;
+        }
+        
+        // Calculate new values
+        // NOTE: pnlPct must be derived from pnl/invested (not price/buyPrice).
+        // After a DCA the averaged buyPrice stored can differ from invested/amount
+        // (break-even price), causing the two to have opposite signs near zero and
+        // producing flickering green↔red on every price_update tick.
+        const amount = parseFloat(cardData.amount);
+        const invested = parseFloat(cardData.invested);
+        const currentValue = price * amount;
+        const pnl = currentValue - invested;
+        const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+
+        // Keep dataset attributes in sync for sorting and visibility guards
+        card.dataset.pnl = pnl.toFixed(2);
+        card.dataset.pnlPct = pnlPct.toFixed(2);
+        card.dataset.value = currentValue.toFixed(2);
+        
+        // Update DOM elements (with null checks)
+        const liveEl = card.querySelector(`[data-live-price="${market}"]`);
+        if (liveEl) {
+            liveEl.textContent = price < 0.01 ? `€${price.toFixed(6)}` : (price < 1 ? `€${price.toFixed(4)}` : `€${price.toFixed(2)}`);
+            liveEl.classList.add('live-pulse');  // Add pulse animation
+        }
+        
+        const pnlEl = card.querySelector(`[data-pnl="${market}"]`);
+        if (pnlEl) {
+            pnlEl.textContent = `€${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`;
+        }
+        
+        const pnlPctEl = card.querySelector(`[data-pnl-pct="${market}"]`);
+        if (pnlPctEl) {
+            pnlPctEl.textContent = `${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%`;
+        }
+        
+        const currentEl = card.querySelector(`[data-current="${market}"]`);
+        if (currentEl) {
+            currentEl.textContent = `€${currentValue.toFixed(2)}`;
+        }
+        
+        // COLOR CLASSES: intentionally NOT updated here.
+        // pnl/pnlPct recalculated from a live price can differ from the server value
+        // (e.g. invested_eur includes fees, making break-even != averaged buy_price).
+        // Colors are set authoritatively by updateCardFromData() which uses server data.
+        // That runs on: page load, socket initial_data/data_refresh, and every 30s REST poll.
+        
+        // Update ROI detail span text only (NOT color - see note above)
+        const roiDetailEl = card.querySelector(`[data-roi-detail="${market}"]`);
+        if (roiDetailEl) {
+            roiDetailEl.textContent = `${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%`;
+        }
+        
+        // Update trailing progress bar (live calculation) - IMPROVED
+        const trailingFill = card.querySelector(`[data-trailing-fill="${market}"]`);
+        if (trailingFill) {
+            const buyPriceData = parseFloat(trailingFill.dataset.buyPrice) || parseFloat(cardData.buy_price) || 0;
+            let activationPrice = parseFloat(trailingFill.dataset.activationPrice);
+
+            if (!activationPrice || Number.isNaN(activationPrice)) {
+                activationPrice = buyPriceData * (1 + (typeof TRAILING_ACTIVATION_PCT === 'number' ? TRAILING_ACTIVATION_PCT : 0.02));
+            }
+            
+            if (activationPrice > buyPriceData && price > buyPriceData) {
+                let trailPct = ((price - buyPriceData) / (activationPrice - buyPriceData)) * 100;
+                trailPct = Math.max(0, Math.min(100, trailPct));
+                
+                // Update fill bar width with minimum 5% visibility if > 0%
+                const minWidth = (trailPct > 0 && trailPct < 5) ? 5 : trailPct;
+                trailingFill.style.width = `${minWidth}%`;
+                
+                // Update color class based on progress
+                trailingFill.className = 'trailing-fill';
+                if (cardData.trailing_activated) {
+                    trailingFill.classList.add('fill-active');
+                } else if (trailPct >= 80) {
+                    trailingFill.classList.add('fill-near');
+                } else if (trailPct >= 50) {
+                    trailingFill.classList.add('fill-mid');
+                } else {
+                    trailingFill.classList.add('fill-early');
+                }
+                
+                // Update trailing percentage text
+                const trailingPct = card.querySelector(`[data-trailing-pct="${market}"]`);
+                if (trailingPct) {
+                    trailingPct.textContent = trailPct >= 100 ? '✓' : `${Math.floor(trailPct)}%`;
+                }
+                
+                // Update card data
+                cardData.trailing_progress = trailPct;
+            }
+        }
+        
+        // Update card data for next calculation
+        if (cardData) {
+            cardData.live_price = price;
+            cardData.current_value = currentValue;
+            cardData.pnl = pnl;
+            cardData.pnl_pct = pnlPct;
+        }
+        
+        // Ensure card stays visible (critical fix for disappearing cards)
+        card.style.display = '';  // Reset display to default (not 'none')
+        card.style.visibility = 'visible';
+        card.style.opacity = '1';
+    }
+    
+    console.debug('[Portfolio] Successfully updated', Object.keys(prices).length, 'trade cards');
+    
+    // Update totals
+    updatePortfolioTotals();
+}
+
+function updatePortfolioTotals() {
+    if (!window.tradeCards || !Array.isArray(window.tradeCards)) {
+        console.warn('[Portfolio] tradeCards not available for totals update');
+        return;
+    }
+    
+    let totalInvested = 0;
+    let totalCurrent = 0;
+    
+    for (const card of window.tradeCards) {
+        totalInvested += parseFloat(card.invested) || 0;
+        totalCurrent += parseFloat(card.current_value) || 0;
+    }
+    
+    const totalPnl = totalCurrent - totalInvested;
+    const totalPnlPct = totalInvested > 0 ? ((totalCurrent / totalInvested) - 1) * 100 : 0;
+    
+    console.debug('[Portfolio] Totals - Invested:', totalInvested, 'Current:', totalCurrent, 'P/L:', totalPnl);
+    
+    // Update hero stats
+    const heroInvested = document.getElementById('hero-invested');
+    const heroCurrent = document.getElementById('hero-current');
+    const heroPnl = document.getElementById('hero-pnl');
+    
+    if (heroInvested) heroInvested.textContent = `€${totalInvested.toFixed(2)}`;
+    if (heroCurrent) heroCurrent.textContent = `€${totalCurrent.toFixed(2)}`;
+    if (heroPnl) {
+        heroPnl.innerHTML = `${totalPnl >= 0 ? '+' : ''}€${totalPnl.toFixed(2)} <small>(${totalPnlPct.toFixed(2)}%)</small>`;
+        if (heroPnl.parentElement) {
+            heroPnl.parentElement.classList.remove('pnl-positive', 'pnl-negative');
+            heroPnl.parentElement.classList.add(totalPnl >= 0 ? 'pnl-positive' : 'pnl-negative');
+        }
+    }
+    
+    // Update status bar
+    const totalPnlEl = document.getElementById('total-pnl');
+    if (totalPnlEl) {
+        totalPnlEl.textContent = `${totalPnl >= 0 ? '+' : ''}€${totalPnl.toFixed(2)}`;
+        totalPnlEl.classList.remove('pnl-positive', 'pnl-negative', 'pnl-neutral');
+        totalPnlEl.classList.add(totalPnl > 0 ? 'pnl-positive' : totalPnl < 0 ? 'pnl-negative' : 'pnl-neutral');
+    }
+}
+
+// ========== TIMEFRAME SELECTOR WITH LOCALSTORAGE PERSISTENCE ==========
+
+// Storage key for timeframe preferences
+const TIMEFRAME_STORAGE_KEY = 'bitvavo_chart_timeframes';
+
+// Get all saved timeframe preferences
+function getTimeframePreferences() {
+    try {
+        const stored = localStorage.getItem(TIMEFRAME_STORAGE_KEY);
+        return stored ? JSON.parse(stored) : {};
+    } catch (e) {
+        console.warn('[Timeframe] Error reading preferences:', e);
+        return {};
+    }
+}
+
+// Save timeframe preference for a market
+function saveTimeframePreference(market, timeframe) {
+    try {
+        const prefs = getTimeframePreferences();
+        prefs[market] = timeframe;
+        localStorage.setItem(TIMEFRAME_STORAGE_KEY, JSON.stringify(prefs));
+        console.log(`[Timeframe] Saved ${market}: ${timeframe}`);
+    } catch (e) {
+        console.warn('[Timeframe] Error saving preference:', e);
+    }
+}
+
+// Change timeframe for a chart
+function changeTimeframe(market, timeframe) {
+    console.log(`[Timeframe] Changing ${market} to ${timeframe}`);
+    
+    // Save preference to localStorage
+    saveTimeframePreference(market, timeframe);
+    
+    // Get chart data
+    const chartData = tradeCardCharts[market];
+    if (!chartData) {
+        console.warn(`[Timeframe] No chart found for ${market}`);
+        return;
+    }
+    
+    // Store current timeframe mode
+    chartData.currentTimeframe = timeframe;
+    
+    // LIVE mode: Keep using real-time per-second price updates
+    if (timeframe === 'live') {
+        console.log(`[Timeframe] Switched ${market} to LIVE mode (per-second updates)`);
+        chartData.isLiveMode = true;
+        chartData.maxDataPoints = 100; // Keep last 100 seconds
+        return; // Continue receiving WebSocket updates
+    }
+    
+    // Aggregated mode: Fetch candle data from backend
+    chartData.isLiveMode = false;
+    
+    // Map timeframe to candle interval and count
+    let interval, limit;
+    switch (timeframe) {
+        case '5m':  interval = '5m';  limit = 60; break;   // 60 x 5min = 5 hours
+        case '15m': interval = '15m'; limit = 96; break;   // 96 x 15min = 24 hours
+        case '1h':  interval = '1h';  limit = 60; break;   // 60 candles = 60 hours (2.5 days)
+        case '6h':  interval = '1h';  limit = 144; break;  // 144 candles = 6 days
+        case '24h': interval = '1h';  limit = 24; break;   // 24 candles = 24 hours (1 day)
+        case '7d':  interval = '1h';  limit = 168; break;  // 168 candles = 7 days
+        case '30d': interval = '1d';  limit = 30; break;   // 30 candles = 30 days
+        case 'all': interval = '1d';  limit = 365; break;  // 365 candles = 1 year max
+        default:    interval = '1h';  limit = 24;
+    }
+    
+    // Fetch candle data from backend API
+    const apiUrl = `/api/candles/${market}?interval=${interval}&limit=${limit}`;
+    console.log(`[Timeframe] Fetching candles from: ${apiUrl}`);
+    
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.candles || data.candles.length === 0) {
+                console.warn(`[Timeframe] No candle data received for ${market}`);
+                return;
+            }
+            
+            const candles = data.candles;
+            console.log(`[Timeframe] Received ${candles.length} candles for ${market}`);
+            
+            // Extract close prices and timestamps
+            const newHistory = [];
+            const newLabels = [];
+            
+            candles.forEach((candle, idx) => {
+                // candle format: [timestamp, open, high, low, close, volume]
+                const timestamp = candle[0];
+                const close = parseFloat(candle[4]);
+                
+                newHistory.push(close);
+                
+                // Format time label based on timeframe
+                const date = new Date(timestamp);
+                let label;
+                if (timeframe === '5m' || timeframe === '15m' || timeframe === '1h') {
+                    label = date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+                } else if (timeframe === '24h' || timeframe === '6h' || timeframe === '7d') {
+                    label = date.toLocaleDateString('nl-NL', { day: '2-digit', month: '2-digit' }) + ' ' + 
+                            date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+                } else {
+                    label = date.toLocaleDateString('nl-NL', { day: '2-digit', month: '2-digit' });
+                }
+                
+                // Only show every Nth label to avoid crowding
+                const labelFreq = Math.ceil(candles.length / 12);
+                if (idx % labelFreq !== 0 && idx !== candles.length - 1) {
+                    label = '';
+                }
+                
+                newLabels.push(label);
+            });
+            
+            // Update chart with real candle data
+            chartData.priceHistory = newHistory;
+            chartData.timeLabels = newLabels;
+            chartData.chart.data.labels = newLabels;
+            chartData.chart.data.datasets[0].data = newHistory;
+            chartData.chart.update('active');
+            
+            console.log(`[Timeframe] Updated ${market} chart with ${newHistory.length} candles for ${timeframe}`);
+        })
+        .catch(error => {
+            console.error(`[Timeframe] Error fetching candles for ${market}:`, error);
+            // Fallback: Keep current data
+        });
+}
+
+// Initialize timeframe selectors from localStorage
+function initTimeframeSelectors() {
+    const prefs = getTimeframePreferences();
+    
+    document.querySelectorAll('.timeframe-selector').forEach(selector => {
+        const market = selector.dataset.market;
+        const savedTimeframe = prefs[market] || 'live'; // Default to LIVE mode
+        
+        // Set the saved value
+        selector.value = savedTimeframe;
+        
+        // Apply the timeframe (after charts are initialized)
+        setTimeout(() => {
+            if (tradeCardCharts[market]) {
+                changeTimeframe(market, savedTimeframe);
+            }
+        }, 500);
+        
+        console.log(`[Timeframe] Initialized ${market}: ${savedTimeframe}`);
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for charts to be initialized, then restore preferences
+    setTimeout(initTimeframeSelectors, 1000);
+});
+
+// === TRADE EDITOR MODAL ===
+function openTradeEditor(market, buyPrice, invested, amount) {
+    const modal = document.getElementById('trade-editor-modal') || createTradeEditorModal();
+    document.getElementById('edit-market').value = market;
+    document.getElementById('edit-buy-price').value = buyPrice.toFixed(8);
+    document.getElementById('edit-invested').value = invested.toFixed(2);
+    document.getElementById('edit-amount').value = amount.toFixed(8);
+    modal.style.display = 'flex';
+}
+
+function closeTradeEditor() {
+    document.getElementById('trade-editor-modal').style.display = 'none';
+}
+
+function createTradeEditorModal() {
+    const modal = document.createElement('div');
+    modal.id = 'trade-editor-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✏️ Edit Trade</h3>
+                <button onclick="closeTradeEditor()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-market">
+                <div class="form-group">
+                    <label>💰 Entry Price (EUR)</label>
+                    <input type="number" id="edit-buy-price" step="0.00000001" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>📊 Invested Amount (EUR)</label>
+                    <input type="number" id="edit-invested" step="0.01" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>💎 Amount (Coins)</label>
+                    <input type="number" id="edit-amount" step="0.00000001" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeTradeEditor()" class="btn-cancel">Cancel</button>
+                <button onclick="saveTradeEdit()" class="btn-save">Save</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+}
+
+async function saveTradeEdit() {
+    const market = document.getElementById('edit-market').value;
+    const buyPrice = parseFloat(document.getElementById('edit-buy-price').value);
+    const invested = parseFloat(document.getElementById('edit-invested').value);
+    const amount = parseFloat(document.getElementById('edit-amount').value);
+    
+    try {
+        const response = await fetch('/api/trade/update', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({market, buy_price: buyPrice, invested, amount})
+        });
+        const result = await response.json();
+        if (result.status === 'ok') {
+            showNotification('✅ Trade updated successfully', 'success');
+            closeTradeEditor();
+            location.reload();
+        } else {
+            showNotification('❌ Error: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showNotification('❌ Network error: ' + error, 'error');
+    }
+}
+
+function showNotification(message, type) {
+    apexToast(message, type);
+}
+</script>
+
+<style>
+.card-edit-btn {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    color: #3b82f6;
+}
+.card-edit-btn:hover {
+    background: rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.5);
+    transform: scale(1.05);
+}
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+.modal-content {
+    background: #1f2937;
+    padding: 0;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #374151;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.modal-header h3 {
+    margin: 0;
+    color: #f3f4f6;
+    font-size: 20px;
+}
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+.modal-close:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+.modal-body {
+    padding: 24px;
+}
+.form-group {
+    margin-bottom: 20px;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #d1d5db;
+    font-weight: 600;
+    font-size: 14px;
+}
+.form-control {
+    width: 100%;
+    padding: 12px 16px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    color: #f3f4f6;
+    font-size: 16px;
+    transition: all 0.2s;
+}
+.form-control:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+.modal-footer {
+    padding: 20px 24px;
+    border-top: 1px solid #374151;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+.btn-cancel, .btn-save {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+.btn-cancel {
+    background: #374151;
+    color: #d1d5db;
+}
+.btn-cancel:hover {
+    background: #4b5563;
+}
+.btn-save {
+    background: #3b82f6;
+    color: white;
+}
+.btn-save:hover {
+    background: #2563eb;
+}
+
+/* Pending Orders Styles */
+.pending-orders-panel {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.05), rgba(245, 158, 11, 0.02));
+    border: 1px solid rgba(251, 191, 36, 0.2);
+}
+.pending-orders-table th,
+.pending-orders-table td {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.9rem;
+}
+.pending-orders-table tbody tr {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    transition: background 0.2s;
+}
+.pending-orders-table tbody tr:hover {
+    background: rgba(251, 191, 36, 0.05);
+}
+.pending-order-market {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.pending-order-logo {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+}
+.pending-order-symbol {
+    font-weight: 600;
+    color: #e2e8f0;
+}
+.pending-order-expiring {
+    color: #f59e0b;
+    font-weight: 600;
+}
+.pending-order-expired {
+    color: #ef4444;
+    font-weight: 600;
+    animation: pulse-warning 1s infinite;
+}
+@keyframes pulse-warning {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(10px); }
+}
+.badge-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #1e1e1e;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.pending-status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+.pending-status-new {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+}
+.pending-status-open {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+}
+</style>
+
+<script>
+// Pending Orders Functions
+function loadPendingOrders() {
+    fetch('/api/orders/pending')
+        .then(response => response.json())
+        .then(data => {
+            renderPendingOrders(data);
+        })
+        .catch(error => {
+            console.error('[Pending Orders] Failed to load:', error);
+        });
+}
+
+function renderPendingOrders(data) {
+    const section = document.getElementById('pending-orders-section');
+    const tbody = document.getElementById('pending-orders-tbody');
+    const countBadge = document.getElementById('pending-orders-count');
+    const slotsUsed = document.getElementById('pending-slots-used');
+    const maxTrades = document.getElementById('pending-max-trades');
+    const timeoutEl = document.getElementById('pending-timeout');
+    const lastUpdate = document.getElementById('pending-last-update');
+    
+    if (!data || !data.pending || data.pending.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+    
+    section.style.display = 'block';
+    countBadge.textContent = data.count;
+    slotsUsed.textContent = data.total_slots;
+    maxTrades.textContent = data.max_trades;
+    timeoutEl.textContent = data.timeout_seconds >= 3600 
+        ? Math.round(data.timeout_seconds / 3600) + 'h'
+        : Math.round(data.timeout_seconds / 60) + 'm';
+    
+    // Clear existing rows
+    tbody.innerHTML = '';
+    
+    // Add rows for each pending order
+    data.pending.forEach(order => {
+        const tr = document.createElement('tr');
+        const isExpiring = order.is_expiring;
+        const isExpired = order.age_seconds >= data.timeout_seconds;
+        const ageClass = isExpired ? 'pending-order-expired' : (isExpiring ? 'pending-order-expiring' : '');
+        
+        tr.innerHTML = `
+            <td>
+                <div class="pending-order-market">
+                    <img src="/static/icons/${order.symbol.toLowerCase()}.png" 
+                         alt="${order.symbol}" 
+                         class="pending-order-logo"
+                         onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;24&quot; height=&quot;24&quot;><rect width=&quot;24&quot; height=&quot;24&quot; rx=&quot;4&quot; fill=&quot;%233B82F6&quot;/><text x=&quot;50%&quot; y=&quot;50%&quot; text-anchor=&quot;middle&quot; dy=&quot;.35em&quot; font-size=&quot;12&quot; fill=&quot;white&quot;>${order.symbol[0]}</text></svg>'">
+                    <span class="pending-order-symbol">${order.symbol}</span>
+                </div>
+            </td>
+            <td style="text-align: right; color: #94a3b8;">${formatAmount(order.amount)}</td>
+            <td style="text-align: right; color: #94a3b8;">€${formatPrice(order.price)}</td>
+            <td style="text-align: right; font-weight: 600; color: #f59e0b;">€${order.value_eur.toFixed(2)}</td>
+            <td style="text-align: center;" class="${ageClass}">${order.age_formatted}</td>
+            <td style="text-align: center;">
+                <span class="pending-status-badge pending-status-${order.status.toLowerCase()}">${order.status}</span>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    // Update last update timestamp
+    const now = new Date();
+    lastUpdate.textContent = `Updated: ${now.toLocaleTimeString()}`;
+}
+
+function formatAmount(amount) {
+    if (amount < 0.01) return amount.toFixed(8);
+    if (amount < 1) return amount.toFixed(6);
+    if (amount < 100) return amount.toFixed(4);
+    return amount.toFixed(2);
+}
+
+function formatPrice(price) {
+    if (price < 0.01) return price.toFixed(6);
+    if (price < 1) return price.toFixed(4);
+    return price.toFixed(2);
+}
+</script>
+{% endblock %}

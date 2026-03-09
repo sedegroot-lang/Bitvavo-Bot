@@ -1,0 +1,798 @@
+/* ============================================================
+   APEX CHARTS CSS - Premium Chart & Trade Card Enhancements
+   TradingView-level styling for Bitvavo Trading Bot Dashboard
+   ============================================================ */
+
+/* ----------------------------------------------------------
+   1. CHART CONTAINER ENHANCEMENTS
+   ---------------------------------------------------------- */
+.card-chart-container {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: box-shadow 0.6s ease;
+}
+
+/* P&L-based chart glow */
+.chart-glow-profit {
+    box-shadow:
+        0 0 20px rgba(22, 199, 132, 0.08),
+        inset 0 0 30px rgba(22, 199, 132, 0.03);
+}
+
+.chart-glow-loss {
+    box-shadow:
+        0 0 20px rgba(234, 57, 67, 0.08),
+        inset 0 0 30px rgba(234, 57, 67, 0.03);
+}
+
+/* ----------------------------------------------------------
+   2. PRICE DELTA BADGE
+   ---------------------------------------------------------- */
+.price-delta-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0.9;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.delta-up {
+    background: rgba(22, 199, 132, 0.2);
+    color: #16c784;
+    border: 1px solid rgba(22, 199, 132, 0.3);
+}
+
+.delta-down {
+    background: rgba(234, 57, 67, 0.2);
+    color: #ea3943;
+    border: 1px solid rgba(234, 57, 67, 0.3);
+}
+
+.delta-arrow {
+    font-size: 8px;
+    margin-right: 2px;
+}
+
+.delta-flash {
+    animation: deltaFlash 0.6s ease-out;
+}
+
+@keyframes deltaFlash {
+    0%   { transform: scale(1.3); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.9; }
+}
+
+/* ----------------------------------------------------------
+   3. CHART TOOLBAR
+   ---------------------------------------------------------- */
+.chart-toolbar {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    display: flex;
+    gap: 4px;
+    z-index: 15;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.card-chart-container:hover .chart-toolbar {
+    opacity: 1;
+}
+
+.chart-tool-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 6px;
+    background: rgba(13, 17, 23, 0.8);
+    color: #8b949e;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.chart-tool-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #58a6ff;
+    transform: scale(1.1);
+}
+
+.chart-tool-btn:active {
+    transform: scale(0.95);
+}
+
+/* ----------------------------------------------------------
+   4. FULLSCREEN CHART MODE
+   ---------------------------------------------------------- */
+.chart-fullscreen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    overflow-y: auto;
+    background: #0d1117 !important;
+}
+
+.chart-fullscreen .card-chart-container {
+    min-height: 60vh !important;
+}
+
+.chart-fullscreen .card-chart-container div[style*="height: 160px"] {
+    height: 500px !important;
+}
+
+body.has-fullscreen-chart {
+    overflow: hidden;
+}
+
+/* ----------------------------------------------------------
+   5. TIMEFRAME PILLS (replaces select)
+   ---------------------------------------------------------- */
+.timeframe-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 2px;
+    background: rgba(13, 17, 23, 0.7);
+    border-radius: 8px;
+    border: 1px solid rgba(48, 54, 61, 0.5);
+}
+
+.tf-pill {
+    padding: 3px 7px;
+    font-size: 9.5px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: #6e7681;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.tf-pill:hover {
+    color: #e6edf3;
+    background: rgba(110, 118, 129, 0.18);
+}
+
+.tf-pill-active {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(99, 102, 241, 0.25)) !important;
+    color: #79c0ff !important;
+    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.35);
+}
+
+/* ----------------------------------------------------------
+   6. TRADE CARD FLIP ANIMATION
+   ---------------------------------------------------------- */
+.trade-card-simple {
+    perspective: 1200px;
+    transition: transform 0.4s ease;
+}
+
+.trade-card-simple.card-flipped {
+    transform: rotateY(180deg);
+}
+
+.trade-card-simple.card-flipped > *:not(.card-back-face) {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.trade-card-simple.card-flipped .card-back-face {
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+}
+
+.card-back-face {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+    border-radius: inherit;
+    padding: 16px;
+    transform: rotateY(180deg);
+    backface-visibility: hidden;
+    visibility: hidden;
+    opacity: 0;
+    overflow-y: auto;
+    z-index: 20;
+}
+
+.back-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.back-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #f0f6fc;
+}
+
+.back-close-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 8px;
+    background: rgba(110, 118, 129, 0.1);
+    color: #8b949e;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.back-close-btn:hover {
+    background: rgba(234, 57, 67, 0.2);
+    border-color: rgba(234, 57, 67, 0.4);
+    color: #ea3943;
+}
+
+.back-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.back-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.back-stat-label {
+    font-size: 10px;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.back-stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    color: #f0f6fc;
+}
+
+.back-vol-bar {
+    height: 6px;
+    background: rgba(110, 118, 129, 0.15);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.back-vol-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3B82F6, #8B5CF6);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.back-mini-chart {
+    height: 60px;
+    background: rgba(22, 27, 34, 0.5);
+    border-radius: 8px;
+    margin-top: auto;
+}
+
+/* ----------------------------------------------------------
+   7. HEATMAP MODE
+   ---------------------------------------------------------- */
+.trade-cards-grid.heatmap-mode {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+    gap: 4px !important;
+}
+
+.heatmap-card {
+    background: var(--heatmap-bg, rgba(22, 27, 34, 0.8)) !important;
+    min-height: 100px !important;
+    max-height: 120px !important;
+    overflow: hidden;
+    padding: 8px !important;
+    transition: all 0.3s ease;
+}
+
+.heatmap-card .card-chart-container,
+.heatmap-card .card-trailing-row,
+.heatmap-card .card-dca-row,
+.heatmap-card .card-expand-btn,
+.heatmap-card .card-details-panel,
+.heatmap-card .card-values-row,
+.heatmap-card .card-price-row,
+.heatmap-card .chart-legend {
+    display: none !important;
+}
+
+.heatmap-card .card-pnl-hero {
+    font-size: 18px;
+    margin: 4px 0;
+}
+
+.heatmap-card .card-header-simple {
+    padding: 0 0 4px;
+}
+
+.heatmap-card .card-status,
+.heatmap-card .card-tag {
+    display: none;
+}
+
+.heatmap-card .card-symbol {
+    font-size: 13px;
+}
+
+.heatmap-card .card-name {
+    display: none;
+}
+
+.heatmap-card .card-logo {
+    width: 24px;
+    height: 24px;
+}
+
+/* ----------------------------------------------------------
+   8. VOLUME INDICATOR
+   ---------------------------------------------------------- */
+.volume-indicator {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    display: flex;
+    align-items: flex-end;
+    padding: 0 12px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.vol-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1;
+    height: 100%;
+}
+
+.vol-bar-tick {
+    flex: 1;
+    min-height: 2px;
+    border-radius: 1px 1px 0 0;
+    background: rgba(148, 163, 184, 0.15);
+    transition: height 0.3s ease, background 0.3s ease;
+}
+
+.vol-label {
+    font-size: 8px;
+    color: rgba(148, 163, 184, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-left: 6px;
+    align-self: center;
+}
+
+/* ----------------------------------------------------------
+   9. SORT ACTION BUTTONS
+   ---------------------------------------------------------- */
+.sort-btn-group {
+    display: flex;
+    gap: 6px;
+    margin-left: 8px;
+}
+
+.sort-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 6px;
+    background: rgba(22, 27, 34, 0.6);
+    color: #8b949e;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.sort-action-btn:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.3);
+    color: #58a6ff;
+}
+
+.sort-action-btn svg {
+    flex-shrink: 0;
+}
+
+/* ----------------------------------------------------------
+   10. PERFORMANCE OVERLAY
+   ---------------------------------------------------------- */
+.perf-overlay {
+    margin-bottom: 1.5rem;
+    padding: 1.2rem;
+    animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.perf-overlay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.perf-overlay-header h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f0f6fc;
+    margin: 0;
+}
+
+.perf-close-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 8px;
+    background: rgba(110, 118, 129, 0.1);
+    color: #8b949e;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.perf-close-btn:hover {
+    background: rgba(234, 57, 67, 0.15);
+    color: #ea3943;
+}
+
+.perf-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.perf-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.perf-label {
+    width: 60px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #c9d1d9;
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.perf-bar-track {
+    flex: 1;
+    height: 20px;
+    background: rgba(110, 118, 129, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+}
+
+.perf-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    width: 0;
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.perf-positive {
+    background: linear-gradient(90deg, rgba(22, 199, 132, 0.3), rgba(22, 199, 132, 0.7));
+}
+
+.perf-negative {
+    background: linear-gradient(90deg, rgba(234, 57, 67, 0.7), rgba(234, 57, 67, 0.3));
+}
+
+.perf-value {
+    width: 65px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    text-align: right;
+}
+
+/* ----------------------------------------------------------
+   11. PRICE ALERT FLASH
+   ---------------------------------------------------------- */
+.price-flash-up {
+    animation: flashUp 1.2s ease-out;
+}
+
+.price-flash-down {
+    animation: flashDown 1.2s ease-out;
+}
+
+@keyframes flashUp {
+    0%   { box-shadow: 0 0 0 0 rgba(22, 199, 132, 0.6); }
+    30%  { box-shadow: 0 0 20px 4px rgba(22, 199, 132, 0.4); }
+    100% { box-shadow: none; }
+}
+
+@keyframes flashDown {
+    0%   { box-shadow: 0 0 0 0 rgba(234, 57, 67, 0.6); }
+    30%  { box-shadow: 0 0 20px 4px rgba(234, 57, 67, 0.4); }
+    100% { box-shadow: none; }
+}
+
+/* ----------------------------------------------------------
+   12. ENHANCED CHART HEADER
+   ---------------------------------------------------------- */
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.chart-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: #6e7681;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.chart-live-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: #16c784;
+    font-weight: 500;
+}
+
+.live-dot-pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #16c784;
+    animation: livePulse 2s infinite;
+}
+
+@keyframes livePulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(22, 199, 132, 0.4); }
+    50%      { opacity: 0.6; box-shadow: 0 0 0 4px rgba(22, 199, 132, 0); }
+}
+
+/* ----------------------------------------------------------
+   13. CHART LEGEND ENHANCEMENT
+   ---------------------------------------------------------- */
+.chart-legend {
+    padding: 4px 0 2px;
+    border-top: 1px solid rgba(110, 118, 129, 0.1);
+    margin-top: 4px;
+}
+
+.chart-legend > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 10px;
+}
+
+.chart-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 0;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------
+   14. ENHANCED TRADE CARD - Premium polish
+   ---------------------------------------------------------- */
+.trade-card-simple {
+    position: relative;
+    overflow: visible;
+}
+
+/* Subtle gradient line at top of card based on P&L */
+.trade-card-simple::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    border-radius: 12px 12px 0 0;
+    background: linear-gradient(90deg, #3B82F6, #8B5CF6);
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+}
+
+.trade-card-simple:hover::before {
+    opacity: 1;
+}
+
+/* Card hover depth effect */
+.trade-card-simple:hover {
+    transform: translateY(-2px);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Card entrance animation */
+.trade-card-simple {
+    animation: cardEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.trade-card-simple:nth-child(1) { animation-delay: 0s; }
+.trade-card-simple:nth-child(2) { animation-delay: 0.05s; }
+.trade-card-simple:nth-child(3) { animation-delay: 0.1s; }
+.trade-card-simple:nth-child(4) { animation-delay: 0.15s; }
+.trade-card-simple:nth-child(5) { animation-delay: 0.2s; }
+.trade-card-simple:nth-child(6) { animation-delay: 0.25s; }
+
+@keyframes cardEntrance {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* ----------------------------------------------------------
+   15. PORTFOLIO OVERVIEW CHART ENHANCEMENTS
+   ---------------------------------------------------------- */
+.portfolio-charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.portfolio-charts-grid .chart-container {
+    background: rgba(13, 17, 23, 0.5);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid rgba(48, 54, 61, 0.4);
+    transition: border-color 0.3s ease;
+}
+
+.portfolio-charts-grid .chart-container:hover {
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.portfolio-charts-grid .chart-container h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #c9d1d9;
+    margin: 0 0 12px 0;
+}
+
+/* ----------------------------------------------------------
+   16. CLOSED TRADES TABLE ENHANCEMENTS
+   ---------------------------------------------------------- */
+.closed-trades-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.closed-trades-table tbody tr {
+    transition: background 0.2s ease;
+}
+
+.closed-trades-table tbody tr:hover {
+    background: rgba(59, 130, 246, 0.06) !important;
+}
+
+/* ----------------------------------------------------------
+   17. RESPONSIVE ADJUSTMENTS
+   ---------------------------------------------------------- */
+@media (max-width: 768px) {
+    .chart-toolbar {
+        opacity: 1;
+    }
+
+    .timeframe-pills {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .sort-btn-group {
+        display: none;
+    }
+
+    .portfolio-charts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .perf-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        margin: 0;
+        border-radius: 0;
+        overflow-y: auto;
+    }
+
+    .trade-cards-grid.heatmap-mode {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
+    }
+}
+
+/* ----------------------------------------------------------
+   18. REDUCED MOTION SUPPORT
+   ---------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    .trade-card-simple,
+    .perf-bar-fill,
+    .delta-flash,
+    .live-dot-pulse {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    .trade-card-simple:hover {
+        transform: none;
+    }
+}
+
+/* ----------------------------------------------------------
+   19. PRINT STYLES
+   ---------------------------------------------------------- */
+@media print {
+    .chart-toolbar,
+    .price-delta-badge,
+    .volume-indicator,
+    .sort-btn-group,
+    .timeframe-pills,
+    .perf-overlay {
+        display: none !important;
+    }
+}

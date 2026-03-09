@@ -1,0 +1,75 @@
+/* Badges - Status indicators */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Badge variants */
+.badge--active,
+.badge--success {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--color-success);
+}
+
+.badge--trailing {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--color-info);
+}
+
+.badge--dca {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--color-warning);
+}
+
+.badge--danger,
+.badge--error {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--color-danger);
+}
+
+.badge--neutral {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-secondary);
+}
+
+/* Dot indicator */
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: var(--space-2);
+}
+
+.status-dot--online {
+    background: var(--color-success);
+    box-shadow: 0 0 8px var(--color-success);
+    animation: pulse 2s infinite;
+}
+
+.status-dot--offline {
+    background: var(--color-danger);
+}
+
+.status-dot--warning {
+    background: var(--color-warning);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Large badge */
+.badge--lg {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+}

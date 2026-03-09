@@ -1,0 +1,101 @@
+{
+  "correlation_analysis": {
+    "correlations": [
+      {
+        "market1": "BTC-EUR",
+        "market2": "SOL-EUR",
+        "correlation": 0.758
+      },
+      {
+        "market1": "ETH-EUR",
+        "market2": "SOL-EUR",
+        "correlation": 0.619
+      },
+      {
+        "market1": "BTC-EUR",
+        "market2": "ETH-EUR",
+        "correlation": 0.576
+      },
+      {
+        "market1": "BNB-EUR",
+        "market2": "DOT-EUR",
+        "correlation": 0.241
+      },
+      {
+        "market1": "SOL-EUR",
+        "market2": "ATOM-EUR",
+        "correlation": -0.233
+      },
+      {
+        "market1": "ATOM-EUR",
+        "market2": "DOT-EUR",
+        "correlation": -0.195
+      },
+      {
+        "market1": "DOT-EUR",
+        "market2": "UNI-EUR",
+        "correlation": 0.178
+      },
+      {
+        "market1": "ETH-EUR",
+        "market2": "LINK-EUR",
+        "correlation": 0.176
+      },
+      {
+        "market1": "ATOM-EUR",
+        "market2": "UNI-EUR",
+        "correlation": 0.169
+      },
+      {
+        "market1": "LINK-EUR",
+        "market2": "DOT-EUR",
+        "correlation": -0.139
+      }
+    ],
+    "high_correlation_pairs": [
+      {
+        "market1": "BTC-EUR",
+        "market2": "SOL-EUR",
+        "correlation": 0.758
+      }
+    ],
+    "avg_correlation": 0.125,
+    "diversification_score": 87.5,
+    "warning": "Hoge correlatie detecteerd - weinig diversificatie"
+  },
+  "win_predictions": [
+    {
+      "market": "BTC-EUR",
+      "win_probability": 0.5,
+      "confidence": "low"
+    },
+    {
+      "market": "ETH-EUR",
+      "win_probability": 0.5,
+      "confidence": "low"
+    },
+    {
+      "market": "SOL-EUR",
+      "win_probability": 0.5,
+      "confidence": "low"
+    },
+    {
+      "market": "BNB-EUR",
+      "win_probability": 0.5,
+      "confidence": "low"
+    },
+    {
+      "market": "AVAX-EUR",
+      "win_probability": 0.5,
+      "confidence": "low"
+    }
+  ],
+  "momentum_shifts": [],
+  "blacklist_analysis": {
+    "blacklist_candidates": [],
+    "underperformers": [],
+    "market_stats": {},
+    "recommendation": "Geen markets om te blacklisten - alle markets presteren OK"
+  },
+  "timestamp": 1762979292.031523
+}

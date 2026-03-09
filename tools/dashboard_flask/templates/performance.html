@@ -1,0 +1,617 @@
+{% extends "base.html" %}
+
+{% block title %}📈 Performance & P/L - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+
+{% block content %}
+<!-- Hero Banner - Quantum style -->
+<div class="glass-panel hero-banner">
+    <div class="hero-content">
+        <div class="hero-subtitle">TRADING PERFORMANCE METRICS</div>
+        <div class="hero-title">📈 Performance & P/L</div>
+        <div class="hero-description">Complete trading analytics • Realized & unrealized P/L • Historical trends</div>
+        <div class="hero-tags">
+            <span class="hero-tag tag-count">{{ total_trades if total_trades else '0' }} trades</span>
+            <span class="hero-tag tag-trailing">{{ "%.1f"|format(win_rate if win_rate else 0) }}% win rate</span>
+        </div>
+    </div>
+</div>
+
+<!-- Hero Stats Grid -->
+<div class="hero-grid">
+    <div class="hero-card">
+        <div class="hero-label">💰 TOTAL P/L</div>
+        <div class="hero-value {% if total_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">{{ '+' if total_pnl >= 0 else '' }}€{{ "%.2f"|format(total_pnl) }}</div>
+        <div class="hero-sub">Realized + Unrealized</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">📊 ROI</div>
+        <div class="hero-value {% if total_pnl_pct >= 0 %}text-success{% else %}text-danger{% endif %}">{{ '+' if total_pnl_pct >= 0 else '' }}{{ "%.2f"|format(total_pnl_pct) }}%</div>
+        <div class="hero-sub">Return on investment</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">✅ REALIZED</div>
+        <div class="hero-value {% if realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">{{ '+' if realized_pnl >= 0 else '' }}€{{ "%.2f"|format(realized_pnl) }}</div>
+        <div class="hero-sub">Closed positions</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">⏳ UNREALIZED</div>
+        <div class="hero-value {% if unrealized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">{{ '+' if unrealized_pnl >= 0 else '' }}€{{ "%.2f"|format(unrealized_pnl) }}</div>
+        <div class="hero-sub">Open positions</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">💼 INVESTED</div>
+        <div class="hero-value">€{{ "%.2f"|format(total_invested) }}</div>
+        <div class="hero-sub">Total capital deployed</div>
+    </div>
+</div>
+
+<!-- Performance Overview -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📊 Performance Overview</h2>
+        <div class="time-range-selector">
+            <button class="btn btn-sm {{ 'btn-primary' if period == '24h' else 'btn-secondary' }}" onclick="changePeriod('24h')">24h</button>
+            <button class="btn btn-sm {{ 'btn-primary' if period == '7d' else 'btn-secondary' }}" onclick="changePeriod('7d')">7d</button>
+            <button class="btn btn-sm {{ 'btn-primary' if period == '30d' else 'btn-secondary' }}" onclick="changePeriod('30d')">30d</button>
+            <button class="btn btn-sm {{ 'btn-primary' if period == 'all' else 'btn-secondary' }}" onclick="changePeriod('all')">All</button>
+        </div>
+    </div>
+    
+    <div class="perf-cards-row">
+        <div class="perf-metric-card">
+            <div class="metric-icon">💰</div>
+            <div class="metric-content">
+                <span class="metric-label">Total Invested</span>
+                <span class="metric-value">€{{ "%.2f"|format(total_invested) }}</span>
+            </div>
+        </div>
+        <div class="perf-metric-card">
+            <div class="metric-icon">📈</div>
+            <div class="metric-content">
+                <span class="metric-label">Current Value</span>
+                <span class="metric-value">€{{ "%.2f"|format(current_value) }}</span>
+            </div>
+        </div>
+        <div class="perf-metric-card {{ 'positive' if realized_pnl >= 0 else 'negative' }}">
+            <div class="metric-icon">✅</div>
+            <div class="metric-content">
+                <span class="metric-label">Realized P/L</span>
+                <span class="metric-value">{{ '+' if realized_pnl >= 0 else '' }}€{{ "%.2f"|format(realized_pnl) }}</span>
+            </div>
+        </div>
+        <div class="perf-metric-card {{ 'positive' if unrealized_pnl >= 0 else 'negative' }}">
+            <div class="metric-icon">⏳</div>
+            <div class="metric-content">
+                <span class="metric-label">Unrealized P/L</span>
+                <span class="metric-value">{{ '+' if unrealized_pnl >= 0 else '' }}€{{ "%.2f"|format(unrealized_pnl) }}</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- P/L Chart -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📉 P/L History</h2>
+        <div class="chart-controls">
+            <button class="btn btn-sm btn-secondary" onclick="toggleChartZoom()" id="zoom-toggle-btn">🔍 Zoom</button>
+            <button class="btn btn-sm btn-secondary" onclick="resetChart()">↺ Reset</button>
+        </div>
+    </div>
+    <div class="chart-container">
+        <canvas id="pnl-chart" width="800" height="300"></canvas>
+    </div>
+</section>
+
+<script>
+// P/L Chart with Chart.js
+const pnlCtx = document.getElementById('pnl-chart').getContext('2d');
+const pnlChart = new Chart(pnlCtx, {
+    type: 'line',
+    data: {
+        labels: {{ pnl_dates|tojson|safe if pnl_dates else '[]' }},
+        datasets: [{
+            label: 'Cumulative P/L (€)',
+            data: {{ pnl_values|tojson|safe if pnl_values else '[]' }},
+            borderColor: '#10B981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#10B981',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+            mode: 'index',
+            intersect: false
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top',
+                labels: {
+                    color: '#94a3b8',
+                    font: { size: 12 }
+                }
+            },
+            tooltip: {
+                enabled: true,
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                titleColor: '#f1f5f9',
+                bodyColor: '#cbd5e1',
+                borderColor: '#334155',
+                borderWidth: 1,
+                padding: 12,
+                displayColors: true,
+                callbacks: {
+                    label: function(context) {
+                        let label = context.dataset.label || '';
+                        if (label) label += ': ';
+                        if (context.parsed.y !== null) {
+                            label += '€' + context.parsed.y.toFixed(2);
+                        }
+                        return label;
+                    }
+                }
+            },
+            // Zoom handled via custom JS (toggleChartZoom)
+        },
+        scales: {
+            x: {
+                grid: {
+                    color: 'rgba(148, 163, 184, 0.1)',
+                    drawBorder: false
+                },
+                ticks: {
+                    color: '#94a3b8',
+                    maxRotation: 45,
+                    minRotation: 0
+                }
+            },
+            y: {
+                grid: {
+                    color: 'rgba(148, 163, 184, 0.1)',
+                    drawBorder: false
+                },
+                ticks: {
+                    color: '#94a3b8',
+                    callback: function(value) {
+                        return '€' + value.toFixed(0);
+                    }
+                }
+            }
+        }
+    }
+});
+
+let zoomEnabled = false;
+let originalData = null;
+
+function toggleChartZoom() {
+    zoomEnabled = !zoomEnabled;
+    const btn = document.getElementById('zoom-toggle-btn');
+    if (zoomEnabled) {
+        btn.classList.add('active');
+        btn.style.background = 'var(--accent-primary, #3b82f6)';
+        btn.style.color = '#fff';
+        apexToast('Zoom ingeschakeld – sleep op de chart om in te zoomen', 'info');
+        // Store original data for reset
+        originalData = {
+            labels: [...pnlChart.data.labels],
+            data: [...pnlChart.data.datasets[0].data]
+        };
+        // Enable drag-to-zoom via mouse events on canvas
+        const canvas = document.getElementById('pnl-chart');
+        canvas.style.cursor = 'crosshair';
+    } else {
+        btn.classList.remove('active');
+        btn.style.background = '';
+        btn.style.color = '';
+        const canvas = document.getElementById('pnl-chart');
+        canvas.style.cursor = 'default';
+        // Reset to full view
+        if (originalData) {
+            pnlChart.data.labels = originalData.labels;
+            pnlChart.data.datasets[0].data = originalData.data;
+            pnlChart.update();
+        }
+    }
+}
+
+function resetChart() {
+    if (originalData) {
+        pnlChart.data.labels = originalData.labels;
+        pnlChart.data.datasets[0].data = originalData.data;
+        pnlChart.update();
+        zoomEnabled = false;
+        const btn = document.getElementById('zoom-toggle-btn');
+        if (btn) { btn.classList.remove('active'); btn.style.background = ''; btn.style.color = ''; }
+        const canvas = document.getElementById('pnl-chart');
+        if (canvas) canvas.style.cursor = 'default';
+    }
+}
+</script>
+
+<!-- Trading Statistics -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📊 Trading Statistics</h2>
+    </div>
+    
+    <div class="stats-grid">
+        <div class="stat-box">
+            <div class="stat-header">
+                <span class="stat-icon">🎯</span>
+                <span class="stat-title">Win Rate</span>
+            </div>
+            <div class="stat-body">
+                <div class="stat-large {{ 'text-success' if win_rate >= 50 else 'text-danger' }}">
+                    {{ "%.1f"|format(win_rate) }}%
+                </div>
+                <div class="stat-detail">{{ winning_trades }} / {{ total_trades }} trades</div>
+            </div>
+        </div>
+        
+        <div class="stat-box">
+            <div class="stat-header">
+                <span class="stat-icon">💎</span>
+                <span class="stat-title">Best Trade</span>
+            </div>
+            <div class="stat-body">
+                <div class="stat-large text-success">+€{{ "%.2f"|format(best_trade_pnl) }}</div>
+                <div class="stat-detail">{{ best_trade_market }} ({{ "%.1f"|format(best_trade_pct) }}%)</div>
+            </div>
+        </div>
+        
+        <div class="stat-box">
+            <div class="stat-header">
+                <span class="stat-icon">📉</span>
+                <span class="stat-title">Worst Trade</span>
+            </div>
+            <div class="stat-body">
+                <div class="stat-large text-danger">-€{{ "%.2f"|format(worst_trade_pnl|abs) }}</div>
+                <div class="stat-detail">{{ worst_trade_market }} ({{ "%.1f"|format(worst_trade_pct) }}%)</div>
+            </div>
+        </div>
+        
+        <div class="stat-box">
+            <div class="stat-header">
+                <span class="stat-icon">⚡</span>
+                <span class="stat-title">Avg Trade Size</span>
+            </div>
+            <div class="stat-body">
+                <div class="stat-large">€{{ "%.2f"|format(avg_trade_size) }}</div>
+                <div class="stat-detail">Per position</div>
+            </div>
+        </div>
+        
+        <div class="stat-box">
+            <div class="stat-header">
+                <span class="stat-icon">⏱️</span>
+                <span class="stat-title">Avg Hold Time</span>
+            </div>
+            <div class="stat-body">
+                <div class="stat-large">{{ avg_hold_time }}</div>
+                <div class="stat-detail">Hours:Minutes</div>
+            </div>
+        </div>
+        
+        <div class="stat-box">
+            <div class="stat-header">
+                <span class="stat-icon">📊</span>
+                <span class="stat-title">Profit Factor</span>
+            </div>
+            <div class="stat-body">
+                <div class="stat-large {{ 'text-success' if profit_factor > 1 else 'text-danger' }}">
+                    {{ "%.2f"|format(profit_factor) }}
+                </div>
+                <div class="stat-detail">{{ 'Profitable' if profit_factor > 1 else 'Unprofitable' }}</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- P/L by Market -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>💹 P/L by Market</h2>
+    </div>
+    
+    <table class="summary-table">
+        <thead>
+            <tr>
+                <th>Market</th>
+                <th>Trades</th>
+                <th>Win Rate</th>
+                <th>Invested</th>
+                <th>Current Value</th>
+                <th>P/L</th>
+                <th>ROI</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for market_pnl in pnl_by_market %}
+            <tr class="{{ 'row-positive' if market_pnl.get('pnl', 0) >= 0 else 'row-negative' }}">
+                <td><strong>{{ market_pnl.get('market', 'N/A') }}</strong></td>
+                <td>{{ market_pnl.get('trades', 0) }}</td>
+                <td>{{ "%.1f"|format(market_pnl.get('win_rate', 0)) }}%</td>
+                <td>€{{ "%.2f"|format(market_pnl.get('invested', 0)) }}</td>
+                <td>€{{ "%.2f"|format(market_pnl.get('current_value', 0)) }}</td>
+                <td class="{{ 'text-success' if market_pnl.get('pnl', 0) >= 0 else 'text-danger' }}">
+                    {{ '+' if market_pnl.get('pnl', 0) >= 0 else '' }}€{{ "%.2f"|format(market_pnl.get('pnl', 0)) }}
+                </td>
+                <td class="{{ 'text-success' if market_pnl.get('roi', 0) >= 0 else 'text-danger' }}">
+                    {{ '+' if market_pnl.get('roi', 0) >= 0 else '' }}{{ "%.2f"|format(market_pnl.get('roi', 0)) }}%
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="text-center" style="color: var(--text-muted); padding: 2rem;">
+                    No trading data available
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="font-weight: 700; background: var(--bg-tertiary);">
+                <td>TOTAL</td>
+                <td>{{ total_trades }}</td>
+                <td>{{ "%.1f"|format(win_rate) }}%</td>
+                <td>€{{ "%.2f"|format(total_invested) }}</td>
+                <td>€{{ "%.2f"|format(current_value) }}</td>
+                <td class="{{ 'text-success' if total_pnl >= 0 else 'text-danger' }}">
+                    {{ '+' if total_pnl >= 0 else '' }}€{{ "%.2f"|format(total_pnl) }}
+                </td>
+                <td class="{{ 'text-success' if total_pnl_pct >= 0 else 'text-danger' }}">
+                    {{ '+' if total_pnl_pct >= 0 else '' }}{{ "%.2f"|format(total_pnl_pct) }}%
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+</section>
+
+<!-- Monthly Performance -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📅 Monthly Performance</h2>
+    </div>
+    
+    <div class="monthly-grid">
+        {% for month in monthly_performance %}
+        <div class="month-card {{ 'positive' if month.get('pnl', 0) >= 0 else 'negative' }}">
+            <div class="month-header">
+                <span class="month-name">{{ month.get('name', 'N/A') }}</span>
+                <span class="month-year">{{ month.get('year', '') }}</span>
+            </div>
+            <div class="month-pnl">
+                <div class="pnl-amount">{{ '+' if month.get('pnl', 0) >= 0 else '' }}€{{ "%.2f"|format(month.get('pnl', 0)) }}</div>
+                <div class="pnl-pct">{{ '+' if month.get('pnl_pct', 0) >= 0 else '' }}{{ "%.1f"|format(month.get('pnl_pct', 0)) }}%</div>
+            </div>
+            <div class="month-stats">
+                <span>{{ month.get('trades', 0) }} trades</span>
+                <span>{{ "%.0f"|format(month.get('win_rate', 0)) }}% win</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<style>
+.time-range-selector {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.perf-cards-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.perf-metric-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.perf-metric-card.positive {
+    border-left: 4px solid var(--success);
+}
+
+.perf-metric-card.negative {
+    border-left: 4px solid var(--danger);
+}
+
+.metric-icon {
+    font-size: 1.75rem;
+}
+
+.metric-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.metric-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.chart-container {
+    min-height: 300px;
+}
+
+.chart-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+}
+
+.placeholder-icon {
+    font-size: 3rem;
+    margin-bottom: var(--spacing-md);
+}
+
+.placeholder-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.placeholder-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.stat-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+}
+
+.stat-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.stat-icon {
+    font-size: 1.25rem;
+}
+
+.stat-title {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.stat-body {
+    text-align: center;
+}
+
+.stat-large {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+}
+
+.stat-detail {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.monthly-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.month-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    text-align: center;
+}
+
+.month-card.positive {
+    background: var(--success-bg);
+}
+
+.month-card.negative {
+    background: var(--danger-bg);
+}
+
+.month-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+    font-size: 0.75rem;
+}
+
+.month-name {
+    font-weight: 600;
+}
+
+.month-year {
+    color: var(--text-muted);
+}
+
+.month-pnl {
+    margin-bottom: var(--spacing-sm);
+}
+
+.pnl-amount {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.month-card.positive .pnl-amount {
+    color: var(--success);
+}
+
+.month-card.negative .pnl-amount {
+    color: var(--danger);
+}
+
+.pnl-pct {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.month-stats {
+    display: flex;
+    justify-content: space-around;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--border-color);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .perf-cards-row { grid-template-columns: repeat(2, 1fr); }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .perf-cards-row { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr; }
+    .monthly-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+
+<script>
+function changePeriod(period) {
+    window.location.href = '/performance?period=' + period;
+}
+</script>
+{% endblock %}

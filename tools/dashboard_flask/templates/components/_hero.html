@@ -1,0 +1,112 @@
+{# Hero Banner Component - Portfolio metrics bar #}
+
+{% macro hero_metrics(totals, heartbeat=None, bot_online=True) %}
+<section class="hero-metrics">
+    <div class="hero-metrics__inner">
+        {# Total Deposited #}
+        <div class="hero-metric">
+            <span class="hero-metric__label">
+                <span class="hero-metric__icon">💰</span>
+                Total Deposited
+            </span>
+            <span class="hero-metric__value" id="total-deposited">
+                €{{ "%.2f"|format(totals.total_deposited) }}
+            </span>
+        </div>
+        
+        {# Account Value #}
+        <div class="hero-metric hero-metric--primary">
+            <span class="hero-metric__label">
+                <span class="hero-metric__icon">📊</span>
+                Account Value
+            </span>
+            <span class="hero-metric__value" id="account-value">
+                €{{ "%.2f"|format(totals.account_value) }}
+            </span>
+        </div>
+        
+        {# Real P/L #}
+        {% set profit_class = 'positive' if totals.real_profit >= 0 else 'negative' %}
+        <div class="hero-metric hero-metric--{{ profit_class }}">
+            <span class="hero-metric__label">
+                <span class="hero-metric__icon">{{ '📈' if totals.real_profit >= 0 else '📉' }}</span>
+                Real P/L
+            </span>
+            <span class="hero-metric__value" id="real-profit">
+                {{ '+' if totals.real_profit >= 0 else '' }}€{{ "%.2f"|format(totals.real_profit) }}
+                <span class="hero-metric__pct">({{ '+' if totals.real_profit_pct >= 0 else '' }}{{ "%.2f"|format(totals.real_profit_pct) }}%)</span>
+            </span>
+        </div>
+        
+        {# EUR Balance #}
+        <div class="hero-metric">
+            <span class="hero-metric__label">
+                <span class="hero-metric__icon">💶</span>
+                EUR Balance
+            </span>
+            <span class="hero-metric__value" id="eur-balance">
+                €{{ "%.2f"|format(totals.eur_balance) }}
+            </span>
+        </div>
+        
+        {# Open Positions #}
+        <div class="hero-metric">
+            <span class="hero-metric__label">
+                <span class="hero-metric__icon">🔄</span>
+                Open Trades
+            </span>
+            <span class="hero-metric__value" id="trade-count">
+                {{ totals.trade_count }}
+            </span>
+        </div>
+        
+        {# Bot Status #}
+        <div class="hero-metric hero-metric--status">
+            <span class="hero-metric__label">
+                <span class="hero-metric__icon">🤖</span>
+                Bot Status
+            </span>
+            <span class="hero-metric__value">
+                <span class="status-indicator status-indicator--{{ 'online' if bot_online else 'offline' }}">
+                    <span class="status-dot"></span>
+                    {{ 'Online' if bot_online else 'Offline' }}
+                </span>
+            </span>
+        </div>
+    </div>
+</section>
+{% endmacro %}
+
+
+{# Compact stats row #}
+{% macro stats_row(totals) %}
+<div class="stats-row">
+    <div class="stat-item">
+        <span class="stat-item__value">€{{ "%.2f"|format(totals.total_invested) }}</span>
+        <span class="stat-item__label">Invested</span>
+    </div>
+    <div class="stat-item">
+        <span class="stat-item__value">€{{ "%.2f"|format(totals.total_current) }}</span>
+        <span class="stat-item__label">Current</span>
+    </div>
+    <div class="stat-item stat-item--{{ 'positive' if totals.total_pnl >= 0 else 'negative' }}">
+        <span class="stat-item__value">{{ '+' if totals.total_pnl >= 0 else '' }}€{{ "%.2f"|format(totals.total_pnl) }}</span>
+        <span class="stat-item__label">Unrealized P/L</span>
+    </div>
+</div>
+{% endmacro %}
+
+
+{# Single KPI card #}
+{% macro kpi_card(icon, label, value, subvalue=None, variant=None) %}
+<div class="kpi-card {% if variant %}kpi-card--{{ variant }}{% endif %}">
+    <div class="kpi-card__icon">{{ icon }}</div>
+    <div class="kpi-card__content">
+        <span class="kpi-card__label">{{ label }}</span>
+        <span class="kpi-card__value">{{ value }}</span>
+        {% if subvalue %}
+        <span class="kpi-card__subvalue">{{ subvalue }}</span>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}

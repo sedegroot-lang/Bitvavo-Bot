@@ -1,0 +1,89 @@
+{
+  "processed": [
+    {
+      "market": "LDO-EUR",
+      "status": "rejected",
+      "reason": "LDO - DeFi protocol",
+      "ts": 1764332376
+    },
+    {
+      "market": "GMX-EUR",
+      "status": "rejected",
+      "reason": "GMX - DeFi protocol",
+      "ts": 1764332376
+    },
+    {
+      "market": "CRV-EUR",
+      "status": "rejected",
+      "reason": "CRV - DeFi protocol",
+      "ts": 1764332376
+    },
+    {
+      "market": "MKR-EUR",
+      "status": "rejected",
+      "reason": "MKR - DeFi protocol",
+      "ts": 1764332376
+    },
+    {
+      "market": "GRT-EUR",
+      "status": "rejected",
+      "reason": "GRT - Unexplored market, worth testing",
+      "ts": 1764332376
+    },
+    {
+      "market": "FTM-EUR",
+      "status": "rejected",
+      "reason": "FTM - Established Layer 1 blockchain",
+      "ts": 1764689700
+    },
+    {
+      "market": "BNB-EUR",
+      "status": "rejected",
+      "reason": "BNB - Unexplored market, worth testing",
+      "ts": 1764689700
+    },
+    {
+      "market": "MATIC-EUR",
+      "status": "rejected",
+      "reason": "MATIC - Unexplored market, worth testing",
+      "ts": 1764689700
+    },
+    {
+      "market": "ARB-EUR",
+      "status": "rejected",
+      "reason": "ARB - Unexplored market, worth testing",
+      "ts": 1764689700
+    },
+    {
+      "market": "INJ-EUR",
+      "status": "rejected",
+      "reason": "INJ - Unexplored market, worth testing",
+      "ts": 1764689700
+    },
+    {
+      "market": "SNX-EUR",
+      "status": "rejected",
+      "reason": "SNX - Unexplored market, worth testing",
+      "ts": 1764689700
+    },
+    {
+      "market": "UNI-EUR",
+      "status": "rejected",
+      "reason": "UNI - Unexplored market, worth testing",
+      "ts": 1765185630
+    },
+    {
+      "market": "BTC-EUR",
+      "status": "rejected",
+      "reason": "BTC - Unexplored market, worth testing",
+      "ts": 1766141662
+    },
+    {
+      "market": "ETH-EUR",
+      "status": "rejected",
+      "reason": "ETH - Unexplored market, worth testing",
+      "ts": 1766141662
+    }
+  ],
+  "ts": 1770939581
+}

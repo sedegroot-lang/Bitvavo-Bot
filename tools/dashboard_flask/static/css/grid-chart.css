@@ -1,0 +1,154 @@
+/* Grid Chart Visualization Styles */
+
+.grid-chart-container {
+    width: 100%;
+    background: var(--bg-primary, #0d1117);
+    border-radius: 8px;
+    padding: 0;
+    margin: 0;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+    position: relative;
+    overflow: hidden;
+}
+
+.grid-chart-container canvas {
+    position: relative;
+    z-index: 1;
+    border-radius: 6px;
+    display: block;
+}
+
+/* Grid visualization (fallback for non-canvas) */
+.grid-visualization {
+    margin: 1.5rem 0;
+}
+
+.price-range {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: rgba(10, 10, 15, 0.4);
+    border-radius: 8px;
+}
+
+.range-bar {
+    flex: 1;
+    height: 300px;
+    background: linear-gradient(to bottom, 
+        rgba(231, 76, 60, 0.1) 0%,
+        rgba(52, 152, 219, 0.1) 50%,
+        rgba(46, 204, 113, 0.1) 100%
+    );
+    border-radius: 8px;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.range-marker {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: 'Courier New', monospace;
+}
+
+.range-marker.top {
+    color: rgba(231, 76, 60, 0.9);
+}
+
+.range-marker.bottom {
+    color: rgba(46, 204, 113, 0.9);
+}
+
+.grid-level {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(150, 150, 150, 0.3);
+    transition: all 0.3s ease;
+}
+
+.grid-level.buy {
+    background: rgba(46, 204, 113, 0.6);
+    box-shadow: 0 0 8px rgba(46, 204, 113, 0.4);
+}
+
+.grid-level.sell {
+    background: rgba(231, 76, 60, 0.6);
+    box-shadow: 0 0 8px rgba(231, 76, 60, 0.4);
+}
+
+.grid-level::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: -3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: inherit;
+}
+
+.current-price-marker {
+    position: absolute;
+    left: -20px;
+    right: -20px;
+    height: 3px;
+    background: linear-gradient(90deg, 
+        transparent,
+        rgba(52, 152, 219, 0.8) 20%,
+        rgba(52, 152, 219, 0.8) 80%,
+        transparent
+    );
+    box-shadow: 0 0 20px rgba(52, 152, 219, 0.6);
+    animation: pulse-price 2s ease-in-out infinite;
+    z-index: 10;
+}
+
+@keyframes pulse-price {
+    0%, 100% {
+        opacity: 0.8;
+        transform: scaleY(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scaleY(1.2);
+    }
+}
+
+.marker-label {
+    position: absolute;
+    left: -60px;
+    top: -12px;
+    background: rgba(52, 152, 219, 0.95);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+}
+
+.marker-label::after {
+    content: '';
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid rgba(52, 152, 219, 0.95);
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+}
+
+/* Grid card - defer to template styles */
+/* Responsive grid chart */
+@media (max-width: 768px) {
+    .grid-chart-container canvas {
+        max-height: 240px;
+    }
+}

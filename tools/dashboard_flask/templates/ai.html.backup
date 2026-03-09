@@ -1,0 +1,637 @@
+{% extends "base.html" %}
+
+{% block title %}🧠 AI Copilot - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+
+{% block content %}
+<!-- Hero Banner - Quantum style -->
+<div class="glass-panel hero-banner">
+    <div class="hero-content">
+        <div class="hero-subtitle">MACHINE LEARNING INTELLIGENCE</div>
+        <div class="hero-title">🧠 AI Copilot</div>
+        <div class="hero-description">XGBoost predictions • Market sentiment analysis • Automated suggestions</div>
+        <div class="hero-tags">
+            <span class="hero-tag tag-count">{{ ai_suggestions|length if ai_suggestions else '0' }} suggestions</span>
+            <span class="hero-tag tag-trailing">{{ "%.1f"|format(model_accuracy) }}% accuracy</span>
+        </div>
+    </div>
+</div>
+
+<!-- Hero Stats Grid -->
+<div class="hero-grid">
+    <div class="hero-card">
+        <div class="hero-label">🤖 AI STATUS</div>
+        <div class="hero-value {% if ai_active %}text-success{% else %}text-danger{% endif %}" id="ai-status-value">{{ 'ACTIVE' if ai_active else 'INACTIVE' }}</div>
+        <div class="hero-sub">Supervisor process</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">🎯 MODEL ACCURACY</div>
+        <div class="hero-value" id="model-accuracy">{{ "%.1f"|format(model_accuracy) }}%</div>
+        <div class="hero-sub">XGBoost model</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">💡 SUGGESTIONS</div>
+        <div class="hero-value">{{ ai_suggestions|length if ai_suggestions else '0' }}</div>
+        <div class="hero-sub">Active recommendations</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">⏰ LAST UPDATE</div>
+        <div class="hero-value">{{ last_ai_update if last_ai_update else '-' }}</div>
+        <div class="hero-sub">Model refresh time</div>
+    </div>
+</div>
+
+<!-- AI Suggestions -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>💡 AI Trade Suggestions</h2>
+        <span class="badge">Updated {{ last_ai_update }}</span>
+    </div>
+    
+    <div class="suggestions-grid">
+        {% if ai_suggestions %}
+            {% for suggestion in ai_suggestions %}
+            <div class="suggestion-card {{ suggestion.get('sentiment', 'neutral') }}">
+                <div class="suggestion-header">
+                    <div class="suggestion-market">
+                        <h3>{{ suggestion.get('market', 'UNKNOWN') }}</h3>
+                        <span class="suggestion-action {{ suggestion.get('action', 'hold') }}">{{ suggestion.get('action', 'hold')|upper }}</span>
+                    </div>
+                    <div class="suggestion-confidence">
+                        <span class="confidence-label">Confidence</span>
+                        <span class="confidence-value">{{ "%.0f"|format(suggestion.get('confidence', 0)) }}%</span>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: {{ suggestion.get('confidence', 0) }}%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="suggestion-body">
+                    <div class="suggestion-reason">
+                        <span class="reason-icon">💭</span>
+                        <p>{{ suggestion.get('reason', 'No reason provided') }}</p>
+                    </div>
+                    
+                    <div class="suggestion-metrics">
+                        <div class="metric">
+                            <span class="label">Entry</span>
+                            <span class="value">€{{ "%.2f"|format(suggestion.get('entry_price', 0)) }}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Target</span>
+                            <span class="value">€{{ "%.2f"|format(suggestion.get('target_price', 0)) }}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Stop Loss</span>
+                            <span class="value">€{{ "%.2f"|format(suggestion.get('stop_loss', 0)) }}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Expected Gain</span>
+                            <span class="value {{ 'text-success' if suggestion.get('expected_gain', 0) > 0 else 'text-danger' }}">
+                                {{ '+' if suggestion.get('expected_gain', 0) > 0 else '' }}{{ "%.1f"|format(suggestion.get('expected_gain', 0)) }}%
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="suggestion-actions">
+                        <button class="btn btn-primary btn-sm" onclick="executeSuggestion('{{ suggestion.id }}')">
+                            ✅ Execute
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="dismissSuggestion('{{ suggestion.id }}')">
+                            ❌ Dismiss
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">🧠</div>
+                <div class="empty-text">No AI suggestions at the moment</div>
+                <div class="empty-hint">The AI is analyzing market conditions...</div>
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Market Analysis -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📊 AI Market Analysis</h2>
+    </div>
+    
+    <div class="analysis-grid">
+        {% for analysis in market_analysis %}
+        <div class="analysis-card">
+            <div class="analysis-header">
+                <h3>{{ analysis.market }}</h3>
+                <span class="analysis-sentiment {{ analysis.sentiment }}">
+                    {{ '📈 Bullish' if analysis.sentiment == 'bullish' else '📉 Bearish' if analysis.sentiment == 'bearish' else '➡️ Neutral' }}
+                </span>
+            </div>
+            <div class="analysis-indicators">
+                <div class="indicator">
+                    <span class="indicator-name">Trend Strength</span>
+                    <div class="indicator-bar">
+                        <div class="indicator-fill {{ 'positive' if analysis.trend_strength > 0 else 'negative' }}" 
+                             style="width: {{ analysis.trend_strength|abs }}%"></div>
+                    </div>
+                    <span class="indicator-value">{{ "%.0f"|format(analysis.trend_strength) }}%</span>
+                </div>
+                <div class="indicator">
+                    <span class="indicator-name">Volatility</span>
+                    <div class="indicator-bar">
+                        <div class="indicator-fill warning" style="width: {{ analysis.volatility }}%"></div>
+                    </div>
+                    <span class="indicator-value">{{ "%.0f"|format(analysis.volatility) }}%</span>
+                </div>
+                <div class="indicator">
+                    <span class="indicator-name">Momentum</span>
+                    <div class="indicator-bar">
+                        <div class="indicator-fill {{ 'positive' if analysis.momentum > 0 else 'negative' }}" 
+                             style="width: {{ analysis.momentum|abs }}%"></div>
+                    </div>
+                    <span class="indicator-value">{{ "%.0f"|format(analysis.momentum) }}%</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Model Performance -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📈 Model Performance</h2>
+    </div>
+    
+    <div class="performance-cards">
+        <div class="perf-card">
+            <div class="perf-icon">🎯</div>
+            <div class="perf-content">
+                <span class="perf-label">Accuracy</span>
+                <span class="perf-value">{{ "%.1f"|format(model_metrics.accuracy) }}%</span>
+            </div>
+        </div>
+        <div class="perf-card">
+            <div class="perf-icon">✅</div>
+            <div class="perf-content">
+                <span class="perf-label">Precision</span>
+                <span class="perf-value">{{ "%.1f"|format(model_metrics.precision) }}%</span>
+            </div>
+        </div>
+        <div class="perf-card">
+            <div class="perf-icon">📊</div>
+            <div class="perf-content">
+                <span class="perf-label">Recall</span>
+                <span class="perf-value">{{ "%.1f"|format(model_metrics.recall) }}%</span>
+            </div>
+        </div>
+        <div class="perf-card">
+            <div class="perf-icon">🏆</div>
+            <div class="perf-content">
+                <span class="perf-label">F1 Score</span>
+                <span class="perf-value">{{ "%.1f"|format(model_metrics.f1_score) }}%</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="training-info">
+        <h4>📚 Training Information</h4>
+        <div class="training-stats">
+            <div class="training-stat">
+                <span class="label">Last Training</span>
+                <span class="value">{{ last_training_date }}</span>
+            </div>
+            <div class="training-stat">
+                <span class="label">Training Samples</span>
+                <span class="value">{{ training_samples }}</span>
+            </div>
+            <div class="training-stat">
+                <span class="label">Model Version</span>
+                <span class="value">{{ model_version }}</span>
+            </div>
+            <div class="training-stat">
+                <span class="label">Next Training</span>
+                <span class="value">{{ next_training }}</span>
+            </div>
+        </div>
+        <button class="btn btn-secondary" onclick="retrainModel()">🔄 Retrain Model</button>
+    </div>
+</section>
+
+<!-- AI Settings -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>⚙️ AI Configuration</h2>
+    </div>
+    
+    <form class="ai-settings-form" id="ai-settings-form">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">AI Mode</label>
+                <select class="form-select" name="ai_mode">
+                    <option value="advisory" {{ 'selected' if ai_config.mode == 'advisory' }}>Advisory (Suggestions only)</option>
+                    <option value="semi_auto" {{ 'selected' if ai_config.mode == 'semi_auto' }}>Semi-Auto (Execute with confirmation)</option>
+                    <option value="full_auto" {{ 'selected' if ai_config.mode == 'full_auto' }}>Full Auto (Autonomous execution)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Minimum Confidence (%)</label>
+                <input type="number" class="form-input" name="min_confidence" 
+                       value="{{ ai_config.min_confidence }}" min="50" max="99" step="1">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Max Trades per Day</label>
+                <input type="number" class="form-input" name="max_trades_per_day" 
+                       value="{{ ai_config.max_trades_per_day }}" min="1" max="50">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Risk Level</label>
+                <select class="form-select" name="risk_level">
+                    <option value="conservative" {{ 'selected' if ai_config.risk_level == 'conservative' }}>Conservative</option>
+                    <option value="moderate" {{ 'selected' if ai_config.risk_level == 'moderate' }}>Moderate</option>
+                    <option value="aggressive" {{ 'selected' if ai_config.risk_level == 'aggressive' }}>Aggressive</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-toggle">
+                    <input type="checkbox" name="use_technical_analysis" 
+                           {{ 'checked' if ai_config.use_technical_analysis }}>
+                    <span>Use Technical Analysis (RSI, MACD, Bollinger)</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="form-toggle">
+                    <input type="checkbox" name="use_sentiment_analysis" 
+                           {{ 'checked' if ai_config.use_sentiment_analysis }}>
+                    <span>Use Sentiment Analysis (News, Social)</span>
+                </label>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">💾 Save Settings</button>
+    </form>
+</section>
+
+<style>
+.suggestions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.suggestion-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-left-width: 4px;
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+}
+
+.suggestion-card.bullish { border-left-color: var(--success); }
+.suggestion-card.bearish { border-left-color: var(--danger); }
+.suggestion-card.neutral { border-left-color: var(--text-muted); }
+
+.suggestion-header {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.suggestion-market h3 {
+    margin: 0 0 var(--spacing-xs);
+    font-size: 1.1rem;
+}
+
+.suggestion-action {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.suggestion-action.buy { background: var(--success-bg); color: var(--success); }
+.suggestion-action.sell { background: var(--danger-bg); color: var(--danger); }
+.suggestion-action.hold { background: var(--bg-tertiary); color: var(--text-muted); }
+
+.suggestion-confidence {
+    text-align: right;
+}
+
+.confidence-label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-xs);
+}
+
+.confidence-value {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+}
+
+.confidence-bar {
+    width: 80px;
+    height: 4px;
+    background: var(--bg-tertiary);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.confidence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--warning), var(--success));
+    transition: width 0.3s ease;
+}
+
+.suggestion-body {
+    padding: var(--spacing-md);
+}
+
+.suggestion-reason {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius-sm);
+}
+
+.reason-icon {
+    font-size: 1.2rem;
+}
+
+.suggestion-reason p {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.suggestion-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.suggestion-metrics .metric {
+    display: flex;
+    flex-direction: column;
+}
+
+.suggestion-metrics .label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.suggestion-metrics .value {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.suggestion-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* Analysis Grid */
+.analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.analysis-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+}
+
+.analysis-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.analysis-header h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.analysis-sentiment {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.analysis-sentiment.bullish { background: var(--success-bg); color: var(--success); }
+.analysis-sentiment.bearish { background: var(--danger-bg); color: var(--danger); }
+.analysis-sentiment.neutral { background: var(--bg-tertiary); color: var(--text-muted); }
+
+.analysis-indicators {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.indicator {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.indicator-name {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.indicator-bar {
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.indicator-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.indicator-fill.positive { background: var(--success); }
+.indicator-fill.negative { background: var(--danger); }
+.indicator-fill.warning { background: var(--warning); }
+
+.indicator-value {
+    font-size: 0.8rem;
+    font-weight: 600;
+    align-self: flex-end;
+}
+
+/* Performance Cards */
+.performance-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.perf-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.perf-icon {
+    font-size: 1.5rem;
+}
+
+.perf-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.perf-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.perf-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.training-info {
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+}
+
+.training-info h4 {
+    margin: 0 0 var(--spacing-md);
+    font-size: 0.9rem;
+}
+
+.training-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.training-stat {
+    display: flex;
+    flex-direction: column;
+}
+
+.training-stat .label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.training-stat .value {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+</style>
+
+<script>
+// Execute AI suggestion
+async function executeSuggestion(id) {
+    if (!confirm('Execute this AI suggestion?')) return;
+    
+    try {
+        const response = await fetch('/api/ai/execute/' + id, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            alert('Trade executed successfully!');
+            location.reload();
+        } else {
+            alert('Failed to execute trade');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+// Dismiss suggestion
+async function dismissSuggestion(id) {
+    try {
+        const response = await fetch('/api/ai/dismiss/' + id, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            location.reload();
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+// Retrain model
+async function retrainModel() {
+    if (!confirm('Start model retraining? This may take several minutes.')) return;
+    
+    try {
+        const response = await fetch('/api/ai/retrain', {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            alert('Model retraining started. Check back in a few minutes.');
+        } else {
+            alert('Failed to start retraining');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+// Settings form
+document.getElementById('ai-settings-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
+    
+    // Convert checkboxes
+    data.use_technical_analysis = formData.has('use_technical_analysis');
+    data.use_sentiment_analysis = formData.has('use_sentiment_analysis');
+    
+    try {
+        const response = await fetch('/api/ai/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            alert('AI settings saved!');
+        } else {
+            alert('Failed to save settings');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+});
+</script>
+{% endblock %}
