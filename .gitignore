@@ -62,6 +62,29 @@ htmlcov/
 coverage.xml
 
 # ==============================================
+# Dev/temp files (not for end users)
+# ==============================================
+_*.py
+_*.txt
+err.txt
+err30.txt
+out.txt
+out30.txt
+param_log.txt
+trade_features.csv
+ai_model_metrics.json
+ai_supervisor.py
+ai_xgb_model.json
+auto_sync_check.*
+check_balance.py
+check_orders.py
+reviews/
+FAANG_LEVEL_ANALYSIS.md
+OPUS_REVIEW_PLAN.md
+OPUS_REVIEW_QUICKSTART.md
+ROADMAP_PROFIT_OPTIMIZATION.md
+
+# ==============================================
 # OS
 # ==============================================
 *.log
