@@ -79,10 +79,36 @@ auto_sync_check.*
 check_balance.py
 check_orders.py
 reviews/
+backups/
 FAANG_LEVEL_ANALYSIS.md
 OPUS_REVIEW_PLAN.md
 OPUS_REVIEW_QUICKSTART.md
 ROADMAP_PROFIT_OPTIMIZATION.md
+CHANGELOG.md
+CONTRIBUTING.md
+UPGRADE_GUIDE.md
+start_bot.log
+
+# ==============================================
+# AI training data & generated files
+# ==============================================
+ai/training_data/
+ai/ai_advanced_analysis.json
+ai/ai_market_suggestions*.json
+ai/logs/
+
+# ==============================================
+# Tools CSV/JSON data output files
+# ==============================================
+tools/*.csv
+tools/reconcile_report.json
+scripts/helpers/heartbeat.json
+
+# ==============================================
+# Template backups
+# ==============================================
+*.html.backup
+*_old_backup.html
 
 # ==============================================
 # OS

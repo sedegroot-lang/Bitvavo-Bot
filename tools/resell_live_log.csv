@@ -1,8 +1,0 @@
-ts,market,amount,price,status,response
-1759643358.9268792,MAGIC-EUR,36.829134720700985,0.14461919999999998,error,Bitvavo.placeOrder() missing 1 required positional argument: 'body'
-ts,market,amount,price,status,response
-1759643400.160136,MAGIC-EUR,36.829134720700985,0.14461919999999998,error,Bitvavo.placeOrder() missing 1 required positional argument: 'body'
-ts,market,amount,price,status,response
-1759643525.8411334,MAGIC-EUR,36.829134720700985,0.14461919999999998,ok,"{'errorCode': 203, 'error': 'operatorId parameter is required.'}"
-1759643528.5245984,USDC-EUR,9.598625212799794,0.8406288,ok,"{'errorCode': 203, 'error': 'operatorId parameter is required.'}"
-1759643531.2131722,CAKE-EUR,2.9715482180796724,2.853477,ok,"{'errorCode': 203, 'error': 'operatorId parameter is required.'}"
