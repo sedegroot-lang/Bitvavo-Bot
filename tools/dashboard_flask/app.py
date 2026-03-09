@@ -3358,6 +3358,11 @@ def save_strategy_parameters():
             'ai_risk_control': ('AI_RISK_CONTROL', bool),
             'ai_tp_control': ('AI_TP_CONTROL', bool),
             'ai_sl_control': ('AI_SL_CONTROL', bool),
+
+            # Telegram notifications
+            'telegram_enabled': ('TELEGRAM_ENABLED', bool),
+            'telegram_bot_token': ('TELEGRAM_BOT_TOKEN', str),
+            'telegram_chat_id': ('TELEGRAM_CHAT_ID', str),
         }
         
         # Update config with form data
@@ -3471,7 +3476,30 @@ def force_refresh():
     
     return jsonify({'status': 'ok', 'message': 'Cache refreshed'})
 
-@app.route('/notifications')
+
+@app.route('/api/telegram/test', methods=['POST'])
+def telegram_test():
+    """Send a test Telegram message with the given token + chat_id."""
+    try:
+        data = request.get_json(force=True) or {}
+        token = str(data.get('token', '')).strip()
+        chat_id = str(data.get('chat_id', '')).strip()
+        if not token or not chat_id:
+            return jsonify({'status': 'error', 'error': 'Token en Chat ID zijn verplicht'})
+        import urllib.request, json as _json
+        msg = '✅ Bitvavo Bot verbonden! Notificaties zijn actief.'
+        url = f'https://api.telegram.org/bot{token}/sendMessage'
+        payload = _json.dumps({'chat_id': chat_id, 'text': msg}).encode()
+        req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = _json.loads(resp.read())
+        if result.get('ok'):
+            return jsonify({'status': 'ok'})
+        return jsonify({'status': 'error', 'error': result.get('description', 'Onbekende fout')})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)})
+
+
 def notifications():
     """Notifications & Alerts page."""
     import time

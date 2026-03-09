@@ -12,6 +12,23 @@ BASE_DIR = Path(__file__).parent
 ENV_FILE = BASE_DIR / '.env'
 ENV_EXAMPLE = BASE_DIR / '.env.example'
 REQUIREMENTS = BASE_DIR / 'requirements.txt'
+BOT_CONFIG = BASE_DIR / 'config' / 'bot_config.json'
+
+
+def _save_telegram_to_config(token: str, chat_id: str) -> None:
+    """Save Telegram credentials directly into bot_config.json."""
+    import json
+    if not BOT_CONFIG.exists():
+        return
+    try:
+        config = json.loads(BOT_CONFIG.read_text(encoding='utf-8'))
+        config['TELEGRAM_ENABLED'] = True
+        config['TELEGRAM_BOT_TOKEN'] = token
+        config['TELEGRAM_CHAT_ID'] = chat_id
+        BOT_CONFIG.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding='utf-8')
+        ok("Telegram credentials opgeslagen in config/bot_config.json")
+    except Exception as e:
+        warn(f"Kon Telegram niet opslaan in config: {e}")
 
 AFFILIATE_LINK = 'https://bitvavo.com/invite?a=B8942E4528'
 BTC_ADDRESS = '1DUCu4ZGgKHZr22DvAxuWKBujcfpCLJoNy'
@@ -205,7 +222,60 @@ def step_install_deps():
     print()
 
 
-# ── Stap 5 — klaar ────────────────────────────────────────────────────────────
+# ── Stap 5 — Telegram (optioneel) ───────────────────────────────────────────
+def step_telegram():
+    """
+    Optionally configure Telegram notifications.
+    Returns (token, chat_id) or (None, None) if skipped.
+    """
+    step(5, 'Telegram notificaties instellen (optioneel)')
+    print()
+    print(f"  Ontvang koopberichten, verkoopberichten en waarschuwingen op je telefoon.")
+    print()
+
+    want_telegram = ask_yn('Wil je Telegram notificaties instellen?', default='n')
+    if not want_telegram:
+        ok("Telegram overgeslagen — je kunt dit later instellen via het dashboard")
+        print()
+        return None, None
+
+    print()
+    print(f"  {BOLD}Stap A — Maak een Telegram bot aan:{RESET}")
+    print(f"  1. Open Telegram → zoek {CYAN}@BotFather{RESET}")
+    print(f"  2. Stuur: /newbot")
+    print(f"  3. Geef een naam (bijv. 'Bitvavo Bot') en gebruikersnaam (eindigt op 'bot')")
+    print(f"  4. Kopieer het token (bijv. 8397921391:AAGYxx...)")
+    print()
+    input("  Druk op ENTER zodra je het token hebt...")
+    print()
+
+    token = ''
+    while not token:
+        token = ask('Plak hier je Bot Token')
+        if not token:
+            warn("Token mag niet leeg zijn.")
+
+    print()
+    print(f"  {BOLD}Stap B — Haal je Chat ID op:{RESET}")
+    print(f"  1. Stuur je nieuwe bot een berichtje in Telegram")
+    print(f"  2. Ga naar: {CYAN}https://api.telegram.org/bot{token}/getUpdates{RESET}")
+    print(f"  3. Zoek het getal achter \"id\":{RESET} — dat is je Chat ID")
+    print()
+    input("  Druk op ENTER zodra je het Chat ID hebt...")
+    print()
+
+    chat_id = ''
+    while not chat_id:
+        chat_id = ask('Plak hier je Chat ID')
+        if not chat_id:
+            warn("Chat ID mag niet leeg zijn.")
+
+    ok(f"Telegram ingesteld — token en chat ID opgeslagen")
+    print()
+    return token, chat_id
+
+
+# ── Stap 6 — klaar ────────────────────────────────────────────────────────────
 def step_finish():
     print(f"{BOLD}{GREEN}{'═' * 58}{RESET}")
     print(f"{BOLD}{GREEN}   ✓  Setup voltooid! Bot is klaar voor gebruik.{RESET}")
@@ -237,6 +307,9 @@ def main():
         api_key, api_secret = step_api_keys()
         step_create_env(api_key, api_secret, is_new_user=is_new_user)
         step_install_deps()
+        tg_token, tg_chat_id = step_telegram()
+        if tg_token and tg_chat_id:
+            _save_telegram_to_config(tg_token, tg_chat_id)
         step_finish()
     except KeyboardInterrupt:
         print()

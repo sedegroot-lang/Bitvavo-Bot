@@ -206,6 +206,93 @@ function saveBudgetSplit() {
 }
 </script>
 
+<!-- Telegram Notificaties -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📱 Telegram Notificaties</h2>
+        <div class="section-actions">
+            <button class="btn btn-secondary btn-sm" onclick="testTelegram()">🔔 Test</button>
+            <button class="btn btn-primary btn-sm" onclick="saveTelegram()">💾 Opslaan</button>
+        </div>
+    </div>
+    <div class="settings-group">
+        <p>Ontvang real-time meldingen op je telefoon bij elke koop, verkoop en waarschuwing.</p>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Telegram actief</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="telegram-enabled"
+                        {% if config.get('TELEGRAM_ENABLED') %}checked{% endif %}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Bot Token</label>
+                <input type="text" id="telegram-token"
+                    placeholder="1234567890:AABBcc..."
+                    value="{{ config.get('TELEGRAM_BOT_TOKEN', '') }}">
+                <small>Aanmaken via @BotFather op Telegram</small>
+            </div>
+            <div class="form-group">
+                <label>Chat ID</label>
+                <input type="text" id="telegram-chat-id"
+                    placeholder="123456789"
+                    value="{{ config.get('TELEGRAM_CHAT_ID', '') }}">
+                <small>Ophalen via api.telegram.org/bot{TOKEN}/getUpdates</small>
+            </div>
+        </div>
+        <details style="margin-top:12px">
+            <summary style="cursor:pointer;color:var(--text-secondary)">📖 Hoe stel ik Telegram in?</summary>
+            <ol style="margin:10px 0 0 20px;color:var(--text-secondary);font-size:0.9em;line-height:1.8">
+                <li>Open Telegram → zoek <b>@BotFather</b> → stuur <code>/newbot</code></li>
+                <li>Geef een naam en gebruikersnaam (eindigt op <code>bot</code>)</li>
+                <li>Kopieer het <b>token</b> dat je krijgt en plak het hierboven</li>
+                <li>Stuur je nieuwe bot een willekeurig berichtje</li>
+                <li>Ga naar <code>api.telegram.org/bot{TOKEN}/getUpdates</code></li>
+                <li>Kopieer het getal achter <code>"id":</code> — dat is je <b>Chat ID</b></li>
+            </ol>
+        </details>
+    </div>
+</section>
+<script>
+async function saveTelegram() {
+    const enabled = document.getElementById('telegram-enabled').checked;
+    const token = document.getElementById('telegram-token').value.trim();
+    const chatId = document.getElementById('telegram-chat-id').value.trim();
+    try {
+        const r = await fetch('/api/strategy/save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                telegram_enabled: enabled,
+                telegram_bot_token: token,
+                telegram_chat_id: chatId
+            })
+        });
+        const d = await r.json();
+        if (d.status === 'ok') apexToast('Telegram instellingen opgeslagen ✅', 'success');
+        else apexToast('Fout: ' + (d.error || d.message), 'error');
+    } catch(e) { apexToast('Fout: ' + e.message, 'error'); }
+}
+async function testTelegram() {
+    const token = document.getElementById('telegram-token').value.trim();
+    const chatId = document.getElementById('telegram-chat-id').value.trim();
+    if (!token || !chatId) { apexToast('Vul eerst Token en Chat ID in', 'warning'); return; }
+    try {
+        const r = await fetch('/api/telegram/test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token, chat_id: chatId})
+        });
+        const d = await r.json();
+        if (d.status === 'ok') apexToast('✅ Testbericht verzonden! Check je Telegram', 'success');
+        else apexToast('Fout: ' + (d.error || 'Verzenden mislukt'), 'error');
+    } catch(e) { apexToast('Fout: ' + e.message, 'error'); }
+}
+</script>
+
 <!-- Deposit Management -->
 <section class="glass-panel">
     <div class="section-header">
