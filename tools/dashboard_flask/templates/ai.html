@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}🧠 AI Copilot - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+{% block title %}🧠 AI Copilot - Bitvavo Trading Bot{% endblock %}
 
 {% block content %}
 <!-- Hero Banner -->
 <div class="glass-panel hero-banner">
     <div class="hero-content">
-        <div class="hero-subtitle">MACHINE LEARNING INTELLIGENCE</div>
-        <div class="hero-title">🧠 AI Operations Center</div>
-        <div class="hero-description">XGBoost predictions • Regime analysis • Automated parameter tuning</div>
+        <div class="hero-subtitle">MACHINE LEARNING INTELLIGENTIE</div>
+        <div class="hero-title">🧠 AI Operatiecentrum</div>
+        <div class="hero-description">XGBoost voorspellingen • Regime-analyse • Automatische parameter afstemming</div>
     </div>
 </div>
 
@@ -16,23 +16,23 @@
 <div class="hero-grid" id="ai-hero-grid">
     <div class="hero-card">
         <div class="hero-label">🤖 SUPERVISOR</div>
-        <div class="hero-value" id="hero-ai-status">Loading...</div>
+        <div class="hero-value" id="hero-ai-status">Laden...</div>
         <div class="hero-sub">AI engine status</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">💡 SUGGESTIONS</div>
+        <div class="hero-label">💡 SUGGESTIES</div>
         <div class="hero-value" id="hero-ai-suggestions">-</div>
-        <div class="hero-sub">Open proposals</div>
+        <div class="hero-sub">Openstaande voorstellen</div>
     </div>
     <div class="hero-card">
         <div class="hero-label">📊 REGIME</div>
         <div class="hero-value" id="hero-ai-regime">-</div>
-        <div class="hero-sub">Market state</div>
+        <div class="hero-sub">Markttoestand</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">🔄 AUTO-APPLY</div>
+        <div class="hero-label">🔄 AUTO-TOEPASSEN</div>
         <div class="hero-value" id="hero-ai-autoapply">-</div>
-        <div class="hero-sub">Automation mode</div>
+        <div class="hero-sub">Automatiseringsmodus</div>
     </div>
 </div>
 
@@ -40,7 +40,7 @@
 <div id="ai-content">
     <div class="loading-spinner">
         <div class="spinner"></div>
-        <p>Loading AI data...</p>
+        <p>AI data laden...</p>
     </div>
 </div>
 
@@ -298,7 +298,7 @@ function renderAIContent(data) {
     html += `
         <section class="glass-panel">
             <div class="section-header">
-                <h2>Automation controls</h2>
+                <h2>Automatiseringsbediening</h2>
             </div>
             <form id="ai-settings-form" class="automation-controls">
                 <div class="control-group">
@@ -416,10 +416,10 @@ function renderInsightsTable(insights) {
         <table class="insights-table">
             <thead>
                 <tr>
-                    <th>Market</th>
+                    <th>Markt</th>
                     <th>Score</th>
                     <th>Spread %</th>
-                    <th>Liquidity</th>
+                    <th>Liquiditeit</th>
                     <th>Volume ratio</th>
                 </tr>
             </thead>
@@ -499,11 +499,11 @@ function renderMLMetrics(mlMetrics) {
     let html = `
         <section class="glass-panel">
             <div class="section-header">
-                <h2>📊 ML Signal Distribution</h2>
+                <h2>📊 ML Signaalverdeling</h2>
             </div>
             <div class="ml-metrics-grid">
                 <div class="ai-metric-card">
-                    <div class="ai-metric-label">Model Accuracy</div>
+                    <div class="ai-metric-label">Model Nauwkeurigheid</div>
                     <div class="ai-metric-value">${(accuracy * 100).toFixed(1)}%</div>
                 </div>
                 <div class="ai-metric-card">
@@ -529,13 +529,13 @@ function renderMLMetrics(mlMetrics) {
         
         if (features.length > 0) {
             html += `
-                <h4 style="margin: 1.5rem 0 0.5rem;">Top Feature Importance</h4>
+                <h4 style="margin: 1.5rem 0 0.5rem;">Top Feature Belang</h4>
                 <table class="feature-importance-table">
                     <thead>
                         <tr>
                             <th>Feature</th>
-                            <th>Importance</th>
-                            <th width="200">Bar</th>
+                            <th>Belang</th>
+                            <th width="200">Balk</th>
                         </tr>
                     </thead>
                     <tbody>

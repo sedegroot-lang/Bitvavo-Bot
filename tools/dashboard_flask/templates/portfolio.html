@@ -6,29 +6,29 @@
 <!-- Hero Metrics Grid - Premium Design -->
 <div class="hero-grid">
     <div class="hero-card">
-        <div class="hero-label">Total Deposited</div>
+        <div class="hero-label">Totaal Gestort</div>
         <div class="hero-value" id="hero-total-deposited">€{{ "%.2f"|format(totals.total_deposited) }}</div>
-        <div class="hero-sub">Deposits on Bitvavo</div>
+        <div class="hero-sub">Stortingen op Bitvavo</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">Account Value</div>
+        <div class="hero-label">Account Waarde</div>
         <div class="hero-value" id="hero-account-value">€{{ "%.2f"|format(totals.account_value) }}</div>
-        <div class="hero-sub">Positions + EUR balance</div>
+        <div class="hero-sub">Posities + EUR saldo</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">Realized P/L</div>
+        <div class="hero-label">Gerealiseerde W/V</div>
         <div class="hero-value {% if totals.real_profit >= 0 %}text-success{% else %}text-danger{% endif %}" id="hero-real-profit">{% if totals.real_profit >= 0 %}+{% endif %}€{{ "%.2f"|format(totals.real_profit) }}</div>
-        <div class="hero-sub" id="hero-real-profit-pct">{{ "%.2f"|format(totals.real_profit_pct) }}% return</div>
+        <div class="hero-sub" id="hero-real-profit-pct">{{ "%.2f"|format(totals.real_profit_pct) }}% rendement</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">Available</div>
+        <div class="hero-label">Beschikbaar</div>
         <div class="hero-value" id="hero-eur-balance">€{{ "%.2f"|format(totals.eur_balance) }}</div>
-        <div class="hero-sub">Ready for entries</div>
+        <div class="hero-sub">Klaar voor nieuwe trades</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">Position Value</div>
+        <div class="hero-label">Positie Waarde</div>
         <div class="hero-value" id="hero-total-current">€{{ "%.2f"|format(totals.total_current) }}</div>
-        <div class="hero-sub" id="hero-trade-count">{{ totals.trade_count }} active positions</div>
+        <div class="hero-sub" id="hero-trade-count">{{ totals.trade_count }} actieve posities</div>
     </div>
 </div>
 
@@ -45,7 +45,7 @@
         <div class="status-card-icon">◎</div>
         <div class="status-card-content">
             <div class="status-card-title">AI Supervisor</div>
-            <div class="status-card-status">{% if ai_running %}Active{% else %}Inactive{% endif %}</div>
+            <div class="status-card-status">{% if ai_running %}Actief{% else %}Inactief{% endif %}</div>
         </div>
     </div>
     <div class="status-card status-info">
@@ -58,7 +58,7 @@
     <div class="status-card status-info">
         <div class="status-card-icon">◈</div>
         <div class="status-card-content">
-            <div class="status-card-title">EUR Balance</div>
+            <div class="status-card-title">EUR Saldo</div>
             <div class="status-card-status" id="status-eur-balance">€{{ "%.2f"|format((heartbeat.eur_balance if heartbeat else 0) or 0) }}</div>
         </div>
     </div>
@@ -144,8 +144,8 @@
     <div class="trade-readiness-header">
         <span class="readiness-icon">{{ trade_readiness.icon if trade_readiness else '○' }}</span>
         <div class="readiness-info">
-            <span class="readiness-label" data-label-color="{{ trade_readiness.color if trade_readiness else '#94a3b8' }}">{{ trade_readiness.label if trade_readiness else 'Status Unknown' }}</span>
-            <span class="readiness-message">{{ trade_readiness.message if trade_readiness else 'Bot inactive or data unavailable' }}</span>
+            <span class="readiness-label" data-label-color="{{ trade_readiness.color if trade_readiness else '#94a3b8' }}">{{ trade_readiness.label if trade_readiness else 'Status Onbekend' }}</span>
+            <span class="readiness-message">{{ trade_readiness.message if trade_readiness else 'Bot inactief of data niet beschikbaar' }}</span>
         </div>
     </div>
     {% if trade_readiness and trade_readiness.details and trade_readiness.details|length > 0 %}
@@ -201,16 +201,16 @@
 
 <!-- Trade Cards Grid -->
 <div class="section-header">
-    <h2>Open Positions</h2>
+    <h2>Open Posities</h2>
     <div class="section-controls">
-        <span class="badge">{{ cards|length }} active</span>
+        <span class="badge">{{ cards|length }} actief</span>
         <div class="sort-controls">
-            <label class="sort-label">Sort:</label>
-            <select id="sort-trades" class="form-select form-select-sm" onchange="sortTradeCards(this.value)" aria-label="Sort trades">
-                <option value="pnl-pct-desc" selected>P/L % (High → Low)</option>
-                <option value="pnl-desc">P/L (High → Low)</option>
-                <option value="pnl-asc">P/L (Low → High)</option>
-                <option value="value-desc">Value (High → Low)</option>
+            <label class="sort-label">Sorteer:</label>
+            <select id="sort-trades" class="form-select form-select-sm" onchange="sortTradeCards(this.value)" aria-label="Sorteer trades">
+                <option value="pnl-pct-desc" selected>W/V % (Hoog → Laag)</option>
+                <option value="pnl-desc">W/V (Hoog → Laag)</option>
+                <option value="pnl-asc">W/V (Laag → Hoog)</option>
+                <option value="value-desc">Waarde (Hoog → Laag)</option>
                 <option value="symbol-asc">Asset (A-Z)</option>
             </select>
         </div>
@@ -528,11 +528,11 @@
 <!-- Unified Portfolio Overview -->
 <div class="glass-panel">
     <div class="section-header">
-        <h2>Portfolio Overview</h2>
+        <h2>Portfolio Overzicht</h2>
         <div class="chart-controls" style="display: flex; gap: 8px; align-items: center;">
             <button class="sort-action-btn" onclick="togglePortfolioView()" title="Switch between value and P&L view">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9-9a9 9 0 0 0-9 9m9-9v18"/></svg>
-                Switch View
+                Wissel Weergave
             </button>
         </div>
     </div>
@@ -540,13 +540,13 @@
     <div class="portfolio-charts-grid">
         <!-- Combined Value Chart -->
         <div class="chart-container" style="height: 300px; max-height: 300px; overflow: hidden;">
-            <h3>Total Portfolio Value</h3>
+            <h3>Totale Portfolio Waarde</h3>
             <canvas id="portfolio-combined-chart" style="max-height: 250px;"></canvas>
         </div>
         
         <!-- Allocation Pie Chart -->
         <div class="chart-container" style="height: 300px; max-height: 300px; overflow: hidden;">
-            <h3>Asset Allocation</h3>
+            <h3>Asset Verdeling</h3>
             <canvas id="portfolio-allocation-chart" style="max-height: 250px;"></canvas>
         </div>
     </div>
@@ -573,15 +573,15 @@
                 <td>€{{ "%.2f"|format(totals.total_current) }}</td>
             </tr>
             <tr class="{% if totals.total_pnl >= 0 %}row-positive{% else %}row-negative{% endif %}">
-                <td>Unrealized P/L</td>
+                <td>Ongerealiseerde W/V</td>
                 <td>{% if totals.total_pnl >= 0 %}+{% endif %}€{{ "%.2f"|format(totals.total_pnl) }} ({{ "%.2f"|format(totals.total_pnl_pct) }}%)</td>
             </tr>
             <tr>
-                <td>Winning Trades</td>
+                <td>Winstgevende Trades</td>
                 <td class="text-success">{{ totals.winning_trades }}</td>
             </tr>
             <tr>
-                <td>Losing Trades</td>
+                <td>Verliesgevende Trades</td>
                 <td class="text-danger">{{ totals.losing_trades }}</td>
             </tr>
         </tbody>

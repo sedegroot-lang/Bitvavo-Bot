@@ -675,11 +675,34 @@ class GridManager:
         state = self.grids[market]
         state.status = 'placing_orders'
 
+        # Check base asset balance to decide which sells we can actually place
+        base_asset = market.split('-')[0]
+        base_balance = 0.0
+        try:
+            bals = self._safe_call(self.bitvavo.balance, {'symbol': base_asset})
+            if isinstance(bals, list):
+                for b in bals:
+                    if isinstance(b, dict) and b.get('symbol') == base_asset:
+                        base_balance = float(b.get('available', 0) or 0)
+                        break
+            elif isinstance(bals, dict):
+                base_balance = float(bals.get('available', 0) or 0)
+        except Exception:
+            pass
+
         placed_count = 0
         error_count = 0
+        skipped_sells = 0
 
         for level in state.levels:
             if level.status in ('pending', 'error'):
+                # Skip sell orders if we don't hold enough base asset
+                if level.side == 'sell' and base_balance < level.amount * 0.99:
+                    level.status = 'cancelled'
+                    level.error_msg = f'No {base_asset} balance at startup; will be placed via counter-order'
+                    skipped_sells += 1
+                    continue
+
                 resp = self._place_limit_order(
                     market, level.side, level.amount, level.price
                 )
@@ -688,6 +711,8 @@ class GridManager:
                     level.status = 'placed'
                     level.placed_at = time.time()
                     placed_count += 1
+                    if level.side == 'sell':
+                        base_balance -= level.amount
                 else:
                     level.status = 'error'
                     level.error_msg = str(resp)[:200] if resp else 'No response'
@@ -695,6 +720,9 @@ class GridManager:
 
                 # Small delay between orders to respect rate limits
                 time.sleep(0.2)
+
+        if skipped_sells:
+            log(f"[Grid] {market}: skipped {skipped_sells} sells (no {base_asset} balance)", level='info')
 
         if placed_count > 0:
             state.status = 'running'
@@ -1049,17 +1077,47 @@ class GridManager:
         state.rebalance_count += 1
         state.last_rebalance = time.time()
 
-        # Place new orders
+        # Place new orders — only place buys immediately; sells wait for
+        # counter-order after a buy fills (we typically don't hold base asset)
+        base_asset = market.split('-')[0]
+        base_balance = 0.0
+        try:
+            bals = self._safe_call(self.bitvavo.balance, {'symbol': base_asset})
+            if isinstance(bals, list):
+                for b in bals:
+                    if isinstance(b, dict) and b.get('symbol') == base_asset:
+                        base_balance = float(b.get('available', 0) or 0)
+                        break
+            elif isinstance(bals, dict):
+                base_balance = float(bals.get('available', 0) or 0)
+        except Exception:
+            pass
+
         placed = 0
+        skipped_sells = 0
         for level in state.levels:
             if level.status == 'pending':
+                # Skip sell orders if we don't hold enough base asset
+                if level.side == 'sell' and base_balance < level.amount * 0.99:
+                    level.status = 'cancelled'
+                    level.error_msg = f'No {base_asset} balance at rebalance; will be placed via counter-order'
+                    skipped_sells += 1
+                    continue
                 resp = self._place_limit_order(market, level.side, level.amount, level.price)
                 if resp and isinstance(resp, dict) and resp.get('orderId'):
                     level.order_id = resp['orderId']
                     level.status = 'placed'
                     level.placed_at = time.time()
                     placed += 1
+                    if level.side == 'sell':
+                        base_balance -= level.amount  # Track remaining balance
+                else:
+                    level.status = 'error'
+                    level.error_msg = str(resp)[:200] if resp else 'No response'
                 time.sleep(0.2)
+
+        if skipped_sells:
+            log(f"[Grid] Rebalance {market}: skipped {skipped_sells} sells (no {base_asset} balance)", level='info')
 
         log(f"[Grid] Rebalanced {market}: {old_lower:.2f}-{old_upper:.2f} -> "
             f"{new_lower:.2f}-{new_upper:.2f} ({placed} orders placed)", level='info')
@@ -1314,6 +1372,27 @@ class GridManager:
                 started = self.start_grid(market)
                 results[f'start_{market}'] = started
 
+        # Step 2a: Auto-recover stopped/error grids that have trade history
+        # These were likely stopped by zombie detection or temporary API issues
+        for market, state in list(self.grids.items()):
+            if state.status in ('stopped', 'error') and state.config.enabled and state.total_trades > 0:
+                # Only retry if the grid was updated recently (last 24h) — not ancient stale grids
+                if (time.time() - state.last_update) < 86400:
+                    log(f"[Grid] Auto-recovering {market} (was {state.status}, "
+                        f"{state.total_trades} trades, profit €{state.total_profit:.4f})",
+                        level='info')
+                    current_price = self._get_current_price(market)
+                    if current_price and current_price > 0:
+                        rebal = self._rebalance_grid(market, current_price)
+                        if rebal.get('success') and rebal.get('orders_placed', 0) > 0:
+                            state.status = 'running'
+                            self._save_states()
+                            results[f'recover_{market}'] = rebal
+                            log(f"[Grid] {market} recovered: {rebal.get('orders_placed')} orders placed",
+                                level='info')
+                        else:
+                            log(f"[Grid] {market} recovery failed: {rebal}", level='warning')
+
         # Step 2b: Retry pending/error/cancelled-sell levels in running grids
         for market, state in list(self.grids.items()):
             if state.status == 'running':
@@ -1460,15 +1539,42 @@ class GridManager:
                          and all(l.status in ('pending', 'error') for l in state.levels))
             is_stale = (state.status in ('stopped', 'error') and state.last_update < cutoff)
             # Detect "zombie" grids: status=running but no active orders on exchange
+            # IMPORTANT: Don't count cancelled sells that are waiting for counter-order
+            # (these have 'balance' in their error_msg and are expected behavior)
             is_zombie = False
             if state.status == 'running':
                 placed_levels = [l for l in state.levels if l.status == 'placed' and l.order_id]
-                cancelled_levels = [l for l in state.levels if l.status == 'cancelled']
+                # Only count truly broken cancelled/error levels, not sells waiting for counter
+                real_cancelled = [l for l in state.levels
+                                  if l.status == 'cancelled'
+                                  and not (l.side == 'sell' and l.error_msg
+                                           and ('balance' in str(l.error_msg).lower()
+                                                or 'counter-order' in str(l.error_msg).lower()))]
                 error_levels = [l for l in state.levels if l.status == 'error']
-                if len(placed_levels) == 0 and (len(cancelled_levels) + len(error_levels)) > 0:
+                if len(placed_levels) == 0 and (len(real_cancelled) + len(error_levels)) > 0:
+                    # Before declaring zombie, try to restart error levels once
+                    if error_levels:
+                        log(f"[Grid] {market}: 0 placed orders with {len(error_levels)} errors, "
+                            f"attempting restart...", level='warning')
+                        restarted = 0
+                        for level in error_levels:
+                            if level.side == 'buy':  # Only retry buys
+                                resp = self._place_limit_order(market, level.side, level.amount, level.price)
+                                if resp and isinstance(resp, dict) and resp.get('orderId'):
+                                    level.order_id = resp['orderId']
+                                    level.status = 'placed'
+                                    level.placed_at = time.time()
+                                    level.error_msg = None
+                                    restarted += 1
+                                time.sleep(0.2)
+                        if restarted > 0:
+                            log(f"[Grid] {market}: restarted {restarted} buy orders", level='info')
+                            self._save_states()
+                            continue  # Skip zombie detection, we just placed orders
+
                     is_zombie = True
                     log(f"[Grid] Zombie grid detected: {market} (running but 0 placed orders, "
-                        f"{len(cancelled_levels)} cancelled, {len(error_levels)} errors)", level='warning')
+                        f"{len(real_cancelled)} cancelled, {len(error_levels)} errors)", level='warning')
             if is_broken or is_stale or is_zombie:
                 kind = 'zombie' if is_zombie else 'broken' if is_broken else 'stale'
                 log(f"[Grid] {kind.capitalize()} grid {market} paused "

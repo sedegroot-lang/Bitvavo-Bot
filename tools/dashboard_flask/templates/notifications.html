@@ -1,24 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}🔔 Notifications - Bitvavo Bot{% endblock %}
+{% block title %}🔔 Meldingen - Bitvavo Bot{% endblock %}
 
 {% block content %}
 <div class="glass-panel hero-banner">
     <div class="hero-content">
-        <h1 class="hero-title">🔔 Notifications & Alerts</h1>
+        <h1 class="hero-title">🔔 Meldingen & Waarschuwingen</h1>
         <div class="hero-tags">
-            <span class="hero-tag tag-live">🔴 Live Alerts</span>
-            <span class="hero-tag tag-charts">📋 Audit Log</span>
-            <span class="hero-tag tag-alerts">⚙️ Settings</span>
+            <span class="hero-tag tag-live">🔴 Live Meldingen</span>
+            <span class="hero-tag tag-charts">📋 Auditlog</span>
+            <span class="hero-tag tag-alerts">⚙️ Instellingen</span>
         </div>
     </div>
     <div class="hero-stats">
         <div class="hero-stat">
-            <span class="stat-label">Unread</span>
+            <span class="stat-label">Ongelezen</span>
             <span class="stat-value">{{ unread_count }}</span>
         </div>
         <div class="hero-stat">
-            <span class="stat-label">Today</span>
+            <span class="stat-label">Vandaag</span>
             <span class="stat-value">{{ today_count }}</span>
         </div>
     </div>
@@ -27,13 +27,13 @@
 <!-- Notification Settings -->
 <section class="glass-panel">
     <div class="section-header">
-        <h2>⚙️ Notification Settings</h2>
+        <h2>⚙️ Meldinginstellingen</h2>
     </div>
     
     <div class="settings-grid">
         <div class="setting-card">
             <div class="setting-header">
-                <h4>📊 Trade Alerts</h4>
+                <h4>📊 Trade Meldingen</h4>
                 <label class="toggle-switch">
                     <input type="checkbox" id="toggle-trade-alerts" checked>
                     <span class="toggle-slider"></span>
@@ -41,13 +41,13 @@
             </div>
             <div class="setting-options">
                 <label class="checkbox-label">
-                    <input type="checkbox" checked> Entry executed
+                    <input type="checkbox" checked> Instap uitgevoerd
                 </label>
                 <label class="checkbox-label">
-                    <input type="checkbox" checked> Stop-loss triggered
+                    <input type="checkbox" checked> Stop-loss geactiveerd
                 </label>
                 <label class="checkbox-label">
-                    <input type="checkbox" checked> Take-profit hit
+                    <input type="checkbox" checked> Take-profit bereikt
                 </label>
                 <label class="checkbox-label">
                     <input type="checkbox"> DCA triggers
@@ -57,7 +57,7 @@
         
         <div class="setting-card">
             <div class="setting-header">
-                <h4>🎯 Performance Alerts</h4>
+                <h4>🎯 Prestatie Meldingen</h4>
                 <label class="toggle-switch">
                     <input type="checkbox" id="toggle-performance-alerts" checked>
                     <span class="toggle-slider"></span>
@@ -65,23 +65,23 @@
             </div>
             <div class="setting-options">
                 <label class="checkbox-label">
-                    <input type="checkbox" checked> Daily P/L milestone
+                    <input type="checkbox" checked> Dagelijkse W/V mijlpaal
                 </label>
                 <label class="checkbox-label">
-                    <input type="checkbox"> Win streak (3+)
+                    <input type="checkbox"> Winstreeks (3+)
                 </label>
                 <label class="checkbox-label">
-                    <input type="checkbox"> Loss streak (3+)
+                    <input type="checkbox"> Verliesreeks (3+)
                 </label>
                 <label class="checkbox-label">
-                    <input type="checkbox" checked> Drawdown warning
+                    <input type="checkbox" checked> Drawdown waarschuwing
                 </label>
             </div>
         </div>
         
         <div class="setting-card">
             <div class="setting-header">
-                <h4>🔧 System Alerts</h4>
+                <h4>🔧 Systeem Meldingen</h4>
                 <label class="toggle-switch">
                     <input type="checkbox" id="toggle-system-alerts" checked>
                     <span class="toggle-slider"></span>
@@ -89,16 +89,16 @@
             </div>
             <div class="setting-options">
                 <label class="checkbox-label">
-                    <input type="checkbox" checked> Bot status changes
+                    <input type="checkbox" checked> Bot statuswijzigingen
                 </label>
                 <label class="checkbox-label">
-                    <input type="checkbox" checked> Connection errors
+                    <input type="checkbox" checked> Verbindingsfouten
                 </label>
                 <label class="checkbox-label">
-                    <input type="checkbox"> Balance updates
+                    <input type="checkbox"> Saldo updates
                 </label>
                 <label class="checkbox-label">
-                    <input type="checkbox" checked> Critical errors
+                    <input type="checkbox" checked> Kritieke fouten
                 </label>
             </div>
         </div>

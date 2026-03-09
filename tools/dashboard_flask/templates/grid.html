@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}📊 Grid Bot - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+{% block title %}📊 Grid Bot - Bitvavo Trading Bot{% endblock %}
 
 {% block content %}
 <!-- Hero Banner -->
 <div class="glass-panel hero-banner">
     <div class="hero-content">
-        <div class="hero-subtitle">AUTOMATED RANGE TRADING</div>
+        <div class="hero-subtitle">GEAUTOMATISEERD BEREIK HANDELEN</div>
         <div class="hero-title">Grid Bot</div>
-        <div class="hero-description">Grid trading strategies &bull; Automated buy/sell levels &bull; Range scalping</div>
+        <div class="hero-description">Grid handelsstrategieën &bull; Geautomatiseerde koop/verkoop niveaus &bull; Bereik scalping</div>
         <div class="hero-tags">
-            <span class="hero-tag tag-count">{{ active_grids|length }} active</span>
+            <span class="hero-tag tag-count">{{ active_grids|length }} actief</span>
             {% if total_grid_net_profit is defined %}
             <span class="hero-tag tag-trailing {% if total_grid_net_profit|default(0) >= 0 %}tag-profit{% else %}tag-loss{% endif %}">{{ '+' if total_grid_net_profit|default(0) >= 0 else '' }}€{{ "%.2f"|format(total_grid_net_profit|default(0)) }} net</span>
             {% endif %}
@@ -21,32 +21,32 @@
 <!-- Hero Stats Grid -->
 <div class="hero-grid">
     <div class="hero-card">
-        <div class="hero-label">ACTIVE GRIDS</div>
+        <div class="hero-label">ACTIEVE GRIDS</div>
         <div class="hero-value" id="grid-count">{{ active_grids|length }}</div>
-        <div class="hero-sub">Running strategies</div>
+        <div class="hero-sub">Lopende strategieën</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">NET PROFIT</div>
-        <div class="hero-value {% if total_grid_net_profit|default(0) >= 0 %}text-success{% else %}text-danger{% endif %}" title="Gross: €{{ '%.2f'|format(total_grid_profit|default(0)) }} − Fees: €{{ '%.4f'|format(total_grid_fees|default(0)) }}">{{ '+' if total_grid_net_profit|default(0) >= 0 else '' }}€{{ "%.2f"|format(total_grid_net_profit|default(0)) }}</div>
-        <div class="hero-sub">After fees</div>
+        <div class="hero-label">NETTO WINST</div>
+        <div class="hero-value {% if total_grid_net_profit|default(0) >= 0 %}text-success{% else %}text-danger{% endif %}" title="Bruto: €{{ '%.2f'|format(total_grid_profit|default(0)) }} − Kosten: €{{ '%.4f'|format(total_grid_fees|default(0)) }}">{{ '+' if total_grid_net_profit|default(0) >= 0 else '' }}€{{ "%.2f"|format(total_grid_net_profit|default(0)) }}</div>
+        <div class="hero-sub">Na kosten</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">FILLED ORDERS</div>
+        <div class="hero-label">GEVULDE ORDERS</div>
         <div class="hero-value">{{ filled_orders if filled_orders else '0' }}</div>
-        <div class="hero-sub">Completed trades</div>
+        <div class="hero-sub">Voltooide trades</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">AVG. GRID LEVELS</div>
+        <div class="hero-label">GEM. GRID NIVEAUS</div>
         <div class="hero-value">{{ avg_grid_levels if avg_grid_levels else '—' }}</div>
-        <div class="hero-sub">Per strategy</div>
+        <div class="hero-sub">Per strategie</div>
     </div>
 </div>
 
 <!-- Active Grids -->
 <section class="glass-panel">
     <div class="section-header">
-        <h2>Active Grid Bots</h2>
-        <span class="badge">{{ active_grids|length }} running</span>
+        <h2>Actieve Grid Bots</h2>
+        <span class="badge">{{ active_grids|length }} actief</span>
     </div>
     
     <!-- ETH-EUR Strategy Card (if available and not yet activated) -->
@@ -54,7 +54,7 @@
     <!-- DEBUG: eth_strategy IS loaded -->
     {% if 'ETH-EUR' not in (active_grids | map(attribute='market') | list) %}
     <div class="recommended-strategy glass-panel" style="background: linear-gradient(135deg, rgba(52, 152, 219, 0.1), rgba(46, 204, 113, 0.1)); border: 2px solid var(--accent-primary); margin-bottom: var(--spacing-lg);">
-        <div class="strategy-badge">🎯 RECOMMENDED STRATEGY</div>
+        <div class="strategy-badge">🎯 AANBEVOLEN STRATEGIE</div>
         <div class="strategy-header">
             <h3>{{ eth_strategy.market }} Grid Bot</h3>
             <span class="strategy-mode">{{ eth_strategy.mode|upper|replace('_', ' ') }}</span>
@@ -64,32 +64,32 @@
         </div>
         <div class="strategy-stats-grid">
             <div class="strategy-stat">
-                <div class="stat-label">💰 Investment</div>
+                <div class="stat-label">💰 Investering</div>
                 <div class="stat-value">€{{ "%.2f"|format(eth_strategy.investment.total_eur) }}</div>
                 <div class="stat-hint">{{ eth_strategy.investment.reason[:50] }}...</div>
             </div>
             <div class="strategy-stat">
-                <div class="stat-label">📊 Grid Levels</div>
+                <div class="stat-label">📊 Grid Niveaus</div>
                 <div class="stat-value">{{ eth_strategy.grid_settings.num_grids }}</div>
                 <div class="stat-hint">{{ eth_strategy.grid_settings.grid_mode|title }} spacing</div>
             </div>
             <div class="strategy-stat">
-                <div class="stat-label">📈 Price Range</div>
+                <div class="stat-label">📈 Prijsbereik</div>
                 <div class="stat-value">±{{ eth_strategy.grid_settings.range_pct }}%</div>
                 <div class="stat-hint">€{{ "%.2f"|format(eth_strategy.grid_settings.lower_price) }} - €{{ "%.2f"|format(eth_strategy.grid_settings.upper_price) }}</div>
             </div>
             <div class="strategy-stat">
-                <div class="stat-label">🎯 Est. Monthly ROI</div>
+                <div class="stat-label">🎯 Gesch. Maandelijks ROI</div>
                 <div class="stat-value text-success">+{{ "%.0f"|format(eth_strategy.expected_performance.monthly_roi_pct) }}%</div>
                 <div class="stat-hint">€{{ "%.2f"|format(eth_strategy.expected_performance.estimated_monthly_profit) }}/month</div>
             </div>
         </div>
         <div class="strategy-actions" style="display: flex; gap: var(--spacing-md); margin-top: var(--spacing-md);">
             <button class="btn btn-primary" onclick="activateETHGrid()" style="flex: 1;">
-                ⚡ Activate ETH-EUR Grid
+                ⚡ Activeer ETH-EUR Grid
             </button>
             <button class="btn btn-secondary" onclick="viewETHStrategy()">
-                📋 View Details
+                📋 Bekijk Details
             </button>
         </div>
     </div>
@@ -109,7 +109,7 @@
                         <span class="grid-mode {{ grid.mode }}">{{ grid.mode|upper }}</span>
                     </div>
                     <div class="grid-status {{ 'running' if grid.active else 'paused' }}">
-                        {{ 'Running' if grid.active else 'Paused' }}
+                        {{ 'Actief' if grid.active else 'Gepauzeerd' }}
                     </div>
                 </div>
                 
@@ -121,11 +121,11 @@
                 <!-- P&L Summary -->
                 <div class="grid-pnl-bar">
                     <div class="pnl-item">
-                        <span class="pnl-label">Invested</span>
+                        <span class="pnl-label">Geïnvesteerd</span>
                         <span class="pnl-value">€{{ "%.2f"|format(grid.investment) }}</span>
                     </div>
                     <div class="pnl-item">
-                        <span class="pnl-label">Net P&L</span>
+                        <span class="pnl-label">Netto W/V</span>
                         <span class="pnl-value pnl-highlight {{ 'text-success' if grid.net_profit >= 0 else 'text-danger' }}">{{ '+' if grid.net_profit >= 0 else '' }}€{{ "%.4f"|format(grid.net_profit) }}</span>
                     </div>
                     <div class="pnl-item">
@@ -133,11 +133,11 @@
                         <span class="pnl-value {{ 'text-success' if grid.roi_pct >= 0 else 'text-danger' }}">{{ "%.2f"|format(grid.roi_pct) }}%</span>
                     </div>
                     <div class="pnl-item pnl-detail">
-                        <span class="pnl-label">Gross</span>
+                        <span class="pnl-label">Bruto</span>
                         <span class="pnl-value">€{{ "%.4f"|format(grid.profit) }}</span>
                     </div>
                     <div class="pnl-item pnl-detail">
-                        <span class="pnl-label">Fees</span>
+                        <span class="pnl-label">Kosten</span>
                         <span class="pnl-value text-warning">−€{{ "%.4f"|format(grid.fees) }}</span>
                     </div>
                 </div>
@@ -145,15 +145,15 @@
                 <!-- Stats Grid -->
                 <div class="grid-stats">
                     <div class="grid-stat">
-                        <span class="label">Grid Lines</span>
+                        <span class="label">Grid Lijnen</span>
                         <span class="value">{{ grid.grid_count }}</span>
                     </div>
                     <div class="grid-stat">
-                        <span class="label">Placed / Filled</span>
+                        <span class="label">Geplaatst / Gevuld</span>
                         <span class="value">{{ grid.placed_orders }} / {{ grid.filled_orders_count }}</span>
                     </div>
                     <div class="grid-stat">
-                        <span class="label">Spacing</span>
+                        <span class="label">Tussenruimte</span>
                         <span class="value">€{{ "%.2f"|format(grid.spacing_eur) }} <small>({{ "%.1f"|format(grid.spacing_pct) }}%)</small></span>
                     </div>
                     <div class="grid-stat">
@@ -161,7 +161,7 @@
                         <span class="value">{{ grid.trades_executed }}</span>
                     </div>
                     <div class="grid-stat">
-                        <span class="label">Buy / Sell Value</span>
+                        <span class="label">Koop / Verkoop Waarde</span>
                         <span class="value"><span class="text-success">€{{ "%.0f"|format(grid.total_buy_value) }}</span> / <span class="text-danger">€{{ "%.0f"|format(grid.total_sell_value) }}</span></span>
                     </div>
                     <div class="grid-stat">
@@ -173,7 +173,7 @@
                 <!-- Order Detail Table -->
                 <div class="grid-orders-section">
                     <div class="orders-header" onclick="toggleOrderTable('{{ grid.market|replace('-', '_') }}')">
-                        <span>Order Details ({{ grid.levels|length }})</span>
+                        <span>Orderdetails ({{ grid.levels|length }})</span>
                         <span class="toggle-icon" id="toggle-{{ grid.market|replace('-', '_') }}">▼</span>
                     </div>
                     <div class="orders-table-wrap" id="orders-{{ grid.market|replace('-', '_') }}" style="display: none;">
@@ -181,10 +181,10 @@
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Side</th>
-                                    <th>Price</th>
-                                    <th>Amount</th>
-                                    <th>Value</th>
+                                    <th>Kant</th>
+                                    <th>Prijs</th>
+                                    <th>Aantal</th>
+                                    <th>Waarde</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -207,13 +207,13 @@
                 <!-- Actions -->
                 <div class="grid-actions">
                     <button class="btn btn-secondary btn-sm" onclick="toggleGrid('{{ grid.id }}')">
-                        {{ 'Pause' if grid.active else 'Resume' }}
+                        {{ 'Pauzeer' if grid.active else 'Hervatten' }}
                     </button>
                     <button class="btn btn-secondary btn-sm" onclick="refreshGridData('{{ grid.market }}')">
-                        Refresh
+                        Vernieuwen
                     </button>
                     <button class="btn btn-danger btn-sm" onclick="stopGrid('{{ grid.id }}')">
-                        Stop
+                        Stoppen
                     </button>
                 </div>
             </div>
@@ -221,8 +221,8 @@
         {% else %}
             <div class="empty-state">
                 <div class="empty-icon">📊</div>
-                <div class="empty-text">No active grid bots</div>
-                <div class="empty-hint">Create your first grid bot below</div>
+                <div class="empty-text">Geen actieve grid bots</div>
+                <div class="empty-hint">Maak hieronder je eerste grid bot</div>
             </div>
         {% endif %}
     </div>
@@ -231,9 +231,9 @@
 <!-- Create Grid -->
 <section class="glass-panel">
     <div class="section-header">
-        <h2>Create Grid Bot</h2>
-        <button class="btn btn-ai" onclick="getAIGridSuggestions()" title="Get AI-optimized grid settings">
-            <span class="btn-icon">🤖</span> AI Optimize
+        <h2>Grid Bot Aanmaken</h2>
+        <button class="btn btn-ai" onclick="getAIGridSuggestions()" title="Krijg AI-geoptimaliseerde grid instellingen">
+            <span class="btn-icon">🤖</span> AI Optimaliseer
         </button>
     </div>
     
@@ -241,31 +241,31 @@
     <div id="ai-suggestions-panel" class="ai-suggestions" style="display: none;">
         <div class="ai-header">
             <span class="ai-icon">🤖</span>
-            <h4>AI Grid Optimization</h4>
+            <h4>AI Grid Optimalisatie</h4>
             <button class="btn-close" onclick="closeAISuggestions()">✕</button>
         </div>
         <div id="ai-suggestions-content" class="ai-content">
-            <div class="loading-spinner">Analyzing market conditions...</div>
+            <div class="loading-spinner">Marktomstandigheden analyseren...</div>
         </div>
     </div>
     
     <form class="grid-form" id="create-grid-form">
         <div class="form-section">
-            <h4>Market & Mode</h4>
+            <h4>Markt & Modus</h4>
             <div class="form-row">
                 <div class="form-group">
-                    <label class="form-label">Market</label>
+                    <label class="form-label">Markt</label>
                     <select class="form-select" name="market" id="grid-market" required>
-                        <option value="">Select market...</option>
+                        <option value="">Selecteer markt...</option>
                         {%- for market in available_markets -%}
                         <option value="{{ market }}">{{ market }}</option>
                         {%- endfor -%}
                     </select>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Mode</label>
+                    <label class="form-label">Modus</label>
                     <select class="form-select" name="mode" required>
-                        <option value="neutral">Neutral (Range)</option>
+                        <option value="neutral">Neutraal (Bereik)</option>
                         <option value="long">Long (Bullish)</option>
                         <option value="short">Short (Bearish)</option>
                     </select>
@@ -274,28 +274,28 @@
         </div>
         
         <div class="form-section">
-            <h4>Investment & Grid Settings</h4>
+            <h4>Investering & Grid Instellingen</h4>
             <div class="form-row">
                 <div class="form-group">
-                    <label class="form-label">Investment Amount (€)</label>
+                    <label class="form-label">Investeringsbedrag (€)</label>
                     <input type="number" class="form-input" name="investment" step="0.01" min="10" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Grid Lines</label>
+                    <label class="form-label">Grid Lijnen</label>
                     <input type="number" class="form-input" name="grid_count" value="10" min="3" max="50" required>
                 </div>
             </div>
         </div>
         
         <div class="form-section">
-            <h4>Price Range</h4>
+            <h4>Prijsbereik</h4>
             <div class="form-row">
                 <div class="form-group">
-                    <label class="form-label">Lower Price (€)</label>
+                    <label class="form-label">Ondergrens (€)</label>
                     <input type="number" class="form-input" name="lower_price" id="lower-price" step="0.01" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Upper Price (€)</label>
+                    <label class="form-label">Bovengrens (€)</label>
                     <input type="number" class="form-input" name="upper_price" id="upper-price" step="0.01" required>
                 </div>
             </div>
@@ -303,13 +303,13 @@
                 <button type="button" class="btn btn-secondary btn-sm" onclick="autoRange(5)">±5%</button>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="autoRange(10)">±10%</button>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="autoRange(20)">±20%</button>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="refreshRangeFromLive()">↻ Live range</button>
-                <span class="auto-hint">from current price</span>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="refreshRangeFromLive()">↻ Live bereik</button>
+                <span class="auto-hint">vanaf huidige prijs</span>
             </div>
         </div>
         
         <div class="form-section">
-            <h4>Advanced Settings</h4>
+            <h4>Geavanceerde Instellingen</h4>
             <div class="form-row">
                 <div class="form-group">
                     <label class="form-label">Take Profit (%)</label>
@@ -324,41 +324,41 @@
         
         <!-- Preview -->
         <div class="grid-preview" id="grid-preview">
-            <h4>Grid Preview</h4>
+            <h4>Grid Voorbeeld</h4>
             <div class="preview-stats">
                 <div class="preview-stat">
-                    <span class="label">Profit per Grid</span>
+                    <span class="label">Winst per Grid</span>
                     <span class="value" id="profit-per-grid">—</span>
                 </div>
                 <div class="preview-stat">
-                    <span class="label">Amount per Grid</span>
+                    <span class="label">Bedrag per Grid</span>
                     <span class="value" id="amount-per-grid">—</span>
                 </div>
                 <div class="preview-stat">
-                    <span class="label">Grid Spacing</span>
+                    <span class="label">Grid Tussenruimte</span>
                     <span class="value" id="grid-spacing">—</span>
                 </div>
             </div>
         </div>
         
-        <button type="submit" class="btn btn-primary">Create Grid Bot</button>
+        <button type="submit" class="btn btn-primary">Grid Bot Aanmaken</button>
     </form>
 </section>
 
 <!-- Grid Performance -->
 <section class="glass-panel">
     <div class="section-header">
-        <h2>Grid Performance History</h2>
+        <h2>Grid Prestatie Geschiedenis</h2>
     </div>
     
     <table class="summary-table">
         <thead>
             <tr>
-                <th>Market</th>
-                <th>Mode</th>
-                <th>Duration</th>
+                <th>Markt</th>
+                <th>Modus</th>
+                <th>Duur</th>
                 <th>Trades</th>
-                <th>Profit</th>
+                <th>Winst</th>
                 <th>ROI</th>
                 <th>Status</th>
             </tr>
@@ -377,7 +377,7 @@
             {% else %}
             <tr>
                 <td colspan="7" class="text-center" style="color: var(--text-muted); padding: 2rem;">
-                    No grid history yet
+                    Nog geen grid geschiedenis
                 </td>
             </tr>
             {% endfor %}
@@ -895,7 +895,7 @@ document.getElementById('grid-market').addEventListener('change', async function
         currentPrice = parseFloat(data.price || 0);
         if (currentPrice > 0) {
             autoRange(lastRangePct);
-            apexToast(`Live price updated for ${market}`, 'success');
+            apexToast(`Live prijs bijgewerkt voor ${market}`, 'success');
         }
         updatePreview();
     } catch (error) {

@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}🛡️ Hedge Lab - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+{% block title %}🛡️ Hedge Lab - Bitvavo Trading Bot{% endblock %}
 
 {% block content %}
 <!-- Hero Banner - Quantum style -->
 <div class="glass-panel hero-banner">
     <div class="hero-content">
-        <div class="hero-subtitle">RISK MANAGEMENT CENTER</div>
+        <div class="hero-subtitle">RISICOBEHEER CENTRUM</div>
         <div class="hero-title">🛡️ Hedge Lab</div>
-        <div class="hero-description">Portfolio protection • Risk analysis • Hedging strategies</div>
+        <div class="hero-description">Portfoliobescherming • Risicoanalyse • Hedgingstrategieën</div>
         <div class="hero-tags">
             <span class="hero-tag tag-count">{{ hedge_count }} hedges</span>
-            <span class="hero-tag tag-trailing">€{{ "%.2f"|format(protected_value) }} protected</span>
+            <span class="hero-tag tag-trailing">€{{ "%.2f"|format(protected_value) }} beschermd</span>
         </div>
     </div>
 </div>
@@ -19,31 +19,31 @@
 <!-- Hero Stats Grid -->
 <div class="hero-grid">
     <div class="hero-card">
-        <div class="hero-label">🔒 ACTIVE HEDGES</div>
+        <div class="hero-label">🔒 ACTIEVE HEDGES</div>
         <div class="hero-value" id="hedge-count">{{ hedge_count }}</div>
-        <div class="hero-sub">Protection strategies</div>
+        <div class="hero-sub">Beschermingsstrategieën</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">💰 PROTECTED VALUE</div>
+        <div class="hero-label">💰 BESCHERMDE WAARDE</div>
         <div class="hero-value" id="protected-value">€{{ "%.2f"|format(protected_value) }}</div>
-        <div class="hero-sub">Portfolio coverage</div>
+        <div class="hero-sub">Portfolio dekking</div>
     </div>
     <div class="hero-card">
         <div class="hero-label">📉 MAX DRAWDOWN</div>
         <div class="hero-value text-danger">-{{ "%.1f"|format(max_drawdown) }}%</div>
-        <div class="hero-sub">Largest decline</div>
+        <div class="hero-sub">Grootste daling</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">⚠️ RISK LEVEL</div>
+        <div class="hero-label">⚠️ RISICONIVEAU</div>
         <div class="hero-value">{{ risk_level|upper if risk_level else 'MEDIUM' }}</div>
-        <div class="hero-sub">Overall portfolio risk</div>
+        <div class="hero-sub">Algeheel portfoliorisico</div>
     </div>
 </div>
 
 <!-- Risk Overview -->
 <section class="glass-panel">
     <div class="section-header">
-        <h2>📊 Portfolio Risk Analysis</h2>
+        <h2>📊 Portfolio Risicoanalyse</h2>
     </div>
     
     <div class="risk-cards-row">
@@ -52,7 +52,7 @@
                 <div class="gauge-fill" style="width: {{ risk_percentage }}%"></div>
             </div>
             <div class="risk-info">
-                <span class="risk-label">Overall Risk Level</span>
+                <span class="risk-label">Algeheel Risiconiveau</span>
                 <span class="risk-value">{{ risk_level|upper }}</span>
             </div>
         </div>
@@ -86,8 +86,8 @@
 <!-- Active Hedges -->
 <section class="glass-panel">
     <div class="section-header">
-        <h2>🔒 Active Hedge Positions</h2>
-        <span class="badge">{{ active_hedges|length }} active</span>
+        <h2>🔒 Actieve Hedge Posities</h2>
+        <span class="badge">{{ active_hedges|length }} actief</span>
     </div>
     
     <div class="hedge-grid">
@@ -109,33 +109,33 @@
                 <div class="hedge-body">
                     <div class="hedge-metrics">
                         <div class="hedge-metric">
-                            <span class="label">Trigger Price</span>
+                            <span class="label">Triggerprijs</span>
                             <span class="value">€{{ "%.2f"|format(hedge.trigger_price) }}</span>
                         </div>
                         <div class="hedge-metric">
-                            <span class="label">Current Price</span>
+                            <span class="label">Huidige Prijs</span>
                             <span class="value live-price" data-market="{{ hedge.market }}">
                                 €{{ "%.2f"|format(hedge.current_price) }}
                             </span>
                         </div>
                         <div class="hedge-metric">
-                            <span class="label">Distance</span>
+                            <span class="label">Afstand</span>
                             <span class="value {{ 'text-success' if hedge.distance_pct > 5 else 'text-warning' if hedge.distance_pct > 2 else 'text-danger' }}">
                                 {{ "%.1f"|format(hedge.distance_pct) }}%
                             </span>
                         </div>
                         <div class="hedge-metric">
-                            <span class="label">Protected</span>
+                            <span class="label">Beschermd</span>
                             <span class="value">€{{ "%.2f"|format(hedge.protected_value) }}</span>
                         </div>
                     </div>
                     
                     <div class="hedge-actions">
                         <button class="btn btn-secondary btn-sm" onclick="editHedge('{{ hedge.id }}')">
-                            ✏️ Edit
+                            ✏️ Bewerken
                         </button>
                         <button class="btn btn-danger btn-sm" onclick="removeHedge('{{ hedge.id }}')">
-                            🗑️ Remove
+                            🗑️ Verwijderen
                         </button>
                     </div>
                 </div>
@@ -144,8 +144,8 @@
         {% else %}
             <div class="empty-state">
                 <div class="empty-icon">🛡️</div>
-                <div class="empty-text">No active hedges</div>
-                <div class="empty-hint">Set up stop-loss or take-profit orders below</div>
+                <div class="empty-text">Geen actieve hedges</div>
+                <div class="empty-hint">Stel hieronder stop-loss of take-profit orders in</div>
             </div>
         {% endif %}
     </div>
@@ -154,7 +154,7 @@
 <!-- Create Hedge -->
 <section class="glass-panel">
     <div class="section-header">
-        <h2>➕ Create Hedge</h2>
+        <h2>➕ Hedge Aanmaken</h2>
     </div>
     
     <form class="hedge-form" id="create-hedge-form">
@@ -164,7 +164,7 @@
                 <span class="type-card">
                     <span class="type-icon">🛑</span>
                     <span class="type-name">Stop-Loss</span>
-                    <span class="type-desc">Sell if price drops below trigger</span>
+                    <span class="type-desc">Verkoop als prijs onder trigger daalt</span>
                 </span>
             </label>
             <label class="type-option">
@@ -172,7 +172,7 @@
                 <span class="type-card">
                     <span class="type-icon">🎯</span>
                     <span class="type-name">Take-Profit</span>
-                    <span class="type-desc">Sell when price reaches target</span>
+                    <span class="type-desc">Verkoop wanneer prijs doel bereikt</span>
                 </span>
             </label>
             <label class="type-option">
@@ -180,23 +180,23 @@
                 <span class="type-card">
                     <span class="type-icon">📈</span>
                     <span class="type-name">Trailing Stop</span>
-                    <span class="type-desc">Dynamic stop that follows price up</span>
+                    <span class="type-desc">Dynamische stop die prijs omhoog volgt</span>
                 </span>
             </label>
         </div>
         
         <div class="form-row">
             <div class="form-group">
-                <label class="form-label">Market</label>
+                <label class="form-label">Markt</label>
                 <select class="form-select" name="market" required>
-                    <option value="">Select position...</option>
+                    <option value="">Selecteer positie...</option>
                     {% for trade in open_trades %}
                     <option value="{{ trade.market }}">{{ trade.market }} ({{ trade.amount }})</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group">
-                <label class="form-label">Trigger Price (€)</label>
+                <label class="form-label">Triggerprijs (€)</label>
                 <input type="number" class="form-input" name="trigger_price" step="0.01" required>
             </div>
         </div>

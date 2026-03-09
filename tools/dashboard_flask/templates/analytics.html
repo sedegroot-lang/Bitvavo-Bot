@@ -1,38 +1,38 @@
 {% extends "base.html" %}
 
-{% block title %}📊 Analytics Studio - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+{% block title %}📊 Analyse - Bitvavo Trading Bot{% endblock %}
 
 {% block content %}
 <!-- Hero Banner -->
 <div class="glass-panel hero-banner">
     <div class="hero-content">
-        <div class="hero-subtitle">PERFORMANCE ANALYTICS SUITE</div>
-        <div class="hero-title">📊 Analytics Studio</div>
-        <div class="hero-description">Complete performance analysis • Risk metrics • Market statistics • Daily P/L tracking</div>
+        <div class="hero-subtitle">PRESTATIE ANALYSE SUITE</div>
+        <div class="hero-title">📊 Analyse Studio</div>
+        <div class="hero-description">Volledige prestatie-analyse • Risicometrieken • Marktstatistieken • Dagelijkse W/V tracking</div>
     </div>
 </div>
 
 <!-- Hero Stats Grid -->
 <div class="hero-grid" id="analytics-hero-grid">
     <div class="hero-card">
-        <div class="hero-label">💰 TOTAL P/L</div>
+        <div class="hero-label">💰 TOTALE W/V</div>
         <div class="hero-value" id="hero-an-pnl">-</div>
-        <div class="hero-sub">All-time result</div>
+        <div class="hero-sub">Totaalresultaat</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">🎯 WIN RATE</div>
+        <div class="hero-label">🎯 WINSTPERCENTAGE</div>
         <div class="hero-value" id="hero-an-winrate">-</div>
-        <div class="hero-sub">Success ratio</div>
+        <div class="hero-sub">Succesratio</div>
     </div>
     <div class="hero-card">
         <div class="hero-label">📈 TRADES</div>
         <div class="hero-value" id="hero-an-trades">-</div>
-        <div class="hero-sub">Total executed</div>
+        <div class="hero-sub">Totaal uitgevoerd</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">📊 PROFIT FACTOR</div>
+        <div class="hero-label">📊 WINSTFACTOR</div>
         <div class="hero-value" id="hero-an-pf">-</div>
-        <div class="hero-sub">Win/loss ratio</div>
+        <div class="hero-sub">Winst/verlies verhouding</div>
     </div>
 </div>
 
@@ -41,10 +41,10 @@
     <div class="form-group-hodl">
         <label style="font-weight: 600;">📅 Tijdsperiode</label>
         <select id="period-selector" class="form-input" onchange="loadAnalyticsData()">
-            <option value="all">All time</option>
-            <option value="7">Last 7 days</option>
-            <option value="30" selected>Last 30 days</option>
-            <option value="90">Last 90 days</option>
+            <option value="all">Alle tijd</option>
+            <option value="7">Laatste 7 dagen</option>
+            <option value="30" selected>Laatste 30 dagen</option>
+            <option value="90">Laatste 90 dagen</option>
         </select>
     </div>
 </div>
@@ -53,7 +53,7 @@
 <div id="analytics-content">
     <div class="loading-spinner">
         <div class="spinner"></div>
-        <p>Loading analytics...</p>
+        <p>Analyse laden...</p>
     </div>
 </div>
 
@@ -209,29 +209,29 @@ function renderAnalyticsContent(data) {
             </div>
             <div class="metrics-grid">
                 <div class="metric-card">
-                    <div class="metric-label">Total Trades</div>
+                    <div class="metric-label">Totale Trades</div>
                     <div class="metric-value">${data.total_trades || 0}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Win Rate</div>
+                    <div class="metric-label">Winstpercentage</div>
                     <div class="metric-value positive">${((data.win_rate || 0) * 100).toFixed(1)}%</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Total P/L</div>
+                    <div class="metric-label">Totale W/V</div>
                     <div class="metric-value ${(data.total_pnl_eur || 0) >= 0 ? 'positive' : 'negative'}">
                         €${(data.total_pnl_eur || 0).toFixed(2)}
                     </div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Profit Factor</div>
+                    <div class="metric-label">Winstfactor</div>
                     <div class="metric-value">${(data.profit_factor || 0).toFixed(2)}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Expectancy</div>
+                    <div class="metric-label">Verwachting</div>
                     <div class="metric-value">€${(data.expectancy || 0).toFixed(2)}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Avg Trade Duration</div>
+                    <div class="metric-label">Gem. Trade Duur</div>
                     <div class="metric-value" style="font-size: 1.2rem;">${formatDuration(data.avg_trade_duration || 0)}</div>
                 </div>
             </div>
@@ -243,7 +243,7 @@ function renderAnalyticsContent(data) {
     html += `
         <section class="glass-panel">
             <div class="section-header">
-                <h2>Risk Metrics</h2>
+                <h2>Risico Metrieken</h2>
             </div>
             <div class="metrics-grid">
                 <div class="metric-card">
@@ -271,39 +271,39 @@ function renderAnalyticsContent(data) {
     html += `
         <section class="glass-panel">
             <div class="section-header">
-                <h2>Win/Loss Analysis</h2>
+                <h2>Winst/Verlies Analyse</h2>
             </div>
             <div class="metrics-grid">
                 <div class="metric-card">
-                    <div class="metric-label">Winning Trades</div>
+                    <div class="metric-label">Winstgevende Trades</div>
                     <div class="metric-value positive">${data.winning_trades || 0}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Losing Trades</div>
+                    <div class="metric-label">Verliesgevende Trades</div>
                     <div class="metric-value negative">${data.losing_trades || 0}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Avg Win</div>
+                    <div class="metric-label">Gem. Winst</div>
                     <div class="metric-value positive">€${(data.avg_win || 0).toFixed(2)}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Avg Loss</div>
+                    <div class="metric-label">Gem. Verlies</div>
                     <div class="metric-value negative">€${(data.avg_loss || 0).toFixed(2)}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Best Win</div>
+                    <div class="metric-label">Beste Winst</div>
                     <div class="metric-value positive">€${(data.best_win || 0).toFixed(2)}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Worst Loss</div>
+                    <div class="metric-label">Slechtste Verlies</div>
                     <div class="metric-value negative">€${(data.worst_loss || 0).toFixed(2)}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Win Streak</div>
+                    <div class="metric-label">Winstreeks</div>
                     <div class="metric-value">${data.win_streak || 0}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Loss Streak</div>
+                    <div class="metric-label">Verliesreeks</div>
                     <div class="metric-value">${data.loss_streak || 0}</div>
                 </div>
             </div>
@@ -315,15 +315,15 @@ function renderAnalyticsContent(data) {
     html += `
         <section class="glass-panel">
             <div class="section-header">
-                <h2>Best & Worst Markets</h2>
+                <h2>Beste & Slechtste Markten</h2>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1rem 0;">
                 <div>
-                    <h4 style="color: var(--neon-green); margin-bottom: 0.5rem;">🏆 Top 5 Best Performers</h4>
+                    <h4 style="color: var(--neon-green); margin-bottom: 0.5rem;">🏆 Top 5 Beste Presteerders</h4>
                     ${renderTopMarkets(data.best_markets || [])}
                 </div>
                 <div>
-                    <h4 style="color: var(--danger); margin-bottom: 0.5rem;">📉 Top 5 Worst Performers</h4>
+                    <h4 style="color: var(--danger); margin-bottom: 0.5rem;">📉 Top 5 Slechtste Presteerders</h4>
                     ${renderTopMarkets(data.worst_markets || [])}
                 </div>
             </div>
@@ -335,7 +335,7 @@ function renderAnalyticsContent(data) {
     html += `
         <section class="glass-panel">
             <div class="section-header">
-                <h2>Market Statistics</h2>
+                <h2>Marktstatistieken</h2>
             </div>
             ${renderMarketStatsTable(data.market_stats || [])}
         </section>
@@ -346,7 +346,7 @@ function renderAnalyticsContent(data) {
     html += `
         <section class="glass-panel">
             <div class="section-header">
-                <h2>Daily P/L Performance</h2>
+                <h2>Dagelijkse W/V Prestaties</h2>
             </div>
             <div class="chart-container">
                 <canvas id="daily-pnl-chart"></canvas>
@@ -410,13 +410,13 @@ function renderMarketStatsTable(marketStats) {
         <table class="stats-table" id="market-stats-table">
             <thead>
                 <tr>
-                    <th onclick="sortMarketStats('market')">Market</th>
+                    <th onclick="sortMarketStats('market')">Markt</th>
                     <th onclick="sortMarketStats('trades')">Trades</th>
-                    <th onclick="sortMarketStats('win_rate')">Win Rate</th>
-                    <th onclick="sortMarketStats('total_pnl')">Total P/L</th>
-                    <th onclick="sortMarketStats('avg_pnl')">Avg P/L</th>
-                    <th onclick="sortMarketStats('best_trade')">Best Trade</th>
-                    <th onclick="sortMarketStats('worst_trade')">Worst Trade</th>
+                    <th onclick="sortMarketStats('win_rate')">Winstpercentage</th>
+                    <th onclick="sortMarketStats('total_pnl')">Totale W/V</th>
+                    <th onclick="sortMarketStats('avg_pnl')">Gem. W/V</th>
+                    <th onclick="sortMarketStats('best_trade')">Beste Trade</th>
+                    <th onclick="sortMarketStats('worst_trade')">Slechtste Trade</th>
                 </tr>
             </thead>
             <tbody>
@@ -492,7 +492,7 @@ function renderDailyPnlChart(dailyPnl) {
             labels: dailyPnl.map(dp => dp.date),
             datasets: [
                 {
-                    label: 'Cumulative P/L (EUR)',
+                    label: 'Cumulatieve W/V (EUR)',
                     data: cumulativePnl,
                     borderColor: '#00d4aa',
                     backgroundColor: 'rgba(0, 212, 170, 0.1)',
@@ -501,7 +501,7 @@ function renderDailyPnlChart(dailyPnl) {
                     borderWidth: 2
                 },
                 {
-                    label: 'Daily P/L (EUR)',
+                    label: 'Dagelijkse W/V (EUR)',
                     data: dailyPnl.map(dp => dp.pnl || 0),
                     type: 'bar',
                     backgroundColor: dailyPnl.map(dp => (dp.pnl || 0) >= 0 ? 'rgba(0, 212, 170, 0.5)' : 'rgba(255, 107, 107, 0.5)'),

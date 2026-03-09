@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}</title>
+    <title>{% block title %}Bitvavo Trading Bot{% endblock %}</title>
     
     <!-- Fonts - Inter for FAANG-level premium design -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -172,19 +172,19 @@
         <h1 class="quantum-title">Bitvavo Trading Bot</h1>
     </div>
 
-    <!-- Status Bar - Streamlit process status bar -->
-    <div class="status-bar-quantum" role="region" aria-label="System Status">
+    <!-- Statusbalk -->
+    <div class="status-bar-quantum" role="region" aria-label="Systeemstatus">
         <div class="status-item">
             <span class="status-dot {% if bot_running %}active{% else %}inactive{% endif %}" id="bot-dot" aria-hidden="true"></span>
             <span>Bot: <strong id="bot-status-text" aria-live="polite">{% if bot_running %}Online{% else %}Offline{% endif %}</strong></span>
         </div>
         <div class="status-item">
             <span class="status-dot {% if ai_running %}active{% else %}inactive{% endif %}" id="ai-dot" aria-hidden="true"></span>
-            <span>AI Supervisor: <strong id="ai-status-text" aria-live="polite">{% if ai_running %}Active{% else %}Inactive{% endif %}</strong></span>
+            <span>AI Supervisor: <strong id="ai-status-text" aria-live="polite">{% if ai_running %}Actief{% else %}Inactief{% endif %}</strong></span>
         </div>
         <div class="status-item">
             <span class="status-dot active" id="ws-dot" aria-hidden="true"></span>
-            <span>WebSocket: <strong id="ws-status-text" aria-live="polite">Connected</strong></span>
+            <span>WebSocket: <strong id="ws-status-text" aria-live="polite">Verbonden</strong></span>
         </div>
         <div class="status-item">
             <span>Trades: <strong id="status-trade-count" aria-live="polite">0</strong></span>
@@ -223,17 +223,17 @@
             <a href="{{ url_for('parameters') }}" class="nav-tab {% if active_tab == 'parameters' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'parameters' %}true{% else %}false{% endif %}" aria-label="Parameters tab, press 6">
                 Parameters
             </a>
-            <a href="{{ url_for('performance') }}" class="nav-tab {% if active_tab == 'performance' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'performance' %}true{% else %}false{% endif %}" aria-label="Performance tab, press 7">
-                Performance
+            <a href="{{ url_for('performance') }}" class="nav-tab {% if active_tab == 'performance' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'performance' %}true{% else %}false{% endif %}" aria-label="Prestaties tab, druk 7">
+                Prestaties
             </a>
-            <a href="{{ url_for('analytics') }}" class="nav-tab {% if active_tab == 'analytics' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'analytics' %}true{% else %}false{% endif %}" aria-label="Analytics tab, press 8">
-                Analytics
+            <a href="{{ url_for('analytics') }}" class="nav-tab {% if active_tab == 'analytics' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'analytics' %}true{% else %}false{% endif %}" aria-label="Analyse tab, druk 8">
+                Analyse
             </a>
-            <a href="{{ url_for('reports') }}" class="nav-tab {% if active_tab == 'reports' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'reports' %}true{% else %}false{% endif %}" aria-label="Reports tab, press 9">
-                Reports
+            <a href="{{ url_for('reports') }}" class="nav-tab {% if active_tab == 'reports' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'reports' %}true{% else %}false{% endif %}" aria-label="Rapporten tab, druk 9">
+                Rapporten
             </a>
-            <a href="{{ url_for('settings') }}" class="nav-tab {% if active_tab == 'settings' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'settings' %}true{% else %}false{% endif %}" aria-label="Settings tab">
-                Settings
+            <a href="{{ url_for('settings') }}" class="nav-tab {% if active_tab == 'settings' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'settings' %}true{% else %}false{% endif %}" aria-label="Instellingen tab">
+                Instellingen
             </a>
         </div>
         
@@ -264,7 +264,7 @@
         <span>Bitvavo Trading Bot • Flask v2.0 • 
         <span id="connection-status" aria-live="polite">Live</span> • 
         <span id="last-update-footer">-</span></span>
-        <span class="footer-shortcuts" style="margin-left: auto; opacity: 0.6;">Press <kbd>Ctrl+K</kbd> for commands • <kbd>?</kbd> for shortcuts</span>
+        <span class="footer-shortcuts" style="margin-left: auto; opacity: 0.6;"><kbd>Ctrl+K</kbd> commando's • <kbd>?</kbd> sneltoetsen</span>
     </footer>
 
     <!-- Custom JS -->
@@ -303,14 +303,14 @@
                 socket.on('connect', function() {
                     document.getElementById('ws-dot').classList.add('active');
                     document.getElementById('ws-dot').classList.remove('inactive');
-                    document.getElementById('ws-status-text').textContent = 'Connected';
+                    document.getElementById('ws-status-text').textContent = 'Verbonden';
                     document.getElementById('connection-status').textContent = 'Live';
                 });
                 
                 socket.on('disconnect', function() {
                     document.getElementById('ws-dot').classList.remove('active');
                     document.getElementById('ws-dot').classList.add('inactive');
-                    document.getElementById('ws-status-text').textContent = 'Disconnected';
+                    document.getElementById('ws-status-text').textContent = 'Verbroken';
                     document.getElementById('connection-status').textContent = 'Offline';
                 });
                 
@@ -337,11 +337,11 @@
                         if (data.ai_running) {
                             aiDot.classList.add('active');
                             aiDot.classList.remove('inactive');
-                            aiText.textContent = 'Active';
+                            aiText.textContent = 'Actief';
                         } else {
                             aiDot.classList.remove('active');
                             aiDot.classList.add('inactive');
-                            aiText.textContent = 'Inactive';
+                            aiText.textContent = 'Inactief';
                         }
                     }
                     

@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}📈 Performance & P/L - SVEN QUANTUM CRYPTO BOT NEXUS{% endblock %}
+{% block title %}📈 Prestaties & W/V - Bitvavo Trading Bot{% endblock %}
 
 {% block content %}
 <!-- Hero Banner - Quantum style -->
 <div class="glass-panel hero-banner">
     <div class="hero-content">
-        <div class="hero-subtitle">TRADING PERFORMANCE METRICS</div>
-        <div class="hero-title">📈 Performance & P/L</div>
-        <div class="hero-description">Complete trading analytics • Realized & unrealized P/L • Historical trends</div>
+        <div class="hero-subtitle">HANDELS PRESTATIE OVERZICHT</div>
+        <div class="hero-title">📈 Prestaties & W/V</div>
+        <div class="hero-description">Volledige handelsanalyse • Gerealiseerde & ongerealiseerde W/V • Historische trends</div>
         <div class="hero-tags">
             <span class="hero-tag tag-count">{{ total_trades if total_trades else '0' }} trades</span>
-            <span class="hero-tag tag-trailing">{{ "%.1f"|format(win_rate if win_rate else 0) }}% win rate</span>
+            <span class="hero-tag tag-trailing">{{ "%.1f"|format(win_rate if win_rate else 0) }}% winstpercentage</span>
         </div>
     </div>
 </div>
@@ -19,41 +19,41 @@
 <!-- Hero Stats Grid -->
 <div class="hero-grid">
     <div class="hero-card">
-        <div class="hero-label">💰 TOTAL P/L</div>
+        <div class="hero-label">💰 TOTALE W/V</div>
         <div class="hero-value {% if total_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">{{ '+' if total_pnl >= 0 else '' }}€{{ "%.2f"|format(total_pnl) }}</div>
-        <div class="hero-sub">Realized + Unrealized</div>
+        <div class="hero-sub">Gerealiseerd + Ongerealiseerd</div>
     </div>
     <div class="hero-card">
         <div class="hero-label">📊 ROI</div>
         <div class="hero-value {% if total_pnl_pct >= 0 %}text-success{% else %}text-danger{% endif %}">{{ '+' if total_pnl_pct >= 0 else '' }}{{ "%.2f"|format(total_pnl_pct) }}%</div>
-        <div class="hero-sub">Return on investment</div>
+        <div class="hero-sub">Rendement op investering</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">✅ REALIZED</div>
+        <div class="hero-label">✅ GEREALISEERD</div>
         <div class="hero-value {% if realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">{{ '+' if realized_pnl >= 0 else '' }}€{{ "%.2f"|format(realized_pnl) }}</div>
-        <div class="hero-sub">Closed positions</div>
+        <div class="hero-sub">Gesloten posities</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">⏳ UNREALIZED</div>
+        <div class="hero-label">⏳ ONGEREALISEERD</div>
         <div class="hero-value {% if unrealized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">{{ '+' if unrealized_pnl >= 0 else '' }}€{{ "%.2f"|format(unrealized_pnl) }}</div>
-        <div class="hero-sub">Open positions</div>
+        <div class="hero-sub">Open posities</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">💼 INVESTED</div>
+        <div class="hero-label">💼 GEÏNVESTEERD</div>
         <div class="hero-value">€{{ "%.2f"|format(total_invested) }}</div>
-        <div class="hero-sub">Total capital deployed</div>
+        <div class="hero-sub">Totaal ingezet kapitaal</div>
     </div>
 </div>
 
 <!-- Performance Overview -->
 <section class="glass-panel">
     <div class="section-header">
-        <h2>📊 Performance Overview</h2>
+        <h2>📊 Prestatie Overzicht</h2>
         <div class="time-range-selector">
-            <button class="btn btn-sm {{ 'btn-primary' if period == '24h' else 'btn-secondary' }}" onclick="changePeriod('24h')">24h</button>
+            <button class="btn btn-sm {{ 'btn-primary' if period == '24h' else 'btn-secondary' }}" onclick="changePeriod('24h')">24u</button>
             <button class="btn btn-sm {{ 'btn-primary' if period == '7d' else 'btn-secondary' }}" onclick="changePeriod('7d')">7d</button>
             <button class="btn btn-sm {{ 'btn-primary' if period == '30d' else 'btn-secondary' }}" onclick="changePeriod('30d')">30d</button>
-            <button class="btn btn-sm {{ 'btn-primary' if period == 'all' else 'btn-secondary' }}" onclick="changePeriod('all')">All</button>
+            <button class="btn btn-sm {{ 'btn-primary' if period == 'all' else 'btn-secondary' }}" onclick="changePeriod('all')">Alles</button>
         </div>
     </div>
     
@@ -61,28 +61,28 @@
         <div class="perf-metric-card">
             <div class="metric-icon">💰</div>
             <div class="metric-content">
-                <span class="metric-label">Total Invested</span>
+                <span class="metric-label">Totaal Geïnvesteerd</span>
                 <span class="metric-value">€{{ "%.2f"|format(total_invested) }}</span>
             </div>
         </div>
         <div class="perf-metric-card">
             <div class="metric-icon">📈</div>
             <div class="metric-content">
-                <span class="metric-label">Current Value</span>
+                <span class="metric-label">Huidige Waarde</span>
                 <span class="metric-value">€{{ "%.2f"|format(current_value) }}</span>
             </div>
         </div>
         <div class="perf-metric-card {{ 'positive' if realized_pnl >= 0 else 'negative' }}">
             <div class="metric-icon">✅</div>
             <div class="metric-content">
-                <span class="metric-label">Realized P/L</span>
+                <span class="metric-label">Gerealiseerde W/V</span>
                 <span class="metric-value">{{ '+' if realized_pnl >= 0 else '' }}€{{ "%.2f"|format(realized_pnl) }}</span>
             </div>
         </div>
         <div class="perf-metric-card {{ 'positive' if unrealized_pnl >= 0 else 'negative' }}">
             <div class="metric-icon">⏳</div>
             <div class="metric-content">
-                <span class="metric-label">Unrealized P/L</span>
+                <span class="metric-label">Ongerealiseerde W/V</span>
                 <span class="metric-value">{{ '+' if unrealized_pnl >= 0 else '' }}€{{ "%.2f"|format(unrealized_pnl) }}</span>
             </div>
         </div>
@@ -92,7 +92,7 @@
 <!-- P/L Chart -->
 <section class="glass-panel">
     <div class="section-header">
-        <h2>📉 P/L History</h2>
+        <h2>📉 W/V Geschiedenis</h2>
         <div class="chart-controls">
             <button class="btn btn-sm btn-secondary" onclick="toggleChartZoom()" id="zoom-toggle-btn">🔍 Zoom</button>
             <button class="btn btn-sm btn-secondary" onclick="resetChart()">↺ Reset</button>
@@ -111,7 +111,7 @@ const pnlChart = new Chart(pnlCtx, {
     data: {
         labels: {{ pnl_dates|tojson|safe if pnl_dates else '[]' }},
         datasets: [{
-            label: 'Cumulative P/L (€)',
+            label: 'Cumulatieve W/V (€)',
             data: {{ pnl_values|tojson|safe if pnl_values else '[]' }},
             borderColor: '#10B981',
             backgroundColor: 'rgba(16, 185, 129, 0.1)',
