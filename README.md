@@ -85,6 +85,7 @@ Ga naar het tabblad **⚙️ Settings**. Daar stel je in:
 | **Trailing stop %** | Wanneer winst vastzetten | 4% |
 | **DCA levels** | Hoeveel keer bijkopen bij daling | 9x |
 | **Min AI score** | Hoe zeker de AI moet zijn voor een koop | 5 |
+| **Budget verdeling** | % voor Trailing Bot vs Grid Bot | 75% / 25% |
 
 Wijzigingen worden direct opgeslagen in `config/bot_config.json`. Je hoeft de bot niet te herstarten.
 

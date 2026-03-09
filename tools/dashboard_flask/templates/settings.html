@@ -142,6 +142,70 @@
     </div>
 </section>
 
+<!-- Budget Verdeling -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>💰 Budget Verdeling</h2>
+        <div class="section-actions">
+            <button class="btn btn-primary btn-sm" onclick="saveBudgetSplit()">💾 Opslaan</button>
+        </div>
+    </div>
+    <div class="settings-section">
+        <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 16px;">
+            <div class="setting-info">
+                <h4>📊 Trailing Bot vs Grid Bot</h4>
+                <p>Verdeel je totale budget over de twee strategieën. De som is altijd 100%.</p>
+            </div>
+            {% set budget_res = config.get('BUDGET_RESERVATION', {}) %}
+            {% set cur_grid = budget_res.get('grid_pct', 25) %}
+            {% set cur_trail = budget_res.get('trailing_pct', 75) %}
+            <div style="width: 100%; max-width: 520px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; color: #8b949e;">
+                    <span>Trailing Bot: <strong id="trail-pct-label" style="color:#16c784">{{ cur_trail }}%</strong></span>
+                    <span>Grid Bot: <strong id="grid-pct-label" style="color:#6382dc">{{ cur_grid }}%</strong></span>
+                </div>
+                <!-- slider: represents grid_pct (0=all trailing, 100=all grid) -->
+                <input type="range" id="grid-pct-slider" min="0" max="100" step="5"
+                    value="{{ cur_grid }}"
+                    style="width:100%; accent-color:#6382dc; cursor:pointer;"
+                    oninput="updateBudgetLabels(this.value)">
+                <div style="display: flex; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 10px;">
+                    <div id="trail-bar" style="width:{{ cur_trail }}%; background:#16c784; transition:width 0.2s;"></div>
+                    <div id="grid-bar" style="width:{{ cur_grid }}%; background:#6382dc; transition:width 0.2s;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #6e7681; margin-top: 4px;">
+                    <span>Trailing</span><span>Gelijk</span><span>Grid</span>
+                </div>
+            </div>
+            <p style="font-size:0.78rem; color:#6e7681;">💡 Standaard: 75% Trailing / 25% Grid. Beginners: laat op standaard staan.</p>
+        </div>
+    </div>
+</section>
+<script>
+function updateBudgetLabels(gridVal) {
+    gridVal = parseInt(gridVal);
+    var trailVal = 100 - gridVal;
+    document.getElementById('trail-pct-label').textContent = trailVal + '%';
+    document.getElementById('grid-pct-label').textContent = gridVal + '%';
+    document.getElementById('trail-bar').style.width = trailVal + '%';
+    document.getElementById('grid-bar').style.width = gridVal + '%';
+}
+function saveBudgetSplit() {
+    var gridPct = parseInt(document.getElementById('grid-pct-slider').value);
+    fetch('/api/strategy/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ grid_pct: gridPct })
+    }).then(r => r.json()).then(d => {
+        if (d.status === 'ok') {
+            showToast('Budget verdeling opgeslagen ✅', 'success');
+        } else {
+            showToast('Fout: ' + (d.error || 'onbekend'), 'error');
+        }
+    }).catch(e => showToast('Netwerkfout: ' + e, 'error'));
+}
+</script>
+
 <!-- Deposit Management -->
 <section class="glass-panel">
     <div class="section-header">

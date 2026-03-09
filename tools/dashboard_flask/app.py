@@ -3373,6 +3373,20 @@ def save_strategy_parameters():
                 except (ValueError, TypeError) as e:
                     logger.warning(f"Failed to convert {form_field}: {e}")
         
+        # Budget split (BUDGET_RESERVATION nested dict)
+        if 'grid_pct' in data:
+            try:
+                grid_pct = int(data['grid_pct'])
+                grid_pct = max(0, min(100, grid_pct))
+                trailing_pct = 100 - grid_pct
+                if 'BUDGET_RESERVATION' not in config or not isinstance(config['BUDGET_RESERVATION'], dict):
+                    config['BUDGET_RESERVATION'] = {}
+                config['BUDGET_RESERVATION']['grid_pct'] = grid_pct
+                config['BUDGET_RESERVATION']['trailing_pct'] = trailing_pct
+                updated_count += 1
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Failed to convert grid_pct: {e}")
+
         # Write updated config
         write_json_compat(str(config_path), config, indent=2)
         load_config(force=True)  # Reload cached config
