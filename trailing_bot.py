@@ -3642,8 +3642,9 @@ async def open_trade_async(score, m, price_now, s_short, eur_balance, ml_info=No
             spread_pct = None
     slippage = get_expected_slippage(m, amt_eur, entry_price)
     est_slippage = slippage if slippage is not None else SLIPPAGE_PCT
-    if slippage is not None and slippage > 0.007:
-        log(f"⏭️ Slippage te groot voor {m}: {slippage*100:.2f}%")
+    max_slippage = float(CONFIG.get('MAX_SLIPPAGE_PCT', 0.05))
+    if slippage is not None and slippage > max_slippage:
+        log(f"⏭️ Slippage te groot voor {m}: {slippage*100:.2f}% (max {max_slippage*100:.1f}%)")
         _release_market(m)
         return {'buy_executed': False}
     if spread_pct is not None and spread_pct > MAX_SPREAD_PCT * 1.5:
@@ -4244,6 +4245,10 @@ if __name__ == '__main__':
     try:
         from scripts.helpers.single_instance import ensure_single_instance_or_exit  # type: ignore[import]
         ensure_single_instance_or_exit('trailing_bot.py', allow_claim=True)
+    except SystemExit as se:
+        # Log the singleton guard exit so it's visible in bot_log
+        log(f"🛑 Singleton guard: trailing_bot.py kan niet starten (exit code {se.code})", level='error')
+        raise
     except Exception:
         # Helper not available or import failed; continue without hard guard
         pass
@@ -4305,6 +4310,10 @@ if __name__ == '__main__':
         except Exception as save_err:
             log(f"Opslaan na sync faalde: {save_err}", level='error')
         log("✅ Bot netjes afgesloten.")
+    except SystemExit as se:
+        # Catch sys.exit() from signal handlers or singleton guards so we log it
+        log(f"🛑 Bot exit via SystemExit (code={se.code})", level='warning')
+        raise
     except Exception as e:
         # Log full traceback for debugging
         logging.exception(f"Bot gestopt door fout: {type(e).__name__}: {e}")
