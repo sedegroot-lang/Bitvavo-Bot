@@ -49,7 +49,7 @@ LIMITS = {
     # MAX_TOTAL_EXPOSURE_EUR: removed from AI control — managed manually at 9999
 
     # Trade management
-    'MAX_OPEN_TRADES': {'min': 2, 'max': 6, 'max_delta': 1},
+    'MAX_OPEN_TRADES': {'min': 3, 'max': 6, 'max_delta': 1},  # FLOOR=3, never reduce below 3
     'MIN_SCORE_TO_BUY': {'min': 6.0, 'max': 11.0, 'max_delta': 0.5},
     'OPEN_TRADE_COOLDOWN_SECONDS': {'min': 0, 'max': 3600, 'max_delta': 600},
 

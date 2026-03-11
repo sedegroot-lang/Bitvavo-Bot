@@ -125,6 +125,12 @@ def load_config() -> dict:
     # Sync individual TP keys → arrays (fix AI→bot sync bug)
     _sync_tp_keys(cfg)
 
+    # HARD FLOOR: MAX_OPEN_TRADES must NEVER be below 3
+    _mot = cfg.get('MAX_OPEN_TRADES')
+    if _mot is not None and int(_mot) < 3:
+        log(f"HARD GUARD: MAX_OPEN_TRADES={_mot} < 3 — forced to 3", level='warning')
+        cfg['MAX_OPEN_TRADES'] = 3
+
     # Validate config against schema
     try:
         from modules.config_schema import validate_config as _validate
@@ -197,6 +203,9 @@ def _sync_overrides(config: dict) -> None:
                     changed = True
 
         if changed:
+            # HARD FLOOR: never write MAX_OPEN_TRADES < 3 to overrides
+            if overrides.get('MAX_OPEN_TRADES') is not None and int(overrides['MAX_OPEN_TRADES']) < 3:
+                overrides['MAX_OPEN_TRADES'] = 3
             tmp = override_path + '.tmp'
             with open(tmp, 'w', encoding='utf-8') as f:
                 json.dump(overrides, f, indent=2)
@@ -215,6 +224,12 @@ def save_config(config: dict) -> None:
     if not isinstance(config, dict):
         log("Ongeldig config object (expect dict); save geannuleerd.", level='error')
         return
+
+    # HARD FLOOR: MAX_OPEN_TRADES must NEVER be saved below 3
+    _mot = config.get('MAX_OPEN_TRADES')
+    if _mot is not None and int(_mot) < 3:
+        log(f"SAVE GUARD: MAX_OPEN_TRADES={_mot} < 3 — forced to 3", level='warning')
+        config['MAX_OPEN_TRADES'] = 3
 
     # Save runtime state separately
     _save_state(config)

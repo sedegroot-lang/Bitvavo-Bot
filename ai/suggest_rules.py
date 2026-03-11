@@ -472,8 +472,8 @@ def rules_advanced_optimization(ctx: RuleCtx) -> List[Suggestion]:
                               f'win rate {win_rate:.1%}: can handle more concurrent trades')
             if s:
                 out.append(s)
-        elif win_rate < 0.40 and max_trades > 2:
-            s = _suggest_int('MAX_OPEN_TRADES', max_trades, max_trades - 1,
+        elif win_rate < 0.40 and max_trades > 3:
+            s = _suggest_int('MAX_OPEN_TRADES', max_trades, max(3, max_trades - 1),
                               f'win rate {win_rate:.1%}: focus on fewer quality trades')
             if s:
                 out.append(s)
