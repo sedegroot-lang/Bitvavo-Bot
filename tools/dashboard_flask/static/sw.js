@@ -1,11 +1,11 @@
 // Service Worker for Bitvavo Trading Bot PWA
-const CACHE_NAME = 'bitvavo-bot-v1';
+const CACHE_NAME = 'bitvavo-bot-v2';
 const STATIC_ASSETS = [
-    '/static/css/premium_trading.css',
-    '/static/css/premium_cards.css',
-    '/static/css/faang_upgrades.css',
-    '/static/css/faang_ultimate.css',
-    '/static/css/apex_design.css',
+    '/static/css/premium_trading.css?v=2',
+    '/static/css/premium_cards.css?v=2',
+    '/static/css/faang_upgrades.css?v=2',
+    '/static/css/faang_ultimate.css?v=2',
+    '/static/css/apex_design.css?v=2',
     '/static/js/dashboard.js',
     '/static/js/faang_upgrades.js',
     '/static/js/faang_ultimate.js',

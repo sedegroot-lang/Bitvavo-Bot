@@ -1112,9 +1112,8 @@ function updateCardFromData(cardEl, cardData) {
     const roiDetailEl = cardEl.querySelector(`[data-roi-detail="${cardData.market}"]`);
     if (roiDetailEl) {
         const pnlPctVal = Number(cardData.pnl_pct) || 0;
-        roiDetailEl.classList.toggle('text-success', pnlPctVal >= 0);
-        roiDetailEl.classList.toggle('text-danger', pnlPctVal < 0);
         roiDetailEl.textContent = `${pnlPctVal >= 0 ? '+' : ''}${pnlPctVal.toFixed(2)}%`;
+        roiDetailEl.style.setProperty('color', serverPnlColor, 'important');
     }
 
     const currentEl = cardEl.querySelector(`[data-current="${cardData.market}"]`);
