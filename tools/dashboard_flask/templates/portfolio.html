@@ -238,8 +238,8 @@
         
         <!-- Hero P/L - Big and Bold -->
         <div class="card-pnl-hero {% if card.pnl >= 0 %}pnl-positive{% else %}pnl-negative{% endif %}">
-            <span class="pnl-amount" data-pnl="{{ card.market }}">€{% if card.pnl >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl) }}</span>
-            <span class="pnl-percent" data-pnl-pct="{{ card.market }}">{% if card.pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl_pct) }}%</span>
+            <span class="pnl-amount" data-pnl="{{ card.market }}" style="color: {% if card.pnl >= 0 %}#16c784{% else %}#ea3943{% endif %}">€{% if card.pnl >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl) }}</span>
+            <span class="pnl-percent" data-pnl-pct="{{ card.market }}" style="color: {% if card.pnl_pct >= 0 %}#16c784{% else %}#ea3943{% endif %}; background: {% if card.pnl_pct >= 0 %}rgba(22,199,132,0.15){% else %}rgba(234,57,67,0.15){% endif %}">{% if card.pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl_pct) }}%</span>
         </div>
         
         <!-- Values Row: Invest / Nu -->
@@ -968,6 +968,8 @@ function applyTotals(totals) {
 function buildTradeCardElement(card) {
     const symbol = card.symbol || (card.market || '').split('-')[0] || 'ASSET';
     const pnlClass = (Number(card.pnl) || 0) >= 0 ? 'pnl-positive' : 'pnl-negative';
+    const pnlColor = (Number(card.pnl) || 0) >= 0 ? '#16c784' : '#ea3943';
+    const pnlBg = (Number(card.pnl) || 0) >= 0 ? 'rgba(22,199,132,0.15)' : 'rgba(234,57,67,0.15)';
     const trailingPct = clampPct(card.trailing_progress);
     const trailingFillClass = card.trailing_activated ? 'fill-active' : (trailingPct >= 80 ? 'fill-near' : trailingPct >= 50 ? 'fill-mid' : 'fill-early');
     const dcaLevel = Number(card.dca_level || 0);
@@ -1020,8 +1022,8 @@ function buildTradeCardElement(card) {
         </div>
 
         <div class="card-pnl-hero ${pnlClass}">
-            <span class="pnl-amount" data-pnl="${card.market}">${(Number(card.pnl) || 0) >= 0 ? '+' : ''}${formatEuro(card.pnl || 0)}</span>
-            <span class="pnl-percent" data-pnl-pct="${card.market}">${(Number(card.pnl_pct) || 0) >= 0 ? '+' : ''}${(Number(card.pnl_pct) || 0).toFixed(2)}%</span>
+            <span class="pnl-amount" data-pnl="${card.market}" style="color: ${pnlColor}">${(Number(card.pnl) || 0) >= 0 ? '+' : ''}${formatEuro(card.pnl || 0)}</span>
+            <span class="pnl-percent" data-pnl-pct="${card.market}" style="color: ${pnlColor}; background: ${pnlBg}">${(Number(card.pnl_pct) || 0) >= 0 ? '+' : ''}${(Number(card.pnl_pct) || 0).toFixed(2)}%</span>
         </div>
 
         <div class="card-values-row">
@@ -1089,12 +1091,10 @@ function updateCardFromData(cardEl, cardData) {
     const pnlPctEl = cardEl.querySelector(`[data-pnl-pct="${cardData.market}"]`);
     if (pnlPctEl) pnlPctEl.textContent = `${(Number(cardData.pnl_pct) || 0) >= 0 ? '+' : ''}${(Number(cardData.pnl_pct) || 0).toFixed(2)}%`;
 
-    // Update P/L color class (fix: was missing, caused stale red/green)
-    const pnlSection = cardEl.querySelector('.card-pnl-hero');
-    if (pnlSection) {
-        pnlSection.classList.remove('pnl-positive', 'pnl-negative');
-        pnlSection.classList.add(pnlVal >= 0 ? 'pnl-positive' : 'pnl-negative');
-    }
+    // NOTE: color class (pnl-positive/pnl-negative) and WINST badge are intentionally
+    // NOT updated here. They are controlled exclusively by updateTradeCards() which uses
+    // the real-time WebSocket price (price_update every 2s). This avoids the REST-poll
+    // stale-cache lag (up to 10s) causing cards to flash red on barely-profitable trades.
     // Keep ROI detail span in sync on full-card refresh
     const roiDetailEl = cardEl.querySelector(`[data-roi-detail="${cardData.market}"]`);
     if (roiDetailEl) {
@@ -1103,9 +1103,6 @@ function updateCardFromData(cardEl, cardData) {
         roiDetailEl.classList.toggle('text-danger', pnlPctVal < 0);
         roiDetailEl.textContent = `${pnlPctVal >= 0 ? '+' : ''}${pnlPctVal.toFixed(2)}%`;
     }
-    // Update WINST tag visibility
-    const winstTag = cardEl.querySelector('.tag-profit');
-    if (winstTag) winstTag.style.display = pnlVal >= 0 ? '' : 'none';
 
     const currentEl = cardEl.querySelector(`[data-current="${cardData.market}"]`);
     if (currentEl) currentEl.textContent = formatEuro(cardData.current_value || 0);
@@ -1182,11 +1179,10 @@ function handleDataSnapshot(payload) {
     if (Array.isArray(cards) && cards.length) {
         syncTradeCards(cards);
         // NOTE: Do NOT call updateTradeCards(priceMap) here.
-        // syncTradeCards → updateCardFromData already sets all colors, live prices,
-        // pnl values, and trailing bars from the authoritative server-calculated
-        // card.pnl value. A second recalculation via updateTradeCards(price*amount-invested)
-        // risks floating-point mismatch that can flip a barely-positive pnl to negative,
-        // causing the card color to oscillate red↔green on every snapshot.
+        // syncTradeCards → updateCardFromData sets text values from server-calculated data.
+        // Colors are then corrected by the next price_update WebSocket event which calls
+        // updateTradeCards() with the real-time live price — more accurate than the server's
+        // 10-second REST cache that can cause stale negative pnl on profitable trades.
     }
 }
 
@@ -2060,31 +2056,43 @@ function updateTradeCards(prices) {
             liveEl.classList.add('live-pulse');  // Add pulse animation
         }
         
+        // Determine colors once — used for ALL pnl-related elements below
+        const pnlColor = pnl >= 0 ? '#16c784' : '#ea3943';
+        const pnlBg = pnl >= 0 ? 'rgba(22,199,132,0.15)' : 'rgba(234,57,67,0.15)';
+
         const pnlEl = card.querySelector(`[data-pnl="${market}"]`);
         if (pnlEl) {
             pnlEl.textContent = `€${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`;
+            pnlEl.style.color = pnlColor;
         }
         
         const pnlPctEl = card.querySelector(`[data-pnl-pct="${market}"]`);
         if (pnlPctEl) {
             pnlPctEl.textContent = `${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%`;
+            pnlPctEl.style.color = pnlColor;
+            pnlPctEl.style.background = pnlBg;
         }
-        
+
         const currentEl = card.querySelector(`[data-current="${market}"]`);
         if (currentEl) {
             currentEl.textContent = `€${currentValue.toFixed(2)}`;
         }
-        
-        // COLOR CLASSES: intentionally NOT updated here.
-        // pnl/pnlPct recalculated from a live price can differ from the server value
-        // (e.g. invested_eur includes fees, making break-even != averaged buy_price).
-        // Colors are set authoritatively by updateCardFromData() which uses server data.
-        // That runs on: page load, socket initial_data/data_refresh, and every 30s REST poll.
-        
-        // Update ROI detail span text only (NOT color - see note above)
+
+        // COLOR: set class (for background gradient) AND inline style (override any CSS cache)
+        const pnlSection = card.querySelector('.card-pnl-hero');
+        if (pnlSection) {
+            pnlSection.classList.remove('pnl-positive', 'pnl-negative');
+            pnlSection.classList.add(pnl >= 0 ? 'pnl-positive' : 'pnl-negative');
+        }
+        // Sync WINST badge with live pnl
+        const winstTag = card.querySelector('.tag-profit');
+        if (winstTag) winstTag.style.display = pnl >= 0 ? '' : 'none';
+
+        // Update ROI detail span text + color
         const roiDetailEl = card.querySelector(`[data-roi-detail="${market}"]`);
         if (roiDetailEl) {
             roiDetailEl.textContent = `${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%`;
+            roiDetailEl.style.color = pnlColor;
         }
         
         // Update trailing progress bar (live calculation) - IMPROVED
