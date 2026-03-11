@@ -113,6 +113,7 @@ def portfolio():
         min_score_threshold = last_scan.get('min_score_threshold', 5.0)
         total_markets = last_scan.get('total_markets', 0)
         evaluated = last_scan.get('evaluated', 0)
+        pending_reservations = int(heartbeat.get('pending_reservations', 0) or 0) if heartbeat else 0
         
         blocks = []
         warnings = []
@@ -134,9 +135,30 @@ def portfolio():
                 'label': 'GEBLOKKEERD', 'message': blocks[0], 'details': blocks + warnings
             }
         elif warnings:
+            # Build informative details including scan stats
+            details = list(warnings)
+            remaining_slots = max_trades - open_count
+            available_for_trades = eur_balance - min_balance
+            if pending_reservations > 0:
+                details.append(f'🔒 {pending_reservations} market(s) gereserveerd (wordt verwerkt)')
+            if remaining_slots > 0:
+                details.append(f'{remaining_slots} slot(s) beschikbaar')
+            if available_for_trades >= base_amount:
+                details.append(f'€{available_for_trades:.2f} beschikbaar voor trades')
+            # Show scan results to explain why no trade is opening
+            if total_markets > 0:
+                if passed_min_score == 0:
+                    details.append(f'⚠️ {evaluated}/{total_markets} markets gescand, geen voldoet aan min score ({min_score_threshold})')
+                else:
+                    details.append(f'✅ {passed_min_score} market(s) voldoen aan min score ({min_score_threshold})')
+            # Determine a more descriptive message
+            if passed_min_score == 0 and total_markets > 0:
+                msg = f'Wacht op signaal — geen market scoort ≥{min_score_threshold}'
+            else:
+                msg = warnings[0]
             trade_readiness = {
                 'status': 'yellow', 'color': '#f59e0b', 'icon': '🟡',
-                'label': 'BEPERKT', 'message': warnings[0], 'details': warnings
+                'label': 'BEPERKT', 'message': msg, 'details': details
             }
         else:
             remaining_slots = max_trades - open_count

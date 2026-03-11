@@ -15,7 +15,7 @@ try:
 except Exception:
     _cfg = {}
 
-MODEL_FILE = _cfg.get("XGB_MODEL_PATH") or _cfg.get("MODEL_PATH") or "ai_xgb_model.json"
+MODEL_FILE = _cfg.get("XGB_MODEL_PATH") or _cfg.get("MODEL_PATH") or "ai/ai_xgb_model.json"
 
 # 1. Laad of genereer data
 if os.path.exists(DATA_FILE):

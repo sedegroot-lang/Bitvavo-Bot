@@ -720,6 +720,61 @@
 .tag-profit { color: #2ecc71 !important; border-color: rgba(46, 204, 113, 0.3) !important; }
 .tag-loss { color: #e74c3c !important; border-color: rgba(231, 76, 60, 0.3) !important; }
 
+/* Form Inputs – force dark theme (browser native styling overrides CSS otherwise) */
+.grid-form .form-input,
+.grid-form .form-select,
+.grid-form input[type="number"],
+.grid-form input[type="text"],
+.grid-form select {
+    background: #1a2332 !important;
+    color: #f9fafb !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 8px !important;
+    padding: 10px 12px !important;
+    font-size: 0.9rem !important;
+    font-family: inherit !important;
+    width: 100% !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+    outline: none !important;
+}
+
+.grid-form .form-input:focus,
+.grid-form .form-select:focus,
+.grid-form input[type="number"]:focus,
+.grid-form input[type="text"]:focus,
+.grid-form select:focus {
+    border-color: rgba(16, 185, 129, 0.6) !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12) !important;
+}
+
+.grid-form .form-select,
+.grid-form select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239CA3AF' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    padding-right: 32px !important;
+}
+
+.grid-form .form-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #9ca3af;
+    margin-bottom: 6px;
+}
+
+/* Chromium autofill override */
+.grid-form input:-webkit-autofill,
+.grid-form input:-webkit-autofill:hover,
+.grid-form input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #1a2332 inset !important;
+    -webkit-text-fill-color: #f9fafb !important;
+    caret-color: #f9fafb !important;
+}
+
 /* Form Sections */
 .form-section {
     margin-bottom: var(--spacing-lg);

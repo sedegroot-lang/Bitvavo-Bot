@@ -635,6 +635,7 @@
             // Animate hero values on page load
             const heroValues = document.querySelectorAll('.hero-value');
             heroValues.forEach((el, index) => {
+                if (el.classList.contains('no-animate')) return;
                 const text = el.textContent.trim();
                 const match = text.match(/([+\-€]*)([0-9.,]+)(.*)/);
                 if (!match) return;

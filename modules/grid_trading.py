@@ -327,6 +327,57 @@ class GridManager:
                 log(f"[Grid] Total EUR balance failed: {e}", level='warning')
         return 0.0
 
+    def _get_total_account_value(self) -> float:
+        """Get total account value in EUR: EUR balance + all crypto positions valued at current price.
+
+        This is the correct base for percentage-of-portfolio budget calculations.
+        Falls back to _get_total_eur_balance() if portfolio value cannot be determined.
+        """
+        eur_total = self._get_total_eur_balance()
+        crypto_value = 0.0
+
+        # Method 1: Use bot.shared exposure function (preferred, includes open trades)
+        try:
+            from bot.shared import state as _shared
+            if hasattr(_shared, 'current_open_exposure_eur') and callable(_shared.current_open_exposure_eur):
+                exp = _shared.current_open_exposure_eur(include_dust=True)
+                if exp and exp > 0:
+                    crypto_value = exp
+                    log(f"[Grid] Account value: EUR={eur_total:.2f} + crypto={crypto_value:.2f} "
+                        f"= {eur_total + crypto_value:.2f}", level='debug')
+                    return eur_total + crypto_value
+        except Exception:
+            pass
+
+        # Method 2: Sum all non-EUR balances × ticker price
+        if self.bitvavo:
+            try:
+                balances = self._safe_call(self.bitvavo.balance, {})
+                if isinstance(balances, list):
+                    for entry in balances:
+                        if not isinstance(entry, dict):
+                            continue
+                        sym = entry.get('symbol', '')
+                        if sym == 'EUR':
+                            continue
+                        avail = float(entry.get('available', 0) or 0)
+                        in_order = float(entry.get('inOrder', 0) or 0)
+                        total_coins = avail + in_order
+                        if total_coins <= 0:
+                            continue
+                        market = f"{sym}-EUR"
+                        price = self._get_current_price(market)
+                        if price and price > 0:
+                            crypto_value += total_coins * price
+            except Exception as e:
+                log(f"[Grid] Crypto valuation failed: {e}", level='warning')
+
+        total = eur_total + crypto_value
+        if total > 0:
+            log(f"[Grid] Account value: EUR={eur_total:.2f} + crypto={crypto_value:.2f} "
+                f"= {total:.2f}", level='debug')
+        return total if total > 0 else eur_total
+
     # ==================== STATE PERSISTENCE ====================
 
     def _load_states(self) -> None:
@@ -533,6 +584,15 @@ class GridManager:
         if num_grids < 3:
             num_grids = 3
 
+        # Enforce minimum order value: each grid level must be >= 5.50 EUR
+        min_order_eur = 5.50
+        while num_grids > 3 and (total_investment / num_grids) < min_order_eur:
+            num_grids -= 1
+        if (total_investment / num_grids) < min_order_eur:
+            log(f"[Grid] Cannot create grid: {total_investment:.0f} EUR / {num_grids} grids "
+                f"= {total_investment/num_grids:.2f} EUR/level < {min_order_eur} EUR min", level='error')
+            return None
+
         # Verify grid spacing exceeds fees
         spacing_pct = (upper_price - lower_price) / lower_price / (num_grids - 1)
         if spacing_pct < MIN_GRID_SPACING_PCT:
@@ -611,7 +671,11 @@ class GridManager:
                             if norm_price <= 0:
                                 continue
                             side = lvl['side']
-                            amount = lvl['amount_eur'] / norm_price
+                            amount_eur = lvl['amount_eur']
+                            # Skip levels below Bitvavo minimum order value
+                            if amount_eur < 5.0:
+                                continue
+                            amount = amount_eur / norm_price
                             norm_amount = self._normalize_amount(config.market, amount)
                             if norm_amount <= 0:
                                 continue
@@ -628,6 +692,12 @@ class GridManager:
                             return levels
             except Exception as e:
                 log(f"[Grid A-S] Fallback to static grid: {e}", level='debug')
+
+        # ── Enforce minimum order value before calculating levels ──
+        min_order_eur = 5.50
+        while n > 3 and (config.total_investment / n) < min_order_eur:
+            n -= 1
+            config.num_grids = n
 
         # ── Fallback: static arithmetic/geometric spacing ──
         if config.grid_mode == 'geometric':
@@ -1071,6 +1141,13 @@ class GridManager:
         config.lower_price = new_lower
         config.upper_price = new_upper
 
+        # Enforce minimum order value before recalculating
+        min_order_eur = 5.50
+        while config.num_grids > 3 and (config.total_investment / config.num_grids) < min_order_eur:
+            config.num_grids -= 1
+            log(f"[Grid] Rebalance {market}: reduced num_grids to {config.num_grids} "
+                f"(min order €{min_order_eur})", level='info')
+
         # Recalculate and place new levels
         new_levels = self._calculate_grid_levels(config, current_price)
         state.levels = new_levels
@@ -1476,6 +1553,10 @@ class GridManager:
                 if not candles or len(candles) < 24:
                     continue
                 adjusted = get_volatility_adjusted_num_grids(config.num_grids, candles)
+                # Enforce minimum order value: never increase num_grids beyond affordable
+                min_order_eur = 5.50
+                max_affordable_grids = max(3, int(config.total_investment / min_order_eur))
+                adjusted = min(adjusted, max_affordable_grids)
                 # Only rebalance if difference is significant (>= 2 grids)
                 if abs(adjusted - config.num_grids) >= 2:
                     old_num = config.num_grids
@@ -1608,8 +1689,9 @@ class GridManager:
         if budget_cfg.get('enabled', False):
             mode = budget_cfg.get('mode', 'static')
             if mode == 'dynamic':
-                # Dynamic: calculate grid budget as percentage of total EUR (available + inOrder)
-                total_eur = self._get_total_eur_balance()
+                # Dynamic: calculate grid budget as percentage of TOTAL ACCOUNT VALUE
+                # (EUR balance + all crypto positions valued in EUR)
+                total_eur = self._get_total_account_value()
                 grid_pct = float(budget_cfg.get('grid_pct', 40)) / 100.0
                 reserve_eur = float(budget_cfg.get('min_reserve_eur', 10))
                 grid_max_base = max(0, (total_eur - reserve_eur) * grid_pct)

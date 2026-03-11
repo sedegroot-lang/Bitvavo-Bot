@@ -659,6 +659,11 @@ def get_trade_readiness_status(config: Dict, heartbeat: Dict, trades: Dict) -> D
     scan_details.append("")
     scan_details.append("💰 **TRADING CAPACITY:**")
     
+    # Show pending reservations
+    pending_res = int(heartbeat.get('pending_reservations', 0) or 0)
+    if pending_res > 0:
+        scan_details.append(f"   🔒 Reserveringen: {pending_res} market(s) worden verwerkt")
+    
     # Check max trades
     if open_count >= max_trades:
         blocks.append(f"❌ Max trades bereikt: {open_count}/{max_trades}")
@@ -715,12 +720,18 @@ def get_trade_readiness_status(config: Dict, heartbeat: Dict, trades: Dict) -> D
             'details': scan_details,
         }
     elif warnings:
+        # Show the warning + scan reason in the message
+        warn_msg = warnings[0] if warnings else ''
+        if passed_min_score == 0 and total_markets > 0:
+            combined_msg = f'{warn_msg} · geen market scoort ≥{min_score}'
+        else:
+            combined_msg = f'{warn_msg} · {passed_min_score} market(s) beschikbaar'
         return {
             'status': 'yellow', 
             'color': '#f59e0b',
             'icon': '🟡',
             'label': 'BEPERKT',
-            'message': f'{passed_min_score} market(s) beschikbaar',
+            'message': combined_msg,
             'details': scan_details,
         }
     else:
@@ -2295,37 +2306,6 @@ def parameters():
             logger.error(f"Error fetching markets: {e}")
             available_markets = ['BTC-EUR', 'ETH-EUR', 'XRP-EUR', 'ADA-EUR', 'DOT-EUR', 'LINK-EUR']
     
-    # Strategy profiles with full data
-    strategy_profiles = [
-        {
-            'id': 'conservative',
-            'name': 'Conservative',
-            'description': 'Low risk, steady gains',
-            'active': config.get('ENTRY_STRATEGY', 'dca') == 'dca',
-            'win_rate': 75.0,
-            'avg_roi': 12.5,
-            'total_trades': 248,
-        },
-        {
-            'id': 'balanced',
-            'name': 'Balanced',
-            'description': 'Moderate risk, balanced approach',
-            'active': config.get('ENTRY_STRATEGY') == 'breakout',
-            'win_rate': 68.0,
-            'avg_roi': 28.3,
-            'total_trades': 186,
-        },
-        {
-            'id': 'aggressive',
-            'name': 'Aggressive',
-            'description': 'High risk, high reward',
-            'active': config.get('ENTRY_STRATEGY') == 'pullback',
-            'win_rate': 55.0,
-            'avg_roi': 45.7,
-            'total_trades': 124,
-        },
-    ]
-    
     # Active strategy name
     active_strategy = config.get('ENTRY_STRATEGY', 'dca').upper()
     
@@ -2350,7 +2330,6 @@ def parameters():
     return render_template('parameters.html',
         config=config,
         params=params,
-        strategy_profiles=strategy_profiles,
         active_strategy=active_strategy,
         last_modified=last_modified,
         strategies=strategies,
@@ -3040,176 +3019,6 @@ def sync_deposits():
         })
     except Exception as e:
         logger.error(f"Failed to sync deposits: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-# =====================================================
-# STRATEGY PROFILE API ENDPOINTS
-# =====================================================
-
-@app.route('/api/strategy/profiles')
-def get_strategy_profiles():
-    """Get all saved strategy profiles."""
-    try:
-        profiles_path = PROJECT_ROOT / 'config' / 'strategy_profiles.json'
-        if profiles_path.exists():
-            profiles = json.loads(profiles_path.read_text(encoding='utf-8'))
-        else:
-            # Default profiles if file doesn't exist
-            profiles = {
-                'profiles': [
-                    {
-                        'id': 'conservative',
-                        'name': 'Conservatief',
-                        'description': 'Laag risico, stabiele winst',
-                        'active': False,
-                        'settings': {
-                            'MIN_PROFIT_PCT': 0.3,
-                            'MAX_POSITION_SIZE': 25,
-                            'DCA_MAX_ORDERS': 2
-                        }
-                    },
-                    {
-                        'id': 'balanced',
-                        'name': 'Gebalanceerd',
-                        'description': 'Gemiddeld risico en rendement',
-                        'active': True,
-                        'settings': {
-                            'MIN_PROFIT_PCT': 0.5,
-                            'MAX_POSITION_SIZE': 50,
-                            'DCA_MAX_ORDERS': 3
-                        }
-                    },
-                    {
-                        'id': 'aggressive',
-                        'name': 'Agressief',
-                        'description': 'Hoog risico, hoog rendement',
-                        'active': False,
-                        'settings': {
-                            'MIN_PROFIT_PCT': 1.0,
-                            'MAX_POSITION_SIZE': 100,
-                            'DCA_MAX_ORDERS': 5
-                        }
-                    }
-                ],
-                'active_profile': 'balanced'
-            }
-            # Save default profiles
-            write_json_compat(str(profiles_path), profiles, indent=2)
-        
-        return jsonify(profiles)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/strategy/profile/<profile_id>/activate', methods=['POST'])
-def activate_strategy_profile(profile_id):
-    """Activate a strategy profile."""
-    try:
-        profiles_path = PROJECT_ROOT / 'config' / 'strategy_profiles.json'
-        
-        if not profiles_path.exists():
-            return jsonify({'error': 'Profiles file not found'}), 404
-        
-        profiles = json.loads(profiles_path.read_text(encoding='utf-8'))
-        
-        # Find and activate the profile
-        profile_found = False
-        for profile in profiles.get('profiles', []):
-            if profile['id'] == profile_id:
-                profile['active'] = True
-                profile_found = True
-                
-                # Apply profile settings to main config
-                config = load_config(force=True)
-                for key, value in profile.get('settings', {}).items():
-                    config[key] = value
-                write_json_compat(str(CONFIG_PATH), config, indent=2)
-                set_cached('config', config)
-            else:
-                profile['active'] = False
-        
-        if not profile_found:
-            return jsonify({'error': f'Profile {profile_id} not found'}), 404
-        
-        profiles['active_profile'] = profile_id
-        write_json_compat(str(profiles_path), profiles, indent=2)
-        
-        return jsonify({
-            'status': 'ok', 
-            'message': f'Profile {profile_id} activated',
-            'restart_required': True
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/strategy/profile', methods=['POST'])
-def create_strategy_profile():
-    """Create a new strategy profile."""
-    try:
-        data = request.get_json()
-        if not data or 'name' not in data:
-            return jsonify({'error': 'Profile name required'}), 400
-        
-        profiles_path = PROJECT_ROOT / 'config' / 'strategy_profiles.json'
-        
-        if profiles_path.exists():
-            profiles = json.loads(profiles_path.read_text(encoding='utf-8'))
-        else:
-            profiles = {'profiles': [], 'active_profile': None}
-        
-        # Create new profile
-        import uuid
-        new_profile = {
-            'id': data.get('id', str(uuid.uuid4())[:8]),
-            'name': data['name'],
-            'description': data.get('description', ''),
-            'active': False,
-            'settings': data.get('settings', {})
-        }
-        
-        profiles['profiles'].append(new_profile)
-        write_json_compat(str(profiles_path), profiles, indent=2)
-        
-        return jsonify({
-            'status': 'ok',
-            'message': 'Profile created',
-            'profile': new_profile
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/strategy/profile/<profile_id>', methods=['DELETE'])
-def delete_strategy_profile(profile_id):
-    """Delete a strategy profile."""
-    try:
-        profiles_path = PROJECT_ROOT / 'config' / 'strategy_profiles.json'
-        
-        if not profiles_path.exists():
-            return jsonify({'error': 'Profiles file not found'}), 404
-        
-        profiles = json.loads(profiles_path.read_text(encoding='utf-8'))
-        
-        # Find and remove the profile
-        original_count = len(profiles.get('profiles', []))
-        profiles['profiles'] = [p for p in profiles.get('profiles', []) if p['id'] != profile_id]
-        
-        if len(profiles['profiles']) == original_count:
-            return jsonify({'error': f'Profile {profile_id} not found'}), 404
-        
-        # If deleted profile was active, clear active_profile
-        if profiles.get('active_profile') == profile_id:
-            profiles['active_profile'] = None
-        
-        write_json_compat(str(profiles_path), profiles, indent=2)
-        
-        return jsonify({
-            'status': 'ok',
-            'message': f'Profile {profile_id} deleted'
-        })
-    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 

@@ -1236,8 +1236,9 @@ def main() -> None:
         print("[start_bot] Launched by automation wrapper - skipping duplicate detection.")
 
     # Single-instance check: prevent duplicate start_bot processes using mutex+PID guard
-    # DISABLED: Causes false positives when Windows mutex cleanup is slow
-    # ensure_single_instance_or_exit('start_bot.py', allow_claim=True)
+    # RE-ENABLED: Use allow_claim=False so a second launch exits cleanly
+    # instead of killing the first (which would orphan child processes).
+    ensure_single_instance_or_exit('start_bot.py', allow_claim=False)
     
     debug_log(f"main: START pid={os.getpid()}")
     try:
@@ -1350,10 +1351,15 @@ def main() -> None:
     # Re-enable auto-restart for critical processes after initial startup.
     # During the initial startup we disable auto-restart to avoid accidental
     # duplicate spawns; once processes have started we want the supervisor
-    # loop to be able to restart the trailing bot and other helpers.
+    # loop to be able to restart helpers.
+    # NOTE: trailing_bot is deliberately excluded — monitor.py is the sole
+    # restart manager for the trading bot.  Having *both* start_bot and
+    # monitor restart trailing_bot causes a dual-manager race condition
+    # where two instances fight over the singleton lock, force-killing each
+    # other in an infinite loop (exit rc=1, no traceback).
     try:
         for proc in processes:
-            if proc.name in ("trailing_bot", "monitor", "auto_backup", "ai_supervisor", "pairs_runner"):
+            if proc.name in ("monitor", "auto_backup", "ai_supervisor", "pairs_runner"):
                 proc.auto_restart = True
                 debug_log(f"main: auto_restart enabled for {proc.name}")
     except Exception:

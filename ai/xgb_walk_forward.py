@@ -42,7 +42,7 @@ except Exception:
     CONFIG = {}
 
 DATA_FILE = ROOT / "trade_features.csv"
-MODEL_FILE = CONFIG.get("XGB_MODEL_PATH") or CONFIG.get("MODEL_PATH") or "ai_xgb_model.json"
+MODEL_FILE = CONFIG.get("XGB_MODEL_PATH") or CONFIG.get("MODEL_PATH") or "ai/ai_xgb_model.json"
 METRICS_DIR = ROOT / "metrics"
 
 

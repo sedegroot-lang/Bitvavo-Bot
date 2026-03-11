@@ -238,8 +238,8 @@
         
         <!-- Hero P/L - Big and Bold -->
         <div class="card-pnl-hero {% if card.pnl >= 0 %}pnl-positive{% else %}pnl-negative{% endif %}">
-            <span class="pnl-amount" data-pnl="{{ card.market }}" style="color: {% if card.pnl >= 0 %}#16c784{% else %}#ea3943{% endif %}">€{% if card.pnl >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl) }}</span>
-            <span class="pnl-percent" data-pnl-pct="{{ card.market }}" style="color: {% if card.pnl_pct >= 0 %}#16c784{% else %}#ea3943{% endif %}; background: {% if card.pnl_pct >= 0 %}rgba(22,199,132,0.15){% else %}rgba(234,57,67,0.15){% endif %}">{% if card.pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl_pct) }}%</span>
+            <span class="pnl-amount" data-pnl="{{ card.market }}" style="color: {% if card.pnl >= 0 %}#16c784{% else %}#ea3943{% endif %} !important">€{% if card.pnl >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl) }}</span>
+            <span class="pnl-percent" data-pnl-pct="{{ card.market }}" style="color: {% if card.pnl_pct >= 0 %}#16c784{% else %}#ea3943{% endif %} !important; background: {% if card.pnl_pct >= 0 %}rgba(22,199,132,0.15){% else %}rgba(234,57,67,0.15){% endif %} !important">{% if card.pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl_pct) }}%</span>
         </div>
         
         <!-- Values Row: Invest / Nu -->
@@ -1022,8 +1022,8 @@ function buildTradeCardElement(card) {
         </div>
 
         <div class="card-pnl-hero ${pnlClass}">
-            <span class="pnl-amount" data-pnl="${card.market}" style="color: ${pnlColor}">${(Number(card.pnl) || 0) >= 0 ? '+' : ''}${formatEuro(card.pnl || 0)}</span>
-            <span class="pnl-percent" data-pnl-pct="${card.market}" style="color: ${pnlColor}; background: ${pnlBg}">${(Number(card.pnl_pct) || 0) >= 0 ? '+' : ''}${(Number(card.pnl_pct) || 0).toFixed(2)}%</span>
+            <span class="pnl-amount" data-pnl="${card.market}" style="color: ${pnlColor} !important">${(Number(card.pnl) || 0) >= 0 ? '+' : ''}${formatEuro(card.pnl || 0)}</span>
+            <span class="pnl-percent" data-pnl-pct="${card.market}" style="color: ${pnlColor} !important; background: ${pnlBg} !important">${(Number(card.pnl_pct) || 0) >= 0 ? '+' : ''}${(Number(card.pnl_pct) || 0).toFixed(2)}%</span>
         </div>
 
         <div class="card-values-row">
@@ -1091,10 +1091,23 @@ function updateCardFromData(cardEl, cardData) {
     const pnlPctEl = cardEl.querySelector(`[data-pnl-pct="${cardData.market}"]`);
     if (pnlPctEl) pnlPctEl.textContent = `${(Number(cardData.pnl_pct) || 0) >= 0 ? '+' : ''}${(Number(cardData.pnl_pct) || 0).toFixed(2)}%`;
 
-    // NOTE: color class (pnl-positive/pnl-negative) and WINST badge are intentionally
-    // NOT updated here. They are controlled exclusively by updateTradeCards() which uses
-    // the real-time WebSocket price (price_update every 2s). This avoids the REST-poll
-    // stale-cache lag (up to 10s) causing cards to flash red on barely-profitable trades.
+    // Update color class + inline style from server data.
+    // Uses setProperty('important') so inline !important beats any CSS !important rules.
+    const serverPnlColor = pnlVal >= 0 ? '#16c784' : '#ea3943';
+    const serverPnlBg = pnlVal >= 0 ? 'rgba(22,199,132,0.15)' : 'rgba(234,57,67,0.15)';
+    const pnlSection = cardEl.querySelector('.card-pnl-hero');
+    if (pnlSection) {
+        pnlSection.classList.remove('pnl-positive', 'pnl-negative');
+        pnlSection.classList.add(pnlVal >= 0 ? 'pnl-positive' : 'pnl-negative');
+    }
+    if (pnlAmount) pnlAmount.style.setProperty('color', serverPnlColor, 'important');
+    if (pnlPctEl) {
+        pnlPctEl.style.setProperty('color', serverPnlColor, 'important');
+        pnlPctEl.style.setProperty('background', serverPnlBg, 'important');
+    }
+    const winstTag = cardEl.querySelector('.tag-profit');
+    if (winstTag) winstTag.style.display = pnlVal >= 0 ? '' : 'none';
+
     // Keep ROI detail span in sync on full-card refresh
     const roiDetailEl = cardEl.querySelector(`[data-roi-detail="${cardData.market}"]`);
     if (roiDetailEl) {
@@ -2063,14 +2076,14 @@ function updateTradeCards(prices) {
         const pnlEl = card.querySelector(`[data-pnl="${market}"]`);
         if (pnlEl) {
             pnlEl.textContent = `€${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`;
-            pnlEl.style.color = pnlColor;
+            pnlEl.style.setProperty('color', pnlColor, 'important');
         }
         
         const pnlPctEl = card.querySelector(`[data-pnl-pct="${market}"]`);
         if (pnlPctEl) {
             pnlPctEl.textContent = `${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%`;
-            pnlPctEl.style.color = pnlColor;
-            pnlPctEl.style.background = pnlBg;
+            pnlPctEl.style.setProperty('color', pnlColor, 'important');
+            pnlPctEl.style.setProperty('background', pnlBg, 'important');
         }
 
         const currentEl = card.querySelector(`[data-current="${market}"]`);
@@ -2092,7 +2105,7 @@ function updateTradeCards(prices) {
         const roiDetailEl = card.querySelector(`[data-roi-detail="${market}"]`);
         if (roiDetailEl) {
             roiDetailEl.textContent = `${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%`;
-            roiDetailEl.style.color = pnlColor;
+            roiDetailEl.style.setProperty('color', pnlColor, 'important');
         }
         
         // Update trailing progress bar (live calculation) - IMPROVED

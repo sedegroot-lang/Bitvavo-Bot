@@ -4,7 +4,7 @@ from modules.logging_utils import log
 from modules.config import load_config
 from typing import Dict, Tuple, Optional
 
-DEFAULT_MODEL_PATH = "ai_xgb_model.json"
+DEFAULT_MODEL_PATH = "ai/ai_xgb_model.json"
 
 # Allow overriding model path via config with backward compatibility for legacy key
 try:

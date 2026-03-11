@@ -8,9 +8,8 @@
     <div class="hero-content">
         <div class="hero-subtitle">BOT CONFIGURATION CENTER</div>
         <div class="hero-title">⚙️ Strategie & Parameters</div>
-        <div class="hero-description">Trading strategy profiles • Parameter optimization • Risk settings</div>
+        <div class="hero-description">Parameter optimization • Risk settings</div>
         <div class="hero-tags">
-            <span class="hero-tag tag-count">{{ strategy_profiles|length if strategy_profiles else '3' }} profiles</span>
             <span class="hero-tag tag-trailing">{{ active_strategy|default('DCA Conservative', true) }}</span>
         </div>
     </div>
@@ -24,74 +23,16 @@
         <div class="hero-sub">Current profile</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">💾 PROFILES</div>
-        <div class="hero-value">{{ strategy_profiles|length if strategy_profiles else '3' }}</div>
-        <div class="hero-sub">Saved configurations</div>
-    </div>
-    <div class="hero-card">
         <div class="hero-label">📊 RISK LEVEL</div>
         <div class="hero-value">{{ risk_level if risk_level else 'MEDIUM' }}</div>
         <div class="hero-sub">Current setting</div>
     </div>
     <div class="hero-card">
         <div class="hero-label">⏰ LAST MODIFIED</div>
-        <div class="hero-value" id="last-modified">{{ last_modified|default('Today', true) }}</div>
+        <div class="hero-value no-animate" id="last-modified">{{ last_modified|default('Today', true) }}</div>
         <div class="hero-sub">Configuration change</div>
     </div>
 </div>
-
-<!-- Strategy Profiles -->
-<section class="glass-panel">
-    <div class="section-header">
-        <h2>📋 Strategy Profiles</h2>
-        <button class="btn btn-primary btn-sm" onclick="createProfile()">➕ New Profile</button>
-    </div>
-    
-    <div class="profiles-grid">
-        {% for profile in strategy_profiles %}
-        <div class="profile-card {{ 'active' if profile.active }}">
-            <div class="profile-header">
-                <div class="profile-info">
-                    <h3>{{ profile.name }}</h3>
-                    <span class="profile-desc">{{ profile.description }}</span>
-                </div>
-                {% if profile.active %}
-                <span class="active-badge">✅ Active</span>
-                {% endif %}
-            </div>
-            <div class="profile-stats">
-                <div class="profile-stat">
-                    <span class="label">Win Rate</span>
-                    <span class="value">{{ "%.1f"|format(profile.win_rate|default(0, true)) }}%</span>
-                </div>
-                <div class="profile-stat">
-                    <span class="label">Avg ROI</span>
-                    <span class="value">{{ "%.2f"|format(profile.avg_roi|default(0, true)) }}%</span>
-                </div>
-                <div class="profile-stat">
-                    <span class="label">Trades</span>
-                    <span class="value">{{ profile.total_trades|default(0, true) }}</span>
-                </div>
-            </div>
-            <div class="profile-actions">
-                {% if not profile.active %}
-                <button class="btn btn-primary btn-sm" onclick="activateProfile('{{ profile.id }}')">
-                    ✅ Activate
-                </button>
-                {% endif %}
-                <button class="btn btn-secondary btn-sm" onclick="editProfile('{{ profile.id }}')">
-                    ✏️ Edit
-                </button>
-                <button class="btn btn-danger btn-sm" onclick="deleteProfile('{{ profile.id }}')">
-                    🗑️ Delete
-                </button>
-            </div>
-        </div>
-        {% else %}
-        <div class="empty-state">No strategy profiles found. Create one to get started.</div>
-        {% endfor %}
-    </div>
-</section>
 
 <form class="params-form" id="strategy-form">
 <!-- Bot Identification & Core Settings -->
@@ -1958,74 +1899,6 @@ document.getElementById('strategy-form').addEventListener('submit', async functi
         showNotification('⚠️ Error saving parameters: ' + error.message, 'error');
     }
 });
-
-// Profile management
-async function createProfile() {
-    const name = await apexPrompt('Nieuw profiel', 'Profielnaam:', '', 'Mijn strategie');
-    if (!name || name.trim() === '') return;
-    
-    const description = await apexPrompt('Beschrijving', 'Profielbeschrijving (optioneel):', 'Custom profile');
-    
-    apexToast('Profiel wordt aangemaakt...', 'info', 2000);
-    
-    fetch('/api/strategy/profile', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            name: name.trim(),
-            description: description.trim()
-        })
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.status === 'ok') {
-            showNotification('✅ Profile created!', 'success');
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            showNotification('❌ ' + (result.error || 'Failed to create profile'), 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Create profile error:', error);
-        showNotification('⚠️ Error: ' + error.message, 'error');
-    });
-}
-
-function activateProfile(id) {
-    showNotification('Activating profile...', 'info');
-    
-    fetch('/api/strategy/profile/' + id + '/activate', {
-        method: 'POST'
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.status === 'ok') {
-            showNotification('✅ Profile activated!', 'success');
-            if (result.restart_required) {
-                showNotification('⚠️ Bot restart required for changes to take effect', 'info');
-            }
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            showNotification('❌ ' + (result.error || 'Failed to activate'), 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Activate error:', error);
-        showNotification('⚠️ Error: ' + error.message, 'error');
-    });
-}
-
-function editProfile(id) {
-    location.href = '/parameters?edit=' + id;
-}
-
-async function deleteProfile(id) {
-    const ok = await apexConfirm('Profiel verwijderen', 'Weet je zeker dat je dit profiel wilt verwijderen?');
-    if (ok) {
-        fetch('/api/strategy/profile/' + id, {method: 'DELETE'})
-            .then(r => r.ok && location.reload());
-    }
-}
 
 // Reset defaults
 async function resetDefaults() {

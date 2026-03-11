@@ -301,7 +301,7 @@ def monitor_loop():
             return True
         return True
 
-    ensure_single_instance_or_exit('monitor')
+    ensure_single_instance_or_exit('monitor.py')
 
     # PID-file handling
     try:
