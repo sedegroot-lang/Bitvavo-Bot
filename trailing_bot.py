@@ -3712,6 +3712,10 @@ async def open_trade_async(score, m, price_now, s_short, eur_balance, ml_info=No
                 and _compute_trade_value_eur(mk, t)[0] >= (DUST_TRADE_THRESHOLD_EUR or 0)
             )
             _prebuy_reserved = _get_pending_count()
+            # Subtract our OWN reservation — we reserved this market ourselves earlier,
+            # so it should not block us from buying it.
+            if _is_market_reserved(m):
+                _prebuy_reserved = max(0, _prebuy_reserved - 1)
             _prebuy_total = _prebuy_current + _prebuy_reserved
             if _prebuy_total >= _prebuy_max and m not in open_trades:
                 log(f"🚫 PRE-BUY LOCK CHECK: cap bereikt ({_prebuy_current}+{_prebuy_reserved}/{_prebuy_max}), "
@@ -3898,19 +3902,41 @@ async def open_trade_async(score, m, price_now, s_short, eur_balance, ml_info=No
                                      if _compute_trade_value_eur(mk, t)[0] is not None
                                      and _compute_trade_value_eur(mk, t)[0] >= (DUST_TRADE_THRESHOLD_EUR or 0))
             reserved = _get_pending_count()
+            # Subtract our OWN reservation — same fix as PRE-BUY check
+            if _is_market_reserved(m):
+                reserved = max(0, reserved - 1)
             if (current_under_lock + reserved) >= max_trades and m not in open_trades:
-                log(f"🚫 ATOMIC race guard: cap bereikt na koop ({current_under_lock}+{reserved}/{max_trades}), trade {m} NIET toevoegen — CANCELLING order", level='warning')
-                _release_market(m)
-                # CRITICAL FIX: Cancel the buy order on exchange to prevent sync from re-adding
-                try:
-                    if isinstance(buy_result, dict) and buy_result.get('orderId'):
-                        _cancel_order_id = buy_result['orderId']
-                        safe_call(bitvavo.cancelOrder, m, _cancel_order_id)
-                        log(f"🗑️ Cancelled orphan buy order {_cancel_order_id} for {m}", level='warning')
-                except Exception as _cancel_err:
-                    log(f"[ERROR] Could not cancel orphan order for {m}: {_cancel_err}", level='error')
-                return {'buy_executed': False}
-            open_trades[m] = new_trade
+                # Check if the order is already FILLED — if so, we MUST track it.
+                # Trying to cancel a filled order does nothing; not tracking creates orphans.
+                _order_filled = False
+                if isinstance(buy_result, dict):
+                    _order_status = str(buy_result.get('status', '')).lower()
+                    _order_filled_amt = float(buy_result.get('filledAmount', 0) or 0)
+                    _order_filled = (_order_status == 'filled' or _order_filled_amt > 0)
+
+                if _order_filled:
+                    # Order already filled — money is spent. Track it to prevent orphans.
+                    # Exceeding MAX_OPEN_TRADES by 1 is far better than losing track of real money.
+                    log(f"⚠️ ATOMIC race guard: cap bereikt ({current_under_lock}+{reserved}/{max_trades}) "
+                        f"maar order {m} is al FILLED — trade ALSNOG toevoegen om orphan te voorkomen",
+                        level='warning')
+                    open_trades[m] = new_trade
+                    _release_market(m)
+                    # Don't return — fall through to post-trade logic below
+                else:
+                    log(f"🚫 ATOMIC race guard: cap bereikt na koop ({current_under_lock}+{reserved}/{max_trades}), "
+                        f"trade {m} NIET toevoegen — CANCELLING order", level='warning')
+                    _release_market(m)
+                    try:
+                        if isinstance(buy_result, dict) and buy_result.get('orderId'):
+                            _cancel_order_id = buy_result['orderId']
+                            safe_call(bitvavo.cancelOrder, m, _cancel_order_id)
+                            log(f"🗑️ Cancelled unfilled buy order {_cancel_order_id} for {m}", level='warning')
+                    except Exception as _cancel_err:
+                        log(f"[ERROR] Could not cancel order for {m}: {_cancel_err}", level='error')
+                    return {'buy_executed': False}
+            else:
+                open_trades[m] = new_trade
             try:
                 if watch_cfg['enabled'] and is_watchlist_market(m):
                     open_trades[m]['watchlist_candidate'] = True

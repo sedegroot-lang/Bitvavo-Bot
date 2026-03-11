@@ -293,3 +293,4 @@ Also: trailing-whitespace, end-of-file-fixer, check-yaml, check-json, detect-pri
 8. **Metrics are non-blocking**: Metrics emission must never raise or block trading operations — wrap in `try/except: pass`.
 9. **Startup order matters**: `bot.api.init()` must be called before any API function. `bot.shared.init()` must be called before any extracted module accesses state.
 10. **Windows-first**: The bot runs on Windows. Use `os.replace()` not `os.rename()`. Use thread-based timeouts, not signals. Paths may contain spaces (OneDrive).
+11. **GitHub push on bug fixes**: After fixing any bug (code changes in `.py` files), always commit and push the changes to the GitHub repository. Use a descriptive commit message like `fix: <short description>`. This ensures the production bot stays in sync with the repo and fixes are not lost.

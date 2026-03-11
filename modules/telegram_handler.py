@@ -56,8 +56,16 @@ def _load_config() -> dict:
 
 
 def _save_config(cfg: dict) -> None:
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2, ensure_ascii=False)
+    try:
+        from modules.config import save_config as _real_save
+        _real_save(cfg)
+    except Exception as e:
+        logger.warning(f"[Telegram] Fallback to direct write: {e}")
+        import tempfile
+        tmp = str(CONFIG_PATH) + '.tmp'
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, str(CONFIG_PATH))
 
 
 def _reload_credentials() -> None:
