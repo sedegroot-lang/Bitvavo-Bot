@@ -965,7 +965,10 @@ def _apply_critical_suggestions(critical_list: list, cfg: dict) -> list:
                 log(f"âš ï¸  AI Config Guard [CRITICAL]: RSI_MAX_BUY={to_v} <= RSI_MIN_BUY={rsi_min} (invalid range) - skipping", level='warning')
                 continue
         
-        # MAX_OPEN_TRADES: reasonable upper bound (prevent resource exhaustion)
+        # MAX_OPEN_TRADES: bounds (min 3, max 10) - NEVER reduce below 3
+        if p == 'MAX_OPEN_TRADES' and to_v < 3:
+            log(f'AI Config Guard: MAX_OPEN_TRADES={to_v} < 3 (minimum floor) - clamped to 3', level='warning')
+            to_v = 3
         if p == 'MAX_OPEN_TRADES' and to_v > 10:
             log(f"âš ï¸  AI Config Guard [CRITICAL]: MAX_OPEN_TRADES={to_v} > 10 (too many trades) - clamped to 10", level='warning')
             to_v = 10
@@ -1200,7 +1203,10 @@ def auto_apply_if_enabled(suggestions):
                     log(f"âš ï¸  AI Config Guard: RSI_MAX_BUY={to_v} <= RSI_MIN_BUY={rsi_min} (invalid range) - skipping")
                     continue
             
-            # MAX_OPEN_TRADES: reasonable upper bound (prevent resource exhaustion)
+            # MAX_OPEN_TRADES: bounds (min 3, max 10) - NEVER reduce below 3
+            if p == 'MAX_OPEN_TRADES' and to_v < 3:
+                log(f'AI Config Guard: MAX_OPEN_TRADES={to_v} < 3 (minimum floor) - clamped to 3')
+                to_v = 3
             if p == 'MAX_OPEN_TRADES' and to_v > 10:
                 log(f"âš ï¸  AI Config Guard: MAX_OPEN_TRADES={to_v} > 10 (too many trades) - clamped to 10")
                 to_v = 10

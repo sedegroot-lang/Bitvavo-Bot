@@ -276,7 +276,7 @@ def rules_signal_optimization(ctx: RuleCtx) -> List[Suggestion]:
                 out.append(s)
         elif avg_ppt < -1.0:
             current = int(cfg.get('MAX_OPEN_TRADES', 3))
-            s = _suggest_int('MAX_OPEN_TRADES', current, max(2, current - 1),
+            s = _suggest_int('MAX_OPEN_TRADES', current, max(3, current - 1),
                               f'negative avg profit ({avg_ppt:.2f} EUR): reduce exposure')
             if s:
                 out.append(s)
@@ -671,9 +671,9 @@ def rules_market_intelligence(ctx: RuleCtx) -> List[Suggestion]:
 
         if daily_dd < -15:
             max_trades = int(cfg.get('MAX_OPEN_TRADES', 4))
-            if max_trades > 2 and _cooldown_ok('MAX_OPEN_TRADES'):
-                out.append({'param': 'MAX_OPEN_TRADES', 'from': max_trades, 'to': 2,
-                            'reason': f'ðŸš¨ CRITICAL: Daily drawdown â‚¬{daily_dd:.1f} - EMERGENCY MODE',
+            if max_trades > 3 and _cooldown_ok('MAX_OPEN_TRADES'):
+                out.append({'param': 'MAX_OPEN_TRADES', 'from': max_trades, 'to': 3,
+                            'reason': f'🚨 CRITICAL: Daily drawdown €{daily_dd:.1f} - EMERGENCY MODE',
                             'risk_level': 'CRITICAL', 'daily_dd': daily_dd})
                 _last_suggest['MAX_OPEN_TRADES'] = _utc_now()
 
@@ -737,9 +737,9 @@ def rules_market_intelligence(ctx: RuleCtx) -> List[Suggestion]:
             btc_trades = [t for t in closed_trades[-10:] if t.get('market') == 'BTC-EUR']
             if btc_trades:
                 btc_pnl = sum(t.get('profit', 0) for t in btc_trades) / len(btc_trades)
-                if btc_pnl < -5 and max_open > 2:
-                    s = _suggest_int('MAX_OPEN_TRADES', max_open, max(2, max_open - 1),
-                                      f'BTC dump detected (avg loss: â‚¬{btc_pnl:.1f}): reduce altcoin exposure',
+                if btc_pnl < -5 and max_open > 3:
+                    s = _suggest_int('MAX_OPEN_TRADES', max_open, max(3, max_open - 1),
+                                      f'BTC dump detected (avg loss: €{btc_pnl:.1f}): reduce altcoin exposure',
                                       extras={'btc_pnl': btc_pnl})
                     if s:
                         out.append(s)
