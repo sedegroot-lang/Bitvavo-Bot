@@ -184,10 +184,14 @@ def _validate_and_fix_trade_data(data: Dict[str, Any]) -> Dict[str, Any]:
                 log(f"VALIDATION FIX [{market}]: total_invested_eur={total:.2f} -> {expected_total:.2f} (initial {initial:.2f} + DCA {dca_sum:.2f})", level='warning')
                 trade['total_invested_eur'] = expected_total
                 needs_fix = True
-        if dca_buys != actual_dca_count:
+        if dca_buys < actual_dca_count:
             log(f"VALIDATION FIX [{market}]: dca_buys={dca_buys} -> {actual_dca_count} (matched to dca_events)", level='warning')
             trade['dca_buys'] = actual_dca_count
             needs_fix = True
+        elif dca_buys > actual_dca_count:
+            # dca_buys > events: events may have been lost after a sync/restart.
+            # Do NOT reset dca_buys downward — that would cause a duplicate DCA at the same level.
+            log(f"VALIDATION WARN [{market}]: dca_buys={dca_buys} > dca_events={actual_dca_count} — events possibly lost, keeping dca_buys to prevent duplicate DCA", level='warning')
         
         if needs_fix:
             fixed_count += 1
