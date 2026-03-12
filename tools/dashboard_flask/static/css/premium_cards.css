@@ -6,7 +6,7 @@
 /* Trade Cards Grid */
 .trade-cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: var(--space-md, 1rem);
     margin-bottom: var(--space-xl, 2rem);
 }
@@ -16,38 +16,38 @@
     background: linear-gradient(160deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.98) 100%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(48, 54, 61, 0.6);
-    border-radius: 16px;
+    border: 1px solid rgba(48, 54, 61, 0.5);
+    border-radius: 14px;
     overflow: hidden;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .trade-card-simple:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(79, 140, 255, 0.2), inset 0 1px 0 rgba(255,255,255,0.06);
-    border-color: rgba(79, 140, 255, 0.35);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    border-color: rgba(48, 54, 61, 0.8);
 }
 
-/* Profit/Loss border accent - driven by class set in template */
+/* Profit/Loss accent — subtle top bar only */
 .trade-card-simple.card-profit {
-    border-left: 3px solid #16c784;
+    border-top: 2px solid rgba(22, 199, 132, 0.6);
 }
 
 .trade-card-simple.card-loss {
-    border-left: 3px solid #ea3943;
+    border-top: 2px solid rgba(234, 57, 67, 0.6);
 }
 
-/* Legacy fallback selectors (keep for safety) */
+/* Legacy selectors (mapped to top accent) */
 .trade-card-simple.profit,
 .trade-card-simple[data-pnl]:not([data-pnl^="-"]):not([data-pnl=""]) {
-    border-left: 3px solid #16c784;
+    border-top: 2px solid rgba(22, 199, 132, 0.6);
 }
 
 .trade-card-simple.loss,
 .trade-card-simple[data-pnl^="-"] {
-    border-left: 3px solid #ea3943;
+    border-top: 2px solid rgba(234, 57, 67, 0.6);
 }
 
 /* Card Header */
@@ -55,9 +55,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px;
-    border-bottom: 1px solid var(--border-secondary, rgba(240, 246, 252, 0.05));
-    background: var(--bg-tertiary, #21262d);
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(240, 246, 252, 0.04);
+    background: rgba(33, 38, 45, 0.5);
 }
 
 .card-asset {
@@ -67,12 +67,12 @@
 }
 
 .card-logo {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     object-fit: cover;
     background: var(--bg-secondary, #161b22);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
 .card-asset-info {
@@ -140,10 +140,10 @@
 
 /* P&L Hero Section */
 .card-pnl-hero {
-    padding: 20px 16px;
+    padding: 16px 16px;
     display: flex;
     align-items: baseline;
-    gap: 12px;
+    gap: 10px;
 }
 
 .card-pnl-hero.pnl-positive {
@@ -155,7 +155,7 @@
 }
 
 .pnl-amount {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
     font-weight: 700;
     font-family: 'JetBrains Mono', monospace;
     letter-spacing: -0.03em;
@@ -212,7 +212,7 @@
 .value-label {
     font-size: 0.5625rem;
     font-weight: 600;
-    color: var(--text-muted, #484f58);
+    color: var(--text-secondary, #8b949e);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-bottom: 2px;
@@ -266,7 +266,7 @@
 .price-label {
     font-size: 0.5rem;
     font-weight: 600;
-    color: var(--text-muted, #484f58);
+    color: var(--text-secondary, #8b949e);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -283,8 +283,8 @@
 }
 
 .price-arrow {
-    color: var(--text-muted, #484f58);
-    font-size: 1rem;
+    color: rgba(139, 148, 158, 0.5);
+    font-size: 0.875rem;
 }
 
 /* Trailing Progress Row */
@@ -396,7 +396,7 @@
     gap: 16px;
     margin-top: 8px;
     font-size: 0.625rem;
-    color: var(--text-muted, #484f58);
+    color: var(--text-secondary, #8b949e);
 }
 
 .dca-detail-item strong {
@@ -414,6 +414,41 @@
     padding-top: 0;
     padding: 0;
     border-radius: 0;
+}
+
+/* Collapsible chart body */
+.card-chart-container .chart-body {
+    transition: height 0.3s ease, opacity 0.25s ease;
+    overflow: hidden;
+}
+
+.card-chart-container.chart-collapsed .chart-body {
+    height: 0 !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.chart-collapse-btn {
+    background: none;
+    border: none;
+    color: #6e7681;
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    transition: color 0.2s ease;
+}
+
+.chart-collapse-btn:hover {
+    color: #8b949e;
+}
+
+.chart-collapse-icon {
+    transition: transform 0.3s ease;
+}
+
+.card-chart-container.chart-collapsed .chart-collapse-icon {
+    transform: rotate(-90deg);
 }
 
 .card-chart-container .chart-header {
@@ -488,6 +523,26 @@
     border: none !important;
 }
 
+/* Card Footer */
+.card-footer-simple {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    border-top: 1px solid rgba(48, 54, 61, 0.25);
+    font-size: 0.6875rem;
+    color: #6e7681;
+    background: rgba(13, 17, 23, 0.4);
+}
+
+.footer-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.625rem;
+}
+
 /* Expand Button */
 .card-expand-btn {
     width: 100%;
@@ -545,7 +600,7 @@
 
 .detail-label {
     font-size: 0.625rem;
-    color: var(--text-muted, #484f58);
+    color: var(--text-secondary, #8b949e);
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }

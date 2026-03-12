@@ -1,5 +1,5 @@
 // Service Worker for Bitvavo Trading Bot PWA
-const CACHE_NAME = 'bitvavo-bot-v2';
+const CACHE_NAME = 'bitvavo-bot-v3';
 const STATIC_ASSETS = [
     '/static/css/premium_trading.css?v=2',
     '/static/css/premium_cards.css?v=2',
