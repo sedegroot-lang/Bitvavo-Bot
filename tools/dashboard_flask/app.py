@@ -358,8 +358,11 @@ def load_config(force: bool = False) -> Dict:
         logger.error(f"Failed to load config: {e}")
     return {}
 
+_last_good_trades: Dict = {}  # fallback when file read fails
+
 def load_trades(force: bool = False) -> Dict:
-    """Load trade log data."""
+    """Load trade log data with fallback to last known good snapshot."""
+    global _last_good_trades
     if not force:
         cached = get_cached('trades')
         if cached:
@@ -368,10 +371,16 @@ def load_trades(force: bool = False) -> Dict:
     try:
         if TRADE_LOG_PATH.exists():
             data = load_trade_snapshot(str(TRADE_LOG_PATH))
+            if data and data.get('open'):
+                _last_good_trades = data
             set_cached('trades', data)
             return data
     except Exception as e:
         logger.error(f"Failed to load trades: {e}")
+    # Fallback: return last known good data to prevent trades showing as external
+    if _last_good_trades:
+        logger.warning("Using last known good trade data as fallback")
+        return _last_good_trades
     return {'open': {}, 'closed': []}
 
 def load_heartbeat(force: bool = False) -> Dict:
@@ -1603,6 +1612,82 @@ def api_status():
         'last_heartbeat': heartbeat.get('ts'),
         'timestamp': time.time(),
     })
+
+@app.route('/api/balance-history')
+def api_balance_history():
+    """Serve real balance history from balance_history.jsonl for the portfolio chart."""
+    period = request.args.get('period', '7d').lower()
+    now = time.time()
+
+    period_seconds = {
+        '1d': 86400,
+        '7d': 7 * 86400,
+        '30d': 30 * 86400,
+        '1y': 365 * 86400,
+        'all': None,
+    }.get(period, 7 * 86400)
+
+    balance_file = PROJECT_ROOT / 'data' / 'balance_history.jsonl'
+    if not balance_file.exists():
+        return jsonify({'labels': [], 'values': [], 'current': 0, 'change_pct': 0, 'min': 0, 'max': 0})
+
+    try:
+        raw = []
+        with open(balance_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                    ts = float(rec.get('ts', 0))
+                    val = float(rec.get('total_eur', 0))
+                    if period_seconds is None or (now - ts) <= period_seconds:
+                        raw.append((ts, val))
+                except (ValueError, KeyError):
+                    continue
+
+        if not raw:
+            return jsonify({'labels': [], 'values': [], 'current': 0, 'change_pct': 0, 'min': 0, 'max': 0})
+
+        raw.sort(key=lambda x: x[0])
+
+        # Downsample to max 300 points
+        target_points = 300
+        if len(raw) > target_points:
+            step = len(raw) / target_points
+            raw = [raw[int(i * step)] for i in range(target_points)]
+            raw.append((raw[-1][0], raw[-1][1]))  # ensure last point
+
+        from datetime import datetime
+        # Choose label format based on period
+        if period == '1d':
+            fmt = lambda ts: datetime.fromtimestamp(ts).strftime('%H:%M')
+        elif period in ('7d', '30d'):
+            fmt = lambda ts: datetime.fromtimestamp(ts).strftime('%d/%m %H:%M')
+        else:
+            fmt = lambda ts: datetime.fromtimestamp(ts).strftime('%d/%m/%y')
+
+        labels = [fmt(ts) for ts, _ in raw]
+        values = [round(v, 2) for _, v in raw]
+
+        current_val = values[-1] if values else 0
+        first_val = values[0] if values else 0
+        change_pct = round((current_val - first_val) / first_val * 100, 2) if first_val else 0
+        min_val = round(min(values), 2) if values else 0
+        max_val = round(max(values), 2) if values else 0
+
+        return jsonify({
+            'labels': labels,
+            'values': values,
+            'current': current_val,
+            'change_pct': change_pct,
+            'min': min_val,
+            'max': max_val,
+        })
+    except Exception as e:
+        logger.error(f"[API] balance-history error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # =====================================================
 # FLASK ROUTES - PAGE VIEWS

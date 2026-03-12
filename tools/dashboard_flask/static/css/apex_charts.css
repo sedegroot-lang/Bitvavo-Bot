@@ -13,17 +13,13 @@
     transition: box-shadow 0.6s ease;
 }
 
-/* P&L-based chart glow */
+/* P&L-based chart glow — disabled for cleaner look */
 .chart-glow-profit {
-    box-shadow:
-        0 0 20px rgba(22, 199, 132, 0.08),
-        inset 0 0 30px rgba(22, 199, 132, 0.03);
+    box-shadow: none;
 }
 
 .chart-glow-loss {
-    box-shadow:
-        0 0 20px rgba(234, 57, 67, 0.08),
-        inset 0 0 30px rgba(234, 57, 67, 0.03);
+    box-shadow: none;
 }
 
 /* ----------------------------------------------------------
@@ -711,6 +707,99 @@ body.has-fullscreen-chart {
     color: #c9d1d9;
     margin: 0 0 12px 0;
 }
+
+/* ----------------------------------------------------------
+   BITVAVO-STYLE PORTFOLIO VALUE CHART
+   ---------------------------------------------------------- */
+.bitvavo-chart-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 20px 20px 12px 20px !important;
+}
+
+.bitvavo-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.bitvavo-chart-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: #8b949e;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.bitvavo-chart-value-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.bitvavo-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #e6edf3;
+    letter-spacing: -0.5px;
+}
+
+.bitvavo-change-badge {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
+.bitvavo-change-badge.positive {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+}
+
+.bitvavo-period-tabs {
+    display: flex;
+    gap: 2px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    padding: 3px;
+    align-self: flex-start;
+}
+
+.bv-period-btn {
+    background: none;
+    border: none;
+    color: #8b949e;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.bv-period-btn:hover {
+    color: #e6edf3;
+    background: rgba(255,255,255,0.06);
+}
+.bv-period-btn.bv-active {
+    background: #1f6feb;
+    color: #ffffff;
+}
+
+.bitvavo-chart-area {
+    position: relative;
+    height: 200px;
+}
+.bitvavo-chart-area canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
 
 /* ----------------------------------------------------------
    16. CLOSED TRADES TABLE ENHANCEMENTS

@@ -326,7 +326,7 @@
         {% endif %}
         
         <!-- LIVE PRICE CHART - Premium Interactive with Apex Enhancements -->
-        <div class="card-chart-container">
+        <div class="card-chart-container" data-chart-market="{{ card.market }}">
             <div class="chart-header">
                 <span class="chart-title">Price Chart</span>
                 <div class="chart-controls">
@@ -348,9 +348,12 @@
                         <span class="live-dot-pulse"></span>
                         Live
                     </span>
+                    <button class="chart-collapse-btn" onclick="toggleChartCollapse(this)" title="Toggle chart">
+                        <svg class="chart-collapse-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
                 </div>
             </div>
-            <div style="position: relative; height: 160px; width: 100%; overflow: hidden;">
+            <div class="chart-body" style="position: relative; height: 160px; width: 100%; overflow: hidden;">
                 <canvas id="chart-{{ card.market }}" 
                         class="trade-card-chart" 
                         style="display: block !important; width: 100% !important; height: 160px !important;"
@@ -538,10 +541,27 @@
     </div>
     
     <div class="portfolio-charts-grid">
-        <!-- Combined Value Chart -->
-        <div class="chart-container" style="height: 300px; max-height: 300px; overflow: hidden;">
-            <h3>Totale Portfolio Waarde</h3>
-            <canvas id="portfolio-combined-chart" style="max-height: 250px;"></canvas>
+        <!-- Bitvavo-style Total Value Chart -->
+        <div class="chart-container bitvavo-chart-card">
+            <div class="bitvavo-chart-header">
+                <div class="bitvavo-chart-value-block">
+                    <div class="bitvavo-chart-title">Totale waarde portfolio</div>
+                    <div class="bitvavo-chart-value-row">
+                        <span class="bitvavo-value" id="bv-current-value">€ --,--</span>
+                        <span class="bitvavo-change-badge" id="bv-change-badge">--</span>
+                    </div>
+                </div>
+                <div class="bitvavo-period-tabs">
+                    <button class="bv-period-btn" data-period="1d">1D</button>
+                    <button class="bv-period-btn bv-active" data-period="7d">7D</button>
+                    <button class="bv-period-btn" data-period="30d">30D</button>
+                    <button class="bv-period-btn" data-period="1y">1J</button>
+                    <button class="bv-period-btn" data-period="all">ALLES</button>
+                </div>
+            </div>
+            <div class="bitvavo-chart-area">
+                <canvas id="portfolio-combined-chart"></canvas>
+            </div>
         </div>
         
         <!-- Allocation Pie Chart -->
@@ -992,7 +1012,7 @@ function buildTradeCardElement(card) {
         : '';
 
     const el = document.createElement('div');
-    el.className = 'trade-card-simple';
+    el.className = `trade-card-simple ${(Number(card.pnl) || 0) >= 0 ? 'card-profit' : 'card-loss'}`;
     el.dataset.market = card.market;
     el.dataset.pnl = (Number(card.pnl) || 0).toFixed(2);
     el.dataset.pnlPct = (Number(card.pnl_pct) || 0).toFixed(2);
@@ -1084,6 +1104,10 @@ function updateCardFromData(cardEl, cardData) {
     cardEl.dataset.pnlPct = (Number(cardData.pnl_pct) || 0).toFixed(2);
     cardEl.dataset.value = (Number(cardData.current_value) || 0).toFixed(2);
     cardEl.dataset.symbol = cardEl.dataset.symbol || cardData.symbol || '';
+
+    // Update profit/loss accent class
+    cardEl.classList.remove('card-profit', 'card-loss');
+    cardEl.classList.add(pnlVal >= 0 ? 'card-profit' : 'card-loss');
 
     const pnlAmount = cardEl.querySelector(`[data-pnl="${cardData.market}"]`);
     if (pnlAmount) pnlAmount.textContent = `${pnlVal >= 0 ? '+' : ''}${formatEuro(cardData.pnl || 0)}`;
@@ -1388,14 +1412,10 @@ function initTradeCardCharts() {
             // Get current price from DOM
             const liveEl = document.querySelector(`[data-live-price="${market}"]`);
             let currentPrice = buyPrice;
-            if (liveEl) {
-                currentPrice = parseFloat(liveEl.textContent.replace('€', '')) || buyPrice;
-            }
-            
-            // Calculate P&L to determine color
-            const pnl = currentPrice - buyPrice;
-            const isProfit = pnl >= 0;
-            
+            if Y-axis focused on price action — don't let TP/stop levels compress the chart
+            const corePrices = [buyPrice, currentPrice];
+            const yMin = Math.min(...corePrices) * 0.97;
+            const yMax = Math.max(...corePrice
             // TradingView/CoinGecko style colors
             const profitColor = '#16c784';  // Green
             const lossColor = '#ea3943';    // Red
@@ -1406,90 +1426,86 @@ function initTradeCardCharts() {
             const priceHistory = [];
             const timeLabels = [];
             // Collect all key price levels for Y-axis range
-            const priceLevels = [buyPrice, currentPrice];
-            if (dcaPrice > 0) priceLevels.push(dcaPrice);
-            if (activationPrice > 0) priceLevels.push(activationPrice);
-            if (trailingStop > 0 && trailingActive) priceLevels.push(trailingStop);
-            if (pyramidPrice > 0 && (dcaMode === 'hybrid' || dcaMode === 'pyramid')) priceLevels.push(pyramidPrice);
-            const yMin = Math.min(...priceLevels) * 0.97;
-            const yMax = Math.max(...priceLevels) * 1.03;
-            for (let i = 30; i >= 0; i--) {
-                const variance = (Math.random() - 0.5) * 0.04;
-                priceHistory.push(buyPrice * (1 + variance));
-                timeLabels.push(`-${i}m`);
-            }
-            
-            // Build annotation lines for key price levels (Entry, TP, Stop)
-            // DCA line uses a separate dataset for maximum reliability
-            const annotations = {};
-            
-            // Buy price line (always shown)
+            const priceLevels — thin, no label badge
             if (buyPrice > 0) {
                 annotations.buyLine = {
                     type: 'line',
                     yMin: buyPrice,
                     yMax: buyPrice,
-                    borderColor: '#3B82F6',
-                    borderWidth: 1.5,
-                    borderDash: [6, 3],
+                    borderColor: 'rgba(59, 130, 246, 0.5)',
+                    borderWidth: 1,
+                    borderDash: [4, 3],
                     label: {
                         display: true,
-                        content: `Entry €${buyPrice >= 1 ? buyPrice.toFixed(2) : buyPrice.toFixed(4)}`,
+                        content: 'Entry',
                         position: 'start',
-                        backgroundColor: 'rgba(59, 130, 246, 0.85)',
-                        color: '#fff',
-                        font: { size: 9, weight: '600' },
-                        padding: { top: 2, bottom: 2, left: 4, right: 4 },
-                        borderRadius: 3
+                        backgroundColor: 'transparent',
+                        color: 'rgba(59, 130, 246, 0.7)',
+                        font: { size: 8, weight: '500' },
+                        padding: { top: 0, bottom: 0, left: 2, right: 2 },
                     }
                 };
             }
             
-            // TP Activation line (green dashed)
+            // TP Activation line — subtle green
             if (activationPrice > 0) {
                 annotations.tpLine = {
                     type: 'line',
                     yMin: activationPrice,
                     yMax: activationPrice,
-                    borderColor: '#10B981',
-                    borderWidth: 1.5,
-                    borderDash: [6, 3],
+                    borderColor: 'rgba(16, 185, 129, 0.35)',
+                    borderWidth: 1,
+                    borderDash: [4, 3],
                     label: {
                         display: true,
-                        content: `TP €${activationPrice >= 1 ? activationPrice.toFixed(2) : activationPrice.toFixed(4)}`,
+                        content: 'TP',
                         position: 'end',
-                        backgroundColor: 'rgba(16, 185, 129, 0.85)',
-                        color: '#fff',
-                        font: { size: 9, weight: '600' },
-                        padding: { top: 2, bottom: 2, left: 4, right: 4 },
-                        borderRadius: 3
+                        backgroundColor: 'transparent',
+                        color: 'rgba(16, 185, 129, 0.6)',
+                        font: { size: 8, weight: '500' },
+                        padding: { top: 0, bottom: 0, left: 2, right: 2 },
                     }
                 };
             }
             
-            // Trailing stop line (red dashed, only when trailing is active)
+            // Trailing stop line — subtle red, only when active
             if (trailingStop > 0 && trailingActive) {
                 annotations.stopLine = {
                     type: 'line',
                     yMin: trailingStop,
                     yMax: trailingStop,
-                    borderColor: '#EF4444',
-                    borderWidth: 1.5,
-                    borderDash: [4, 4],
+                    borderColor: 'rgba(239, 68, 68, 0.35)',
+                    borderWidth: 1,
+                    borderDash: [3, 3],
                     label: {
                         display: true,
-                        content: `Stop €${trailingStop >= 1 ? trailingStop.toFixed(2) : trailingStop.toFixed(4)}`,
+                        content: 'Stop',
                         position: 'end',
-                        backgroundColor: 'rgba(239, 68, 68, 0.85)',
-                        color: '#fff',
-                        font: { size: 9, weight: '600' },
-                        padding: { top: 2, bottom: 2, left: 4, right: 4 },
-                        borderRadius: 3
+                        backgroundColor: 'transparent',
+                        color: 'rgba(239, 68, 68, 0.6)',
+                        font: { size: 8, weight: '500' },
+                        padding: { top: 0, bottom: 0, left: 2, right: 2 },
                     }
                 };
             }
             
-            // Pyramid-up line (cyan dashed) - annotation for reliability
+            // Pyramid-up line — subtle cyan
+            if (pyramidPrice > 0 && (dcaMode === 'hybrid' || dcaMode === 'pyramid')) {
+                annotations.pyramidLine = {
+                    type: 'line',
+                    yMin: pyramidPrice,
+                    yMax: pyramidPrice,
+                    borderColor: 'rgba(6, 182, 212, 0.35)',
+                    borderWidth: 1,
+                    borderDash: [3, 3],
+                    label: {
+                        display: true,
+                        content: 'Pyramid',
+                        position: 'start',
+                        backgroundColor: 'transparent',
+                        color: 'rgba(6, 182, 212, 0.6)',
+                        font: { size: 8, weight: '500' },
+                        padding: { top: 0, bottom: 0, left: 2, right: 2 },shed) - annotation for reliability
             if (pyramidPrice > 0 && (dcaMode === 'hybrid' || dcaMode === 'pyramid')) {
                 annotations.pyramidLine = {
                     type: 'line',
@@ -1535,7 +1551,7 @@ function initTradeCardCharts() {
                     return gradient;
                 },
                 borderWidth: 2,
-                fill: true,
+                fill: false,
                 tension: 0.3,
                 pointRadius: 0,
                 pointHoverRadius: 5,
@@ -1544,14 +1560,14 @@ function initTradeCardCharts() {
                 pointHoverBorderWidth: 2,
             }];
             
-            // DCA Grens line (orange dashed) - flat dataset line for reliability
+            // DCA Grens line — subtle orange dashed
             if (dcaPrice > 0) {
                 datasets.push({
                     label: 'DCA Grens',
                     data: priceHistory.map(() => dcaPrice),
-                    borderColor: '#F97316',
-                    borderWidth: 1.5,
-                    borderDash: [4, 4],
+                    borderColor: 'rgba(249, 115, 22, 0.4)',
+                    borderWidth: 1,
+                    borderDash: [3, 3],
                     pointRadius: 0,
                     pointHoverRadius: 0,
                     fill: false,
@@ -1809,134 +1825,30 @@ function toggleCardDetails(market) {
     }
 }
 
+function toggleChartCollapse(btn) {
+    const container = btn.closest('.card-chart-container');
+    if (!container) return;
+    container.classList.toggle('chart-collapsed');
+}
+
 function initPortfolioCharts() {
     console.log('[Portfolio] Initializing portfolio charts');
+    loadBitvavoChart('7d');
     
-    // Combined Value Chart
-    const combinedCtx = document.getElementById('portfolio-combined-chart');
-    if (combinedCtx) {
-        var combinedEl = document.getElementById('portfolio-combined-data');
-        const combinedData = combinedEl ? JSON.parse(combinedEl.textContent) : {};
-        
-        console.log('[Portfolio] Combined chart data:', {
-            labels: combinedData.labels?.length || 0,
-            active_values: combinedData.active_values?.length || 0,
-            hodl_values: combinedData.hodl_values?.length || 0,
-            total_values: combinedData.total_values?.length || 0,
-            sample_data: combinedData.total_values?.slice(0, 3)
+    // Period tab buttons
+    document.querySelectorAll('.bv-period-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.bv-period-btn').forEach(b => b.classList.remove('bv-active'));
+            this.classList.add('bv-active');
+            loadBitvavoChart(this.dataset.period);
         });
-        
-        if (!combinedData.labels || combinedData.labels.length === 0) {
-            console.warn('[Portfolio] Combined chart has no data labels - chart will be empty');
-        }
-        
-        if (combinedChart) { combinedChart.destroy(); combinedChart = null; }
-        combinedChart = new Chart(combinedCtx.getContext('2d'), {
-            type: 'line',
-            data: {
-                labels: combinedData.labels || [],
-                datasets: [
-                    {
-                        label: 'Active Trades',
-                        data: combinedData.active_values || [],
-                        borderColor: '#3B82F6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        pointRadius: 0
-                    },
-                    {
-                        label: 'HODL Positions',
-                        data: combinedData.hodl_values || [],
-                        borderColor: '#10B981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        pointRadius: 0
-                    },
-                    {
-                        label: 'Total Portfolio',
-                        data: combinedData.total_values || [],
-                        borderColor: '#F59E0B',
-                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                        tension: 0.4,
-                        borderWidth: 2,
-                        fill: false,
-                        pointRadius: 0
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            color: '#E5E7EB',
-                            font: { size: 11 }
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                        titleColor: '#E5E7EB',
-                        bodyColor: '#E5E7EB',
-                        borderColor: '#374151',
-                        borderWidth: 1,
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': €' + context.parsed.y.toFixed(2);
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            color: '#9CA3AF',
-                            callback: function(value) {
-                                return '€' + value.toFixed(0);
-                            }
-                        },
-                        grid: {
-                            color: 'rgba(75, 85, 99, 0.2)'
-                        }
-                    },
-                    x: {
-                        ticks: { color: '#9CA3AF' },
-                        grid: { color: 'rgba(75, 85, 99, 0.2)' }
-                    }
-                }
-            }
-        });
-        
-        console.log('[Portfolio] Combined chart created successfully with', combinedData.labels?.length || 0, 'data points');
-    } else {
-        console.error('[Portfolio] Combined chart canvas element not found');
-    }
+    });
     
     // Allocation Pie Chart
     const allocationCtx = document.getElementById('portfolio-allocation-chart');
     if (allocationCtx) {
         var allocationEl = document.getElementById('portfolio-allocation-data');
         const allocationData = allocationEl ? JSON.parse(allocationEl.textContent) : {};
-        
-        console.log('[Portfolio] Allocation chart data:', {
-            labels: allocationData.labels?.length || 0,
-            values: allocationData.values?.length || 0,
-            total_value: allocationData.values?.reduce((a, b) => a + b, 0) || 0,
-            assets: allocationData.labels
-        });
-        
-        if (!allocationData.labels || allocationData.labels.length === 0) {
-            console.warn('[Portfolio] Allocation chart has no data - chart will be empty');
-        }
         
         if (allocationChart) { allocationChart.destroy(); allocationChart = null; }
         allocationChart = new Chart(allocationCtx.getContext('2d'), {
@@ -2000,14 +1912,120 @@ function initPortfolioCharts() {
                 }
             }
         });
-        
-        console.log('[Portfolio] Allocation chart created successfully with', allocationData.labels?.length || 0, 'assets');
-    } else {
-        console.error('[Portfolio] Allocation chart canvas element not found');
     }
     
     console.log('[Portfolio] Portfolio charts initialization complete');
 }
+
+function loadBitvavoChart(period) {
+    const canvas = document.getElementById('portfolio-combined-chart');
+    if (!canvas) return;
+
+    fetch('/api/balance-history?period=' + period)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.values || data.values.length === 0) return;
+
+            // Update header value + badge
+            const valEl = document.getElementById('bv-current-value');
+            const badgeEl = document.getElementById('bv-change-badge');
+            if (valEl) {
+                valEl.textContent = '€ ' + data.current.toFixed(2).replace('.', ',');
+            }
+            if (badgeEl) {
+                const pct = data.change_pct;
+                const sign = pct >= 0 ? '+' : '';
+                badgeEl.textContent = sign + pct.toFixed(2) + '%';
+                badgeEl.className = 'bitvavo-change-badge' + (pct >= 0 ? ' positive' : '');
+            }
+
+            const ctx = canvas.getContext('2d');
+
+            // Gradient fill
+            const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+            gradient.addColorStop(0, 'rgba(31, 111, 235, 0.35)');
+            gradient.addColorStop(1, 'rgba(31, 111, 235, 0.0)');
+
+            if (combinedChart) { combinedChart.destroy(); combinedChart = null; }
+
+            // Tight Y-axis range with small padding
+            const pad = (data.max - data.min) * 0.15 || 1;
+            const yMin = Math.floor((data.min - pad) * 100) / 100;
+            const yMax = Math.ceil((data.max + pad) * 100) / 100;
+
+            const isPositive = data.change_pct >= 0;
+            const lineColor = isPositive ? '#1f6feb' : '#ef4444';
+
+            combinedChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.values,
+                        borderColor: lineColor,
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        pointHoverBackgroundColor: lineColor,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 300 },
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(13, 17, 23, 0.92)',
+                            titleColor: '#8b949e',
+                            bodyColor: '#e6edf3',
+                            borderColor: 'rgba(48,54,61,0.8)',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: false,
+                            callbacks: {
+                                title: function(items) { return items[0].label; },
+                                label: function(ctx) {
+                                    return '€ ' + ctx.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            min: yMin,
+                            max: yMax,
+                            position: 'right',
+                            ticks: {
+                                color: '#8b949e',
+                                font: { size: 11 },
+                                maxTicksLimit: 4,
+                                callback: v => '€' + v.toFixed(0)
+                            },
+                            grid: { color: 'rgba(48,54,61,0.3)', drawBorder: false },
+                            border: { display: false }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#8b949e',
+                                font: { size: 10 },
+                                maxTicksLimit: 6,
+                                maxRotation: 0
+                            },
+                            grid: { display: false },
+                            border: { display: false }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(err => console.warn('[Portfolio] balance-history fetch failed:', err));
+}
+
 
 function togglePortfolioView() {
     portfolioViewMode = portfolioViewMode === 'value' ? 'pnl' : 'value';
