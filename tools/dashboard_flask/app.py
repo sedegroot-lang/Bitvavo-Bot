@@ -3537,18 +3537,19 @@ def serve_icon(symbol):
     """
     Serve local cryptocurrency icons from data/icons/ folder.
     
-    Returns PNG file if exists, otherwise 404.
-    Frontend should handle 404 with fallback to CoinGecko or SVG.
-    
-    Example: /icons/btc.png -> data/icons/btc.png
+    Returns image file if exists, otherwise 404.
+    Frontend should handle 404 with fallback to SVG.
     """
     try:
-        # Remove file extension if included
         symbol_clean = symbol.lower().replace('.png', '')
-        # Serve from ICONS_DIR (data/icons/)
-        return send_from_directory(str(ICONS_DIR), f"{symbol_clean}.png", mimetype='image/png')
+        icon_path = ICONS_DIR / f"{symbol_clean}.png"
+        if not icon_path.exists():
+            return jsonify({'error': 'Icon not found'}), 404
+        # Auto-detect MIME type from file content (some .png are actually WebP)
+        header = icon_path.read_bytes()[:4]
+        mime = 'image/webp' if header[:4] == b'RIFF' else 'image/png'
+        return send_from_directory(str(ICONS_DIR), f"{symbol_clean}.png", mimetype=mime)
     except FileNotFoundError:
-        # Icon not found - return 404, browser will use onerror fallback
         return jsonify({'error': 'Icon not found'}), 404
 
 # =====================================================
