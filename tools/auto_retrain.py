@@ -90,7 +90,7 @@ _PROJECT_ROOT = _TOOLS_DIR.parent
 
 CONFIG_PATH = _PROJECT_ROOT / 'config' / 'bot_config.json'
 METRICS_PATH = _PROJECT_ROOT / 'ai' / 'ai_model_metrics.json'
-TRAIN_SCRIPT = _PROJECT_ROOT / 'tools' / 'train_ai_model.py'
+TRAIN_SCRIPT = _PROJECT_ROOT / 'ai' / 'xgb_train_enhanced.py'
 DEFAULT_LOOP_SECONDS = 900  # 15 minutes
 
 
@@ -163,23 +163,8 @@ def compute_due_time(last_ts: int, interval_days: int, target_time: dt_time) -> 
 
 
 def build_train_command(cfg_args: Dict) -> list:
-    cmd = [sys.executable, str(TRAIN_SCRIPT)]
-    default_args = {
-        'interval': '1m',
-        'limit': 600,
-        'lookahead': 20,
-        'target_threshold': 0.0075,
-        'min_samples': 250,
-        'test_size': 0.2,
-        'max_models': 3,
-        'output_dir': 'models'
-    }
-    merged = {**default_args, **{k: cfg_args[k] for k in cfg_args if cfg_args[k] is not None}}
-    for key, value in merged.items():
-        flag = f"--{key.replace('_', '-')}"
-        cmd.append(flag)
-        cmd.append(str(value))
-    return cmd
+    # xgb_train_enhanced.py uses no CLI args — it reads config and trade_log directly
+    return [sys.executable, str(TRAIN_SCRIPT)]
 
 
 def maybe_retrain(args: argparse.Namespace) -> Dict[str, object]:
