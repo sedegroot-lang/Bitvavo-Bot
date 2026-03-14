@@ -105,7 +105,7 @@ def sync_with_bitvavo():
                 'highest_price': price,
                 'amount': amount,
                 'timestamp': time.time(),
-                'tp_levels_done': [False, False],
+                'tp_levels_done': [False, False, False],
                 'partial_tp_events': [],
                 'dca_buys': 0,
                 'dca_max': int(DCA_MAX_BUYS),
