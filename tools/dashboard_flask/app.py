@@ -841,13 +841,12 @@ def build_trade_cards(trades: Dict, config: Dict) -> List[Dict]:
             activation_price_val = trailing_info.get('activation_price') or trade.get('activation_price')
             highest_price_val = trailing_info.get('highest_price') or trade.get('highest_price') or trade.get('highest_since_activation')
             
-            # DCA level: prefer dca_events list if it has entries, otherwise fallback to dca_buys counter
+            # DCA level: use max of dca_buys counter and dca_events length
+            # (dca_events may be incomplete if events were lost by earlier sync bugs)
             dca_events = trade.get('dca_events', [])
-            if isinstance(dca_events, list) and len(dca_events) > 0:
-                dca_level = len(dca_events)
-            else:
-                # Fallback to dca_buys counter (older trades don't have dca_events array)
-                dca_level = int(trade.get('dca_buys', 0) or 0)
+            dca_events_len = len(dca_events) if isinstance(dca_events, list) else 0
+            dca_buys_counter = int(trade.get('dca_buys', 0) or 0)
+            dca_level = max(dca_events_len, dca_buys_counter)
             
             status = 'active'
             status_label = 'Actief'
