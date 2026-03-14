@@ -105,7 +105,7 @@ def send_message(text: str, parse_mode: str = "HTML") -> bool:
         return False
 
 
-_TRADE_KEYWORDS = ("KOOP", "VERKOOP", "koop", "verkoop", "BUY", "SELL", "gekocht", "verkocht")
+_TRADE_KEYWORDS = ("KOOP", "VERKOOP", "koop", "verkoop", "BUY", "SELL", "gekocht", "verkocht", "DCA", "partial tp")
 _ALERT_KEYWORDS = (
     "ERROR", "CRITICAL", "STALE", "DRAWDOWN", "CIRCUIT",
     "sync_removed", "API glitch", "stale buy_price", "RISK",
@@ -115,9 +115,10 @@ _ALERT_KEYWORDS = (
 
 def notify(text: str) -> None:
     """Forward trade events AND error/risk alerts to Telegram."""
-    if any(kw in text for kw in _TRADE_KEYWORDS):
+    _text_lower = text.lower()
+    if any(kw.lower() in _text_lower for kw in _TRADE_KEYWORDS):
         send_message(text)
-    elif any(kw in text for kw in _ALERT_KEYWORDS):
+    elif any(kw.lower() in _text_lower for kw in _ALERT_KEYWORDS):
         send_message(f"\u26a0\ufe0f ALERT:\n{text}")
 
 
