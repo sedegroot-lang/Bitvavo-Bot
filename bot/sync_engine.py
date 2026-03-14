@@ -166,14 +166,19 @@ def sync_with_bitvavo():
                                             local['total_invested_eur'] = _new_inv
                                             if hasattr(_fresh_basis, 'earliest_timestamp') and _fresh_basis.earliest_timestamp:
                                                 local['opened_ts'] = float(_fresh_basis.earliest_timestamp)
-                                            local['dca_buys'] = 0
-                                            local['dca_events'] = []
+                                            # Preserve existing DCA history — only reset if truly empty
+                                            if not local.get('dca_events'):
+                                                local.setdefault('dca_buys', 0)
+                                                local.setdefault('dca_events', [])
                                         else:
                                             log(f"⚠️ STALE FIX {m}: derive failed, using ticker €{_ticker_price:.6f} as buy_price", level='warning')
                                             local['buy_price'] = _ticker_price
-                                            local['invested_eur'] = round(_ticker_price * new_amount, 4)
-                                            local['initial_invested_eur'] = local['invested_eur']
-                                            local['total_invested_eur'] = local['invested_eur']
+                                            _fallback_inv = round(_ticker_price * new_amount, 4)
+                                            local['invested_eur'] = _fallback_inv
+                                            # Only set initial if not already set (preserve DCA history)
+                                            if not local.get('initial_invested_eur'):
+                                                local['initial_invested_eur'] = _fallback_inv
+                                            local['total_invested_eur'] = _fallback_inv
                                     except Exception as _stale_err:
                                         log(f"⚠️ STALE FIX {m} failed: {_stale_err}", level='error')
                     except Exception as _stale_check_err:
@@ -189,8 +194,11 @@ def sync_with_bitvavo():
                                 log(f"Sync: FIXING invested_eur for {m}: {old_invested:.2f} -> {correct_invested:.2f}", level='warning')
                                 local['invested_eur'] = correct_invested
                                 local['total_invested_eur'] = correct_invested
+                                # NEVER overwrite initial_invested_eur if DCA history exists
+                                # When DCAs are done, initial != current is expected
                                 init_inv = float(local.get('initial_invested_eur') or 0)
-                                if init_inv > 0 and abs(correct_invested - init_inv) / init_inv > 0.20:
+                                has_dca_history = int(local.get('dca_buys', 0) or 0) > 0 or len(local.get('dca_events', []) or []) > 0
+                                if not has_dca_history and init_inv > 0 and abs(correct_invested - init_inv) / init_inv > 0.20:
                                     local['initial_invested_eur'] = correct_invested
                     except Exception as sync_inv_err:
                         log(f"Sync: invested_eur recalc failed for {m}: {sync_inv_err}", level='debug')
@@ -201,8 +209,21 @@ def sync_with_bitvavo():
                     except Exception:
                         local['highest_price'] = entry.get('highest_price')
                     local['timestamp'] = time.time()
-                    local.setdefault('tp_levels_done', [False, False])
+                    local.setdefault('tp_levels_done', [False, False, False])
                     local.setdefault('dca_buys', 0)
+                    local.setdefault('dca_events', [])
+                    local.setdefault('partial_tp_returned_eur', 0.0)
+                    local.setdefault('partial_tp_events', [])
+                    # Ensure critical trailing/DCA config fields exist with config defaults
+                    local.setdefault('trailing_activation_pct', float(CONFIG.get('TRAILING_ACTIVATION_PCT', 0.015)))
+                    local.setdefault('base_trailing_pct', float(CONFIG.get('DEFAULT_TRAILING', 0.025)))
+                    local.setdefault('cost_buffer_pct', float(CONFIG.get('FEE_TAKER', 0.0025)) * 2 + float(CONFIG.get('SLIPPAGE_PCT', 0.001)))
+                    local.setdefault('dca_drop_pct', float(CONFIG.get('DCA_DROP_PCT', 0.05)))
+                    local.setdefault('dca_amount_eur', float(CONFIG.get('DCA_AMOUNT_EUR', 30)))
+                    local.setdefault('dca_step_mult', float(CONFIG.get('DCA_STEP_MULTIPLIER', 1.0)))
+                    local.setdefault('score', 0.0)
+                    local.setdefault('volatility_at_entry', 0.0)
+                    local.setdefault('opened_regime', 'unknown')
 
                     if 'dca_max' not in local:
                         try:
@@ -279,16 +300,26 @@ def sync_with_bitvavo():
                             'highest_price': entry.get('highest_price'),
                             'amount': entry.get('amount'),
                             'timestamp': time.time(),
-                            'tp_levels_done': entry.get('tp_levels_done', [False, False]),
+                            'tp_levels_done': entry.get('tp_levels_done', [False, False, False]),
                             'partial_tp_events': entry.get('partial_tp_events', []),
+                            'partial_tp_returned_eur': 0.0,
                             'dca_buys': 0,
                             'dca_events': [],
                             'dca_max': int(DCA_MAX_BUYS),
                             'dca_next_price': entry.get('dca_next_price', 0.0),
+                            'dca_drop_pct': float(CONFIG.get('DCA_DROP_PCT', 0.05)),
+                            'dca_amount_eur': float(CONFIG.get('DCA_AMOUNT_EUR', 30)),
+                            'dca_step_mult': float(CONFIG.get('DCA_STEP_MULTIPLIER', 1.0)),
                             'tp_last_time': entry.get('tp_last_time', 0.0),
+                            'trailing_activation_pct': float(CONFIG.get('TRAILING_ACTIVATION_PCT', 0.015)),
+                            'base_trailing_pct': float(CONFIG.get('DEFAULT_TRAILING', 0.025)),
+                            'cost_buffer_pct': float(CONFIG.get('FEE_TAKER', 0.0025)) * 2 + float(CONFIG.get('SLIPPAGE_PCT', 0.001)),
+                            'score': 0.0,
+                            'volatility_at_entry': 0.0,
+                            'opened_regime': 'unknown',
                         }
                     except Exception:
-                        new_local = {'market': m, 'buy_price': entry.get('buy_price'), 'amount': entry.get('amount', 0.0), 'dca_buys': 0, 'dca_events': []}
+                        new_local = {'market': m, 'buy_price': entry.get('buy_price'), 'amount': entry.get('amount', 0.0), 'dca_buys': 0, 'dca_events': [], 'partial_tp_returned_eur': 0.0}
 
                     try:
                         from core.trade_investment import set_initial as _ti_set_initial
