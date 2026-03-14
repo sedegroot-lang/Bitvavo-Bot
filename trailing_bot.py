@@ -2091,8 +2091,8 @@ async def bot_loop():
             t = open_trades.get(m)
             if not isinstance(t, dict):
                 continue
-            # CRITICAL: Force fresh price for open trades to catch peaks
-            cp = get_current_price(m, force_refresh=True)
+            # Gebruik gecachte prijs — prijs wordt al ververst tijdens de market scan
+            cp = get_current_price(m)
             if not cp:
                 continue
             

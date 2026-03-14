@@ -34,6 +34,29 @@ _cfg: dict = {}
 _open_trades: dict = {}  # reference to the global open_trades dict
 
 # ---------------------------------------------------------------------------
+# HTF candle cache — avoids 3 redundant API calls per trade per loop tick
+# ---------------------------------------------------------------------------
+_HTF_CACHE: Dict[str, dict] = {}
+_HTF_CACHE_LOCK = threading.Lock()
+_HTF_CACHE_TTL: Dict[str, float] = {"5m": 120.0, "15m": 300.0, "1h": 600.0}
+
+
+def _get_htf_candles(market: str, interval: str, limit: int = 20) -> Optional[List]:
+    """Return HTF candles from cache or fetch fresh; TTL varies by interval."""
+    cache_key = f"{market}:{interval}:{limit}"
+    ttl = _HTF_CACHE_TTL.get(interval, 120.0)
+    now = time.time()
+    with _HTF_CACHE_LOCK:
+        entry = _HTF_CACHE.get(cache_key)
+        if entry and (now - entry["ts"]) < ttl:
+            return entry["data"]
+    data = _api.get_candles(market, interval, limit)
+    if data is not None:
+        with _HTF_CACHE_LOCK:
+            _HTF_CACHE[cache_key] = {"data": data, "ts": now}
+    return data
+
+# ---------------------------------------------------------------------------
 # Partial TP state (module-owned)
 # ---------------------------------------------------------------------------
 PARTIAL_TP_HISTORY_FILE: Path = Path("data/partial_tp_events.jsonl")
@@ -128,6 +151,10 @@ def _partial_tp_levels() -> List[Tuple[float, float]]:
 # ---------------------------------------------------------------------------
 
 def _ensure_tp_flags(trade: Dict[str, Any]) -> List[bool]:
+    """Ensure partial-TP flags are initialised on *trade*.
+
+    NOTE: Caller MUST hold ``state.trades_lock`` — this function mutates *trade*.
+    """
     levels = _partial_tp_levels()
     required = len(levels)
     if required <= 0:
@@ -273,7 +300,11 @@ def calculate_adaptive_tp(market, entry_price, volatility=None, trend_strength=N
 # ---------------------------------------------------------------------------
 
 def check_stop_loss(market, trade, current_price, enabled=False):
-    """Hard stop-loss override for trailing logic (DISABLED by default)."""
+    """Hard stop-loss override for trailing logic (DISABLED by default).
+
+    NOTE: Caller MUST hold ``state.trades_lock`` when *trade* may be mutated
+    based on the return value of this function.
+    """
     try:
         if not enabled:
             return False, "Stop loss disabled in config"
@@ -382,7 +413,12 @@ def check_advanced_exit_strategies(trade, current_price):
 # ---------------------------------------------------------------------------
 
 def calculate_stop_levels(m, buy, high):  # noqa: C901
-    """Calculate trailing stop, hard stop, and trend strength for a market."""
+    """Calculate trailing stop, hard stop, and trend strength for a market.
+
+    NOTE: Caller MUST hold ``state.trades_lock`` before calling this function,
+    because it reads and mutates ``_open_trades[m]`` (e.g. trailing_activated,
+    original_hard_stop, highest_since_activation).
+    """
     try:
         try:
             trade = _open_trades.get(m)
@@ -644,7 +680,7 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                         bullish_count = 0
                         bearish_count = 0
 
-                        c5m = _api.get_candles(m, "5m", 20)
+                        c5m = _get_htf_candles(m, "5m", 20)
                         if c5m and len(c5m) >= 10:
                             closes_5m = [float(c[4]) for c in c5m]
                             sma_5m = sum(closes_5m[-10:]) / 10
@@ -653,7 +689,7 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                             else:
                                 bearish_count += 1
 
-                        c15m = _api.get_candles(m, "15m", 20)
+                        c15m = _get_htf_candles(m, "15m", 20)
                         if c15m and len(c15m) >= 10:
                             closes_15m = [float(c[4]) for c in c15m]
                             sma_15m = sum(closes_15m[-10:]) / 10
@@ -662,7 +698,7 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                             else:
                                 bearish_count += 1
 
-                        c1h = _api.get_candles(m, "1h", 20)
+                        c1h = _get_htf_candles(m, "1h", 20)
                         if c1h and len(c1h) >= 10:
                             closes_1h = [float(c[4]) for c in c1h]
                             sma_1h = sum(closes_1h[-10:]) / 10

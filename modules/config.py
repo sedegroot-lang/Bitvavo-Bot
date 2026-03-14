@@ -2,6 +2,13 @@ import json
 import os
 from modules.logging_utils import file_lock, log
 
+# Load .env file for sensitive credentials (Telegram token etc.)
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv()
+except Exception:
+    pass  # python-dotenv not installed — env vars from OS are still read
+
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config', 'bot_config.json')
 STATE_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'bot_state.json')
 
@@ -18,6 +25,10 @@ RUNTIME_STATE_KEYS = frozenset({
     'LAST_HEARTBEAT_TS',
     '_circuit_breaker_until_ts',
     'LAST_SCAN_STATS',
+    '_SALDO_COOLDOWN_UNTIL',
+    '_REGIME_ADJ',
+    '_REGIME_RESULT',
+    '_cb_trades_since_reset',
 })
 
 def _default_config() -> dict:
@@ -140,6 +151,14 @@ def load_config() -> dict:
             log(f"Config validatie [{item['severity'].upper()}] {item['key']}: {item['issue']}", level=lvl)
     except Exception:
         pass  # Schema module missing or broken — don't block startup
+
+    # Override sensitive credentials from environment variables (.env / OS)
+    _tg_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    if _tg_token:
+        cfg['TELEGRAM_BOT_TOKEN'] = _tg_token
+    _tg_chat = os.environ.get('TELEGRAM_CHAT_ID')
+    if _tg_chat:
+        cfg['TELEGRAM_CHAT_ID'] = _tg_chat
 
     return cfg
 

@@ -245,6 +245,7 @@ def _emit_api_metric(api_name: str, duration_ms: float, result: str, code: str |
 
 # Circuit-breaker state lives here (module-level dict, not in trailing_bot globals)
 _CB_STATE: Dict[str, dict] = {}
+_CB_LOCK = threading.Lock()  # Beschermt _CB_STATE tegen race conditions tussen threads
 
 
 def safe_call(func: Any, *args: Any, **kwargs: Any) -> Any:
@@ -270,7 +271,8 @@ def safe_call(func: Any, *args: Any, **kwargs: Any) -> Any:
                 return cached
 
     # --- circuit breaker check -------------------------------------------
-    st = _CB_STATE.get(key, {'failures': 0, 'state': 'closed', 'opened_ts': 0})
+    with _CB_LOCK:
+        st = _CB_STATE.get(key, {'failures': 0, 'state': 'closed', 'opened_ts': 0}).copy()
     now = time.time()
     open_secs = _cfg.get('SAFE_CALL_OPEN_SECONDS', 30)
     fail_thresh = _cfg.get('SAFE_CALL_FAIL_THRESHOLD', 5)
@@ -282,7 +284,8 @@ def safe_call(func: Any, *args: Any, **kwargs: Any) -> Any:
         return None
     if cb_enabled and st.get('state') == 'open' and (now - st.get('opened_ts', 0) >= open_secs):
         st['state'] = 'half'
-        _CB_STATE[key] = st
+        with _CB_LOCK:
+            _CB_STATE[key] = st
 
     max_retries = max(1, int(_cfg.get('SAFE_CALL_MAX_RETRIES', 5)))
     base_delay = max(0.25, float(_cfg.get('SAFE_CALL_BASE_DELAY_SECONDS', 0.5)))
@@ -318,7 +321,8 @@ def safe_call(func: Any, *args: Any, **kwargs: Any) -> Any:
 
             resp = result_holder['resp']
             if cb_enabled:
-                _CB_STATE[key] = {'failures': 0, 'state': 'closed', 'opened_ts': 0}
+                with _CB_LOCK:
+                    _CB_STATE[key] = {'failures': 0, 'state': 'closed', 'opened_ts': 0}
             if cache_key is not None and cache_ttl > 0 and resp is not None:
                 _cache_set(cache_key, cache_ttl, resp)
             try:
@@ -344,13 +348,15 @@ def safe_call(func: Any, *args: Any, **kwargs: Any) -> Any:
                 sleep_cap = min(max_delay, base_delay * (2 ** attempt))
                 time.sleep(random.uniform(base_delay, sleep_cap))
                 if cb_enabled:
-                    st = _CB_STATE.get(key, {'failures': 0, 'state': 'closed', 'opened_ts': 0})
+                    with _CB_LOCK:
+                        st = _CB_STATE.get(key, {'failures': 0, 'state': 'closed', 'opened_ts': 0}).copy()
                     st['failures'] = st.get('failures', 0) + 1
                     if st['failures'] >= fail_thresh:
                         st['state'] = 'open'
                         st['opened_ts'] = time.time()
                         log(f"Circuit OPEN for {key} after {st['failures']} failures", level='error')
-                    _CB_STATE[key] = st
+                    with _CB_LOCK:
+                        _CB_STATE[key] = st
                 continue
             log(f"API error: {e}", level='error')
             try:

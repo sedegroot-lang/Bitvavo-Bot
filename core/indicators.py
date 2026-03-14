@@ -129,6 +129,20 @@ def bollinger_bands(
     return ma + num_std * std, ma, ma - num_std * std
 
 
+def bb_position(
+    vals: Sequence[float],
+    window: int = 20,
+    num_std: float = 2.0,
+) -> Optional[float]:
+    """Bollinger Bands position: (prijs - lower) / (upper - lower). Retourneert 0.0-1.0."""
+    upper, mid, lower = bollinger_bands(vals, window, int(num_std))
+    if upper is None or lower is None:
+        return None
+    if upper == lower:
+        return 0.5
+    return float(np.clip((vals[-1] - lower) / (upper - lower), 0.0, 1.0))
+
+
 def atr(
     h: Sequence[float],
     l: Sequence[float],

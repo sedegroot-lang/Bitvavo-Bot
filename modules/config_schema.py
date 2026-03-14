@@ -37,6 +37,8 @@ _SCHEMA: Dict[str, Dict[str, Any]] = {
     "MIN_AVG_VOLUME_1M":        {"type": "float", "default": 500.0,"min": 0.0,   "max": 100000.0,"desc": "Min avg volume EUR/1m candle"},
     "RSI_MIN_BUY":              {"type": "float", "default": 35.0, "min": 0.0,   "max": 100.0,  "desc": "Min RSI for entry"},
     "RSI_MAX_BUY":              {"type": "float", "default": 65.0, "min": 0.0,   "max": 100.0,  "desc": "Max RSI for entry"},
+    "RSI_DCA_THRESHOLD":        {"type": "float", "default": 100.0, "min": 50.0,  "max": 100.0, "desc": "RSI drempel voor DCA (100=altijd DCA)"},
+    "DCA_SYNC_COOLDOWN_SEC":    {"type": "float", "default": 300.0, "min": 0.0,   "max": 1800.0, "desc": "Seconden DCA-pauze na sync"},
 
     # === Trailing stop ===
     "DEFAULT_TRAILING":         {"type": "float", "default": 0.032, "min": 0.001, "max": 0.50,   "desc": "Default trailing stop %"},

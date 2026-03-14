@@ -299,20 +299,36 @@ class SyncValidator:
                             level='debug',
                         )
                     else:
-                        # Fallback: calculate weighted average of buys only
+                        # Fallback: use FIFO cost basis from all trades (accounts for sells)
                         try:
+                            from modules.cost_basis import _compute_cost_basis_from_fills
                             trades = self.bitvavo.trades(market, {})
                             if trades and isinstance(trades, list):
-                                buy_trades = [t for t in trades if t.get('side') == 'buy']
-                                if buy_trades:
-                                    total_cost = sum(float(t.get('amount', 0)) * float(t.get('price', 0)) for t in buy_trades)
-                                    total_amount = sum(float(t.get('amount', 0)) for t in buy_trades)
-                                    if total_amount > 0:
-                                        avg_buy_price = total_cost / total_amount
-                                        self._log(
-                                            f"Calculated avg buy price for {market}: €{avg_buy_price:.6f} from {len(buy_trades)} trades",
-                                            level='debug',
-                                        )
+                                fifo_result = _compute_cost_basis_from_fills(
+                                    trades, market=market, target_amount=amount, tolerance=1.0,
+                                )
+                                if fifo_result and fifo_result.avg_price > 0:
+                                    avg_buy_price = fifo_result.avg_price
+                                    invested = round(fifo_result.invested_eur, 2)
+                                    initial_invested = invested
+                                    total_invested = invested
+                                    dca_buys = max(1, fifo_result.buy_order_count)
+                                    self._log(
+                                        f"Fallback FIFO cost basis for {market}: €{avg_buy_price:.6f} ({dca_buys} buy order(s))",
+                                        level='debug',
+                                    )
+                                else:
+                                    # Last resort: simple average of buy trades only
+                                    buy_trades = [t for t in trades if t.get('side') == 'buy']
+                                    if buy_trades:
+                                        total_cost = sum(float(t.get('amount', 0)) * float(t.get('price', 0)) for t in buy_trades)
+                                        total_amount = sum(float(t.get('amount', 0)) for t in buy_trades)
+                                        if total_amount > 0:
+                                            avg_buy_price = total_cost / total_amount
+                                            self._log(
+                                                f"Calculated avg buy price for {market}: €{avg_buy_price:.6f} from {len(buy_trades)} trades (WARNING: no sell history accounted)",
+                                                level='warning',
+                                            )
                         except Exception as te:
                             self._log(f"Could not get trade history for {market}: {te}", level='debug')
                     
@@ -321,6 +337,26 @@ class SyncValidator:
                         ticker = self.bitvavo.tickerPrice({'market': market})
                         avg_buy_price = float(ticker['price'])
                         self._log(f"Using current price for {market}: €{avg_buy_price:.6f} (no trade history)")
+                    
+                    # SANITY CHECK: if calculated buy_price is >30% above current market price,
+                    # it likely includes old closed positions. Use current price instead to
+                    # prevent catastrophic DCA cascades.
+                    try:
+                        ticker = self.bitvavo.tickerPrice({'market': market})
+                        current_price = float(ticker['price'])
+                        if current_price > 0 and avg_buy_price > current_price * 1.30:
+                            self._log(
+                                f"⚠️ SANITY CHECK: {market} calculated buy_price €{avg_buy_price:.6f} is "
+                                f"{((avg_buy_price / current_price) - 1) * 100:.1f}% above current price €{current_price:.6f}. "
+                                f"Using current price to prevent DCA cascade.",
+                                level='warning',
+                            )
+                            avg_buy_price = current_price
+                            invested = round(amount * current_price, 2)
+                            initial_invested = invested
+                            total_invested = invested
+                    except Exception:
+                        pass
                     
                     if invested is None:
                         invested = round(amount * avg_buy_price, 2)
@@ -390,7 +426,8 @@ class SyncValidator:
                     'trailing_activated': False,
                     'activation_price': None,
                     'highest_since_activation': None,
-                    'last_dca_price': add['price']
+                    'last_dca_price': add['price'],
+                    'synced_at': timestamp,  # DCA cooldown: skip DCA for 5 min after sync
                 }
                 self._log(f"Added missing position: {add['market']} - {add['amount']:.8f} @ €{add['price']:.4f}")
             

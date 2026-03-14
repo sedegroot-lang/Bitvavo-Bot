@@ -475,13 +475,12 @@ class RiskManager:
 			kelly_fraction = win_rate - (1 - win_rate) / win_loss_ratio
 
 			if kelly_fraction <= 0:
-				# Negative Kelly = losing strategy → use minimum
-				min_amount = float(self.ctx.config.get("RISK_KELLY_MIN_AMOUNT", 5.0))
+				# Negative Kelly = losing strategy → don't trade
 				self.ctx.log(
-					f"Kelly negative ({kelly_fraction:.3f}) — using min amount €{min_amount}",
+					f"Kelly negative ({kelly_fraction:.3f}) — skip new trades until win rate improves",
 					level="warning",
 				)
-				return min_amount
+				return 0.0
 
 			# Apply fractional Kelly (default half-Kelly)
 			frac = float(self.ctx.config.get("RISK_KELLY_FRACTION", 0.5))

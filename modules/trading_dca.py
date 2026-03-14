@@ -146,6 +146,20 @@ class DCAManager:
             self._record_dca_audit(market, trade, "skip", "no_current_price")
             return
 
+        # DCA cooldown after sync: skip DCA for 5 minutes after a position is synced
+        # to prevent cascading DCAs from potentially inaccurate buy_price
+        import time as _time_mod
+        synced_at = trade.get('synced_at')
+        if synced_at:
+            cooldown_sec = float(self.ctx.config.get('DCA_SYNC_COOLDOWN_SEC', 300))
+            elapsed = _time_mod.time() - float(synced_at)
+            if elapsed < cooldown_sec:
+                self.ctx.log(
+                    f"DCA voor {market} overgeslagen: sync cooldown ({cooldown_sec - elapsed:.0f}s remaining)"
+                )
+                self._record_dca_audit(market, trade, "skip", "sync_cooldown", {"elapsed": elapsed, "cooldown": cooldown_sec})
+                return
+
         ctx = self.ctx
         cfg = ctx.config
         log = ctx.log

@@ -61,11 +61,18 @@ def validate_features(features, expected_count=None) -> bool:
 
 def feature_engineering(raw: dict):
     """
-    Zet ruwe indicatoren om naar ML feature array.
+    Zet ruwe indicatoren om naar ML feature array (7 features).
+    Volgorde: rsi, macd, sma_short, sma_long, volume, bb_position, stochastic_k
     """
-    # raw: dict met indicatoren
-    # Voorbeeld: {'rsi':..., 'macd':..., 'sma_short':..., 'sma_long':..., 'volume':...}
-    features = [raw.get('rsi',0), raw.get('macd',0), raw.get('sma_short',0), raw.get('sma_long',0), raw.get('volume',0)]
+    features = [
+        raw.get('rsi', 0),
+        raw.get('macd', 0),
+        raw.get('sma_short', 0),
+        raw.get('sma_long', 0),
+        raw.get('volume', 0),
+        raw.get('bb_position', 0.5),   # Bollinger Bands positie (0=under lower, 1=above upper)
+        raw.get('stochastic_k', 50.0), # Stochastic %K
+    ]
     return features
 
 def model_explainability(model, features) -> dict:
@@ -75,7 +82,7 @@ def model_explainability(model, features) -> dict:
     # Return feature importances
     try:
         importances = model.feature_importances_
-        return dict(zip(['rsi','macd','sma_short','sma_long','volume'], importances))
+        return dict(zip(['rsi','macd','sma_short','sma_long','volume','bb_position','stochastic_k'], importances))
     except Exception as e:
         log(f"Explainability mislukt: {e}", level='error')
         return {}
