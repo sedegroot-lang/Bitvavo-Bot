@@ -27,20 +27,20 @@ Signaalkanaal: **https://t.me/+pDwrMmx107lhNDA0**
 ### 📨 Bericht voor Telegram groepen (kopieer-plak)
 
 ```
-📡 Gratis trading signalen voor Bitvavo — via Telegram
+Ik handel al een tijdje automatisch in crypto via Bitvavo, en deze week besloot ik de signalen gratis te delen.
 
-Ik run een AI-trading bot op Bitvavo en deel de signalen gratis:
+Geen grote beloftes — gewoon eerlijk laten zien wat de bot doet:
 
-📈 BUY signalen (coin + prijs + reden)
-📉 SELL signalen (winst/verlies bij close)
-🔄 DCA bijkoop-meldingen
-📊 Dagelijkse samenvatting
+📈 Wanneer ik instap (welke coin, op welk niveau)
+📉 Wanneer ik uitstap (met winst of verlies, transparant)
+🔄 Als ik bijkoop bij een dip
+📊 Elke ochtend een eerlijk dagrapport
 
-Track record deze week: 21 trades, 100% winrate, +€22.59 💰
+Deze week: 21 trades, allemaal met winst, totaal +€22.59. Vorige week was er ook een verliezer, dat deel ik ook gewoon.
 
-Signalen komen 30 sec na de bot (anti front-running).
-Geen kosten, geen verplichting.
+Je ziet de signalen 30 seconden nadat ik al gehandeld heb — zodat ik je niet voor me uit jaag.
 
+Gratis, geen abonnement, geen verplichtingen.
 👉 https://t.me/+pDwrMmx107lhNDA0
 ```
 
@@ -49,20 +49,20 @@ Geen kosten, geen verplichting.
 ### 📨 Engelstalig bericht (voor internationale groepen)
 
 ```
-📡 Free Bitvavo trading signals — Telegram channel
+I've been trading crypto on Bitvavo automatically for a while now, and this week I started sharing the signals for free.
 
-I run an AI-powered trading bot on Bitvavo and share the signals for free:
+No hype, no promises — just showing exactly what I do:
 
-📈 BUY signals (coin + price + reason)
-📉 SELL signals (P&L on close)
-🔄 DCA top-up alerts
-📊 Daily summary (winrate + PnL)
+📈 When I buy (which coin, at what price, why)
+📉 When I sell (profit or loss — I share both)
+🔄 When I add to a position on dips
+📊 An honest daily report every morning
 
-This week: 21 trades, 100% winrate, +€22.59
+This week: 21 trades, all closed in profit, +€22.59 total. Some weeks have losers too — I show those as well.
 
-Signals are delayed 30s after bot execution (anti front-running).
-Free to join, no obligations.
+Signals arrive 30 seconds after I've already traded, so you're never my exit liquidity.
 
+Free. No subscription. No catch.
 👉 https://t.me/+pDwrMmx107lhNDA0
 ```
 
@@ -112,110 +112,109 @@ Zorg dat je GitHub repo publiek staat en de topics zijn ingesteld (zie onderaan 
 
 ## 🟠 Reddit — r/cryptonederlands
 
-**Titel:** Gratis crypto trading signalen voor Bitvavo — live via Telegram (AI bot)
+**Titel:** Ik deel gratis mijn trading signalen op Bitvavo — eerlijk en transparant
 
 ```
 Hey r/cryptonederlands,
 
-Ik heb een automatische trading bot gebouwd voor Bitvavo en deel nu gratis de signalen via Telegram.
+Ik handel al maanden automatisch in crypto op Bitvavo. Geen klikbait, geen beloftes — ik wilde gewoon een systeem bouwen dat voor mij werkt terwijl ik slaap.
 
-**Wat krijg je?**
-- 📈 BUY signalen (welke coin, op welk moment)
-- 📉 SELL signalen (winst/verlies bij close)
-- 🔄 DCA bijkoop-meldingen
-- 📊 Dagelijkse samenvatting (winrate + P&L)
+Na een tijdje besloot ik de signalen gewoon gratis te delen. Dan kunnen jullie zelf zien of het wat is.
 
-**Track record deze week:** 21 trades, 100% winrate, +€22.59
+Wat je krijgt:
+- 📈 Instapmoment (welke coin, prijs, waarom)
+- 📉 Uitstapmoment — winst én verlies, alles transparant
+- 🔄 Bijkoopmomenten bij dips
+- 📊 Elke ochtend een dagrapport
 
-De bot gebruikt XGBoost AI + trailing stops + DCA. Signalen komen met 30 sec vertraging (bot handelt eerst).
+Deze week: 21 trades, +€22.59. Er zijn ook weken met verlies — dat deel ik ook gewoon.
 
-📡 Join gratis: https://t.me/+pDwrMmx107lhNDA0
+Je ziet de signalen 30 seconden nadat ik al ben in- of uitgestapt. Gratis, geen abonnement.
 
-Bot is ook open source als je hem zelf wilt draaien:
+📡 https://t.me/+pDwrMmx107lhNDA0
+
+Wil je de bot zelf draaien? Open source:
 https://github.com/sedegroot-lang/Bitvavo-Bot
 
-Nog geen Bitvavo? Via deze link aanmelden:
+Nog geen Bitvavo? Via deze link aanmelden (geeft ons allebei korting):
 https://bitvavo.com/invite?a=B8942E4528
-
-Vragen welkom 👇
 ```
 
 ---
 
-## 🟠 Reddit — r/cryptonederlands (origineel)
+## 🟠 Reddit — r/cryptonederlands (variant: bot zelf draaien)
 
-**Titel:** Ik bouwde een gratis crypto trading bot voor Bitvavo (open source, NL)
+**Titel:** Ik bouwde mijn eigen trading bot voor Bitvavo — na maanden eindelijk tevreden
 
 ```
 Hey r/cryptonederlands,
 
-Ik heb de afgelopen maanden een volledig automatische trading bot gebouwd voor Bitvavo, speciaal voor Nederlandse gebruikers. Gratis, open source, en draait gewoon op je eigen Windows PC.
+Ik had al een tijdje het gevoel dat ik kansen miste omdat ik niet 24/7 naar mijn scherm kon kijken. Dus begon ik te bouwen.
 
-**Wat kan hij?**
-- 🔄 Trailing Stop Loss — volgt de koers omhoog, verkoopt bij daling
-- 📉 DCA (Dollar Cost Averaging) — koopt bij elke dip automatisch bij
-- 📊 Grid Trading + XGBoost AI — handelt op automatische koerslagen, AI traint op je eigen trades
+Na een paar maanden fixen, testen en verliezen heb ik nu een bot die voor mij handelt op Bitvavo. Draait gewoon op mijn Windows PC, gratis, open source.
 
-**Dashboard via browser** (Flask, localhost:5001):
-- Live portfolio overzicht
-- Winst/verlies per coin
-- Orders beheer
-- Backtest met echte Bitvavo data
-- Telegram notificaties bij elke order
+Wat werkt voor mij:
+- Trailing stop: volgt de koers omhoog, verkoopt automatisch als het keert
+- Bijkopen bij dips (DCA) — niet met gevoel maar met regels
+- Dashboard in de browser zodat ik het gewoon kan volgen
 
-**Vereisten:** Python 3.11+, Windows, Bitvavo API key
+Het is geen magische machine. Er zijn verliesdagen. Maar over de afgelopen 838 trades zit ik op 58.5% winrate, en ik hoef er niet meer bij te zitten.
 
-GitHub: https://github.com/sedegroot-lang/Bitvavo-Bot
-
-📡 Gratis trading signalen via Telegram (real-time buy/sell):
+Bovendien deel ik de live signalen gratis via Telegram als je zelf niet wilt bouwen:
 https://t.me/+pDwrMmx107lhNDA0
 
-Nog geen Bitvavo account? Aanmelden via mijn link geeft ons allebei 0% fee-korting:
-https://bitvavo.com/invite?a=B8942E4528
+Code staat hier als je het zelf wilt draaien of aanpassen:
+https://github.com/sedegroot-lang/Bitvavo-Bot
 
-Vragen welkom 👇
+Nog geen Bitvavo? Via deze link aanmelden:
+https://bitvavo.com/invite?a=B8942E4528
 ```
 
 ---
 
 ## 🟠 Reddit — r/algotrading
 
-**Titel:** Python bot for Bitvavo crypto exchange — Trailing/DCA/Grid + XGBoost AI (open source)
+**Titel:** Built a personal trading bot for Bitvavo over the past year — sharing what I learned
 
 ```
-I built a Python trading bot for Bitvavo (popular EU/NL exchange), focused on retail users.
+I've been running my own trading bot on Bitvavo for about a year now. Started as a hobby project, ended up being something I actually rely on.
 
-**Strategies implemented:**
-- Trailing Stop Loss with configurable trail %
-- DCA (Dollar Cost Averaging) with configurable levels
-- Grid trading combined with XGBoost AI (trains on own trade history)
+The main loop: scan markets every 25 seconds, enter based on a scored signal stack, manage position with a stepped trailing stop, DCA on the way down if confidence holds.
 
-**Tech stack:**
-- Python 3.11, Flask dashboard
-- XGBoost for signal filtering (auto-retrains weekly or when accuracy < 55%)
-- Bitvavo REST API
-- Telegram notifications
+What I ended up with after a lot of iteration:
+- Trailing stop with configurable activation threshold and step levels — avoids the "too tight, too early" problem
+- DCA with per-market limits so one coin can't blow up the whole portfolio
+- A signal scoring system I can plug new indicators into without touching core logic
+- XGBoost layer that retrains on my own closed trade history weekly — mostly useful as a veto, not a driver
 
-GitHub: https://github.com/sedegroot-lang/Bitvavo-Bot
+838 closed trades, 58.5% winrate. Not spectacular, but it runs unattended and I sleep fine.
 
-Feedback / PRs welcome. Still a solo project, looking for contributors.
+Stack: Python 3.13, Flask dashboard, Bitvavo REST API, TinyDB for persistence.
+
+https://github.com/sedegroot-lang/Bitvavo-Bot
+
+Happy to discuss the architecture or what didn't work (there's a lot of that too).
 ```
 
 ---
 
 ## 🟠 Reddit — r/DutchFIRE
 
-**Titel:** Automatisch crypto handelen via Bitvavo — gratis Python bot (passief inkomen experiment)
+**Titel:** Ik laat een bot mijn crypto-deel van de portefeuille beheren — wat ik er na een jaar van geleerd heb
 
 ```
-Voor de FIRE-community die ook crypto als onderdeel van hun strategie hebben:
+Ik houd crypto relatief klein in mijn portefeuille, maar het kostte onevenredig veel tijd. Elke dag even checken, twijfelen of ik moet bijkopen, te laat verkopen.
 
-Ik gebruik zelf een bot die automatisch handelt op Bitvavo. Trailing Stop, DCA, en Grid Trading. 
-Open source, gratis, draait 24/7 op je eigen PC.
+Vorig jaar besloot ik dat deel te automatiseren. Niet om er rijk van te worden, maar om er niet meer in mee te hoeven denken.
 
-Niet financieel advies, maar het scheelt mij uren per week aan handmatig monitoren.
+Het resultaat: een bot die 24/7 draait op mijn eigen PC, handelt op regels die ik zelf heb bepaald, en mij een Telegram-berichtje stuurt als er iets gebeurt.
 
-GitHub: https://github.com/sedegroot-lang/Bitvavo-Bot
+838 trades later: 58.5% winrate, geen slaap verloren, en ik hoef er niet meer bij te zitten.
+
+Niet financieel advies — dit is wat voor mij werkt. Maar als je nieuwsgierig bent:
+
+Code (open source, gratis): https://github.com/sedegroot-lang/Bitvavo-Bot
+Live signalen via Telegram (gratis meekijken): https://t.me/+pDwrMmx107lhNDA0
 
 Nog geen Bitvavo? Via deze link aanmelden:
 https://bitvavo.com/invite?a=B8942E4528
@@ -253,70 +252,63 @@ Vragen? Open een Issue of vraag hier.
 ## 🔵 Facebook — Groepen: "Crypto Nederland", "Investeren & Beleggen NL"
 
 ```
-💡 Wist je dat je crypto automatisch kunt laten handelen, gratis en op je eigen PC?
+Al een tijdje handel ik automatisch in crypto via Bitvavo. Niet omdat ik er de hele dag mee bezig wil zijn, maar juist omdat ik dat niet wil.
 
-Ik heb een trading bot gebouwd voor Bitvavo die 24/7 voor je handelt:
-✅ Trailing Stop Loss
-✅ DCA (automatisch bijkopen bij dips)
-✅ Grid Trading met AI
-✅ Dashboard in je browser
-✅ Telegram melding bij elke order
+Een bot beslist zonder emotie. Geen "ik wacht nog even", geen "ik verkoop niet want het komt vast terug". Gewoon regels die altijd gevolgd worden.
 
-Helemaal gratis, open source, draait op Windows.
+Enkele maanden en 838 trades verder deel ik nu de signalen gratis via Telegram — zodat jij kunt meekijken zonder zelf te hoeven bouwen.
 
-👉 GitHub: https://github.com/sedegroot-lang/Bitvavo-Bot
+📡 Gratis meekijken: https://t.me/+pDwrMmx107lhNDA0
 
-📡 Gratis live trading signalen via Telegram:
-https://t.me/+pDwrMmx107lhNDA0
+Wil je de bot zelf draaien? Gratis, open source:
+https://github.com/sedegroot-lang/Bitvavo-Bot
 
-Nog geen Bitvavo account? Via deze link aanmelden:
+Nog geen Bitvavo? Via deze link aanmelden:
 https://bitvavo.com/invite?a=B8942E4528
-
-Vragen? Reageer gerust 👇
 ```
 
 ---
 
 ## 🐦 X / Twitter (meerdere tweets)
 
-**Tweet 1 (aankondiging):**
+**Tweet 1 (persoonlijk verhaal):**
 ```
-🤖 Ik lanceerde een gratis open source trading bot voor @Bitvavo
+Een jaar geleden was ik de man die om 2u 's nachts charts zat te checken.
 
-✅ Trailing Stop Loss
-✅ DCA (bijkopen bij dips)
-✅ Grid + XGBoost AI
-✅ Flask dashboard
-✅ Telegram notificaties
+Nu draait een bot dat voor me, ik slaap, en krijg 's ochtends een berichtje met wat er is gebeurd.
 
-Draait op je eigen Windows PC, geen cloud, geen subscriptie.
+838 trades later: 58.5% winrate. Niet perfect, maar ik ben er niet meer bij.
 
-GitHub 👇
+Signalen gratis:
+https://t.me/+pDwrMmx107lhNDA0
+
+#bitvavo #crypto #trading
+```
+
+**Tweet 2 (transparantie):**
+```
+Ik deel mijn trading signalen gratis — inclusief de verliezers.
+
+Geen filtered track record. Gewoon alles wat de bot doet, 30 seconden later in je Telegram.
+
+Deze week: 21 trades, +€22.59.
+
+https://t.me/+pDwrMmx107lhNDA0
+
+#bitvavo #cryptosignals
+```
+
+**Tweet 3 (voor developers):**
+```
+Ik bouwde een trading bot in Python voor @Bitvavo.
+
+Een jaar itereren later: trailing stops, DCA, signal scoring, Flask dashboard, alles open source.
+
+Geen cloud, geen subscriptie, draait op je eigen pc.
+
 https://github.com/sedegroot-lang/Bitvavo-Bot
 
-#crypto #trading #python #bitvavo #nederland
-```
-
-**Tweet 2 (technisch):**
-```
-De XGBoost AI in mijn Bitvavo trading bot traint automatisch op je eigen trade-geschiedenis.
-
-Elke week hertraint hij zichzelf — als accuracy onder 55% zakt, eerder.
-
-Open source: https://github.com/sedegroot-lang/Bitvavo-Bot
-
-#algotrading #xgboost #python #crypto
-```
-
-**Tweet 3 (call to action):**
-```
-Verdien je pas geld als je achter je PC zit? 🤔
-
-Ik gebruik een bot die 24/7 crypto handelt op Bitvavo. Gratis, lokaal, Python.
-
-Probeer het zelf: https://github.com/sedegroot-lang/Bitvavo-Bot
-
-#passieveinkomen #crypto #bitvavo
+#python #algotrading #opensource
 ```
 
 ---
@@ -376,10 +368,10 @@ trailing-stop-loss, xgboost, flask, nederland, dutch, windows, automation
 
 **Signaalkanaal:**
 ```
-📡 Gratis crypto trading signalen (real-time, AI-gestuurd):
-https://t.me/+pDwrMmx107lhNDA0
+Ik handel automatisch in crypto op Bitvavo en deel de signalen gratis.
+Deze week: 21 trades, allemaal met winst. Verliezende weken deel ik ook.
 
-21 trades deze week, 100% winrate. Volledig automatisch.
+📡 https://t.me/+pDwrMmx107lhNDA0
 ```
 
 **Affiliate:**
