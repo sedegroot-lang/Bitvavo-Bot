@@ -6,7 +6,7 @@
 
 ---
 
-## Uitvoeringsstatus (bijgewerkt 2026-03-13)
+## Uitvoeringsstatus (bijgewerkt 2026-03-14)
 
 | # | Status | Bestand | Probleem |
 |---|--------|---------|----------|
@@ -23,6 +23,9 @@
 | 11 | ✅ GEDAAN | `config/bot_config.json` + overrides | Dode key `ENABLE_STOP_LOSS` verwijderd |
 | 12 | ⏭️ SKIP | `trailing_bot.py` | `optimize_parameters()` lege placeholder — bewust gelaten |
 | 13 | ✅ GEDAAN | `modules/ml.py` | `model_explainability()` bijgewerkt naar 7 feature-namen |
+| 14 | ✅ GEDAAN | `modules/trade_store.py` | Validatie double-counting DCA → total_invested_eur opgeblazen |
+| 15 | ✅ GEDAAN | `modules/trading_dca.py` | `DCAManager._log()` methode ontbrak (12 crash-punten) |
+| 16 | ✅ GEDAAN | `modules/ml.py` | Model-pad wees naar verouderd model (80 dagen oud) |
 
 ---
 
@@ -43,6 +46,9 @@
 | 11 | 🟡 MEDIUM | `config/bot_config.json` + overrides | Dode key `ENABLE_STOP_LOSS` (live key = `STOP_LOSS_ENABLED`) | Laag |
 | 12 | 🟢 LOW | `trailing_bot.py` | `optimize_parameters()` is een lege placeholder | Laag |
 | 13 | 🟢 LOW | `modules/ml.py` | `model_explainability()` kent maar 5 feature-namen (moet 7 zijn na fix #1) | Laag |
+| 14 | 🔴 CRITICAL | `modules/trade_store.py` | Validatie recalculeert `total_invested_eur` met DCA dubbeltelling → winst wordt verlies | Middel |
+| 15 | 🔴 CRITICAL | `modules/trading_dca.py` | `DCAManager._log()` ontbreekt — 12 aanroepen crashen in exception handlers | Laag |
+| 16 | 🟠 HIGH | `modules/ml.py` | Default model-pad wijst naar `ai_xgb_model.json` (80 dagen oud, data leakage) | Laag |
 
 ---
 
@@ -549,6 +555,70 @@ Na Fix 1 klopt `model_explainability()` niet meer — het kent 5 feature-namen m
 
 ### Fix
 Zie **Fix 1, Stap 3** hierboven.
+
+---
+
+## Fix 14 — trade_store.py Validatie Double-Counting DCA (CRITICAL)
+
+### Probleem
+`modules/trade_store.py` Rule 3 in `validate_trade_data()` herberekent `total_invested_eur = initial_invested_eur + sum(dca_events.amount_eur)`. Maar als `initial_invested_eur` al door `derive_cost_basis()` is gezet (wat DCA-kosten meerekent), worden DCA-bedragen dubbel geteld.
+
+**Impact**: DOGE-EUR trade toonde -€144,33 verlies in plaats van +€0,24 winst. All-time PNL was -€847 in plaats van +€300. +€144,57 aan "phantom losses" hersteld.
+
+### Fix
+Rule 3 veranderd van auto-correctie naar WARN-only voor trades met DCA events:
+
+```python
+# Voorheen: auto-correctie (FOUT bij DCA)
+trade['total_invested_eur'] = recalc
+
+# Nu: alleen waarschuwing
+if dca_events:
+    log(f"[trade_store] WARN: {market} total_invested_eur verschil ...", level='warning')
+else:
+    trade['total_invested_eur'] = recalc  # alleen auto-correct zonder DCA
+```
+
+### Data correctie
+- `data/trade_archive.json`: DOGE-EUR profit -144.33 → +0.24, total_invested 347.60 → 203.21
+- `data/trade_pnl_history.jsonl`: DOGE-EUR profit_eur gecorrigeerd
+
+---
+
+## Fix 15 — DCAManager._log() Ontbreekt (CRITICAL)
+
+### Probleem
+`modules/trading_dca.py`: `DCAManager` class had 12 aanroepen naar `self._log()` maar de methode bestond niet. Alle `_log()` calls zaten in exception handlers, wat betekent dat wanneer een DCA-operatie faalt, de error-logging ook crasht — dubbele failure zonder diagnostiek.
+
+### Fix
+Wrapper methode toegevoegd na `__init__`:
+
+```python
+def _log(self, msg, level='info'):
+    if self.ctx and hasattr(self.ctx, 'log') and self.ctx.log:
+        self.ctx.log(msg, level=level)
+```
+
+---
+
+## Fix 16 — ML Model Pad Wijst naar Verouderd Model (HIGH)
+
+### Probleem
+`modules/ml.py` had `DEFAULT_MODEL_PATH = "ai/ai_xgb_model.json"` hardcoded. Het enhanced training script (`xgb_train_enhanced.py`) slaat het model op als `ai/ai_xgb_model_enhanced.json`. Gevolg: productie laadde een 80 dagen oud model met data leakage (gebruikte `exit_price` als feature).
+
+### Fix
+Model-pad bijgewerkt met fallback logica:
+
+```python
+DEFAULT_MODEL_PATH = "ai/ai_xgb_model_enhanced.json"
+# Bij laden: als enhanced niet bestaat, val terug naar ai_xgb_model.json
+```
+
+### XGBoost Hertraining (2026-03-14)
+- **Dataset**: 151 gesloten trades, 5 features (score, ml_score, rsi_at_buy, dca_buys, hold_duration_hours)
+- **CV AUC**: 0.833 | **Test AUC**: 0.941 | **Precision**: 0.769 | **Recall**: 0.909 | **F1**: 0.833
+- Alle kwaliteitsdrempels gehaald ✅
+- Geen data leakage meer (exit_price verwijderd als feature)
 
 ---
 

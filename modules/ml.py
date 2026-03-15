@@ -4,15 +4,17 @@ from modules.logging_utils import log
 from modules.config import load_config
 from typing import Dict, Tuple, Optional
 
-DEFAULT_MODEL_PATH = "ai/ai_xgb_model.json"
+DEFAULT_MODEL_PATH = "ai/ai_xgb_model_enhanced.json"
+_FALLBACK_MODEL_PATH = "ai/ai_xgb_model.json"
 
 # Allow overriding model path via config with backward compatibility for legacy key
 try:
+    import os as _os
     _cfg = load_config()
     MODEL_PATH = (
         _cfg.get("XGB_MODEL_PATH")
         or _cfg.get("MODEL_PATH")
-        or DEFAULT_MODEL_PATH
+        or (DEFAULT_MODEL_PATH if _os.path.exists(DEFAULT_MODEL_PATH) else _FALLBACK_MODEL_PATH)
     )
     USE_LSTM = _cfg.get("USE_LSTM", False)
     USE_RL_AGENT = _cfg.get("USE_RL_AGENT", False)

@@ -54,6 +54,13 @@ class DCAManager:
         self.ctx = ctx
         self._audit_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'dca_audit.log'))
 
+    def _log(self, msg: str, level: str = 'info') -> None:
+        """Wrapper for ctx.log — prevents AttributeError in exception handlers."""
+        try:
+            self.ctx.log(msg, level=level)
+        except Exception:
+            pass
+
     def _compute_perf_metrics(self) -> Dict[str, Optional[float]]:
         """Derive simple performance stats (win rate, max drawdown) from trade_log for sizing guards."""
         out: Dict[str, Optional[float]] = {"win_rate": None, "max_drawdown": None}
@@ -546,6 +553,14 @@ class DCAManager:
                     )
             except Exception as _tg_err:
                 log(f"[DCA] Telegram notify failed: {_tg_err}", level='warning')
+            # Signal Publisher: publiceer DCA signaal
+            try:
+                from modules import signal_publisher as _sp
+                _avg = float(trade.get('buy_price', current_price))
+                _drop = ((current_price - _avg) / _avg * 100) if _avg > 0 else 0.0
+                _sp.publish_dca(market, new_dca_buys, float(current_price), float(actual_dca_eur), _avg, _drop)
+            except Exception:
+                pass
             ctx.save_trades()
             buys_this_call += 1
             # reservation consumed by actual exposure; release reservation record

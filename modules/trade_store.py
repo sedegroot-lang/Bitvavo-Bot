@@ -178,12 +178,13 @@ def _validate_and_fix_trade_data(data: Dict[str, Any]) -> Dict[str, Any]:
                 needs_fix = True
         elif actual_dca_count > 0 and initial > 0:
             # Verify total = initial + sum of DCA amounts
+            # NOTE: Only WARN, never auto-correct. initial_invested_eur may have been
+            # set by sync engine (derive_cost_basis) which includes DCA costs already.
+            # Auto-correcting would double-count DCA costs and cause massive phantom losses.
             dca_sum = sum(float(e.get('amount_eur', 0) or 0) for e in dca_events if isinstance(e, dict))
             expected_total = initial + dca_sum
             if dca_sum > 0 and abs(total - expected_total) > 0.50:
-                log(f"VALIDATION FIX [{market}]: total_invested_eur={total:.2f} -> {expected_total:.2f} (initial {initial:.2f} + DCA {dca_sum:.2f})", level='warning')
-                trade['total_invested_eur'] = expected_total
-                needs_fix = True
+                log(f"VALIDATION WARN [{market}]: total_invested_eur={total:.2f} != initial({initial:.2f}) + DCA({dca_sum:.2f}) = {expected_total:.2f} — NOT auto-correcting (initial may include synced DCA costs)", level='warning')
         if dca_buys < actual_dca_count:
             log(f"VALIDATION FIX [{market}]: dca_buys={dca_buys} -> {actual_dca_count} (matched to dca_events)", level='warning')
             trade['dca_buys'] = actual_dca_count
