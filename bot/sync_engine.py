@@ -100,6 +100,18 @@ def sync_with_bitvavo():
                     price = float(tick.get('price') or 0)
                 except Exception:
                     price = None
+
+            # Skip dust balances: positions below minimum EUR value are not tradeable
+            dust_threshold = float(CONFIG.get('SYNC_DUST_VALUE_EUR', 5.0))
+            position_value = (price or 0) * amount
+            if price and position_value < dust_threshold:
+                log(
+                    f"Sync: {market} balance {amount:.6f} (≈€{position_value:.2f}) is below "
+                    f"dust threshold (€{dust_threshold:.0f}) — skipping to avoid phantom trade loop.",
+                    level='info',
+                )
+                continue
+
             live_open[market] = {
                 'buy_price': price,
                 'highest_price': price,
