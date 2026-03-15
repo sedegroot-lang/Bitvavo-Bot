@@ -2,11 +2,57 @@
 
 Kopieer-plak teksten voor de promotie van de bot op diverse platforms.  
 Affiliate link: **https://bitvavo.com/invite?a=B8942E4528**  
-GitHub: **https://github.com/sedegroot-lang/Bitvavo-Bot**
+GitHub: **https://github.com/sedegroot-lang/Bitvavo-Bot**  
+Signaalkanaal: **https://t.me/+pDwrMmx107lhNDA0**
+
+---
+
+## 📡 Telegram Signaalkanaal
+
+**Invite link:** https://t.me/+pDwrMmx107lhNDA0  
+**Channel ID:** -1003867510036  
+**Bot:** @mijn_bitvavo_bot (admin)
+
+**Stats (15 maart 2026):**
+- Laatste 7 dagen: 21 trades, 100% winrate, +€22.59
+- Totaal: 838 trades, 58.5% winrate
+- Beste trade: ZEUS-EUR +€235.96
 
 ---
 
 ## 🟠 Reddit — r/cryptonederlands
+
+**Titel:** Gratis crypto trading signalen voor Bitvavo — live via Telegram (AI bot)
+
+```
+Hey r/cryptonederlands,
+
+Ik heb een automatische trading bot gebouwd voor Bitvavo en deel nu gratis de signalen via Telegram.
+
+**Wat krijg je?**
+- 📈 BUY signalen (welke coin, op welk moment)
+- 📉 SELL signalen (winst/verlies bij close)
+- 🔄 DCA bijkoop-meldingen
+- 📊 Dagelijkse samenvatting (winrate + P&L)
+
+**Track record deze week:** 21 trades, 100% winrate, +€22.59
+
+De bot gebruikt XGBoost AI + trailing stops + DCA. Signalen komen met 30 sec vertraging (bot handelt eerst).
+
+📡 Join gratis: https://t.me/+pDwrMmx107lhNDA0
+
+Bot is ook open source als je hem zelf wilt draaien:
+https://github.com/sedegroot-lang/Bitvavo-Bot
+
+Nog geen Bitvavo? Via deze link aanmelden:
+https://bitvavo.com/invite?a=B8942E4528
+
+Vragen welkom 👇
+```
+
+---
+
+## 🟠 Reddit — r/cryptonederlands (origineel)
 
 **Titel:** Ik bouwde een gratis crypto trading bot voor Bitvavo (open source, NL)
 
@@ -30,6 +76,9 @@ Ik heb de afgelopen maanden een volledig automatische trading bot gebouwd voor B
 **Vereisten:** Python 3.11+, Windows, Bitvavo API key
 
 GitHub: https://github.com/sedegroot-lang/Bitvavo-Bot
+
+📡 Gratis trading signalen via Telegram (real-time buy/sell):
+https://t.me/+pDwrMmx107lhNDA0
 
 Nog geen Bitvavo account? Aanmelden via mijn link geeft ons allebei 0% fee-korting:
 https://bitvavo.com/invite?a=B8942E4528
@@ -126,6 +175,9 @@ Ik heb een trading bot gebouwd voor Bitvavo die 24/7 voor je handelt:
 Helemaal gratis, open source, draait op Windows.
 
 👉 GitHub: https://github.com/sedegroot-lang/Bitvavo-Bot
+
+📡 Gratis live trading signalen via Telegram:
+https://t.me/+pDwrMmx107lhNDA0
 
 Nog geen Bitvavo account? Via deze link aanmelden:
 https://bitvavo.com/invite?a=B8942E4528
@@ -227,3 +279,27 @@ trailing-stop-loss, xgboost, flask, nederland, dutch, windows, automation
 | 4 | Reddit r/DutchFIRE | FIRE-community post |
 | 4 | Twitter/X | Tweet 3 |
 | 5+ | YouTube | Demo video |
+
+---
+
+## 📋 Snelle kopieer-links
+
+**Signaalkanaal:**
+```
+📡 Gratis crypto trading signalen (real-time, AI-gestuurd):
+https://t.me/+pDwrMmx107lhNDA0
+
+21 trades deze week, 100% winrate. Volledig automatisch.
+```
+
+**Affiliate:**
+```
+Nog geen Bitvavo? Registreer gratis via deze link:
+https://bitvavo.com/invite?a=B8942E4528
+```
+
+**GitHub:**
+```
+Open source trading bot voor Bitvavo:
+https://github.com/sedegroot-lang/Bitvavo-Bot
+```

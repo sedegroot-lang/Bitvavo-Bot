@@ -9,6 +9,11 @@
 
 Geautomatiseerde crypto trading bot voor [Bitvavo](https://bitvavo.com/invite?a=B8942E4528). Gratis, open source, draait lokaal op je eigen PC.
 
+> **📡 Live Trading Signalen** — Ontvang onze buy/sell signalen in real-time via Telegram:
+> **[▶ Join het signaalkanaal](https://t.me/+pDwrMmx107lhNDA0)**
+>
+> *Laatste 7 dagen: 21 trades, 100% winrate, +€22.59 — volledig automatisch door de bot*
+
 ---
 
 ## Wat doet de bot?
@@ -224,6 +229,12 @@ Bekijk ook eerst [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 ## Doneren
 
 Deze bot is gratis en blijft gratis. Wil je de ontwikkeling steunen?
+
+**📡 Signaalkanaal:**
+Ontvang live buy/sell signalen van de bot: [Join via Telegram](https://t.me/+pDwrMmx107lhNDA0)
+
+**Bitvavo affiliate:**
+Nog geen account? [Registreer via deze link](https://bitvavo.com/invite?a=B8942E4528) — je eerste €10.000 aan trades zijn zonder kosten.
 
 **Bitcoin:**
 ```
