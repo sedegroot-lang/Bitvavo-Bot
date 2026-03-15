@@ -195,6 +195,25 @@ def _finalize_close_trade(
     if do_cleanup:
         cleanup_trades()
 
+    # Signal Publisher: publiceer SELL signaal
+    try:
+        if _signal_pub:
+            _bp = float(closed_entry.get('buy_price', 0) or 0)
+            _sp = float(closed_entry.get('sell_price', 0) or 0)
+            _profit = float(closed_entry.get('profit', 0) or 0)
+            _pct = ((_sp - _bp) / _bp * 100) if _bp > 0 else 0.0
+            _hold_h = None
+            if trade and trade.get('opened_ts'):
+                _hold_h = (time.time() - float(trade['opened_ts'])) / 3600
+            _signal_pub.publish_sell(
+                market, _bp, _sp, _profit, _pct,
+                reason=closed_entry.get('reason', 'unknown'),
+                hold_time_hours=_hold_h,
+                dca_count=int(closed_entry.get('dca_buys', 0) or 0),
+            )
+    except Exception:
+        pass
+
 
 def _get_true_total_invested(trade: Dict[str, Any]) -> float:
     """Return the most reliable total investment cost for a trade.
@@ -947,6 +966,14 @@ try:
 except Exception as _tg_init_err:
     log(f"[Telegram] Init mislukt: {_tg_init_err}", level='warning')
     _tg_handler = None  # type: ignore
+
+# Signal Publisher (betaald signaalkanaal)
+try:
+    from modules import signal_publisher as _signal_pub
+    _signal_pub.init(CONFIG)
+except Exception as _sp_init_err:
+    log(f"[SignalPublisher] Init mislukt: {_sp_init_err}", level='warning')
+    _signal_pub = None  # type: ignore
 
 
 def send_alert(msg):
@@ -2473,6 +2500,13 @@ async def bot_loop():
                             send_alert(_ptp_msg)
                         except Exception:
                             pass
+                        # Signal Publisher: publiceer Partial TP
+                        try:
+                            if _signal_pub:
+                                _tp_lvl = (tp_level_idx + 1) if tp_level_idx is not None else 0
+                                _signal_pub.publish_partial_tp(m, _tp_lvl, exit_portion, float(final_sell_price), float(real_profit))
+                        except Exception:
+                            pass
 
             # Prefer preserved high-water mark when trailing was activated; otherwise use current highest_price
             try:
@@ -2822,8 +2856,16 @@ async def bot_loop():
                 _regime_adj = get_regime_adjustments(_regime_result)
                 _regime_name = _regime_adj.get('regime', 'ranging')
                 # Store in CONFIG for access by open_trade_async and other functions
+                # Signal Publisher: publiceer regime wijziging
+                _prev_regime = (CONFIG.get('_REGIME_RESULT') or {}).get('regime')
                 CONFIG['_REGIME_ADJ'] = _regime_adj
                 CONFIG['_REGIME_RESULT'] = {'regime': _regime_name, 'confidence': _regime_adj.get('confidence', 0.5)}
+                if _prev_regime and _prev_regime != _regime_name:
+                    try:
+                        if _signal_pub:
+                            _signal_pub.publish_regime_change(_prev_regime, _regime_name, _regime_adj.get('confidence', 0.5))
+                    except Exception:
+                        pass
                 # Apply regime adjustments to score threshold
                 _score_adj = float(_regime_adj.get('min_score_adj', 0.0))
                 if _score_adj != 0:
@@ -3966,6 +4008,14 @@ async def open_trade_async(score, m, price_now, s_short, eur_balance, ml_info=No
     log(f"Trade geopend voor {m} op {entry_price:.6f} (score {score}, vol {vol:.3f}, winst {total_profit:.2f})")
     save_trades()
     cleanup_trades()
+
+    # Signal Publisher: publiceer BUY signaal
+    try:
+        if _signal_pub:
+            _regime_name = (CONFIG.get('_REGIME_RESULT') or {}).get('regime')
+            _signal_pub.publish_buy(m, float(entry_price), float(amt_eur), score=float(score) if score else None, regime=_regime_name)
+    except Exception:
+        pass
     
     # Force EUR balance refresh after buy (Issue #8)
     get_eur_balance(force_refresh=True)
