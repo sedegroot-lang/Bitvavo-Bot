@@ -1001,7 +1001,11 @@ def _start_heartbeat_writer(interval=30):
         _get_pending_markets_dict,
         interval=interval,
         dust_threshold_eur=DUST_TRADE_THRESHOLD_EUR,
-        scan_stats_provider=lambda: CONFIG.get('LAST_SCAN_STATS', {}),
+        scan_stats_provider=lambda: {
+            **CONFIG.get('LAST_SCAN_STATS', {}),
+            'regime': CONFIG.get('_REGIME_RESULT', {}).get('regime'),
+            'regime_score_adj': float((CONFIG.get('_REGIME_ADJ') or {}).get('min_score_adj', 0)),
+        },
     )
 
 def _start_reservation_watchdog(interval=30):
@@ -1828,8 +1832,14 @@ async def bot_loop():
                     'BASE_AMOUNT_EUR',
                 )
                 before_snapshot = {k: CONFIG.get(k) for k in important_keys}
+                # Preserve volatile runtime state computed fresh in this session.
+                # These keys are re-computed each scan cycle and must NOT be overwritten
+                # with stale values from bot_state.json during hot-reload.
+                _volatile_keys = {'LAST_SCAN_STATS', '_REGIME_ADJ', '_REGIME_RESULT'}
+                _preserved_volatile = {k: CONFIG[k] for k in _volatile_keys if k in CONFIG}
                 for k, v in new_cfg.items():
                     CONFIG[k] = v
+                CONFIG.update(_preserved_volatile)  # Restore fresh computed values
                 after_snapshot = {k: CONFIG.get(k) for k in important_keys}
                 delta_bits = []
                 for key in important_keys:

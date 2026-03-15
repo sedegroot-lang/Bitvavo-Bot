@@ -114,10 +114,17 @@ def portfolio():
         total_markets = last_scan.get('total_markets', 0)
         evaluated = last_scan.get('evaluated', 0)
         pending_reservations = int(heartbeat.get('pending_reservations', 0) or 0) if heartbeat else 0
-        
+        regime = last_scan.get('regime')
+        regime_score_adj = float(last_scan.get('regime_score_adj', 0) or 0)
+        regime_blocking = regime == 'bearish' or regime_score_adj > 50
+
         blocks = []
         warnings = []
-        
+
+        if regime_blocking:
+            regime_label = (regime or 'bearish').upper().replace('_', ' ')
+            blocks.append(f"Regime {regime_label}: alle nieuwe entries geblokkeerd (threshold +{regime_score_adj:.0f})")
+
         if open_count >= max_trades:
             blocks.append(f"Max trades bereikt: {open_count}/{max_trades}")
         elif open_count >= max_trades - 1:
