@@ -7,7 +7,97 @@ Signaalkanaal: **https://t.me/+pDwrMmx107lhNDA0**
 
 ---
 
-## 📡 Telegram Signaalkanaal
+## � TELEGRAM GROEISTRATEGIE — Snel volgers krijgen
+
+### Stap 1: Join deze grote NL crypto Telegram groepen en post het bericht hieronder
+
+| Groep | Leden (ca.) | Link |
+|-------|-------------|------|
+| Crypto Nederland (officieel) | ~8.000 | https://t.me/cryptonederland |
+| Bitcoin Nederland | ~5.000 | https://t.me/bitcoinnederland |
+| Bitvavo Community (officieel) | ~3.000 | https://t.me/bitvavo |
+| Altcoins Nederland | ~2.500 | https://t.me/altcoinsnl |
+| Crypto Trading NL | ~2.000 | https://t.me/cryptotradingnl |
+| DutchCrypto | ~1.500 | https://t.me/dutchcrypto |
+
+> **Tip:** Join elke groep, wacht 24u (spam-filter), post dan het bericht hieronder. Niet dezelfde dag in 6 groepen — dat triggert bans.
+
+---
+
+### 📨 Bericht voor Telegram groepen (kopieer-plak)
+
+```
+📡 Gratis trading signalen voor Bitvavo — via Telegram
+
+Ik run een AI-trading bot op Bitvavo en deel de signalen gratis:
+
+📈 BUY signalen (coin + prijs + reden)
+📉 SELL signalen (winst/verlies bij close)
+🔄 DCA bijkoop-meldingen
+📊 Dagelijkse samenvatting
+
+Track record deze week: 21 trades, 100% winrate, +€22.59 💰
+
+Signalen komen 30 sec na de bot (anti front-running).
+Geen kosten, geen verplichting.
+
+👉 https://t.me/+pDwrMmx107lhNDA0
+```
+
+---
+
+### 📨 Engelstalig bericht (voor internationale groepen)
+
+```
+📡 Free Bitvavo trading signals — Telegram channel
+
+I run an AI-powered trading bot on Bitvavo and share the signals for free:
+
+📈 BUY signals (coin + price + reason)
+📉 SELL signals (P&L on close)
+🔄 DCA top-up alerts
+📊 Daily summary (winrate + PnL)
+
+This week: 21 trades, 100% winrate, +€22.59
+
+Signals are delayed 30s after bot execution (anti front-running).
+Free to join, no obligations.
+
+👉 https://t.me/+pDwrMmx107lhNDA0
+```
+
+---
+
+### Stap 2: Post ook in deze internationale Telegram groepen
+
+| Groep | Leden (ca.) | Link |
+|-------|-------------|------|
+| Crypto Signals (algemeen) | ~50.000 | https://t.me/CryptocurrencySignals |
+| Bitvavo International | ~2.000 | https://t.me/bitvavocom |
+| Altcoin Signals | ~10.000 | https://t.me/altcoinsignals |
+| Crypto Trading & Signals | ~8.000 | https://t.me/cryptotradingsignals |
+
+---
+
+### Stap 3: Zet je kanaal op Telegram-directories (gratis)
+
+Voeg je kanaal toe op deze sites voor organische ontdekking:
+- **https://tgstat.com** — grootste Telegram directory, gratis invoer
+- **https://telemetrio.com** — zoekdirectory voor Telegram kanalen
+- **https://telegram-group.com** — add your channel for free
+
+Bij elk: zoek categorie "Crypto Signals" of "Finance" → "Add channel" → vul in.
+
+---
+
+### Stap 4: GitHub CTA (automatische organische aanwas)
+
+Iedereen die de bot installeert via GitHub ziet de kanaallink. README is al bijgewerkt.
+Zorg dat je GitHub repo publiek staat en de topics zijn ingesteld (zie onderaan dit bestand).
+
+---
+
+## �📡 Telegram Signaalkanaal
 
 **Invite link:** https://t.me/+pDwrMmx107lhNDA0  
 **Channel ID:** -1003867510036  
