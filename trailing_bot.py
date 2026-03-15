@@ -3192,7 +3192,38 @@ async def bot_loop():
 
         # Trades openen via async
         await open_trades_async(scored, eur_balance)
-        
+
+        # Daily summary voor signaalkanaal (eenmalig per dag, rond middernacht)
+        try:
+            if _signal_pub:
+                if not hasattr(bot_loop, '_last_daily_summary_date'):
+                    bot_loop._last_daily_summary_date = ""
+                today_str = time.strftime("%Y-%m-%d")
+                if bot_loop._last_daily_summary_date != today_str and int(time.strftime("%H")) >= 0:
+                    bot_loop._last_daily_summary_date = today_str
+                    yesterday_end = time.mktime(time.strptime(today_str, "%Y-%m-%d"))
+                    yesterday_start = yesterday_end - 86400
+                    yday_trades = [
+                        t for t in closed_trades
+                        if yesterday_start <= float(t.get("timestamp") or 0) < yesterday_end
+                    ]
+                    if yday_trades:
+                        wins = sum(1 for t in yday_trades if float(t.get("profit") or 0) > 0)
+                        losses = len(yday_trades) - wins
+                        total_pnl = sum(float(t.get("profit") or 0) for t in yday_trades)
+                        sorted_t = sorted(yday_trades, key=lambda t: float(t.get("profit") or 0), reverse=True)
+                        best = sorted_t[0] if sorted_t else None
+                        worst = sorted_t[-1] if sorted_t else None
+                        best_str = f"{best.get('market', '?').replace('-EUR', '')} {'+' if float(best.get('profit', 0)) >= 0 else ''}€{float(best.get('profit', 0)):.2f}" if best else None
+                        worst_str = f"{worst.get('market', '?').replace('-EUR', '')} {'+' if float(worst.get('profit', 0)) >= 0 else ''}€{float(worst.get('profit', 0)):.2f}" if worst else None
+                        _signal_pub.publish_daily_summary(
+                            len(yday_trades), wins, losses, total_pnl,
+                            best_trade=best_str, worst_trade=worst_str,
+                            regime=_regime_name if '_regime_name' in dir() else None,
+                        )
+        except Exception:
+            pass
+
         # CRITICAL: Sleep tussen scans om rate limits te voorkomen
         await asyncio.sleep(SLEEP_SECONDS)
 
