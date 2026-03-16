@@ -186,6 +186,19 @@ def _signal_strength_impl(m: str) -> Tuple[float, Any, Any, dict]:
     }
     score = sum(weight for (cond, weight) in signals.values() if cond)
 
+    # Apply Bayesian adaptive weights to classic signals
+    if _cfg.get('BAYESIAN_FUSION_ENABLED', True):
+        try:
+            from core.bayesian_fusion import get_signal_weight
+            bayesian_adj = 0.0
+            for name, (cond, weight) in signals.items():
+                if cond:
+                    bw = get_signal_weight(name, default=1.0)
+                    bayesian_adj += weight * (bw - 1.0)
+            score += bayesian_adj
+        except Exception:
+            pass
+
     if _cfg.get('SIGNALS_DEBUG_LOGGING'):
         triggered = [name for name, (cond, _) in signals.items() if cond]
         log(f"[signals] {m} base_score={score:.2f} triggered={triggered}", level='debug')

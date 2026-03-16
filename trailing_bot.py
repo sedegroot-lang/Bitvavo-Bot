@@ -188,6 +188,37 @@ def _finalize_close_trade(
     if update_market_profits:
         p = profit_for_market if profit_for_market is not None else closed_entry.get('profit', 0.0)
         market_profits[market] = market_profits.get(market, 0.0) + p
+
+    # Bayesian Signal Fusion: update signal weights from trade outcome
+    try:
+        if CONFIG.get('BAYESIAN_FUSION_ENABLED', True):
+            from core.bayesian_fusion import update_from_trade_result
+            _active_sigs = {}
+            for _sn in ('sma_cross', 'price_above_sma', 'rsi_ok', 'macd_ok',
+                         'ema_ok', 'bb_breakout', 'stoch_ok', 'trend_1m',
+                         'trend_5m', 'trend_5m_strong', 'breakout', 'vol_above_avg',
+                         'rsi_momentum'):
+                _active_sigs[_sn] = True  # We don't track per-signal activation yet; default active
+            _trade_profit = float(closed_entry.get('profit', 0) or 0)
+            update_from_trade_result(_active_sigs, _trade_profit)
+    except Exception:
+        pass
+
+    # Meta-Learner: update strategy performance from trade outcome
+    try:
+        if CONFIG.get('META_LEARNER_ENABLED', True):
+            from core.meta_learner import MetaLearner
+            _ml_instance = MetaLearner.load()
+            _rsi_entry = trade.get('rsi_at_entry') if trade else None
+            _sma_cross = trade.get('sma_short_at_entry') and trade.get('sma_long_at_entry') and \
+                         float(trade.get('sma_short_at_entry', 0) or 0) > float(trade.get('sma_long_at_entry', 0) or 0)
+            _strategy = _ml_instance.classify_trade(rsi=_rsi_entry, sma_cross=_sma_cross)
+            _ml_instance.record_outcome(_strategy, float(closed_entry.get('profit', 0) or 0))
+            _ml_instance.update_weights()
+            _ml_instance.save()
+    except Exception:
+        pass
+
     if market in open_trades:
         del open_trades[market]
     if do_save:
@@ -2876,6 +2907,28 @@ async def bot_loop():
                     log(f"[REGIME] 🔴 BEARISH regime – all new entries BLOCKED", level='warning')
             except Exception as _regime_err:
                 log(f"[REGIME] Error: {_regime_err}", level='debug')
+
+        # ── Markov Regime Anticipation: record regime + adjust score threshold ──
+        if CONFIG.get('MARKOV_REGIME_ENABLED', True) and _regime_adj:
+            try:
+                from core.markov_regime import MarkovRegimePredictor
+                if not hasattr(bot_loop, '_markov_predictor'):
+                    bot_loop._markov_predictor = MarkovRegimePredictor.load()
+                _mk = bot_loop._markov_predictor
+                _current_regime = _regime_adj.get('regime', 'ranging')
+                _mk.record_regime(_current_regime)
+                _markov_adj = _mk.get_score_adjustment(_current_regime)
+                if _markov_adj != 0:
+                    min_score_threshold += _markov_adj
+                    log(f"[MARKOV] Score threshold adjusted: {min_score_threshold:.1f} ({_markov_adj:+.1f} from regime transition prediction)", level='info')
+                # Persist periodically (every 50 cycles)
+                if not hasattr(bot_loop, '_markov_save_counter'):
+                    bot_loop._markov_save_counter = 0
+                bot_loop._markov_save_counter += 1
+                if bot_loop._markov_save_counter % 50 == 0:
+                    _mk.save()
+            except Exception:
+                pass
 
         # ── Cascade Correlation Shield: check portfolio correlation risk ──
         _corr_block_entries = False

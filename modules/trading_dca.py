@@ -259,6 +259,27 @@ class DCAManager:
             self._record_dca_audit(market, trade, "skip", "rsi_block", {"rsi": rsi_val, "rsi_threshold": rsi_dca_threshold})
             return
 
+        # --- SMART DCA: Volatility-aware timing (Bollinger Band squeeze) ---
+        # When SMART_DCA_ENABLED=true, delay DCA until selling exhaustion is detected
+        # (price below lower BB + bandwidth contracting). Falls back to standard DCA
+        # when insufficient data or when smart DCA is disabled.
+        if bool(cfg.get("SMART_DCA_ENABLED", True)):
+            try:
+                from core.smart_dca import should_smart_dca
+                _buy_px = float(trade.get("buy_price", cp) or cp)
+                _smart_ok, _smart_reason = should_smart_dca(
+                    prices, cp, _buy_px,
+                    dca_drop_pct=settings.drop_pct,
+                    bb_window=int(cfg.get("SMART_DCA_BB_WINDOW", 20)),
+                    bandwidth_threshold=float(cfg.get("SMART_DCA_BW_THRESHOLD", 0.04)),
+                )
+                if not _smart_ok and _smart_reason == "waiting_for_squeeze":
+                    ctx.log(f"Smart DCA {market}: waiting for BB squeeze (selling exhaustion)")
+                    self._record_dca_audit(market, trade, "skip", "smart_dca_waiting")
+                    return
+            except Exception:
+                pass  # Fall through to standard DCA on any error
+
         # --- HYBRID DCA MODE ---
         # When DCA_HYBRID=true (or both DCA_ENABLED and DCA_PYRAMID_UP are true):
         #   - Position in LOSS  → average-down (fixed/dynamic DCA)

@@ -1,0 +1,81 @@
+{
+  "trained_at": 1773689509,
+  "samples_total": 158,
+  "samples_train": 126,
+  "samples_test": 32,
+  "positive_ratio": 0.3924050632911392,
+  "cv_auc_mean": 0.901025641025641,
+  "cv_auc_std": 0.052296045415942724,
+  "test_accuracy": 0.90625,
+  "test_auc": 0.9534412955465588,
+  "test_precision_0": 0.9444444444444444,
+  "test_precision_1": 0.8571428571428571,
+  "test_recall_1": 0.9230769230769231,
+  "test_f1_1": 0.8888888888888888,
+  "classification_report": {
+    "0": {
+      "precision": 0.9444444444444444,
+      "recall": 0.8947368421052632,
+      "f1-score": 0.918918918918919,
+      "support": 19.0
+    },
+    "1": {
+      "precision": 0.8571428571428571,
+      "recall": 0.9230769230769231,
+      "f1-score": 0.8888888888888888,
+      "support": 13.0
+    },
+    "accuracy": 0.90625,
+    "macro avg": {
+      "precision": 0.9007936507936507,
+      "recall": 0.9089068825910931,
+      "f1-score": 0.9039039039039038,
+      "support": 32.0
+    },
+    "weighted avg": {
+      "precision": 0.9089781746031745,
+      "recall": 0.90625,
+      "f1-score": 0.9067192192192193,
+      "support": 32.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      17,
+      2
+    ],
+    [
+      1,
+      12
+    ]
+  ],
+  "feature_importance": {
+    "feature_0": 0.677216649055481,
+    "feature_1": 0.0,
+    "feature_2": 0.0,
+    "feature_3": 0.0,
+    "feature_4": 0.32278335094451904
+  },
+  "scaler_mean": [
+    1.5973004820954122,
+    0.0,
+    50.0,
+    0.17088607594936708,
+    382.550990386835
+  ],
+  "scaler_scale": [
+    4.189865524301432,
+    1.0,
+    1.0,
+    0.9948795358327457,
+    203.90116398176707
+  ],
+  "feature_names": [
+    "score",
+    "ml_score",
+    "rsi_at_buy",
+    "dca_buys",
+    "hold_duration_hours"
+  ],
+  "quality_threshold_met": true
+}
