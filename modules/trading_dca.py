@@ -263,7 +263,7 @@ class DCAManager:
         # When SMART_DCA_ENABLED=true, delay DCA until selling exhaustion is detected
         # (price below lower BB + bandwidth contracting). Falls back to standard DCA
         # when insufficient data or when smart DCA is disabled.
-        if bool(cfg.get("SMART_DCA_ENABLED", True)):
+        if bool(cfg.get("SMART_DCA_ENABLED", False)):
             try:
                 from core.smart_dca import should_smart_dca
                 _buy_px = float(trade.get("buy_price", cp) or cp)

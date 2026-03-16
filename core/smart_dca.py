@@ -73,6 +73,10 @@ def should_smart_dca(
     if bandwidth is None:
         return True, "standard_dca_fallback"
 
+    # If bandwidth is effectively zero (flat candles / no variance), fall back to standard DCA
+    if bandwidth < 1e-9:
+        return True, "standard_dca_fallback"
+
     # Check if bandwidth is contracting (squeeze forming)
     if len(closes) >= bb_window + 10:
         prev_bw = bollinger_bandwidth(list(closes[:-5]), bb_window)
