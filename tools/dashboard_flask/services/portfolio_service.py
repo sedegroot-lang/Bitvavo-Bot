@@ -89,6 +89,12 @@ class PortfolioTotals:
     winning_trades: int = 0
     losing_trades: int = 0
     trailing_active_count: int = 0
+    daily_pnl: float = 0.0
+    daily_pnl_pct: float = 0.0
+    weekly_pnl: float = 0.0
+    weekly_pnl_pct: float = 0.0
+    monthly_pnl: float = 0.0
+    monthly_pnl_pct: float = 0.0
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -106,6 +112,12 @@ class PortfolioTotals:
             'winning_trades': self.winning_trades,
             'losing_trades': self.losing_trades,
             'trailing_active_count': self.trailing_active_count,
+            'daily_pnl': self.daily_pnl,
+            'daily_pnl_pct': self.daily_pnl_pct,
+            'weekly_pnl': self.weekly_pnl,
+            'weekly_pnl_pct': self.weekly_pnl_pct,
+            'monthly_pnl': self.monthly_pnl,
+            'monthly_pnl_pct': self.monthly_pnl_pct,
         }
 
 
@@ -389,6 +401,49 @@ class PortfolioService:
         account_value = overview_total if overview_total > 0 else (total_current + eur_balance)
         real_profit = account_value - total_deposited
         
+        # Calculate period P&L from closed trades
+        import time as _time
+        import json as _json
+        _now = _time.time()
+        _day_ago = _now - 86400
+        _week_ago = _now - 7 * 86400
+        _month_ago = _now - 30 * 86400
+        daily_pnl = daily_inv = weekly_pnl = weekly_inv = monthly_pnl = monthly_inv = 0.0
+        try:
+            _trades_data = self.data_service.load_trades()
+            _closed = list(_trades_data.get('closed', []) or [])
+            _archive_path = self.data_service._project_root / 'data' / 'trade_archive.json'
+            if _archive_path.exists():
+                try:
+                    with _archive_path.open('r', encoding='utf-8') as _af:
+                        _arch = _json.load(_af)
+                    if isinstance(_arch, list):
+                        _closed = _closed + _arch
+                    elif isinstance(_arch, dict):
+                        _closed = _closed + (_arch.get('closed', []) or [])
+                except Exception:
+                    pass
+            for _t in _closed:
+                _ts = float(_t.get('timestamp', 0) or 0)
+                if _ts <= 0:
+                    continue
+                _profit = float(_t.get('profit', 0) or 0)
+                _inv = float(_t.get('initial_invested_eur', 0) or _t.get('invested_eur', 0) or 0)
+                if _ts >= _month_ago:
+                    monthly_pnl += _profit
+                    monthly_inv += _inv
+                if _ts >= _week_ago:
+                    weekly_pnl += _profit
+                    weekly_inv += _inv
+                if _ts >= _day_ago:
+                    daily_pnl += _profit
+                    daily_inv += _inv
+        except Exception as _e:
+            logger.debug(f"Period P&L calc error: {_e}")
+
+        def _pct(pnl, inv):
+            return (pnl / inv * 100) if inv > 0 else 0.0
+
         return PortfolioTotals(
             total_invested=total_invested,
             total_current=total_current,
@@ -409,6 +464,12 @@ class PortfolioService:
             winning_trades=winning_trades,
             losing_trades=losing_trades,
             trailing_active_count=trailing_active_count,
+            daily_pnl=round(daily_pnl, 2),
+            daily_pnl_pct=round(_pct(daily_pnl, daily_inv), 2),
+            weekly_pnl=round(weekly_pnl, 2),
+            weekly_pnl_pct=round(_pct(weekly_pnl, weekly_inv), 2),
+            monthly_pnl=round(monthly_pnl, 2),
+            monthly_pnl_pct=round(_pct(monthly_pnl, monthly_inv), 2),
         )
     
     def get_portfolio_data(self) -> Dict[str, Any]:
