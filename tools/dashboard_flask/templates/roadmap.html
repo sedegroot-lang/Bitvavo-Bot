@@ -353,8 +353,9 @@
     <div class="current-value">€{{ "%.0f"|format(current_value) }}</div>
     <div class="target-label">van €5.000 doel · €{{ "%.0f"|format(total_deposited) }} gestort</div>
     <div class="progress-track">
-        <div class="progress-fill" style="width: {{ "%.1f"|format(progress_pct) }}%"></div>
+        <div class="progress-fill" id="roadmap-progress" data-pct="{{ "%.1f"|format(progress_pct) }}"></div>
     </div>
+    <script>!function(){var e=document.getElementById('roadmap-progress');if(e)e.style.width=e.dataset.pct+'%';}();</script>
     <div class="progress-labels">
         <span>€0</span>
         <span>€1.000</span>
