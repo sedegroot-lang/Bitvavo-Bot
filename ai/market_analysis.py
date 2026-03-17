@@ -338,9 +338,9 @@ def scan_all_markets_for_opportunities(cfg: dict, closed_trades: list) -> Dict[s
     if not all_markets:
         all_markets = [
             "BTC-EUR", "ETH-EUR", "SOL-EUR", "BNB-EUR", "AVAX-EUR", "LINK-EUR",
-            "MATIC-EUR", "ATOM-EUR", "DOT-EUR", "UNI-EUR", "AAVE-EUR", "ARB-EUR",
+            "POL-EUR", "ATOM-EUR", "DOT-EUR", "UNI-EUR", "AAVE-EUR", "ARB-EUR",
             "OP-EUR", "INJ-EUR", "SNX-EUR", "XRP-EUR", "LTC-EUR", "ALGO-EUR",
-            "NEAR-EUR", "FTM-EUR", "GRT-EUR", "LDO-EUR", "GMX-EUR", "CRV-EUR", "MKR-EUR",
+            "NEAR-EUR", "GRT-EUR", "LDO-EUR", "GMX-EUR", "CRV-EUR",
         ]
         log(f"[MARKET-SCAN] Using fallback list: {len(all_markets)} markets", level="warning")
 
@@ -365,14 +365,14 @@ def scan_all_markets_for_opportunities(cfg: dict, closed_trades: list) -> Dict[s
     available_markets = [m for m in all_markets if m not in current_whitelist]
 
     layer1_markets = [
-        "XRP-EUR", "ADA-EUR", "LTC-EUR", "ALGO-EUR", "NEAR-EUR", "FTM-EUR",
+        "XRP-EUR", "ADA-EUR", "LTC-EUR", "ALGO-EUR", "NEAR-EUR",
         "EGLD-EUR", "FLOW-EUR", "TRX-EUR", "XTZ-EUR", "EOS-EUR",
     ]
     defi_markets = [
-        "LDO-EUR", "GMX-EUR", "CRV-EUR", "MKR-EUR", "1INCH-EUR", "COMP-EUR",
+        "LDO-EUR", "GMX-EUR", "CRV-EUR", "1INCH-EUR", "COMP-EUR",
         "YFI-EUR", "BAL-EUR", "SUSHI-EUR", "CAKE-EUR",
     ]
-    layer2_markets = ["IMX-EUR", "LRC-EUR", "METIS-EUR"]
+    layer2_markets = ["POL-EUR", "IMX-EUR", "LRC-EUR", "METIS-EUR"]
 
     priority_markets: Dict[str, Dict[str, str]] = {}
     for market in layer1_markets:

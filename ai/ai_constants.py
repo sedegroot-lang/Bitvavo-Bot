@@ -115,10 +115,10 @@ CONFIG_VALIDATION_RULES = {
 # Sector categorization for correlation management
 SECTOR_DEFINITIONS = {
     'Layer1': ['BTC-EUR', 'ETH-EUR', 'XRP-EUR', 'ADA-EUR', 'LTC-EUR', 'ALGO-EUR', 'NEAR-EUR',
-               'FTM-EUR', 'EGLD-EUR', 'FLOW-EUR', 'TRX-EUR', 'XTZ-EUR', 'EOS-EUR', 'AVAX-EUR', 'SOL-EUR'],
-    'DeFi': ['UNI-EUR', 'AAVE-EUR', 'LDO-EUR', 'GMX-EUR', 'CRV-EUR', 'MKR-EUR', '1INCH-EUR',
+               'EGLD-EUR', 'FLOW-EUR', 'TRX-EUR', 'XTZ-EUR', 'EOS-EUR', 'AVAX-EUR', 'SOL-EUR'],
+    'DeFi': ['UNI-EUR', 'AAVE-EUR', 'LDO-EUR', 'GMX-EUR', 'CRV-EUR', '1INCH-EUR',
              'COMP-EUR', 'YFI-EUR', 'BAL-EUR', 'SUSHI-EUR', 'CAKE-EUR', 'SNX-EUR'],
-    'Layer2': ['MATIC-EUR', 'IMX-EUR', 'LRC-EUR', 'METIS-EUR', 'ARB-EUR', 'OP-EUR'],
+    'Layer2': ['POL-EUR', 'IMX-EUR', 'LRC-EUR', 'METIS-EUR', 'ARB-EUR', 'OP-EUR'],
     'Meme': ['DOGE-EUR', 'SHIB-EUR', 'PEPE-EUR'],
     'AI': ['FET-EUR', 'AGIX-EUR', 'OCEAN-EUR'],
     'Gaming': ['AXS-EUR', 'SAND-EUR', 'MANA-EUR', 'ENJ-EUR', 'GALA-EUR'],

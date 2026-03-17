@@ -4,8 +4,10 @@ from modules.logging_utils import log
 from modules.config import load_config
 from typing import Dict, Tuple, Optional
 
-DEFAULT_MODEL_PATH = "ai/ai_xgb_model_enhanced.json"
-_FALLBACK_MODEL_PATH = "ai/ai_xgb_model.json"
+# Regular model (7 market-indicator features) is used for entry signals.
+# Enhanced model (5 trade-outcome features) is for post-trade analysis only.
+DEFAULT_MODEL_PATH = "ai/ai_xgb_model.json"
+_FALLBACK_MODEL_PATH = "ai/ai_xgb_model_enhanced.json"
 
 # Allow overriding model path via config with backward compatibility for legacy key
 try:

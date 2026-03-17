@@ -79,20 +79,23 @@ def _signal_strength_impl(m: str) -> Tuple[float, Any, Any, dict]:
     ml_signal = 0
     ml_conf = 0.0
     try:
-        from modules.ml import predict_ensemble, prepare_lstm_sequence
-        features = [
-            float(r if r is not None else 50.0),
-            float((m_line - m_sig) if (m_line is not None and m_sig is not None) else 0.0),
-            float(s_short[-1] if s_short is not None and hasattr(s_short, '__getitem__') else (s_short if s_short is not None else p1[-1])),
-            float(s_long[-1] if s_long is not None and hasattr(s_long, '__getitem__') else (s_long if s_long is not None else p1[-1])),
-            float(v1[-1] if v1 and len(v1) > 0 else 0.0),
-            float(ema_val[-1] if ema_val is not None and hasattr(ema_val, '__getitem__') else (ema_val if ema_val is not None else p1[-1])),
-            float(bb_upper[-1] if bb_upper is not None and hasattr(bb_upper, '__getitem__') else (bb_upper if bb_upper is not None else p1[-1] * 1.02)),
-            float(bb_lower[-1] if bb_lower is not None and hasattr(bb_lower, '__getitem__') else (bb_lower if bb_lower is not None else p1[-1] * 0.98)),
-            float(stoch_val if stoch_val is not None else 50.0),
-            float(avg_vol if avg_vol else 0.0),
-            float(p1[-1] if p1 else 0.0),
-        ]
+        from modules.ml import predict_ensemble, prepare_lstm_sequence, feature_engineering
+        # Build 7-feature array matching the XGBoost model (rsi, macd, sma_short, sma_long, volume, bb_position, stochastic_k)
+        _sma_s = float(s_short[-1] if s_short is not None and hasattr(s_short, '__getitem__') else (s_short if s_short is not None else p1[-1]))
+        _sma_l = float(s_long[-1] if s_long is not None and hasattr(s_long, '__getitem__') else (s_long if s_long is not None else p1[-1]))
+        _bb_u = float(bb_upper[-1] if bb_upper is not None and hasattr(bb_upper, '__getitem__') else (bb_upper if bb_upper is not None else p1[-1] * 1.02))
+        _bb_l = float(bb_lower[-1] if bb_lower is not None and hasattr(bb_lower, '__getitem__') else (bb_lower if bb_lower is not None else p1[-1] * 0.98))
+        _bb_range = _bb_u - _bb_l
+        _bb_pos = ((p1[-1] - _bb_l) / _bb_range) if _bb_range > 0 else 0.5
+        features = feature_engineering({
+            'rsi': float(r if r is not None else 50.0),
+            'macd': float((m_line - m_sig) if (m_line is not None and m_sig is not None) else 0.0),
+            'sma_short': _sma_s,
+            'sma_long': _sma_l,
+            'volume': float(v1[-1] if v1 and len(v1) > 0 else 0.0),
+            'bb_position': float(max(0.0, min(1.0, _bb_pos))),
+            'stochastic_k': float(stoch_val if stoch_val is not None else 50.0),
+        })
         features_dict = {
             'rsi': float(r if r is not None else 50.0),
             'macd': float((m_line - m_sig) if (m_line is not None and m_sig is not None) else 0.0),
