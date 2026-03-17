@@ -289,9 +289,11 @@ class PortfolioService:
                 )
                 trailing_progress = max(0, min(100, trailing_progress))
             
-            # DCA info
-            dca_level = int(trade.get('dca_level', 0))
+            # DCA info — cap dca_level to dca_max so corrupted legacy trades
+            # (dca_buys=50, dca_max_config=9) never display nonsense.
             dca_max = int(config.get('DCA_MAX_BUYS', 4))
+            _dca_level_raw = int(trade.get('dca_buys', trade.get('dca_level', 0)) or 0)
+            dca_level = min(_dca_level_raw, dca_max) if dca_max else _dca_level_raw
             
             # DCA next price and buy amount
             dca_next_price = trade.get('dca_next_price')

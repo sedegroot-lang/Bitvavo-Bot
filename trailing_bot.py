@@ -840,7 +840,15 @@ def validate_and_repair_trades():
             dca_buys = int(trade.get('dca_buys', 0) or 0)
             invested = float(trade.get('invested_eur', 0) or 0)
             total_invested = float(trade.get('total_invested_eur', invested) or invested)
-            
+
+            # GUARD 0: per-trade dca_max must not exceed global — prevents corrupted
+            # trades from bypassing the cap (e.g. legacy trades with dca_max=42/50)
+            if dca_max_local > dca_max_global:
+                log(f"⚠️ REPAIR [{market}]: dca_max {dca_max_local} > global {dca_max_global}, resetting", level='warning')
+                trade['dca_max'] = dca_max_global
+                dca_max_local = dca_max_global
+                repairs_made += 1
+
             # GUARD 1: dca_buys > dca_max
             if dca_buys > dca_max_local:
                 log(f"⚠️ REPAIR [{market}]: dca_buys {dca_buys} > dca_max {dca_max_local}, resetting to {dca_max_local}", level='warning')

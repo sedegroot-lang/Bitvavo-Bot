@@ -846,10 +846,12 @@ def build_trade_cards(trades: Dict, config: Dict) -> List[Dict]:
             
             # DCA level: use max of dca_buys counter and dca_events length
             # (dca_events may be incomplete if events were lost by earlier sync bugs)
+            # Cap to dca_max_levels so corrupted legacy trades (dca_buys=50, max=9)
+            # never show nonsense like "50/9".
             dca_events = trade.get('dca_events', [])
             dca_events_len = len(dca_events) if isinstance(dca_events, list) else 0
             dca_buys_counter = int(trade.get('dca_buys', 0) or 0)
-            dca_level = max(dca_events_len, dca_buys_counter)
+            dca_level = min(max(dca_events_len, dca_buys_counter), dca_max_levels) if dca_max_levels else max(dca_events_len, dca_buys_counter)
             
             status = 'active'
             status_label = 'Actief'

@@ -562,12 +562,14 @@ class DCAManager:
             from core.trade_investment import add_dca as _ti_add_dca
             _ti_add_dca(trade, float(actual_dca_eur), source="dca_market_buy")
             new_dca_buys = int(trade.get("dca_buys", 0)) + 1
-            # GUARD: Never exceed dca_max to prevent corruption
-            dca_max_limit = int(trade.get("dca_max") or settings.max_buys or 3)
+            # GUARD: Never exceed global max_buys — use settings.max_buys (from global
+            # config) as authoritative limit; per-trade dca_max can be corrupted.
+            dca_max_limit = int(settings.max_buys or 3)
             if new_dca_buys > dca_max_limit:
                 log(f"⚠️ GUARD: dca_buys {new_dca_buys} would exceed dca_max {dca_max_limit} for {market}, capping")
                 new_dca_buys = dca_max_limit
             trade["dca_buys"] = new_dca_buys
+            trade["dca_max"] = dca_max_limit  # Keep per-trade max in sync
             trade["last_dca_price"] = float(current_price)
             # Add DCA event with unique ID and ACTUAL amounts
             trade.setdefault("dca_events", []).append({
@@ -755,12 +757,14 @@ class DCAManager:
             from core.trade_investment import add_dca as _ti_add_dca
             _ti_add_dca(trade, float(actual_dca_eur), source="dca_dynamic_buy")
             new_dca_buys = int(trade.get("dca_buys", 0)) + 1
-            # GUARD: Never exceed dca_max to prevent corruption
-            dca_max_limit = int(trade.get("dca_max") or settings.max_buys or 3)
+            # GUARD: Never exceed global max_buys — use settings.max_buys (from global
+            # config) as authoritative limit; per-trade dca_max can be corrupted.
+            dca_max_limit = int(settings.max_buys or 3)
             if new_dca_buys > dca_max_limit:
                 log(f"⚠️ GUARD: dca_buys {new_dca_buys} would exceed dca_max {dca_max_limit} for {market}, capping")
                 new_dca_buys = dca_max_limit
             trade["dca_buys"] = new_dca_buys
+            trade["dca_max"] = dca_max_limit  # Keep per-trade max in sync
             trade["last_dca_price"] = float(current_price)
             # Add DCA event with unique ID and ACTUAL amounts
             trade.setdefault("dca_events", []).append({
