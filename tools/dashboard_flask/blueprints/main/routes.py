@@ -1,6 +1,6 @@
 """Main blueprint routes."""
 import logging
-from flask import render_template, redirect, url_for
+from flask import render_template, redirect, url_for, request
 from . import main_bp
 
 logger = logging.getLogger(__name__)
@@ -214,18 +214,24 @@ def portfolio():
             'details': ['Bot status wordt geladen...', 'Probeer de pagina te vernieuwen']
         }
     
-    # Get last 10 closed trades for the closed trades table
+    # Get closed trades — count driven by ?trades_count= query param
+    try:
+        trades_count = int(request.args.get('trades_count', 10))
+    except (ValueError, TypeError):
+        trades_count = 10
+    trades_count = max(1, min(trades_count, 500))  # clamp to 1-500
+
     closed_trades_raw = trades.get('closed', [])
     open_markets = set(trades.get('open', {}).keys())  # Markets that are still open
-    
+
     # Filter out partial TP entries for trades that are still open
     # These have reason='trailing_tp' but the trade is still active
     closed_trades_filtered = [
-        t for t in closed_trades_raw 
+        t for t in closed_trades_raw
         if not (t.get('market') in open_markets and t.get('reason') == 'trailing_tp')
     ]
-    
-    closed_trades_sorted = sorted(closed_trades_filtered, key=lambda x: x.get('timestamp', 0), reverse=True)[:10]
+
+    closed_trades_sorted = sorted(closed_trades_filtered, key=lambda x: x.get('timestamp', 0), reverse=True)[:trades_count]
     
     # Format closed trades for display
     closed_trades = []
@@ -294,4 +300,5 @@ def portfolio():
         portfolio_allocation=portfolio_allocation,
         trade_readiness=trade_readiness,
         closed_trades=closed_trades,
+        trades_count=trades_count,
     )
