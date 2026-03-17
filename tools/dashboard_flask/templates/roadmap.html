@@ -1,0 +1,476 @@
+{% extends "base.html" %}
+
+{% block title %}Roadmap - Bitvavo Trading Bot{% endblock %}
+
+{% block head_extra %}
+<style>
+/* Roadmap Page Styles */
+.roadmap-hero {
+    text-align: center;
+    padding: 2rem 1.5rem 1.5rem;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, rgba(56,97,251,0.08), rgba(16,185,129,0.08));
+    border: 1px solid rgba(56,97,251,0.15);
+    border-radius: 16px;
+}
+.roadmap-hero h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+    background: linear-gradient(135deg, #58a6ff, #10b981);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.roadmap-hero .subtitle {
+    color: var(--text-tertiary, #6e7681);
+    font-size: 0.85rem;
+    margin-bottom: 1.5rem;
+}
+.roadmap-hero .current-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    color: #58a6ff;
+    margin-bottom: 0.25rem;
+}
+.roadmap-hero .target-label {
+    font-size: 0.8rem;
+    color: var(--text-tertiary, #6e7681);
+}
+
+/* Progress bar */
+.progress-track {
+    width: 100%;
+    max-width: 600px;
+    height: 12px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 6px;
+    margin: 1.25rem auto 0.5rem;
+    overflow: hidden;
+    position: relative;
+}
+.progress-fill {
+    height: 100%;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #3861fb, #10b981);
+    transition: width 1s ease;
+    position: relative;
+}
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 20px;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3));
+    border-radius: 0 6px 6px 0;
+    animation: shimmer 2s infinite;
+}
+@keyframes shimmer {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+}
+.progress-labels {
+    display: flex;
+    justify-content: space-between;
+    max-width: 600px;
+    margin: 0 auto;
+    font-size: 0.72rem;
+    color: var(--text-tertiary, #6e7681);
+}
+
+/* Section panels */
+.roadmap-section {
+    margin-bottom: 1.5rem;
+}
+.roadmap-section h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary, #e6edf3);
+    margin: 0 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Timeline */
+.timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: rgba(255,255,255,0.08);
+}
+.timeline-item {
+    position: relative;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    background: var(--bg-card, rgba(22,27,34,0.6));
+    border: 1px solid var(--border-primary, rgba(240,246,252,0.1));
+    border-radius: 10px;
+    transition: all 0.2s ease;
+}
+.timeline-item:hover {
+    border-color: rgba(56,97,251,0.3);
+    transform: translateX(4px);
+}
+.timeline-item.completed {
+    border-color: rgba(16,185,129,0.3);
+    background: rgba(16,185,129,0.04);
+}
+.timeline-item.current {
+    border-color: rgba(56,97,251,0.5);
+    background: rgba(56,97,251,0.06);
+    box-shadow: 0 0 20px rgba(56,97,251,0.1);
+}
+.timeline-item.star {
+    border-color: rgba(245,158,11,0.3);
+}
+.timeline-item.star.current {
+    border-color: rgba(245,158,11,0.5);
+    background: rgba(245,158,11,0.06);
+}
+.timeline-dot {
+    position: absolute;
+    left: -25px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.15);
+    background: var(--bg-primary, #0d1117);
+    z-index: 1;
+}
+.timeline-item.completed .timeline-dot {
+    background: #10b981;
+    border-color: #10b981;
+}
+.timeline-item.current .timeline-dot {
+    background: #3861fb;
+    border-color: #3861fb;
+    box-shadow: 0 0 8px rgba(56,97,251,0.5);
+    animation: pulse-dot 2s ease infinite;
+}
+@keyframes pulse-dot {
+    0%, 100% { box-shadow: 0 0 4px rgba(56,97,251,0.4); }
+    50% { box-shadow: 0 0 12px rgba(56,97,251,0.7); }
+}
+.timeline-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.timeline-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text-primary, #e6edf3);
+}
+.timeline-item.completed .timeline-value {
+    color: #10b981;
+}
+.timeline-item.current .timeline-value {
+    color: #58a6ff;
+}
+.timeline-icon {
+    font-size: 1rem;
+}
+.timeline-action {
+    font-size: 0.78rem;
+    color: var(--text-secondary, #8b949e);
+    margin-top: 0.2rem;
+}
+.timeline-badge {
+    margin-left: auto;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+.badge-done {
+    background: rgba(16,185,129,0.15);
+    color: #10b981;
+}
+.badge-current {
+    background: rgba(56,97,251,0.15);
+    color: #58a6ff;
+}
+.badge-upcoming {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-tertiary, #6e7681);
+}
+
+/* Golden rules */
+.rules-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.rules-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 0.4rem;
+    background: rgba(245,158,11,0.04);
+    border: 1px solid rgba(245,158,11,0.12);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    color: var(--text-secondary, #8b949e);
+    line-height: 1.4;
+}
+.rules-list li .rule-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    background: rgba(245,158,11,0.15);
+    color: #f59e0b;
+    font-weight: 700;
+    font-size: 0.7rem;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+/* Deposit plan table */
+.deposit-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.8rem;
+}
+.deposit-table th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    color: var(--text-tertiary, #6e7681);
+    font-weight: 500;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.deposit-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: var(--text-secondary, #8b949e);
+}
+.deposit-table tr.done td {
+    color: #10b981;
+}
+.deposit-table .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+}
+
+/* Earnings projection */
+.earnings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+}
+.earning-card {
+    background: rgba(16,185,129,0.05);
+    border: 1px solid rgba(16,185,129,0.15);
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+}
+.earning-card .earning-label {
+    font-size: 0.7rem;
+    color: var(--text-tertiary, #6e7681);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.3rem;
+}
+.earning-card .earning-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    color: #10b981;
+}
+.earning-card .earning-sub {
+    font-size: 0.7rem;
+    color: var(--text-tertiary, #6e7681);
+    margin-top: 0.15rem;
+}
+
+/* Bear market protocol */
+.bear-card {
+    background: rgba(239,68,68,0.04);
+    border: 1px solid rgba(239,68,68,0.15);
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+    margin-bottom: 0.5rem;
+}
+.bear-card .trigger {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #ef4444;
+    margin-bottom: 0.25rem;
+}
+.bear-card .bear-action {
+    font-size: 0.78rem;
+    color: var(--text-secondary, #8b949e);
+}
+
+/* Two-column layout for rules + deposit */
+.roadmap-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+@media (max-width: 900px) {
+    .roadmap-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+.glass-panel {
+    background: var(--bg-card, rgba(22,27,34,0.8));
+    border: 1px solid var(--border-primary, rgba(240,246,252,0.1));
+    border-radius: 12px;
+    padding: 1.2rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Roadmap Hero -->
+<div class="roadmap-hero">
+    <h2>Portfolio Roadmap</h2>
+    <div class="subtitle">Groeiplan van €465 naar €5.000 — stap voor stap opschalen</div>
+    <div class="current-value">€{{ "%.0f"|format(current_value) }}</div>
+    <div class="target-label">van €5.000 doel · €{{ "%.0f"|format(total_deposited) }} gestort</div>
+    <div class="progress-track">
+        <div class="progress-fill" style="width: {{ "%.1f"|format(progress_pct) }}%"></div>
+    </div>
+    <div class="progress-labels">
+        <span>€0</span>
+        <span>€1.000</span>
+        <span>€2.000</span>
+        <span>€3.000</span>
+        <span>€4.000</span>
+        <span>€5.000</span>
+    </div>
+</div>
+
+<!-- Two-column: Golden Rules + Deposit Plan -->
+<div class="roadmap-columns">
+    <!-- Golden Rules -->
+    <div class="roadmap-section">
+        <div class="glass-panel">
+            <h3>📜 Gouden Regels</h3>
+            <ol class="rules-list">
+                {% for rule in golden_rules %}
+                <li>
+                    <span class="rule-num">{{ loop.index }}</span>
+                    {{ rule }}
+                </li>
+                {% endfor %}
+            </ol>
+        </div>
+    </div>
+
+    <!-- Deposit Plan -->
+    <div class="roadmap-section">
+        <div class="glass-panel">
+            <h3>💰 Stortingsplan</h3>
+            <table class="deposit-table">
+                <thead>
+                    <tr><th>Maand</th><th>Storting</th><th>Cum. gestort</th><th>Geschat</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for d in deposit_plan %}
+                    <tr{% if d.done %} class="done"{% endif %}>
+                        <td>{{ d.month }}</td>
+                        <td class="mono">€{{ d.deposit }}</td>
+                        <td class="mono">€{{ d.cum }}</td>
+                        <td class="mono">€{{ d.est }}</td>
+                        <td>{% if d.done %}✅{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Milestone Timeline -->
+<div class="roadmap-section">
+    <div class="glass-panel">
+        <h3>🗺️ Mijlpalen Timeline</h3>
+        <div class="timeline">
+            {% for m in milestones %}
+            <div class="timeline-item {% if loop.index0 < current_idx %}completed{% elif loop.index0 == current_idx %}current{% endif %}{% if m.star %} star{% endif %}">
+                <div class="timeline-dot"></div>
+                <div class="timeline-header">
+                    <span class="timeline-icon">{{ m.icon }}</span>
+                    <span class="timeline-value">{{ m.label }}</span>
+                    <span class="timeline-action">{{ m.action }}</span>
+                    <span class="timeline-badge {% if loop.index0 < current_idx %}badge-done{% elif loop.index0 == current_idx %}badge-current{% else %}badge-upcoming{% endif %}">
+                        {% if loop.index0 < current_idx %}Bereikt{% elif loop.index0 == current_idx %}Huidig{% else %}Komend{% endif %}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Two-column: Earnings Projection + Bear Market Protocol -->
+<div class="roadmap-columns">
+    <!-- Earnings at €5.000 -->
+    <div class="roadmap-section">
+        <div class="glass-panel">
+            <h3>📈 Verwachte Opbrengst bij €5.000</h3>
+            <div class="earnings-grid">
+                <div class="earning-card">
+                    <div class="earning-label">Per dag</div>
+                    <div class="earning-value">€{{ "%.2f"|format(earnings_at_5k.total_day) }}</div>
+                    <div class="earning-sub">trailing + grid</div>
+                </div>
+                <div class="earning-card">
+                    <div class="earning-label">Per week</div>
+                    <div class="earning-value">€{{ earnings_at_5k.total_week }}</div>
+                    <div class="earning-sub">passief inkomen</div>
+                </div>
+                <div class="earning-card">
+                    <div class="earning-label">Per maand</div>
+                    <div class="earning-value">€{{ earnings_at_5k.total_month }}</div>
+                    <div class="earning-sub">zonder stortingen</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bear Market Protocol -->
+    <div class="roadmap-section">
+        <div class="glass-panel">
+            <h3>🔴 Bear Market Protocol</h3>
+            <div class="bear-card">
+                <div class="trigger">Trigger 1: Portfolio −10% in 1 week</div>
+                <div class="bear-action">MAX_OPEN_TRADES −1, MIN_SCORE +0,5</div>
+            </div>
+            <div class="bear-card">
+                <div class="trigger">Trigger 2: Portfolio −20% in 2 weken</div>
+                <div class="bear-action">Ga terug naar config van 2 mijlpalen eerder</div>
+            </div>
+            <div class="bear-card">
+                <div class="trigger">Trigger 3: Portfolio −30%+ (crash)</div>
+                <div class="bear-action">Noodconfig: 2 trades, €30 BASE, Grid uit. Wacht op stabilisatie.</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -55,10 +55,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     
-    <!-- Preload critical resources -->
-    <link rel="preload" href="{{ url_for('static', filename='js/faang_upgrades.js') }}" as="script">
-    <link rel="preload" href="{{ url_for('static', filename='js/faang_ultimate.js') }}" as="script">
-    <link rel="preload" href="{{ url_for('static', filename='js/apex_interactions.js') }}" as="script">
+    <!-- Preload critical font -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style">
     
     {% block head_extra %}{% endblock %}
 </head>
@@ -232,6 +230,9 @@
             <a href="{{ url_for('reports') }}" class="nav-tab {% if active_tab == 'reports' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'reports' %}true{% else %}false{% endif %}" aria-label="Rapporten tab, druk 9">
                 Rapporten
             </a>
+            <a href="{{ url_for('roadmap') }}" class="nav-tab {% if active_tab == 'roadmap' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'roadmap' %}true{% else %}false{% endif %}" aria-label="Roadmap tab">
+                Roadmap
+            </a>
             <a href="{{ url_for('settings') }}" class="nav-tab {% if active_tab == 'settings' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'settings' %}true{% else %}false{% endif %}" aria-label="Instellingen tab">
                 Instellingen
             </a>
@@ -267,22 +268,20 @@
         <span class="footer-shortcuts" style="margin-left: auto; opacity: 0.6;"><kbd>Ctrl+K</kbd> commando's • <kbd>?</kbd> sneltoetsen</span>
     </footer>
 
-    <!-- Custom JS -->
-    <script src="{{ url_for('static', filename='js/grid-chart.js') }}"></script>
+    <!-- Core JS (loaded first) -->
+    <script src="{{ url_for('static', filename='js/apex_unified.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     
-    <!-- FAANG-Level Upgrades JS -->
-    <script src="{{ url_for('static', filename='js/faang_upgrades.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/faang_ultimate.js') }}"></script>
+    <!-- Deferred JS -->
+    <script src="{{ url_for('static', filename='js/faang_upgrades.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/faang_ultimate.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/apex_interactions.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/apex_charts.js') }}" defer></script>
     
-    <!-- Apex Interactions - Advanced UI/UX -->
-    <script src="{{ url_for('static', filename='js/apex_interactions.js') }}"></script>
-    
-    <!-- Apex Charts - Premium Chart Plugins & Enhancements -->
-    <script src="{{ url_for('static', filename='js/apex_charts.js') }}"></script>
-    
-    <!-- Apex Unified - Shared utilities (toast, modal, formatEuro, etc.) -->
-    <script src="{{ url_for('static', filename='js/apex_unified.js') }}"></script>
+    <!-- Grid chart JS - only needed on grid page -->
+    {% if active_tab == 'grid' %}
+    <script src="{{ url_for('static', filename='js/grid-chart.js') }}"></script>
+    {% endif %}
     
     <!-- PWA Service Worker Registration -->
     <script>
@@ -294,69 +293,49 @@
     </script>
     
     <script>
-        // Update status indicators from WebSocket data
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize socket connection
-            if (typeof io !== 'undefined') {
-                const socket = io();
-                
-                socket.on('connect', function() {
-                    document.getElementById('ws-dot').classList.add('active');
-                    document.getElementById('ws-dot').classList.remove('inactive');
-                    document.getElementById('ws-status-text').textContent = 'Verbonden';
-                    document.getElementById('connection-status').textContent = 'Live';
-                });
-                
-                socket.on('disconnect', function() {
-                    document.getElementById('ws-dot').classList.remove('active');
-                    document.getElementById('ws-dot').classList.add('inactive');
-                    document.getElementById('ws-status-text').textContent = 'Verbroken';
-                    document.getElementById('connection-status').textContent = 'Offline';
-                });
-                
-                socket.on('status_update', function(data) {
-                    // Update bot status
-                    if (data.bot_running !== undefined) {
-                        const botDot = document.getElementById('bot-dot');
-                        const botText = document.getElementById('bot-status-text');
-                        if (data.bot_running) {
-                            botDot.classList.add('active');
-                            botDot.classList.remove('inactive');
-                            botText.textContent = 'Online';
-                        } else {
-                            botDot.classList.remove('active');
-                            botDot.classList.add('inactive');
-                            botText.textContent = 'Offline';
-                        }
-                    }
-                    
-                    // Update AI status
-                    if (data.ai_running !== undefined) {
-                        const aiDot = document.getElementById('ai-dot');
-                        const aiText = document.getElementById('ai-status-text');
-                        if (data.ai_running) {
-                            aiDot.classList.add('active');
-                            aiDot.classList.remove('inactive');
-                            aiText.textContent = 'Actief';
-                        } else {
-                            aiDot.classList.remove('active');
-                            aiDot.classList.add('inactive');
-                            aiText.textContent = 'Inactief';
-                        }
-                    }
-                    
-                    // Update trade count
-                    if (data.open_trades !== undefined) {
-                        document.getElementById('status-trade-count').textContent = data.open_trades;
-                    }
-                    
-                    // Update timestamp
-                    if (data.timestamp) {
-                        document.getElementById('last-update-footer').textContent = new Date(data.timestamp).toLocaleTimeString();
-                    }
-                });
-            }
-        });
+        // Status bar dot updates — hooks into window.socket from dashboard.js (no extra connection)
+        (function _waitForSocket() {
+            if (!window.socket) { setTimeout(_waitForSocket, 200); return; }
+            var s = window.socket;
+            s.on('connect', function() {
+                var d = document.getElementById('ws-dot');
+                if (d) { d.classList.add('active'); d.classList.remove('inactive'); }
+                var t = document.getElementById('ws-status-text');
+                if (t) t.textContent = 'Verbonden';
+                var c = document.getElementById('connection-status');
+                if (c) c.textContent = 'Live';
+            });
+            s.on('disconnect', function() {
+                var d = document.getElementById('ws-dot');
+                if (d) { d.classList.remove('active'); d.classList.add('inactive'); }
+                var t = document.getElementById('ws-status-text');
+                if (t) t.textContent = 'Verbroken';
+                var c = document.getElementById('connection-status');
+                if (c) c.textContent = 'Offline';
+            });
+            s.on('status_update', function(data) {
+                if (data.bot_running !== undefined) {
+                    var bd = document.getElementById('bot-dot');
+                    var bt = document.getElementById('bot-status-text');
+                    if (bd) { bd.classList.toggle('active', data.bot_running); bd.classList.toggle('inactive', !data.bot_running); }
+                    if (bt) bt.textContent = data.bot_running ? 'Online' : 'Offline';
+                }
+                if (data.ai_running !== undefined) {
+                    var ad = document.getElementById('ai-dot');
+                    var at_ = document.getElementById('ai-status-text');
+                    if (ad) { ad.classList.toggle('active', data.ai_running); ad.classList.toggle('inactive', !data.ai_running); }
+                    if (at_) at_.textContent = data.ai_running ? 'Actief' : 'Inactief';
+                }
+                if (data.open_trades !== undefined) {
+                    var tc = document.getElementById('status-trade-count');
+                    if (tc) tc.textContent = data.open_trades;
+                }
+                if (data.timestamp) {
+                    var fu = document.getElementById('last-update-footer');
+                    if (fu) fu.textContent = new Date(data.timestamp).toLocaleTimeString();
+                }
+            });
+        })();
         
         function requestRefresh() {
             location.reload();

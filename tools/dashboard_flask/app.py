@@ -93,6 +93,9 @@ except ImportError:
     register_blueprints(app)
     logger.info("Blueprints registered (fallback): /api/v1/* endpoints available")
 
+# Static file caching - 1 hour for CSS/JS (cache-busted via ?v= query param)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600
+
 # Initialize Flask-SocketIO with threading mode for live updates
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
@@ -190,8 +193,8 @@ _CACHE = {
     'heartbeat': {'data': None, 'ts': 0, 'ttl': 5},
     'metrics': {'data': None, 'ts': 0, 'ttl': 30},
     'prices': {'data': {}, 'ts': 0, 'ttl': 10},
-    'portfolio_cards': {'data': None, 'ts': 0, 'ttl': 3},  # Cache built cards briefly
-    'portfolio_totals': {'data': None, 'ts': 0, 'ttl': 3},  # Cache totals briefly
+    'portfolio_cards': {'data': None, 'ts': 0, 'ttl': 30},  # Cache built cards
+    'portfolio_totals': {'data': None, 'ts': 0, 'ttl': 30},  # Cache totals
     'balances': {'data': None, 'ts': 0, 'ttl': 15},  # Cache API balances for 15 seconds
     'pending_orders': {'data': None, 'ts': 0, 'ttl': 5},  # Cache pending orders for 5 seconds
 }
@@ -1071,6 +1074,71 @@ def build_trade_cards(trades: Dict, config: Dict) -> List[Dict]:
     cards.sort(key=lambda x: x.get('pnl', 0), reverse=True)
     return cards
 
+
+def _calculate_period_pnl() -> Dict:
+    """Calculate daily, weekly, and monthly realized P&L from closed trades."""
+    now = time.time()
+    day_ago = now - 86400
+    week_ago = now - 7 * 86400
+    month_ago = now - 30 * 86400
+
+    daily_pnl = 0.0
+    daily_invested = 0.0
+    weekly_pnl = 0.0
+    weekly_invested = 0.0
+    monthly_pnl = 0.0
+    monthly_invested = 0.0
+
+    try:
+        trades = load_trades()
+        closed = trades.get('closed', []) or []
+
+        # Also load archive for older trades
+        archive_path = PROJECT_ROOT / 'data' / 'trade_archive.json'
+        if archive_path.exists():
+            try:
+                with archive_path.open('r', encoding='utf-8') as f:
+                    archive_data = json.load(f)
+                if isinstance(archive_data, list):
+                    closed = closed + archive_data
+                elif isinstance(archive_data, dict):
+                    closed = closed + (archive_data.get('closed', []) or [])
+            except Exception:
+                pass
+
+        for trade in closed:
+            ts = float(trade.get('timestamp', 0) or 0)
+            if ts <= 0:
+                continue
+            profit = float(trade.get('profit', 0) or 0)
+            invested = float(trade.get('initial_invested_eur', 0) or trade.get('invested_eur', 0) or 0)
+
+            if ts >= month_ago:
+                monthly_pnl += profit
+                monthly_invested += invested
+            if ts >= week_ago:
+                weekly_pnl += profit
+                weekly_invested += invested
+            if ts >= day_ago:
+                daily_pnl += profit
+                daily_invested += invested
+
+    except Exception as e:
+        logger.debug(f"Period P&L calc error: {e}")
+
+    def pct(pnl, invested):
+        return (pnl / invested * 100) if invested > 0 else 0.0
+
+    return {
+        'daily_pnl': round(daily_pnl, 2),
+        'daily_pnl_pct': round(pct(daily_pnl, daily_invested), 2),
+        'weekly_pnl': round(weekly_pnl, 2),
+        'weekly_pnl_pct': round(pct(weekly_pnl, weekly_invested), 2),
+        'monthly_pnl': round(monthly_pnl, 2),
+        'monthly_pnl_pct': round(pct(monthly_pnl, monthly_invested), 2),
+    }
+
+
 def calculate_portfolio_totals(cards: List[Dict], heartbeat: Dict = None) -> Dict:
     """Calculate portfolio totals from trade cards, including deposit-adjusted profit."""
     total_invested = sum(c.get('invested', 0) for c in cards)
@@ -1113,6 +1181,9 @@ def calculate_portfolio_totals(cards: List[Dict], heartbeat: Dict = None) -> Dic
     real_profit = total_account_value - total_deposited
     real_profit_pct = ((total_account_value / total_deposited) - 1) * 100 if total_deposited > 0 else 0
     
+    # Calculate period P&L from closed trades
+    period_pnl = _calculate_period_pnl()
+    
     return {
         'total_invested': total_invested,
         'total_current': total_current,
@@ -1128,6 +1199,8 @@ def calculate_portfolio_totals(cards: List[Dict], heartbeat: Dict = None) -> Dic
         'total_deposited': total_deposited,
         'real_profit': real_profit,
         'real_profit_pct': real_profit_pct,
+        # Period P&L
+        **period_pnl,
     }
 
 # =====================================================
@@ -3498,6 +3571,109 @@ def notifications():
         today_count=today_count,
         active_tab='notifications'
     )
+
+@app.route('/roadmap')
+def roadmap():
+    """Portfolio Roadmap page — growth plan from €465 to €5,000."""
+    config = load_config()
+    heartbeat = load_heartbeat()
+
+    # Current portfolio value from account_overview or totals
+    current_value = 0.0
+    try:
+        ao_path = PROJECT_ROOT / 'data' / 'account_overview.json'
+        if ao_path.exists():
+            with ao_path.open('r', encoding='utf-8') as f:
+                ao = json.load(f)
+            current_value = float(ao.get('total_account_value_eur', 0) or 0)
+    except Exception:
+        pass
+    if current_value == 0:
+        current_value = float(heartbeat.get('eur_balance', 0) or 0)
+
+    total_deposited = get_total_deposited()
+
+    # Milestones from PORTFOLIO_ROADMAP.md (hardcoded for fast rendering)
+    milestones = [
+        {'value': 465, 'label': '€465', 'action': 'Huidige config — stabiel draaien', 'icon': '🟢', 'star': False},
+        {'value': 500, 'label': '€500', 'action': 'Geen wijzigingen — stabiel houden', 'icon': '📍', 'star': False},
+        {'value': 600, 'label': '€600', 'action': 'BASE → 42', 'icon': '📍', 'star': False},
+        {'value': 700, 'label': '€700', 'action': 'BASE → 48, DCA → 32', 'icon': '📍', 'star': False},
+        {'value': 800, 'label': '€800', 'action': '4 trades, BASE → 52', 'icon': '📍', 'star': False},
+        {'value': 900, 'label': '€900', 'action': 'BASE → 56, DCA → 34, trailing → 2,4%', 'icon': '📍', 'star': False},
+        {'value': 1000, 'label': '€1.000', 'action': 'Grid BTC aan (€150)', 'icon': '⭐', 'star': True},
+        {'value': 1100, 'label': '€1.100', 'action': 'BASE → 62', 'icon': '📍', 'star': False},
+        {'value': 1200, 'label': '€1.200', 'action': '5 trades, MIN_SCORE → 6,5', 'icon': '📍', 'star': False},
+        {'value': 1300, 'label': '€1.300', 'action': 'BASE → 68', 'icon': '📍', 'star': False},
+        {'value': 1400, 'label': '€1.400', 'action': 'Grid ETH erbij (€250)', 'icon': '📍', 'star': False},
+        {'value': 1500, 'label': '€1.500', 'action': 'BASE → 75, DCA → 40', 'icon': '📍', 'star': False},
+        {'value': 1600, 'label': '€1.600', 'action': '6 trades', 'icon': '📍', 'star': False},
+        {'value': 1800, 'label': '€1.800', 'action': 'Grid SOL erbij (€400)', 'icon': '📍', 'star': False},
+        {'value': 2000, 'label': '€2.000', 'action': '7 trades, DCA 10 levels', 'icon': '⭐', 'star': True},
+        {'value': 2500, 'label': '€2.500', 'action': 'Grid 4 markten (€600)', 'icon': '📍', 'star': False},
+        {'value': 3000, 'label': '€3.000', 'action': '8 trades, Grid 5 mktn (€800)', 'icon': '⭐', 'star': True},
+        {'value': 4000, 'label': '€4.000', 'action': '9 trades, Grid 6 mktn (€1.400)', 'icon': '📍', 'star': False},
+        {'value': 5000, 'label': '€5.000', 'action': '10 trades, Grid €2.000 — Passief Inkomen', 'icon': '🏆', 'star': True},
+    ]
+
+    # Determine current milestone index
+    current_idx = 0
+    for i, m in enumerate(milestones):
+        if current_value >= m['value']:
+            current_idx = i
+
+    progress_pct = min(100, max(0, (current_value / 5000) * 100))
+
+    # Golden rules
+    golden_rules = [
+        'Nooit een stap overslaan — elke verhoging bouwt voort op bewezen stabiliteit',
+        'Minimaal 2 weken wachten na elke config-wijziging',
+        'Winrate check: moet ≥ 50% zijn over laatste 2 weken',
+        'EUR buffer: houd ALTIJD minimaal 15% van portfoliowaarde vrij',
+        'Grid pas bij €1.000+ met minimaal €40/level',
+        'Bij 15% drawdown: ga terug naar vorige mijlpaal-config',
+        'Eén ding tegelijk wijzigen — nooit alles tegelijk verhogen',
+    ]
+
+    # Deposit plan
+    deposit_plan = [
+        {'month': 'Mrt 2026', 'deposit': 100, 'cum': 870, 'est': 465, 'done': True},
+        {'month': 'Apr 2026', 'deposit': 100, 'cum': 970, 'est': 521, 'done': False},
+        {'month': 'Mei 2026', 'deposit': 100, 'cum': 1070, 'est': 581, 'done': False},
+        {'month': 'Jun 2026', 'deposit': 100, 'cum': 1170, 'est': 645, 'done': False},
+        {'month': 'Jul 2026', 'deposit': 100, 'cum': 1270, 'est': 713, 'done': False},
+        {'month': 'Aug 2026', 'deposit': 100, 'cum': 1370, 'est': 785, 'done': False},
+        {'month': 'Sep 2026', 'deposit': 100, 'cum': 1470, 'est': 861, 'done': False},
+        {'month': 'Okt 2026', 'deposit': 100, 'cum': 1570, 'est': 945, 'done': False},
+        {'month': 'Nov 2026', 'deposit': 100, 'cum': 1670, 'est': 1035, 'done': False},
+        {'month': 'Dec 2026', 'deposit': 100, 'cum': 1770, 'est': 1135, 'done': False},
+    ]
+
+    # Expected earnings at target
+    earnings_at_5k = {
+        'trailing_day': 9.0,
+        'grid_day': 1.6,
+        'total_day': 10.5,
+        'total_week': 73,
+        'total_month': 315,
+    }
+
+    return render_template('roadmap.html',
+        milestones=milestones,
+        current_value=current_value,
+        current_idx=current_idx,
+        progress_pct=progress_pct,
+        total_deposited=total_deposited,
+        golden_rules=golden_rules,
+        deposit_plan=deposit_plan,
+        earnings_at_5k=earnings_at_5k,
+        config=config,
+        heartbeat=heartbeat,
+        bot_running=is_bot_online(heartbeat, config),
+        ai_running=heartbeat.get('ai_active', False),
+        active_tab='roadmap',
+    )
+
 
 @app.route('/settings')
 def settings():

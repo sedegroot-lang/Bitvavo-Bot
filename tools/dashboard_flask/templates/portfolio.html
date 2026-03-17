@@ -30,6 +30,22 @@
         <div class="hero-value" id="hero-total-current">€{{ "%.2f"|format(totals.total_current) }}</div>
         <div class="hero-sub" id="hero-trade-count">{{ totals.trade_count }} actieve posities</div>
     </div>
+    <!-- Period P&L Cards -->
+    <div class="hero-card">
+        <div class="hero-label">Dagelijkse W/V</div>
+        <div class="hero-value {% if totals.daily_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">{% if totals.daily_pnl >= 0 %}+{% endif %}€{{ "%.2f"|format(totals.daily_pnl) }}</div>
+        <div class="hero-sub {% if totals.daily_pnl_pct >= 0 %}text-success{% else %}text-danger{% endif %}">{% if totals.daily_pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(totals.daily_pnl_pct) }}% vandaag</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">Wekelijkse W/V</div>
+        <div class="hero-value {% if totals.weekly_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">{% if totals.weekly_pnl >= 0 %}+{% endif %}€{{ "%.2f"|format(totals.weekly_pnl) }}</div>
+        <div class="hero-sub {% if totals.weekly_pnl_pct >= 0 %}text-success{% else %}text-danger{% endif %}">{% if totals.weekly_pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(totals.weekly_pnl_pct) }}% deze week</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">Maandelijkse W/V</div>
+        <div class="hero-value {% if totals.monthly_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">{% if totals.monthly_pnl >= 0 %}+{% endif %}€{{ "%.2f"|format(totals.monthly_pnl) }}</div>
+        <div class="hero-sub {% if totals.monthly_pnl_pct >= 0 %}text-success{% else %}text-danger{% endif %}">{% if totals.monthly_pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(totals.monthly_pnl_pct) }}% deze maand</div>
+    </div>
 </div>
 
 <!-- System Status Cards -->
