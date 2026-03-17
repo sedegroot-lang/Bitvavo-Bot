@@ -796,8 +796,16 @@ def _list_running_start_bot_pids() -> list[int]:
     """Zoek naar andere python-processen die start_bot.py draaien."""
     pids: list[int] = []
     current_pid = os.getpid()
+    # Also skip parent PID — on Windows, VS Code terminals and wrapper scripts
+    # can appear with the same commandline, and killing them kills our own tree.
+    parent_pid = 0
+    try:
+        parent_pid = os.getppid()
+    except Exception:
+        parent_pid = 0
+    skip_pids = {current_pid, parent_pid}
     if DEBUG_GUARD:
-        print(f"[start_bot] guard current_pid={current_pid}")
+        print(f"[start_bot] guard current_pid={current_pid} parent_pid={parent_pid}")
     # Define repo path used by both detection branches
     repo_path = str(BASE_DIR)
 
@@ -806,9 +814,9 @@ def _list_running_start_bot_pids() -> list[int]:
         try:
             for proc in _psutil.process_iter(["pid", "cmdline"]):
                 try:
-                    # Get PID first and check if it's current process
+                    # Get PID first and check if it's current process or parent
                     pid = int(proc.info["pid"])
-                    if pid == current_pid:
+                    if pid in skip_pids:
                         continue
                     
                     # Check process is still alive before accessing cmdline
@@ -910,7 +918,7 @@ def _list_running_start_bot_pids() -> list[int]:
                         if 'start_bot.py' not in cmdline:
                             continue
                         pid = int(pid_str)
-                        if pid == current_pid:
+                        if pid in skip_pids:
                             continue
                         # Quick liveness check
                         if not _pid_alive(pid):
