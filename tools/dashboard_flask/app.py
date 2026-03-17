@@ -934,6 +934,13 @@ def build_trade_cards(trades: Dict, config: Dict) -> List[Dict]:
             # TODO: Improve bot's DCA logging to track only actual DCA safety buys, not all buy orders
             # For now, display the raw value - if incorrect, it's a bot logging issue to fix
             
+            # Pure price drop % (no fees) and distance to DCA activation
+            _bp = financials['buy_price'] or 0
+            _lp = live_price or _bp
+            price_drop_pct = ((_bp - _lp) / _bp * 100) if _bp > 0 else 0
+            _dca_trigger_pct = float(trade.get('dca_drop_pct', config.get('DCA_DROP_PCT', 0.02)) or 0.02) * 100
+            dca_distance_pct = max(0, _dca_trigger_pct - price_drop_pct)
+
             card = {
                 'market': market,
                 'symbol': symbol,
@@ -946,6 +953,9 @@ def build_trade_cards(trades: Dict, config: Dict) -> List[Dict]:
                 'current_value': financials['current_value'],
                 'pnl': financials['pnl'],
                 'pnl_pct': financials['pnl_pct'],
+                'price_drop_pct': round(price_drop_pct, 2),
+                'dca_distance_pct': round(dca_distance_pct, 2),
+                'dca_trigger_pct': round(_dca_trigger_pct, 2),
                 'status': status,
                 'status_label': status_label,
                 'status_class': status_class,

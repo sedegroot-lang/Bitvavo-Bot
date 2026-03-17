@@ -240,6 +240,8 @@
         <div class="card-pnl-hero {% if card.pnl >= 0 %}pnl-positive{% else %}pnl-negative{% endif %}">
             <span class="pnl-amount" data-pnl="{{ card.market }}" style="color: {% if card.pnl >= 0 %}#16c784{% else %}#ea3943{% endif %} !important">€{% if card.pnl >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl) }}</span>
             <span class="pnl-percent" data-pnl-pct="{{ card.market }}" style="color: {% if card.pnl_pct >= 0 %}#16c784{% else %}#ea3943{% endif %} !important; background: {% if card.pnl_pct >= 0 %}rgba(22,199,132,0.15){% else %}rgba(234,57,67,0.15){% endif %} !important">{% if card.pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(card.pnl_pct) }}%</span>
+            {% set pdrop = card.price_drop_pct|default(0, true)|float %}
+            <span class="price-drop-badge" data-price-drop="{{ card.market }}" style="font-size: 0.7em; padding: 2px 8px; border-radius: 6px; margin-left: 6px; color: {% if pdrop > 0 %}#ea3943{% else %}#16c784{% endif %}; background: {% if pdrop > 0 %}rgba(234,57,67,0.10){% else %}rgba(22,199,132,0.10){% endif %}; font-weight: 600;" title="Pure prijsdrop (excl. fees)">📉 {{ "%.2f"|format(pdrop) }}%</span>
         </div>
         
         <!-- Values Row: Invest / Nu -->
@@ -311,6 +313,11 @@
             <div class="dca-details">
                 <span class="dca-detail-item" title="Prijs voor volgende DCA activatie">
                     🎯 Activatie: <strong>€{{ "%.6f"|format(dca_next_price) if dca_next_price < 0.01 else ("%.4f"|format(dca_next_price) if dca_next_price < 1 else "%.2f"|format(dca_next_price)) }}</strong>
+                </span>
+                {% set dca_dist = card.dca_distance_pct|default(0, true)|float %}
+                {% set dca_trig = card.dca_trigger_pct|default(2, true)|float %}
+                <span class="dca-detail-item" data-dca-dist="{{ card.market }}" title="Nog {{ "%.2f"|format(dca_dist) }}% prijsdrop nodig voor DCA (trigger: {{ "%.1f"|format(dca_trig) }}%)" style="{% if dca_dist <= 0 %}color: #16c784; font-weight: 700;{% elif dca_dist < 0.5 %}color: #f5a623;{% endif %}">
+                    {% if dca_dist <= 0 %}✅ DCA KLAAR{% else %}📏 Nog {{ "%.2f"|format(dca_dist) }}% tot DCA{% endif %}
                 </span>
                 <span class="dca-detail-item" title="Bedrag per DCA buy">
                     💰 Koop: <strong>€{{ "%.2f"|format(dca_buy_amount) }}</strong>
@@ -1044,6 +1051,7 @@ function buildTradeCardElement(card) {
         <div class="card-pnl-hero ${pnlClass}">
             <span class="pnl-amount" data-pnl="${card.market}" style="color: ${pnlColor} !important">${(Number(card.pnl) || 0) >= 0 ? '+' : ''}${formatEuro(card.pnl || 0)}</span>
             <span class="pnl-percent" data-pnl-pct="${card.market}" style="color: ${pnlColor} !important; background: ${pnlBg} !important">${(Number(card.pnl_pct) || 0) >= 0 ? '+' : ''}${(Number(card.pnl_pct) || 0).toFixed(2)}%</span>
+            <span class="price-drop-badge" data-price-drop="${card.market}" style="font-size:0.7em;padding:2px 8px;border-radius:6px;margin-left:6px;color:${(Number(card.price_drop_pct)||0) > 0 ? '#ea3943' : '#16c784'};background:${(Number(card.price_drop_pct)||0) > 0 ? 'rgba(234,57,67,0.10)' : 'rgba(22,199,132,0.10)'};font-weight:600;" title="Pure prijsdrop (excl. fees)">📉 ${(Number(card.price_drop_pct)||0).toFixed(2)}%</span>
         </div>
 
         <div class="card-values-row">
@@ -2148,6 +2156,32 @@ function updateTradeCards(prices) {
             }
         }
         
+        // Update price drop badge and DCA distance (live)
+        const buyPrice = parseFloat(cardData.buy_price) || 0;
+        if (buyPrice > 0) {
+            const priceDrop = (buyPrice - price) / buyPrice * 100;
+            const priceDropEl = card.querySelector(`[data-price-drop="${market}"]`);
+            if (priceDropEl) {
+                priceDropEl.textContent = `📉 ${priceDrop.toFixed(2)}%`;
+                priceDropEl.style.color = priceDrop > 0 ? '#ea3943' : '#16c784';
+                priceDropEl.style.background = priceDrop > 0 ? 'rgba(234,57,67,0.10)' : 'rgba(22,199,132,0.10)';
+            }
+            const dcaTrigPct = parseFloat(cardData.dca_trigger_pct) || 2.0;
+            const dcaDist = Math.max(0, dcaTrigPct - priceDrop);
+            const dcaDistEl = card.querySelector(`[data-dca-dist="${market}"]`);
+            if (dcaDistEl) {
+                if (dcaDist <= 0) {
+                    dcaDistEl.textContent = '✅ DCA KLAAR';
+                    dcaDistEl.style.color = '#16c784';
+                    dcaDistEl.style.fontWeight = '700';
+                } else {
+                    dcaDistEl.textContent = `📏 Nog ${dcaDist.toFixed(2)}% tot DCA`;
+                    dcaDistEl.style.color = dcaDist < 0.5 ? '#f5a623' : '';
+                    dcaDistEl.style.fontWeight = '';
+                }
+            }
+        }
+
         // Update card data for next calculation
         if (cardData) {
             cardData.live_price = price;
