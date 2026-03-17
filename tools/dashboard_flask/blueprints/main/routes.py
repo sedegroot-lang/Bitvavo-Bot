@@ -271,11 +271,21 @@ def portfolio():
         })
     
     logger.info(f"[PORTFOLIO] Closed trades count: {len(closed_trades)}")
-    
+
+    totals_dict = totals.to_dict()
+    # Guarantee period P&L keys exist so the template never crashes
+    _period_defaults = {
+        'daily_pnl': 0.0, 'daily_pnl_pct': 0.0,
+        'weekly_pnl': 0.0, 'weekly_pnl_pct': 0.0,
+        'monthly_pnl': 0.0, 'monthly_pnl_pct': 0.0,
+    }
+    for _k, _v in _period_defaults.items():
+        totals_dict.setdefault(_k, _v)
+
     return render_template(
         'portfolio.html',
         cards=[c.to_dict() for c in cards],
-        totals=totals.to_dict(),
+        totals=totals_dict,
         config=config,
         heartbeat=heartbeat,
         bot_online=data_service.is_bot_online(),
