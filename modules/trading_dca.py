@@ -53,6 +53,7 @@ class DCAManager:
     def __init__(self, ctx: DCAContext) -> None:
         self.ctx = ctx
         self._audit_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'dca_audit.log'))
+        self._smart_dca_wait_since: Dict[str, float] = {}  # market -> first-block timestamp
 
     def _log(self, msg: str, level: str = 'info') -> None:
         """Wrapper for ctx.log — prevents AttributeError in exception handlers."""
@@ -265,18 +266,42 @@ class DCAManager:
         # when insufficient data or when smart DCA is disabled.
         if bool(cfg.get("SMART_DCA_ENABLED", False)):
             try:
+                import time as _time
                 from core.smart_dca import should_smart_dca
                 _buy_px = float(trade.get("buy_price", cp) or cp)
-                _smart_ok, _smart_reason = should_smart_dca(
-                    prices, cp, _buy_px,
-                    dca_drop_pct=settings.drop_pct,
-                    bb_window=int(cfg.get("SMART_DCA_BB_WINDOW", 20)),
-                    bandwidth_threshold=float(cfg.get("SMART_DCA_BW_THRESHOLD", 0.04)),
-                )
-                if not _smart_ok and _smart_reason == "waiting_for_squeeze":
-                    ctx.log(f"Smart DCA {market}: waiting for BB squeeze (selling exhaustion)")
-                    self._record_dca_audit(market, trade, "skip", "smart_dca_waiting")
-                    return
+                _drop_actual = (_buy_px - cp) / _buy_px if _buy_px > 0 else 0
+                _deep_drop_mult = float(cfg.get("SMART_DCA_DEEP_DROP_MULT", 1.5))
+                _timeout_sec = float(cfg.get("SMART_DCA_TIMEOUT_SEC", 1200))  # 20 min default
+
+                # Deep drop override: if drop >> trigger, DCA immediately (opportunity cost too high)
+                _is_deep_drop = _drop_actual >= settings.drop_pct * _deep_drop_mult
+
+                # Timeout override: if we've been waiting too long, fall back to standard DCA
+                _wait_start = self._smart_dca_wait_since.get(market)
+                _timed_out = _wait_start is not None and (_time.time() - _wait_start) > _timeout_sec
+
+                if _is_deep_drop:
+                    self._smart_dca_wait_since.pop(market, None)
+                    ctx.log(f"Smart DCA {market}: deep drop override ({_drop_actual*100:.1f}% >> {settings.drop_pct*100:.1f}%), executing DCA")
+                elif _timed_out:
+                    self._smart_dca_wait_since.pop(market, None)
+                    ctx.log(f"Smart DCA {market}: timeout after {(_time.time() - _wait_start)/60:.0f}min, executing DCA")
+                else:
+                    _smart_ok, _smart_reason = should_smart_dca(
+                        prices, cp, _buy_px,
+                        dca_drop_pct=settings.drop_pct,
+                        bb_window=int(cfg.get("SMART_DCA_BB_WINDOW", 20)),
+                        bandwidth_threshold=float(cfg.get("SMART_DCA_BW_THRESHOLD", 0.04)),
+                    )
+                    if not _smart_ok and _smart_reason == "waiting_for_squeeze":
+                        if market not in self._smart_dca_wait_since:
+                            self._smart_dca_wait_since[market] = _time.time()
+                        _waited = (_time.time() - self._smart_dca_wait_since[market]) / 60
+                        ctx.log(f"Smart DCA {market}: waiting for BB squeeze ({_waited:.0f}min, timeout {_timeout_sec/60:.0f}min)")
+                        self._record_dca_audit(market, trade, "skip", "smart_dca_waiting")
+                        return
+                    else:
+                        self._smart_dca_wait_since.pop(market, None)
             except Exception:
                 pass  # Fall through to standard DCA on any error
 
