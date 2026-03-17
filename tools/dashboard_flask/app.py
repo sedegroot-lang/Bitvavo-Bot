@@ -1891,10 +1891,12 @@ def portfolio():
     logger.info(f"[PORTFOLIO] Allocation chart: {len(allocation_labels)} assets, total value={sum(allocation_values):.2f}")
     logger.debug(f"[PORTFOLIO] Allocation - Labels: {allocation_labels}, Values: {allocation_values}")
     
-    # Get last 10 closed trades for the closed trades table
+    # Get last N closed trades for the closed trades table (configurable)
+    trades_count = request.args.get('trades_count', 10, type=int)
+    trades_count = max(1, min(trades_count, 500))  # clamp 1-500
     closed_trades_raw = trades.get('closed', [])
-    # Sort by timestamp descending and take last 10
-    closed_trades_sorted = sorted(closed_trades_raw, key=lambda x: x.get('timestamp', 0), reverse=True)[:10]
+    # Sort by timestamp descending and take last N
+    closed_trades_sorted = sorted(closed_trades_raw, key=lambda x: x.get('timestamp', 0), reverse=True)[:trades_count]
     
     # Format closed trades for display
     closed_trades = []
@@ -1980,6 +1982,7 @@ def portfolio():
         portfolio_combined_data=portfolio_combined_data,
         portfolio_allocation=portfolio_allocation,
         closed_trades=closed_trades,
+        trades_count=trades_count,
         trade_readiness=trade_readiness,
         active_tab='portfolio',
     )
@@ -2563,14 +2566,39 @@ def performance():
         for market, data in pnl_by_market_dict.items()
     ]
     
-    # Monthly performance (mock data for now)
+    # Monthly performance from REAL closed trades
     import datetime
-    current_year = datetime.datetime.now().year
-    monthly_performance = [
-        {'name': 'January', 'year': current_year, 'pnl': 150.50, 'pnl_pct': 5.2, 'trades': 8, 'win_rate': 75.0},
-        {'name': 'February', 'year': current_year, 'pnl': -25.30, 'pnl_pct': -1.1, 'trades': 5, 'win_rate': 40.0},
-        {'name': 'March', 'year': current_year, 'pnl': 320.75, 'pnl_pct': 12.8, 'trades': 12, 'win_rate': 83.3},
-    ]
+    month_names = ['January', 'February', 'March', 'April', 'May', 'June',
+                   'July', 'August', 'September', 'October', 'November', 'December']
+    monthly_data = {}  # key: (year, month) -> {pnl, trades, wins, invested}
+    for trade in closed_trades:
+        close_ts = trade.get('close_ts') or trade.get('timestamp') or 0
+        if close_ts > 0:
+            try:
+                dt = datetime.datetime.fromtimestamp(close_ts)
+                key = (dt.year, dt.month)
+                if key not in monthly_data:
+                    monthly_data[key] = {'pnl': 0, 'trades': 0, 'wins': 0, 'invested': 0}
+                monthly_data[key]['pnl'] += trade.get('profit', 0)
+                monthly_data[key]['trades'] += 1
+                monthly_data[key]['invested'] += trade.get('invested', 0)
+                if trade.get('profit', 0) > 0:
+                    monthly_data[key]['wins'] += 1
+            except Exception:
+                pass
+    
+    monthly_performance = []
+    for (year, month), data in sorted(monthly_data.items()):
+        wr = (data['wins'] / data['trades'] * 100) if data['trades'] > 0 else 0
+        pnl_pct = (data['pnl'] / data['invested'] * 100) if data['invested'] > 0 else 0
+        monthly_performance.append({
+            'name': month_names[month - 1],
+            'year': year,
+            'pnl': round(data['pnl'], 2),
+            'pnl_pct': round(pnl_pct, 1),
+            'trades': data['trades'],
+            'win_rate': round(wr, 1),
+        })
     
     # Calculate CORRECT total invested: Current open trades + deposits (NOT sum of all closed trades!)
     # OLD WRONG WAY: total_invested = sum(abs(t.get('invested', 0)) for t in closed_trades)  # THIS COUNTS SAME MONEY MULTIPLE TIMES!
@@ -2665,20 +2693,30 @@ def performance():
     # Calculate total trades for footer
     total_trades = len(closed_trades)
     
-    # Generate P/L chart data (last 30 days)
+    # Generate P/L chart data (last 30 days) from REAL closed trades
     from datetime import datetime, timedelta
-    import random
     
     pnl_dates = []
     pnl_values = []
     current_date = datetime.now()
-    cumulative_pnl = 0
     
+    # Build daily P/L from actual closed trades
+    daily_pnl = {}
+    for trade in closed_trades:
+        close_ts = trade.get('close_ts') or trade.get('timestamp') or 0
+        if close_ts > 0:
+            try:
+                trade_date = datetime.fromtimestamp(close_ts).strftime('%Y-%m-%d')
+                daily_pnl[trade_date] = daily_pnl.get(trade_date, 0) + trade.get('profit', 0)
+            except Exception:
+                pass
+    
+    cumulative_pnl = 0
     for i in range(30, -1, -1):
         date = current_date - timedelta(days=i)
+        date_str = date.strftime('%Y-%m-%d')
         pnl_dates.append(date.strftime('%d/%m'))
-        daily_change = random.uniform(-20, 50) if i > 5 else random.uniform(10, 60)
-        cumulative_pnl += daily_change
+        cumulative_pnl += daily_pnl.get(date_str, 0)
         pnl_values.append(round(cumulative_pnl, 2))
     
     return render_template('performance.html',
@@ -2901,12 +2939,35 @@ def reports():
     # All trades for log
     all_trades = trades.get('closed', []) + list(trades.get('open', {}).values())
     
-    # System logs (mock data - would read from actual log files)
-    system_logs = [
-        {'timestamp': '2025-12-17 14:30:25', 'level': 'INFO', 'message': 'Bot started successfully'},
-        {'timestamp': '2025-12-17 14:31:10', 'level': 'INFO', 'message': 'Market scan completed: 25 markets'},
-        {'timestamp': '2025-12-17 14:32:45', 'level': 'WARNING', 'message': 'Low volume detected on SHIB-EUR'},
-    ]
+    # System logs from real bot.log file
+    system_logs = []
+    log_path = PROJECT_ROOT / 'logs' / 'bot.log'
+    if log_path.exists():
+        try:
+            with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()[-50:]
+            for line in reversed(lines):
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split(' | ', 2)
+                if len(parts) >= 3:
+                    log_ts, log_level, log_msg = parts[0].strip(), parts[1].strip(), parts[2].strip()
+                elif len(parts) == 2:
+                    log_ts, log_msg = parts[0].strip(), parts[1].strip()
+                    log_level = 'INFO'
+                else:
+                    continue
+                system_logs.append({
+                    'timestamp': log_ts[:19],
+                    'level': log_level.upper(),
+                    'message': log_msg[:300],
+                })
+                if len(system_logs) >= 25:
+                    break
+        except Exception as e:
+            logger.warning(f"Could not read bot.log for reports: {e}")
+            system_logs = [{'timestamp': '-', 'level': 'WARNING', 'message': f'Kan bot.log niet lezen: {e}'}]
     
     # Bot heartbeat status
     bot_heartbeat = {
@@ -2925,11 +2986,13 @@ def reports():
         'uptime': int(time.time()),
     }
     
-    # Performance reports (mock data)
+    # Performance reports generated from actual trade data
+    import datetime as _dt
+    now = _dt.datetime.now()
     reports_list = [
-        {'name': 'Daily Report 2025-12-17', 'type': 'daily', 'date': '2025-12-17'},
-        {'name': 'Weekly Report W50', 'type': 'weekly', 'date': '2025-12-15'},
-        {'name': 'Monthly Report Dec', 'type': 'monthly', 'date': '2025-12-01'},
+        {'name': f'Dagrapport {now.strftime("%Y-%m-%d")}', 'type': 'daily', 'date': now.strftime('%Y-%m-%d')},
+        {'name': f'Weekrapport W{now.isocalendar()[1]}', 'type': 'weekly', 'date': (now - _dt.timedelta(days=now.weekday())).strftime('%Y-%m-%d')},
+        {'name': f'Maandrapport {now.strftime("%b %Y")}', 'type': 'monthly', 'date': now.strftime('%Y-%m-01')},
     ]
     
     # Pagination data
@@ -3476,93 +3539,84 @@ def telegram_test():
         return jsonify({'status': 'error', 'error': str(e)})
 
 
+@app.route('/notifications')
 def notifications():
     """Notifications & Alerts page."""
     import time
+    from datetime import datetime
     
-    # Mock alerts data (would come from database/notification system)
-    alerts = [
-        {
-            'id': 'alert_1',
-            'type': 'success',
-            'icon': '✅',
-            'title': 'Take-Profit Hit',
-            'message': 'BTC-EUR take-profit triggered at €45,250.00. Profit: +€156.30',
-            'timestamp': '2025-12-17 14:32:10',
-            'read': False
-        },
-        {
-            'id': 'alert_2',
-            'type': 'warning',
-            'icon': '⚠️',
-            'title': 'Trailing Stop Activated',
-            'message': 'ETH-EUR trailing stop now active at €3,150.00',
-            'timestamp': '2025-12-17 13:15:22',
-            'read': False
-        },
-        {
-            'id': 'alert_3',
-            'type': 'info',
-            'icon': '📊',
-            'title': 'Daily P/L Milestone',
-            'message': 'Daily profit reached €500.00 target (125% of goal)',
-            'timestamp': '2025-12-17 12:00:00',
-            'read': True
-        },
-        {
-            'id': 'alert_4',
-            'type': 'error',
-            'icon': '❌',
-            'title': 'Connection Error',
-            'message': 'Bitvavo API connection timeout. Retrying...',
-            'timestamp': '2025-12-17 10:45:33',
-            'read': True
-        },
-    ]
+    # Build real alerts from closed trades (last 20)
+    trades = load_trades()
+    closed_trades_raw = trades.get('closed', [])
+    sorted_trades = sorted(closed_trades_raw, key=lambda t: t.get('close_ts', t.get('timestamp', 0)), reverse=True)[:20]
     
-    # Audit log entries
-    audit_log = [
-        {
-            'timestamp': '2025-12-17 14:32:10',
-            'type': 'trade',
-            'event': 'Position Closed',
-            'details': 'BTC-EUR take-profit at €45,250.00',
-            'user': 'System'
-        },
-        {
-            'timestamp': '2025-12-17 13:15:22',
-            'type': 'trade',
-            'event': 'Trailing Activated',
-            'details': 'ETH-EUR trailing stop enabled',
-            'user': 'System'
-        },
-        {
-            'timestamp': '2025-12-17 12:00:00',
-            'type': 'system',
-            'event': 'Daily Reset',
-            'details': 'Daily metrics reset and archived',
-            'user': 'Scheduler'
-        },
-        {
-            'timestamp': '2025-12-17 10:45:33',
-            'type': 'error',
-            'event': 'API Error',
-            'details': 'Connection timeout (retry successful)',
-            'user': 'System'
-        },
-        {
-            'timestamp': '2025-12-17 09:30:00',
-            'type': 'system',
-            'event': 'Bot Started',
-            'details': 'Trading bot initialized successfully',
-            'user': 'Admin'
-        },
-    ]
+    alerts = []
+    for t in sorted_trades:
+        ts = t.get('close_ts') or t.get('timestamp') or 0
+        profit = t.get('profit', 0)
+        market = t.get('market', 'UNKNOWN')
+        reason = t.get('reason', 'unknown')
+        try:
+            ts_str = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S') if ts > 0 else '-'
+        except Exception:
+            ts_str = '-'
+        
+        if profit >= 0:
+            alert_type, icon, title = 'success', '✅', 'Positie Gesloten (Winst)'
+            message = f'{market} — +€{profit:.2f} ({reason})'
+        else:
+            alert_type, icon, title = 'warning', '⚠️', 'Positie Gesloten (Verlies)'
+            message = f'{market} — €{profit:.2f} ({reason})'
+        
+        alerts.append({
+            'id': f'trade_{market}_{int(ts)}',
+            'type': alert_type,
+            'icon': icon,
+            'title': title,
+            'message': message,
+            'timestamp': ts_str,
+            'read': True,
+        })
+    
+    # Build real audit log from bot.log (last 30 lines)
+    audit_log = []
+    log_path = PROJECT_ROOT / 'logs' / 'bot.log'
+    if log_path.exists():
+        try:
+            with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()[-30:]
+            for line in reversed(lines):
+                line = line.strip()
+                if not line:
+                    continue
+                # Parse log lines like "2025-12-17 14:30:25 | INFO | message"
+                parts = line.split(' | ', 2)
+                if len(parts) >= 3:
+                    log_ts, log_level, log_msg = parts[0].strip(), parts[1].strip(), parts[2].strip()
+                elif len(parts) == 2:
+                    log_ts, log_msg = parts[0].strip(), parts[1].strip()
+                    log_level = 'INFO'
+                else:
+                    log_ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    log_level = 'INFO'
+                    log_msg = line[:200]
+                
+                event_type = 'error' if 'ERROR' in log_level.upper() else 'system'
+                audit_log.append({
+                    'timestamp': log_ts[:19],
+                    'type': event_type,
+                    'event': log_level,
+                    'details': log_msg[:200],
+                    'user': 'System',
+                })
+                if len(audit_log) >= 20:
+                    break
+        except Exception as e:
+            logger.warning(f"Could not read bot.log for notifications: {e}")
     
     # Calculate stats
-    unread_count = len([a for a in alerts if not a.get('read', False)])
-    today_timestamp = int(time.time()) - 86400  # Last 24h
-    today_count = len(alerts)  # Simplified - would filter by timestamp
+    unread_count = 0
+    today_count = len([a for a in alerts if a.get('timestamp', '') >= datetime.now().strftime('%Y-%m-%d')])
     
     return render_template('notifications.html',
         alerts=alerts,

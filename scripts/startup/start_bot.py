@@ -746,11 +746,9 @@ def build_processes(mode: str, include_dashboard: bool, include_pairs: bool) -> 
     processes.append(
         ManagedProcess("monitor", _script_command(str(BASE_DIR / "scripts" / "helpers" / "monitor.py")), auto_restart=True)
     )
-    # Kick off trailing_bot immediately so the bot starts trading right after start_bot runs.
-    # Monitor keeps handling restarts/health checks and will notice the existing instance, so there are no duplicates.
-    processes.append(
-        ManagedProcess("trailing_bot", _script_command(str(BASE_DIR / "trailing_bot.py")), auto_restart=False)
-    )
+    # NOTE: trailing_bot is NOT started here — monitor.py is the sole manager
+    # for trailing_bot restarts. Starting it from both places caused duplicate
+    # instances due to race conditions.
     # Ensure the AI supervisor is kept running; restart if it exits quickly
     processes.append(
         ManagedProcess("ai_supervisor", _script_command(str(BASE_DIR / "ai" / "ai_supervisor.py")), auto_restart=False)
@@ -867,15 +865,9 @@ def _list_running_start_bot_pids() -> list[int]:
                         # skip transient/unrelated python invocations
                         continue
 
-                    # If the candidate was launched from VS Code's terminal integration, ignore it
-                    # because VS Code can spawn short-lived helper processes that confuse the guard.
-                    try:
-                        if _launched_from_vscode(pid):
-                            if DEBUG_GUARD:
-                                print(f"[start_bot] guard ignoring pid={pid} because it's launched from VSCode")
-                            continue
-                    except Exception:
-                        pass
+                    # NOTE: VS Code bypass removed — it caused false negatives where
+                    # legitimate duplicate instances launched from VS Code terminals
+                    # were ignored, leading to all processes running 2x.
 
                     pids.append(pid)
                 except (_psutil.NoSuchProcess, _psutil.AccessDenied, _psutil.ZombieProcess):
@@ -959,15 +951,6 @@ def _list_running_start_bot_pids() -> list[int]:
                                 if not is_repo_process:
                                     # skip unrelated python processes
                                     continue
-
-                                # Ignore candidates launched from VS Code's integrated terminal
-                                try:
-                                    if _launched_from_vscode(pid):
-                                        if DEBUG_GUARD:
-                                            print(f"[start_bot] guard ignoring pid={pid} because it's launched from VSCode (wmic branch)")
-                                        continue
-                                except Exception:
-                                    pass
 
                                 pids.append(pid)
                             except Exception:
@@ -1210,8 +1193,10 @@ def main() -> None:
         if _psutil is not None:
             parent = _psutil.Process(os.getppid())
             parent_cmdline = ' '.join(parent.cmdline() or []).lower()
-            # Check if parent is powershell running start_automated.ps1 or start_automated_unified.ps1
-            if 'start_automated' in parent_cmdline or 'start_bot' in parent_cmdline:
+            # Only skip duplicate check when launched by start_automated.ps1/bat wrapper
+            # IMPORTANT: Do NOT match 'start_bot' here — that would skip the check
+            # when start_bot.py is its own parent (e.g. due to Windows process inheritance)
+            if 'start_automated' in parent_cmdline:
                 parent_is_launcher = True
                 debug_log(f"main: Skipping duplicate check - launched by wrapper: {parent_cmdline[:100]}")
     except Exception as e:

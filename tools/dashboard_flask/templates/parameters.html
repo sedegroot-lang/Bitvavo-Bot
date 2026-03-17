@@ -3,34 +3,23 @@
 {% block title %}⚙️ Strategie & Parameters - Bitvavo Trading Bot{% endblock %}
 
 {% block content %}
-<!-- Hero Banner - Quantum style -->
-<div class="glass-panel hero-banner">
-    <div class="hero-content">
-        <div class="hero-subtitle">BOT CONFIGURATION CENTER</div>
-        <div class="hero-title">⚙️ Strategie & Parameters</div>
-        <div class="hero-description">Parameter optimization • Risk settings</div>
-        <div class="hero-tags">
-            <span class="hero-tag tag-trailing">{{ active_strategy|default('DCA Conservative', true) }}</span>
-        </div>
-    </div>
-</div>
 
 <!-- Hero Stats Grid -->
 <div class="hero-grid">
     <div class="hero-card">
-        <div class="hero-label">🎯 ACTIVE STRATEGY</div>
+        <div class="hero-label">🎯 ACTIEVE STRATEGIE</div>
         <div class="hero-value" id="active-strategy">{{ active_strategy|default('DCA', true) }}</div>
-        <div class="hero-sub">Current profile</div>
+        <div class="hero-sub">Huidig profiel</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">📊 RISK LEVEL</div>
+        <div class="hero-label">📊 RISICONIVEAU</div>
         <div class="hero-value">{{ risk_level if risk_level else 'MEDIUM' }}</div>
-        <div class="hero-sub">Current setting</div>
+        <div class="hero-sub">Huidige instelling</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">⏰ LAST MODIFIED</div>
-        <div class="hero-value no-animate" id="last-modified">{{ last_modified|default('Today', true) }}</div>
-        <div class="hero-sub">Configuration change</div>
+        <div class="hero-label">⏰ LAATST GEWIJZIGD</div>
+        <div class="hero-value no-animate" id="last-modified">{{ last_modified|default('Vandaag', true) }}</div>
+        <div class="hero-sub">Configuratie wijziging</div>
     </div>
 </div>
 
@@ -38,7 +27,7 @@
 <!-- Bot Identification & Core Settings -->
 <section class="glass-panel">
     <div class="section-header">
-        <h2>🤖 Bot Identificatie & Core Settings</h2>
+        <h2>🤖 Bot Identificatie & Kerninstellingen</h2>
     </div>
     
     <div class="params-grid">

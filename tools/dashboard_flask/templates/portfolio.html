@@ -93,51 +93,51 @@
 {% set hodl_cfg = config.get('HODL_SCHEDULER', {}) %}
 {% set hodl_weekly = namespace(total=0) %}
 {% for s in hodl_cfg.get('schedules', []) %}{% set hodl_weekly.total = hodl_weekly.total + s.get('amount_eur', 0) %}{% endfor %}
-<div class="glass-panel" style="margin-bottom: 1.5rem; padding: 1rem 1.2rem;">
-    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem;">
-        <span style="font-size: 1.1rem;">💼</span>
-        <h3 style="margin: 0; font-size: 0.95rem; color: var(--text-primary);">Budget Verdeling</h3>
-        <span style="font-size: 0.75rem; color: var(--text-tertiary); margin-left: auto;">{{ budget.get('mode', 'dynamic') }} mode · totaal €{{ "%.0f"|format(total_account) }}</span>
+<div class="glass-panel budget-panel">
+    <div class="budget-header">
+        <span class="budget-header-icon">💼</span>
+        <h3>Budget Verdeling</h3>
+        <span class="budget-header-meta">{{ budget.get('mode', 'dynamic') }} mode · totaal €{{ "%.0f"|format(total_account) }}</span>
     </div>
-    <div style="display: flex; align-items: center; gap: 1.2rem;">
+    <div class="budget-grid-wrap">
         <!-- Donut Chart -->
         <div class="donut-chart-container" id="budget-donut" style="flex-shrink: 0;">
             <!-- Rendered by JS -->
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; flex: 1;">
+        <div class="budget-cards">
         <!-- Trailing Bot -->
-        <div style="background: rgba(99,179,136,0.08); border: 1px solid rgba(99,179,136,0.2); border-radius: 8px; padding: 0.7rem;">
-            <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 0.25rem;">🤖 Trailing Bot</div>
-            <div style="font-size: 1.05rem; font-weight: 600; color: #63b388;">{{ trail_pct }}%</div>
-            <div style="font-size: 0.78rem; color: #94a3b8;">≈ €{{ "%.0f"|format(trail_eur) }}</div>
-            <div style="margin-top: 0.4rem; background: rgba(255,255,255,0.06); border-radius: 4px; height: 4px; overflow: hidden;">
-                <div style="width: {{ trail_pct }}%; height: 100%; background: #63b388; border-radius: 4px;"></div>
+        <div class="budget-card budget-card--trailing">
+            <div class="budget-card-label">🤖 Trailing Bot</div>
+            <div class="budget-card-value">{{ trail_pct }}%</div>
+            <div class="budget-card-sub">≈ €{{ "%.0f"|format(trail_eur) }}</div>
+            <div class="budget-card-bar">
+                <div class="budget-card-bar-fill" style="width: {{ trail_pct }}%;"></div>
             </div>
         </div>
         <!-- Grid Bot -->
-        <div style="background: rgba(99,130,220,0.08); border: 1px solid rgba(99,130,220,0.2); border-radius: 8px; padding: 0.7rem;">
-            <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 0.25rem;">▦ Grid Bot</div>
-            <div style="font-size: 1.05rem; font-weight: 600; color: #6382dc;">{{ grid_pct }}%</div>
-            <div style="font-size: 0.78rem; color: #94a3b8;">≈ €{{ "%.0f"|format(grid_eur) }}</div>
-            <div style="margin-top: 0.4rem; background: rgba(255,255,255,0.06); border-radius: 4px; height: 4px; overflow: hidden;">
-                <div style="width: {{ grid_pct }}%; height: 100%; background: #6382dc; border-radius: 4px;"></div>
+        <div class="budget-card budget-card--grid">
+            <div class="budget-card-label">▦ Grid Bot</div>
+            <div class="budget-card-value">{{ grid_pct }}%</div>
+            <div class="budget-card-sub">≈ €{{ "%.0f"|format(grid_eur) }}</div>
+            <div class="budget-card-bar">
+                <div class="budget-card-bar-fill" style="width: {{ grid_pct }}%;"></div>
             </div>
         </div>
         <!-- HODL DCA -->
-        <div style="background: rgba(220,180,60,0.08); border: 1px solid rgba(220,180,60,0.2); border-radius: 8px; padding: 0.7rem;">
-            <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 0.25rem;">🪙 HODL DCA</div>
-            <div style="font-size: 1.05rem; font-weight: 600; color: #dcb43c;">€{{ "%.0f"|format(hodl_weekly.total) }}</div>
-            <div style="font-size: 0.78rem; color: #94a3b8;">per week · {{ hodl_cfg.get('schedules', [])|length }} assets</div>
-            <div style="margin-top: 0.4rem; font-size: 0.7rem; color: #64748b;">
+        <div class="budget-card budget-card--hodl">
+            <div class="budget-card-label">🪙 HODL DCA</div>
+            <div class="budget-card-value">€{{ "%.0f"|format(hodl_weekly.total) }}</div>
+            <div class="budget-card-sub">per week · {{ hodl_cfg.get('schedules', [])|length }} assets</div>
+            <div class="budget-card-detail">
                 {% for s in hodl_cfg.get('schedules', []) %}{{ s.get('market', '') }} €{{ s.get('amount_eur', 0)|int }}{% if not loop.last %} · {% endif %}{% endfor %}
             </div>
         </div>
         <!-- Reserve -->
-        <div style="background: rgba(148,163,184,0.08); border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 0.7rem;">
-            <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 0.25rem;">🛡️ Reserve</div>
-            <div style="font-size: 1.05rem; font-weight: 600; color: #94a3b8;">{{ reserve_pct }}%</div>
-            <div style="font-size: 0.78rem; color: #94a3b8;">min €{{ "%.0f"|format(reserve_eur) }} vloer</div>
-            <div style="margin-top: 0.4rem; font-size: 0.7rem; color: #64748b;">Circuit breaker buffer</div>
+        <div class="budget-card budget-card--reserve">
+            <div class="budget-card-label">🛡️ Reserve</div>
+            <div class="budget-card-value">{{ reserve_pct }}%</div>
+            <div class="budget-card-sub">min €{{ "%.0f"|format(reserve_eur) }} vloer</div>
+            <div class="budget-card-detail">Circuit breaker buffer</div>
         </div>
     </div>
     </div>
@@ -632,23 +632,30 @@
 </div>
 {% endif %}
 
-<!-- Closed Trades Table - Last 10 -->
+<!-- Closed Trades Table -->
 <div class="glass-panel">
-    <div class="section-header">
-        <h2>📕 Laatste 10 Gesloten Trades</h2>
+    <div class="section-header" style="display: flex; align-items: center; justify-content: space-between;">
+        <h2>📕 Laatste {{ trades_count }} Gesloten Trades</h2>
+        <select id="trades-count-select" onchange="changeTradesCount(this.value)" style="background: var(--bg-secondary, #161b22); color: var(--text-primary, #e6edf3); border: 1px solid var(--border-subtle, #30363d); border-radius: 6px; padding: 4px 8px; font-size: 0.85rem; cursor: pointer;">
+            <option value="10" {% if trades_count == 10 %}selected{% endif %}>10 trades</option>
+            <option value="25" {% if trades_count == 25 %}selected{% endif %}>25 trades</option>
+            <option value="50" {% if trades_count == 50 %}selected{% endif %}>50 trades</option>
+            <option value="100" {% if trades_count == 100 %}selected{% endif %}>100 trades</option>
+            <option value="250" {% if trades_count == 250 %}selected{% endif %}>250 trades</option>
+        </select>
     </div>
     {% if closed_trades and closed_trades|length > 0 %}
     <div class="table-responsive">
         <table class="closed-trades-table">
             <thead>
                 <tr>
-                    <th>Market</th>
+                    <th>Markt</th>
                     <th>Reden</th>
-                    <th>Invested</th>
+                    <th>Geïnvesteerd</th>
                     <th>Verkocht voor</th>
-                    <th>P/L</th>
-                    <th>Buy Price</th>
-                    <th>Sell Price</th>
+                    <th>W/V</th>
+                    <th>Koopprijs</th>
+                    <th>Verkoopprijs</th>
                     <th>Datum</th>
                 </tr>
             </thead>
@@ -697,6 +704,25 @@
 <script id="portfolio-combined-data" type="application/json">{{ portfolio_combined_data|tojson|safe if portfolio_combined_data else '{}' }}</script>
 <script id="portfolio-allocation-data" type="application/json">{{ portfolio_allocation|tojson|safe if portfolio_allocation else '{}' }}</script>
 <script id="portfolio-config-data" type="application/json">{{ config|tojson|safe if config else '{}' }}</script>
+<script>
+// Closed trades count filter with localStorage
+function changeTradesCount(count) {
+    localStorage.setItem('closed_trades_count', count);
+    var url = new URL(window.location.href);
+    url.searchParams.set('trades_count', count);
+    window.location.href = url.toString();
+}
+// Restore saved preference on load
+(function() {
+    var saved = localStorage.getItem('closed_trades_count');
+    var urlParams = new URLSearchParams(window.location.search);
+    if (saved && !urlParams.has('trades_count')) {
+        var url = new URL(window.location.href);
+        url.searchParams.set('trades_count', saved);
+        window.location.replace(url.toString());
+    }
+})();
+</script>
 <script>
 // Read config from JSON data block (avoids VS Code linter errors with Jinja syntax)
 var portfolioConfig = document.getElementById('portfolio-config-data') ? JSON.parse(document.getElementById('portfolio-config-data').textContent) : {};

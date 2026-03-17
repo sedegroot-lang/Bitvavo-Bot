@@ -165,11 +165,6 @@
     }
     </script>
 
-    <!-- Quantum Title - FAANG Premium Header -->
-    <div class="quantum-title-container">
-        <h1 class="quantum-title">Bitvavo Trading Bot</h1>
-    </div>
-
     <!-- Statusbalk -->
     <div class="status-bar-quantum" role="region" aria-label="Systeemstatus">
         <div class="status-item">
@@ -232,6 +227,9 @@
             </a>
             <a href="{{ url_for('roadmap') }}" class="nav-tab {% if active_tab == 'roadmap' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'roadmap' %}true{% else %}false{% endif %}" aria-label="Roadmap tab">
                 Roadmap
+            </a>
+            <a href="{{ url_for('notifications') }}" class="nav-tab {% if active_tab == 'notifications' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'notifications' %}true{% else %}false{% endif %}" aria-label="Meldingen tab">
+                🔔 Meldingen
             </a>
             <a href="{{ url_for('settings') }}" class="nav-tab {% if active_tab == 'settings' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'settings' %}true{% else %}false{% endif %}" aria-label="Instellingen tab">
                 Instellingen

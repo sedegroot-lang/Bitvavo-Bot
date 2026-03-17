@@ -3,18 +3,6 @@
 {% block title %}📈 Prestaties & W/V - Bitvavo Trading Bot{% endblock %}
 
 {% block content %}
-<!-- Hero Banner - Quantum style -->
-<div class="glass-panel hero-banner">
-    <div class="hero-content">
-        <div class="hero-subtitle">HANDELS PRESTATIE OVERZICHT</div>
-        <div class="hero-title">📈 Prestaties & W/V</div>
-        <div class="hero-description">Volledige handelsanalyse • Gerealiseerde & ongerealiseerde W/V • Historische trends</div>
-        <div class="hero-tags">
-            <span class="hero-tag tag-count">{{ total_trades if total_trades else '0' }} trades</span>
-            <span class="hero-tag tag-trailing">{{ "%.1f"|format(win_rate if win_rate else 0) }}% winstpercentage</span>
-        </div>
-    </div>
-</div>
 
 <!-- Hero Stats Grid -->
 <div class="hero-grid">

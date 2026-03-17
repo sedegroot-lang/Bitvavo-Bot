@@ -3,20 +3,6 @@
 {% block title %}📊 Grid Bot - Bitvavo Trading Bot{% endblock %}
 
 {% block content %}
-<!-- Hero Banner -->
-<div class="glass-panel hero-banner">
-    <div class="hero-content">
-        <div class="hero-subtitle">GEAUTOMATISEERD BEREIK HANDELEN</div>
-        <div class="hero-title">Grid Bot</div>
-        <div class="hero-description">Grid handelsstrategieën &bull; Geautomatiseerde koop/verkoop niveaus &bull; Bereik scalping</div>
-        <div class="hero-tags">
-            <span class="hero-tag tag-count">{{ active_grids|length }} actief</span>
-            {% if total_grid_net_profit is defined %}
-            <span class="hero-tag tag-trailing {% if total_grid_net_profit|default(0) >= 0 %}tag-profit{% else %}tag-loss{% endif %}">{{ '+' if total_grid_net_profit|default(0) >= 0 else '' }}€{{ "%.2f"|format(total_grid_net_profit|default(0)) }} net</span>
-            {% endif %}
-        </div>
-    </div>
-</div>
 
 <!-- Hero Stats Grid -->
 <div class="hero-grid">

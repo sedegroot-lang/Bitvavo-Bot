@@ -712,6 +712,39 @@ body.pnl-negative::before {
 }
 
 /* =====================================================
+   13b. BUDGET VERDELING PANEL
+   ===================================================== */
+
+.budget-panel { margin-bottom: 1.5rem; padding: 1rem 1.2rem; }
+.budget-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; }
+.budget-header-icon { font-size: 1.1rem; }
+.budget-header h3 { margin: 0; font-size: 0.95rem; color: var(--text-primary); }
+.budget-header-meta { font-size: 0.75rem; color: var(--text-tertiary); margin-left: auto; }
+.budget-grid-wrap { display: flex; align-items: center; gap: 1.2rem; }
+.budget-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; flex: 1; }
+.budget-card { border-radius: 8px; padding: 0.7rem; }
+.budget-card-label { font-size: 0.72rem; color: #94a3b8; margin-bottom: 0.25rem; }
+.budget-card-value { font-size: 1.05rem; font-weight: 600; }
+.budget-card-sub { font-size: 0.78rem; color: #94a3b8; }
+.budget-card-bar { margin-top: 0.4rem; background: rgba(255,255,255,0.06); border-radius: 4px; height: 4px; overflow: hidden; }
+.budget-card-bar-fill { height: 100%; border-radius: 4px; }
+.budget-card-detail { margin-top: 0.4rem; font-size: 0.7rem; color: #64748b; }
+
+.budget-card--trailing { background: rgba(99,179,136,0.08); border: 1px solid rgba(99,179,136,0.2); }
+.budget-card--trailing .budget-card-value { color: #63b388; }
+.budget-card--trailing .budget-card-bar-fill { background: #63b388; }
+
+.budget-card--grid { background: rgba(99,130,220,0.08); border: 1px solid rgba(99,130,220,0.2); }
+.budget-card--grid .budget-card-value { color: #6382dc; }
+.budget-card--grid .budget-card-bar-fill { background: #6382dc; }
+
+.budget-card--hodl { background: rgba(220,180,60,0.08); border: 1px solid rgba(220,180,60,0.2); }
+.budget-card--hodl .budget-card-value { color: #dcb43c; }
+
+.budget-card--reserve { background: rgba(148,163,184,0.08); border: 1px solid rgba(148,163,184,0.2); }
+.budget-card--reserve .budget-card-value { color: #94a3b8; }
+
+/* =====================================================
    14. CURSOR GLOW TRAIL
    ===================================================== */
 

@@ -104,14 +104,18 @@ def _acquire_windows_mutex_or_exit(script_name: str, safe_name: str) -> None:
         CreateMutexW.restype = wintypes.HANDLE
 
         mutex_name = f"Global\\BitvavoBot_{safe_name}"
-        handle = CreateMutexW(None, False, mutex_name)
+        handle = CreateMutexW(None, True, mutex_name)
         last_error = ctypes.get_last_error()
         if not handle:
             return
         if last_error == 183:  # ERROR_ALREADY_EXISTS
-            # Mutex exists but process might be dead - check PID file first
-            # Don't exit yet, let PID file check handle it
-            return
+            # Another process holds this mutex (Windows auto-releases on process exit)
+            try:
+                kernel32.CloseHandle(handle)
+            except Exception:
+                pass
+            print(f"[singleton] {script_name}: another instance holds the mutex, exiting.")
+            sys.exit(1)
         _MUTEX_HANDLES[safe_name] = handle
         atexit.register(_cleanup_mutex, safe_name)
     except Exception:
