@@ -46,10 +46,11 @@ Config lives in `config/bot_config.json` and is loaded by `modules/config.py`.
 from modules.config import load_config, save_config, CONFIG
 ```
 
-- `load_config()` → returns a plain `dict` merged from 3 layers:
-  1. `config/bot_config.json` (main, synced via OneDrive)
-  2. `config/bot_config_overrides.json` (overrides that survive OneDrive reverts)
-  3. `%LOCALAPPDATA%/BotConfig/bot_config_local.json` (machine-local overrides)
+- `load_config()` → returns a plain `dict` merged from 3 layers (last wins):
+  1. `config/bot_config.json` (base defaults, synced via OneDrive — **DO NOT edit for settings changes**)
+  2. `config/bot_config_overrides.json` (legacy overrides, also on OneDrive — **DO NOT edit for settings changes**)
+  3. **`%LOCALAPPDATA%/BotConfig/bot_config_local.json`** (machine-local overrides, **OUTSIDE OneDrive** — **THIS is where ALL config changes go**)
+- **Layer 3 wins over everything.** OneDrive regularly reverts layers 1 and 2. Layer 3 is immune to OneDrive sync.
 - Runtime state keys (e.g. `LAST_REINVEST_TS`) are stored separately in `data/bot_state.json` and merged in at load time.
 - `CONFIG` is a **module-level dict** exported from `modules/config.py` — many modules import it directly.
 - `save_config()` writes atomically via tmp+replace, strips runtime state keys, and auto-syncs the overrides file.
@@ -58,6 +59,18 @@ from modules.config import load_config, save_config, CONFIG
   max_retries = int(CONFIG.get('SAFE_CALL_MAX_RETRIES', 5))
   ```
 - Config is validated against a schema (`modules/config_schema.py`) at load time; errors are logged but don't block startup.
+
+### CRITICAL: Where to change config values
+**ALWAYS edit `%LOCALAPPDATA%/BotConfig/bot_config_local.json`** (typically `C:\Users\Sedeg\AppData\Local\BotConfig\bot_config_local.json`).
+- This file loads LAST and wins over all other config files.
+- It is OUTSIDE OneDrive and will NEVER be reverted by sync.
+- NEVER edit `config/bot_config.json` or `config/bot_config_overrides.json` for settings changes — OneDrive will revert them.
+- To read the local config path from code: `modules.config.LOCAL_OVERRIDE_PATH`
+- To edit from PowerShell:
+  ```powershell
+  $localPath = Join-Path $env:LOCALAPPDATA "BotConfig\bot_config_local.json"
+  notepad $localPath
+  ```
 
 ### Gotcha
 - Never store runtime state (timestamps, circuit-breaker flags) in `bot_config.json` — use the `RUNTIME_STATE_KEYS` set or `data/bot_state.json`.
@@ -287,11 +300,11 @@ Also: trailing-whitespace, end-of-file-fixer, check-yaml, check-json, detect-pri
 2. **Dutch log messages**: Many log strings are in Dutch — preserve this convention in existing modules but English is fine for new code.
 3. **Config value coercion**: Use `as_float()`, `as_int()`, `as_bool()` from `bot.helpers` — never trust config values to be the right type.
 4. **Circular import avoidance**: Use deferred imports inside functions, not at module top level, when `bot/` ↔ `modules/` cross-references exist.
-5. **OneDrive sync conflicts**: The config override system exists specifically because OneDrive reverts config changes. Never remove the override merge logic.
+5. **OneDrive sync conflicts**: OneDrive frequently reverts `config/bot_config.json` and `config/bot_config_overrides.json` to older versions. **ALL config changes MUST go to `%LOCALAPPDATA%/BotConfig/bot_config_local.json`** which is outside OneDrive and loads last (wins over everything). Never edit the OneDrive config files for settings changes. Never remove the 3-layer merge logic in `modules/config.py`.
 6. **Monolith reference**: `trailing_bot.py` is the legacy monolith (~4300 lines). New code should go into `bot/`, `core/`, or `modules/` packages, not into trailing_bot.py.
 7. **Trade cost basis**: Always use `initial_invested_eur` (immutable) as ground truth, not `invested_eur` (mutable).
 8. **Metrics are non-blocking**: Metrics emission must never raise or block trading operations — wrap in `try/except: pass`.
 9. **Startup order matters**: `bot.api.init()` must be called before any API function. `bot.shared.init()` must be called before any extracted module accesses state.
 10. **Windows-first**: The bot runs on Windows. Use `os.replace()` not `os.rename()`. Use thread-based timeouts, not signals. Paths may contain spaces (OneDrive).
 11. **GitHub push on bug fixes**: After fixing any bug (code changes in `.py` files), always commit and push the changes to the GitHub repository. Use a descriptive commit message like `fix: <short description>`. This ensures the production bot stays in sync with the repo and fixes are not lost.
-12. **MAX_OPEN_TRADES minimum is 3**: The `MAX_OPEN_TRADES` config value must NEVER be set below 3. This is enforced in `ai/ai_supervisor.py` (clamped to 3) and `ai/suggest_rules.py` (floor of 3 in all suggestions). When changing MAX_OPEN_TRADES, always update BOTH `config/bot_config.json` AND `config/bot_config_overrides.json` — the overrides file wins and will revert changes if not also updated. The AI suggest rules use `max(3, ...)` as floor, never `max(2, ...)`.
+12. **MAX_OPEN_TRADES minimum is 3**: The `MAX_OPEN_TRADES` config value must NEVER be set below 3. This is enforced in `ai/ai_supervisor.py` (clamped to 3) and `ai/suggest_rules.py` (floor of 3 in all suggestions). When changing MAX_OPEN_TRADES or any other config value, **edit ONLY `%LOCALAPPDATA%/BotConfig/bot_config_local.json`** — this file loads last and wins over everything. Do NOT edit `config/bot_config.json` or `config/bot_config_overrides.json` (OneDrive reverts them). The AI suggest rules use `max(3, ...)` as floor, never `max(2, ...)`.
