@@ -419,6 +419,8 @@ class MonitoringManager:
             # Wacht eerst lang genoeg zodat de bot zijn eerste heartbeat kan schrijven
             # voordat we beginnen te controleren (voorkomt valse alerts na herstart)
             time.sleep(max(alert_stale_seconds, 120))
+            last_alert_ts = 0.0
+            alert_cooldown = max(600, alert_stale_seconds * 3)  # min 10 min between alerts
             while True:
                 try:
                     ts = None
@@ -429,9 +431,12 @@ class MonitoringManager:
                                 data = json.loads(content)
                                 ts = data.get("ts")
                     if ts is None or time.time() - float(ts) > alert_stale_seconds:
-                        send_alert(
-                            f"ALERT: heartbeat stale of missing (last_ts={ts}). Bot may be down."
-                        )
+                        now = time.time()
+                        if now - last_alert_ts >= alert_cooldown:
+                            send_alert(
+                                f"ALERT: heartbeat stale or missing (last_ts={ts}). Bot may be down."
+                            )
+                            last_alert_ts = now
                 except json.JSONDecodeError:
                     # Ignore transient JSON errors from file being written
                     pass
