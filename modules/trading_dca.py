@@ -488,6 +488,10 @@ class DCAManager:
                 * (float(settings.size_multiplier) ** index)
             )
             eur_amount *= dd_penalty
+            # Floor at DCA_MIN_AMOUNT_EUR so late levels keep buying instead of stopping
+            dca_floor = float(cfg.get('DCA_MIN_AMOUNT_EUR', 5.0) or 5.0)
+            if eur_amount < dca_floor:
+                eur_amount = dca_floor
             eur_amount = self._cap_watchlist_amount(trade, eur_amount)
             # Try to reserve headroom across processes
             reservation_id = None
@@ -686,6 +690,10 @@ class DCAManager:
                 break
 
             eur_amount = float(dynamic_amount_eur) * (settings.size_multiplier ** index)
+            # Floor at DCA_MIN_AMOUNT_EUR so late levels keep buying instead of stopping
+            dca_floor = float(ctx.config.get('DCA_MIN_AMOUNT_EUR', 5.0) or 5.0)
+            if eur_amount < dca_floor:
+                eur_amount = dca_floor
             eur_amount = self._cap_watchlist_amount(trade, eur_amount)
             # Try to reserve headroom across processes
             reservation_id = None

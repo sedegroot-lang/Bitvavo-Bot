@@ -251,3 +251,55 @@ class TestGuard5NeverReduceDcaBuys:
         trade = _make_trade(dca_buys=7, dca_events=events, dca_max=9)
         result = self._run_guard5(trade)
         assert result == 9
+
+
+# ===========================================================================
+# Test: DCA EUR floor at DCA_MIN_AMOUNT_EUR
+# ===========================================================================
+
+class TestDCAMinAmountFloor:
+    """DCA amount should floor at DCA_MIN_AMOUNT_EUR (default €5) instead of
+    going below and hitting under_min_size."""
+
+    def test_late_level_floors_at_5_eur(self):
+        """At level 10, 30 * 0.8^10 = €3.22 → should floor to €5 and succeed."""
+        bought_amounts = []
+
+        def mock_place_buy(market, eur, price):
+            bought_amounts.append(eur)
+            return {
+                'status': 'filled',
+                'filledAmount': str(eur / price),
+                'filledAmountQuote': str(eur),
+            }
+
+        ctx = _make_ctx(
+            config={
+                'RSI_DCA_THRESHOLD': 100,
+                'SMART_DCA_ENABLED': False,
+                'BASE_AMOUNT_EUR': 30,
+                'MAX_TOTAL_EXPOSURE_EUR': 0,
+                'DCA_MAX_BUYS_PER_ITERATION': 1,
+                'DCA_MIN_AMOUNT_EUR': 5.0,
+            },
+            get_min_order_size=MagicMock(return_value=0.001),
+            place_buy=mock_place_buy,
+            is_order_success=MagicMock(return_value=True),
+        )
+        settings = _make_settings(
+            amount_eur=30.0, max_buys=12, size_multiplier=0.8,
+            drop_pct=0.001,  # tiny drop so level triggers
+            max_buys_per_iteration=1,
+        )
+        # Start at level 10 (0.8^10 = 0.107 → 30*0.107 = 3.22 < 5)
+        trade = _make_trade(buy_price=100.0, amount=1.0, dca_buys=10, dca_events=[
+            {'event_id': f'e{i}', 'timestamp': time.time(), 'price': 95.0,
+             'amount_eur': 20.0, 'tokens_bought': 0.2, 'dca_level': i+1}
+            for i in range(10)
+        ])
+        mgr = DCAManager(ctx)
+        mgr._execute_fixed_dca('TEST-EUR', trade, 50.0, settings, 1.0)
+        # Should have bought at €5.0 (the floor), not €3.22
+        assert trade['dca_buys'] == 11
+        assert len(bought_amounts) == 1
+        assert bought_amounts[0] == pytest.approx(5.0, abs=0.1)
