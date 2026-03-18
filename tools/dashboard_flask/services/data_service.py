@@ -1,6 +1,7 @@
 """Data service for JSON file operations with caching."""
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -49,15 +50,55 @@ class DataService:
     # ========== Config ==========
     
     def load_config(self) -> Dict[str, Any]:
-        """Load bot configuration with caching."""
+        """Load bot configuration with 3-layer merge.
+
+        Layer 1: config/bot_config.json (base)
+        Layer 2: config/bot_config_overrides.json (overrides)
+        Layer 3: %LOCALAPPDATA%/BotConfig/bot_config_local.json (wins over all)
+        """
         return self.cache.get_or_set(
             'config',
-            lambda: self._load_json(
-                self._project_root / 'config' / 'bot_config.json',
-                {}
-            ),
+            self._load_merged_config,
             self.TTL_CONFIG
         )
+
+    def _load_merged_config(self) -> Dict[str, Any]:
+        root = self._project_root
+        cfg: Dict[str, Any] = self._load_json(root / 'config' / 'bot_config.json', {})
+
+        # Layer 2 — overrides
+        try:
+            ovr_path = root / 'config' / 'bot_config_overrides.json'
+            if ovr_path.exists():
+                with ovr_path.open('r', encoding='utf-8-sig') as f:
+                    overrides = json.load(f)
+                if isinstance(overrides, dict):
+                    for k, v in overrides.items():
+                        if isinstance(v, dict) and isinstance(cfg.get(k), dict):
+                            cfg[k] = {**cfg[k], **v}
+                        else:
+                            cfg[k] = v
+        except Exception as e:
+            logger.warning(f"Failed to load config overrides: {e}")
+
+        # Layer 3 — local overrides (outside OneDrive)
+        try:
+            local_path = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'BotConfig' / 'bot_config_local.json'
+            if local_path.exists():
+                with local_path.open('r', encoding='utf-8') as f:
+                    local = json.load(f)
+                if isinstance(local, dict):
+                    for k, v in local.items():
+                        if k.startswith('_'):
+                            continue
+                        if isinstance(v, dict) and isinstance(cfg.get(k), dict):
+                            cfg[k] = {**cfg[k], **v}
+                        else:
+                            cfg[k] = v
+        except Exception as e:
+            logger.warning(f"Failed to load local config: {e}")
+
+        return cfg
     
     def load_strategy_params(self) -> Dict[str, Any]:
         """Load strategy parameters with caching."""

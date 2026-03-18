@@ -176,6 +176,8 @@ def inject_time_functions():
 
 TRADE_LOG_PATH = PROJECT_ROOT / 'data' / 'trade_log.json'
 CONFIG_PATH = PROJECT_ROOT / 'config' / 'bot_config.json'
+CONFIG_OVERRIDES_PATH = PROJECT_ROOT / 'config' / 'bot_config_overrides.json'
+CONFIG_LOCAL_PATH = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'BotConfig' / 'bot_config_local.json'
 HEARTBEAT_PATH = PROJECT_ROOT / 'data' / 'heartbeat.json'
 METRICS_PATH = PROJECT_ROOT / 'metrics' / 'latest_metrics.json'
 AI_SUGGESTIONS_FILE = PROJECT_ROOT / 'data' / 'ai_suggestions.json'
@@ -345,21 +347,59 @@ def set_cached(key: str, data: Any) -> None:
         _CACHE[key]['ts'] = time.time()
 
 def load_config(force: bool = False) -> Dict:
-    """Load bot configuration."""
+    """Load bot configuration with 3-layer merge (same as modules/config.py).
+
+    Layer 1: config/bot_config.json (base, OneDrive-synced)
+    Layer 2: config/bot_config_overrides.json (OneDrive-synced)
+    Layer 3: %LOCALAPPDATA%/BotConfig/bot_config_local.json (wins over all)
+    """
     if not force:
         cached = get_cached('config')
         if cached:
             return cached
-    
+
+    cfg: Dict = {}
+    # Layer 1 — base config
     try:
         if CONFIG_PATH.exists():
             with CONFIG_PATH.open('r', encoding='utf-8') as f:
-                data = json.load(f)
-                set_cached('config', data)
-                return data
+                cfg = json.load(f) or {}
     except Exception as e:
         logger.error(f"Failed to load config: {e}")
-    return {}
+
+    # Layer 2 — overrides
+    try:
+        if CONFIG_OVERRIDES_PATH.exists():
+            with CONFIG_OVERRIDES_PATH.open('r', encoding='utf-8-sig') as f:
+                overrides = json.load(f)
+            if isinstance(overrides, dict):
+                for k, v in overrides.items():
+                    if isinstance(v, dict) and isinstance(cfg.get(k), dict):
+                        cfg[k] = {**cfg[k], **v}
+                    else:
+                        cfg[k] = v
+    except Exception as e:
+        logger.warning(f"Failed to load config overrides: {e}")
+
+    # Layer 3 — local overrides (outside OneDrive, wins over everything)
+    try:
+        if CONFIG_LOCAL_PATH.exists():
+            with CONFIG_LOCAL_PATH.open('r', encoding='utf-8') as f:
+                local = json.load(f)
+            if isinstance(local, dict):
+                for k, v in local.items():
+                    if k.startswith('_'):
+                        continue
+                    if isinstance(v, dict) and isinstance(cfg.get(k), dict):
+                        cfg[k] = {**cfg[k], **v}
+                    else:
+                        cfg[k] = v
+    except Exception as e:
+        logger.warning(f"Failed to load local config: {e}")
+
+    if cfg:
+        set_cached('config', cfg)
+    return cfg
 
 _last_good_trades: Dict = {}  # fallback when file read fails
 
