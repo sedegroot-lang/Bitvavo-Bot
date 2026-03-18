@@ -881,7 +881,61 @@ def validate_and_repair_trades():
             if 'dca_max' not in trade:
                 trade['dca_max'] = dca_max_global
                 repairs_made += 1
-                
+
+            # GUARD 5: dca_buys ↔ dca_events consistency
+            # dca_buys should match len(dca_events). When events are the source of truth,
+            # we fix the counter. But never raise dca_buys above dca_max.
+            dca_events = trade.get('dca_events', []) or []
+            actual_event_count = len(dca_events)
+            dca_buys_now = int(trade.get('dca_buys', 0) or 0)
+            dca_max_now = int(trade.get('dca_max', dca_max_global) or dca_max_global)
+            correct_buys = min(actual_event_count, dca_max_now)
+            if dca_buys_now != correct_buys:
+                log(
+                    f"⚠️ REPAIR [{market}]: dca_buys={dca_buys_now}, "
+                    f"events={actual_event_count}, max={dca_max_now} "
+                    f"→ setting dca_buys={correct_buys}",
+                    level='warning',
+                )
+                trade['dca_buys'] = correct_buys
+                repairs_made += 1
+
+            # GUARD 6: invested_eur ↔ initial + sum(dca_events) consistency
+            # Only fix when invested_eur is LOWER than expected (missing DCA EUR).
+            # When invested_eur is HIGHER, it likely includes untracked DCAs whose
+            # tokens are in the balance but events were lost — don't reduce it.
+            initial_inv = float(trade.get('initial_invested_eur', 0) or 0)
+            partial_tp_returned = float(trade.get('partial_tp_returned_eur', 0) or 0)
+            if initial_inv > 0 and dca_events:
+                dca_eur_sum = sum(
+                    float(ev.get('amount_eur', 0) or 0) for ev in dca_events
+                )
+                expected_invested = initial_inv + dca_eur_sum - partial_tp_returned
+                current_invested = float(trade.get('invested_eur', 0) or 0)
+                if current_invested > 0 and current_invested < expected_invested - 0.5:
+                    # invested_eur is too LOW — DCA events exist but EUR wasn't added
+                    log(
+                        f"⚠️ REPAIR [{market}]: invested_eur={current_invested:.2f} too low. "
+                        f"initial({initial_inv:.2f}) + DCAs({dca_eur_sum:.2f}) "
+                        f"- tp({partial_tp_returned:.2f}) = {expected_invested:.2f}. Fixing.",
+                        level='warning',
+                    )
+                    trade['invested_eur'] = round(expected_invested, 4)
+                    expected_total = initial_inv + dca_eur_sum
+                    trade['total_invested_eur'] = round(expected_total, 4)
+                    amount = float(trade.get('amount', 0) or 0)
+                    if amount > 0 and expected_total > 0:
+                        trade['buy_price'] = round(expected_total / amount, 12)
+                    repairs_made += 1
+                elif current_invested > expected_invested + 5.0:
+                    # invested_eur is significantly higher than tracked events —
+                    # likely untracked DCAs exist. Log warning only, don't reduce.
+                    log(
+                        f"⚠️ WARN [{market}]: invested_eur={current_invested:.2f} > expected "
+                        f"{expected_invested:.2f} (possible untracked DCAs). Review manually.",
+                        level='warning',
+                    )
+
         except Exception as e:
             log(f"⚠️ REPAIR [{market}]: Error during validation: {e}", level='warning')
     

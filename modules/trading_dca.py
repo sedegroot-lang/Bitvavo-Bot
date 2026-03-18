@@ -517,7 +517,8 @@ class DCAManager:
                 log(
                     f"DCA voor {market} overgeslagen (te klein): {base_amount:.8f} < min {min_size}"
                 )
-                trade["dca_buys"] = settings.max_buys
+                # NOTE: Do NOT set dca_buys = max_buys here — that corrupts the counter
+                # when no actual DCA was executed. Just break and retry next iteration.
                 self._record_dca_audit(market, trade, "skip", "under_min_size", {"base_amount": base_amount, "min_size": min_size})
                 break
 
@@ -713,7 +714,8 @@ class DCAManager:
                 log(
                     f"DCA (dynamic) voor {market} overgeslagen (te klein): {base_amount:.8f} < min {min_size}"
                 )
-                trade["dca_buys"] = dynamic_max_buys
+                # NOTE: Do NOT set dca_buys = max here — that corrupts the counter
+                # when no actual DCA was executed. Just break and retry next iteration.
                 self._record_dca_audit(market, trade, "skip", "under_min_size", {"base_amount": base_amount, "min_size": min_size})
                 break
 
