@@ -110,7 +110,7 @@ def load_config() -> dict:
     # Load LOCAL overrides (outside OneDrive — never reverted by sync)
     try:
         if os.path.exists(LOCAL_OVERRIDE_PATH):
-            with open(LOCAL_OVERRIDE_PATH, encoding='utf-8') as f:
+            with open(LOCAL_OVERRIDE_PATH, encoding='utf-8-sig') as f:
                 local_overrides = json.load(f)
             if isinstance(local_overrides, dict):
                 count = 0

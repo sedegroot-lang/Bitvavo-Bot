@@ -85,7 +85,7 @@ class DataService:
         try:
             local_path = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'BotConfig' / 'bot_config_local.json'
             if local_path.exists():
-                with local_path.open('r', encoding='utf-8') as f:
+                with local_path.open('r', encoding='utf-8-sig') as f:
                     local = json.load(f)
                 if isinstance(local, dict):
                     for k, v in local.items():

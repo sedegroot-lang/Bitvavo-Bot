@@ -384,7 +384,7 @@ def load_config(force: bool = False) -> Dict:
     # Layer 3 — local overrides (outside OneDrive, wins over everything)
     try:
         if CONFIG_LOCAL_PATH.exists():
-            with CONFIG_LOCAL_PATH.open('r', encoding='utf-8') as f:
+            with CONFIG_LOCAL_PATH.open('r', encoding='utf-8-sig') as f:
                 local = json.load(f)
             if isinstance(local, dict):
                 for k, v in local.items():
