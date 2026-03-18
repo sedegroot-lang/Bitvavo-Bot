@@ -883,13 +883,14 @@ def validate_and_repair_trades():
                 repairs_made += 1
 
             # GUARD 5: dca_buys ↔ dca_events consistency
-            # dca_buys should match len(dca_events). When events are the source of truth,
-            # we fix the counter. But never raise dca_buys above dca_max.
+            # NEVER reduce dca_buys — a higher counter indicates unrecorded exchange
+            # buys whose events were lost (debounce / crash).  Only raise to match
+            # events when events outnumber the counter, and cap at dca_max.
             dca_events = trade.get('dca_events', []) or []
             actual_event_count = len(dca_events)
             dca_buys_now = int(trade.get('dca_buys', 0) or 0)
             dca_max_now = int(trade.get('dca_max', dca_max_global) or dca_max_global)
-            correct_buys = min(actual_event_count, dca_max_now)
+            correct_buys = min(max(dca_buys_now, actual_event_count), dca_max_now)
             if dca_buys_now != correct_buys:
                 log(
                     f"⚠️ REPAIR [{market}]: dca_buys={dca_buys_now}, "
@@ -4214,7 +4215,7 @@ def initialize_managers(force: bool = False) -> None:
             get_min_order_size=get_min_order_size,
             place_buy=place_buy,
             is_order_success=is_order_success,
-            save_trades=save_trades,
+            save_trades=lambda: save_trades(force=True),  # Force-save: DCA buys are real money, never debounce
             get_candles=get_candles,
             close_prices=close_prices,
             rsi=rsi,
