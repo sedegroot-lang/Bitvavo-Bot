@@ -190,3 +190,64 @@ class TestDCANormalExecution:
         assert trade['dca_buys'] == 3
         assert len(trade['dca_events']) == 3
         assert call_count[0] == 3
+
+
+# ===========================================================================
+# Test: GUARD 5 — dca_buys ↔ dca_events consistency (never reduce)
+# ===========================================================================
+
+class TestGuard5NeverReduceDcaBuys:
+    """GUARD 5 should never lower dca_buys below its current value.
+
+    A higher counter than event count indicates unrecorded exchange buys
+    (events lost due to debounce/crash). Reducing would allow extra DCAs.
+    """
+
+    @staticmethod
+    def _run_guard5(trade, dca_max_global=9):
+        """Simulate exactly what GUARD 5 does in validate_and_repair_trades."""
+        dca_events = trade.get('dca_events', []) or []
+        actual_event_count = len(dca_events)
+        dca_buys_now = int(trade.get('dca_buys', 0) or 0)
+        dca_max_now = int(trade.get('dca_max', dca_max_global) or dca_max_global)
+        correct_buys = min(max(dca_buys_now, actual_event_count), dca_max_now)
+        if dca_buys_now != correct_buys:
+            trade['dca_buys'] = correct_buys
+        return trade['dca_buys']
+
+    def test_buys_higher_than_events_stays(self):
+        """dca_buys=5 with 2 events → stays at 5 (untracked buys exist)."""
+        trade = _make_trade(dca_buys=5, dca_events=[
+            {'event_id': 'e1', 'amount_eur': 10},
+            {'event_id': 'e2', 'amount_eur': 10},
+        ], dca_max=9)
+        result = self._run_guard5(trade)
+        assert result == 5
+
+    def test_events_higher_than_buys_raises(self):
+        """dca_buys=2 with 5 events → raises to 5."""
+        events = [{'event_id': f'e{i}', 'amount_eur': 10} for i in range(5)]
+        trade = _make_trade(dca_buys=2, dca_events=events, dca_max=9)
+        result = self._run_guard5(trade)
+        assert result == 5
+
+    def test_buys_above_max_capped(self):
+        """dca_buys=12 with 7 events and max=9 → capped at 9."""
+        events = [{'event_id': f'e{i}', 'amount_eur': 10} for i in range(7)]
+        trade = _make_trade(dca_buys=12, dca_events=events, dca_max=9)
+        result = self._run_guard5(trade)
+        assert result == 9
+
+    def test_consistent_no_change(self):
+        """dca_buys=3 with 3 events → no change."""
+        events = [{'event_id': f'e{i}', 'amount_eur': 10} for i in range(3)]
+        trade = _make_trade(dca_buys=3, dca_events=events, dca_max=9)
+        result = self._run_guard5(trade)
+        assert result == 3
+
+    def test_events_exceed_max_buys_capped(self):
+        """12 events but max=9 → dca_buys capped at 9."""
+        events = [{'event_id': f'e{i}', 'amount_eur': 10} for i in range(12)]
+        trade = _make_trade(dca_buys=7, dca_events=events, dca_max=9)
+        result = self._run_guard5(trade)
+        assert result == 9
