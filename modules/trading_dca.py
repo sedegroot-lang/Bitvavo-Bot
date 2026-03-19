@@ -409,7 +409,7 @@ class DCAManager:
             self._record_dca_audit(market, trade, "skip", "pyramid_under_min")
             return
 
-        buy_result = ctx.place_buy(market, eur_amount, current_price)
+        buy_result = ctx.place_buy(market, eur_amount, current_price, is_dca=True)
         if not ctx.is_order_success(buy_result):
             log(f"Pyramid DCA buy for {market} failed")
             self._record_dca_audit(market, trade, "fail", "pyramid_order_failed")
@@ -526,7 +526,7 @@ class DCAManager:
                 self._record_dca_audit(market, trade, "skip", "under_min_size", {"base_amount": base_amount, "min_size": min_size})
                 break
 
-            buy_result = ctx.place_buy(market, eur_amount, current_price)
+            buy_result = ctx.place_buy(market, eur_amount, current_price, is_dca=True)
             if not ctx.is_order_success(buy_result):
                 log(f"DCA buy voor {market} mislukt.")
                 # release reservation if purchase failed
@@ -727,7 +727,7 @@ class DCAManager:
                 self._record_dca_audit(market, trade, "skip", "under_min_size", {"base_amount": base_amount, "min_size": min_size})
                 break
 
-            buy_result = ctx.place_buy(market, eur_amount, current_price)
+            buy_result = ctx.place_buy(market, eur_amount, current_price, is_dca=True)
             if not ctx.is_order_success(buy_result):
                 log(f"DCA (dynamic) buy voor {market} mislukt.")
                 try:

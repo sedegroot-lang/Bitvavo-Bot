@@ -24,7 +24,7 @@ _BALANCE_API_FAILURE_TS: float = 0.0
 
 # ─── place_buy ──────────────────────────────────────────────────────
 
-def place_buy(market, eur_amount, entry_price, order_type=None):
+def place_buy(market, eur_amount, entry_price, order_type=None, *, is_dca: bool = False):
     global _BALANCE_API_FAILURE_TS
     S = _get_state()
     log = S.log
@@ -34,12 +34,13 @@ def place_buy(market, eur_amount, entry_price, order_type=None):
     bitvavo = S.bitvavo
     safe_call = S.safe_call
 
-    # --- Saldo Guard cooldown ---
-    cooldown_until = float(CONFIG.get('_SALDO_COOLDOWN_UNTIL', 0))
-    if cooldown_until and time.time() < cooldown_until:
-        remaining = int(cooldown_until - time.time())
-        log(f"🛡️ Saldo Guard cooldown actief ({remaining}s resterend) — entry {market} overgeslagen", level='warning')
-        return {"error": "saldo_guard_cooldown"}
+    # --- Saldo Guard cooldown (skip for DCA — existing position maintenance) ---
+    if not is_dca:
+        cooldown_until = float(CONFIG.get('_SALDO_COOLDOWN_UNTIL', 0))
+        if cooldown_until and time.time() < cooldown_until:
+            remaining = int(cooldown_until - time.time())
+            log(f"🛡️ Saldo Guard cooldown actief ({remaining}s resterend) — entry {market} overgeslagen", level='warning')
+            return {"error": "saldo_guard_cooldown"}
 
     # --- Watchlist ---
     watch_cfg = S._get_watchlist_runtime_settings()

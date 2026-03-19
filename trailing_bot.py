@@ -1828,12 +1828,12 @@ def _decimals_from_str_num(s):
 # =========================
 # LIVE ORDER FUNCTIES
 # =========================
-def place_buy(market, eur_amount, entry_price, order_type=None):
+def place_buy(market, eur_amount, entry_price, order_type=None, **kwargs):
     if TEST_MODE or not LIVE_TRADING:
         log(f"(SIM) BUY {market} €{eur_amount:.2f} @ {entry_price} [TEST_MODE]")
         return {"simulated": True}
     from bot.orders_impl import place_buy as _impl
-    return _impl(market, eur_amount, entry_price, order_type)
+    return _impl(market, eur_amount, entry_price, order_type, **kwargs)
 def is_order_success(resp):
     """Return True if a Bitvavo order response indicates success.
 
@@ -4226,15 +4226,25 @@ def initialize_managers(force: bool = False) -> None:
             send_alert=send_alert,
         )
         dca_manager = DCAManager(dca_context)
+        # Read ALL DCA settings fresh from CONFIG each iteration so hot-reload
+        # changes take effect immediately (module-level vars are stale).
+        _dca_ratio_raw_hr = CONFIG.get('DCA_AMOUNT_RATIO')
+        _dca_ratio_hr = _as_float(_dca_ratio_raw_hr, 0.0) if _dca_ratio_raw_hr is not None else None
+        _base_amt_hr = _as_float(CONFIG.get('BASE_AMOUNT_EUR'), 38.0)
+        _dca_amount_hr = (
+            _base_amt_hr * _dca_ratio_hr
+            if _dca_ratio_hr is not None
+            else _as_float(CONFIG.get('DCA_AMOUNT_EUR'), _base_amt_hr)
+        )
         dca_settings = DCASettings(
-            enabled=DCA_ENABLED,
-            dynamic=DCA_DYNAMIC,
-            max_buys=DCA_MAX_BUYS,
+            enabled=_as_bool(CONFIG.get('DCA_ENABLED'), True),
+            dynamic=_as_bool(CONFIG.get('DCA_DYNAMIC'), False),
+            max_buys=_as_int(CONFIG.get('DCA_MAX_BUYS'), 3),
             max_buys_per_iteration=CONFIG.get('DCA_MAX_BUYS_PER_ITERATION', None),
-            drop_pct=DCA_DROP_PCT,
-            step_multiplier=DCA_STEP_MULTIPLIER,
-            amount_eur=DCA_AMOUNT_EUR,
-            size_multiplier=DCA_SIZE_MULTIPLIER,
+            drop_pct=_as_float(CONFIG.get('DCA_DROP_PCT'), 0.02),
+            step_multiplier=_as_float(CONFIG.get('DCA_STEP_MULTIPLIER'), 1.0),
+            amount_eur=_dca_amount_hr,
+            size_multiplier=_as_float(CONFIG.get('DCA_SIZE_MULTIPLIER'), 1.0),
         )
     except Exception as exc:
         dca_manager = None
