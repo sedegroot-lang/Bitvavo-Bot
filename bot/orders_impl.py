@@ -271,6 +271,14 @@ def place_buy(market, eur_amount, entry_price, order_type=None, *, is_dca: bool 
         amount_base = float(eur_amount) / float(price_for_limit)
         q_amt = Decimal(str(amount_base)).quantize(Decimal('1.' + '0' * amt_decimals), rounding=ROUND_DOWN)
         q_px = Decimal(str(price_for_limit)).quantize(Decimal('1.' + '0' * px_decimals), rounding=ROUND_DOWN)
+        # Guard: ROUND_DOWN can push effective quote below exchange minimum.
+        # If so, bump amount by one tick so the order is accepted.
+        if float(q_px) > 0:
+            effective_quote = float(q_amt) * float(q_px)
+            _min_quote = 5.0  # Bitvavo standard minOrderInQuoteAsset
+            if effective_quote < _min_quote and effective_quote > 0:
+                one_tick = Decimal('1.' + '0' * amt_decimals) / Decimal(10 ** amt_decimals)
+                q_amt += one_tick
         params = {
             'amount': float(q_amt),
             'price': float(q_px)
