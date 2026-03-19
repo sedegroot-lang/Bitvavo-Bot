@@ -897,7 +897,11 @@ def build_trade_cards(trades: Dict, config: Dict) -> List[Dict]:
             status_label = 'Actief'
             status_class = 'badge-neutral'
             
-            if trailing_activated:
+            # Only show "Trailing actief" when price is at or above buy price
+            # (trailing_activated flag stays True forever once set, but the trail
+            #  stop is only meaningful when the position is actually in profit)
+            _in_profit = live_price and financials['buy_price'] and live_price >= financials['buy_price']
+            if trailing_activated and _in_profit:
                 status = 'trailing'
                 status_label = 'Trailing actief'
                 status_class = 'badge-success'

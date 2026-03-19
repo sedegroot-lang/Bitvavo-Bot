@@ -196,22 +196,41 @@ def sync_with_bitvavo():
                     except Exception as _stale_check_err:
                         log(f"Stale buy_price check failed for {m}: {_stale_check_err}", level='debug')
 
-                    # Recalculate invested_eur when amount changes
+                    # Recalculate invested_eur when buy_price*amount drifts from tracked invested
+                    # This catches manual buys on the exchange that the bot didn't track
                     try:
                         buy_p = float(local.get('buy_price') or 0)
                         old_invested = float(local.get('invested_eur') or 0)
-                        if buy_p > 0 and new_amount > 0:
-                            correct_invested = round(buy_p * new_amount, 4)
-                            if old_invested > 0 and abs(correct_invested - old_invested) / old_invested > 0.20:
-                                log(f"Sync: FIXING invested_eur for {m}: {old_invested:.2f} -> {correct_invested:.2f}", level='warning')
-                                local['invested_eur'] = correct_invested
-                                local['total_invested_eur'] = correct_invested
+                        if buy_p > 0 and new_amount > 0 and old_invested > 0:
+                            expected_invested = round(buy_p * new_amount, 4)
+                            deviation = abs(expected_invested - old_invested) / old_invested
+                            if deviation > 0.05:
+                                log(f"Sync: invested_eur drift for {m}: stored €{old_invested:.2f} vs expected €{expected_invested:.2f} ({deviation*100:.1f}%). Re-deriving cost basis.", level='warning')
+                                _derived_ok = False
+                                try:
+                                    _opened_ts = float(local.get('opened_ts') or 0.0) or None
+                                    _basis = S.derive_cost_basis(bitvavo, m, new_amount, opened_ts=_opened_ts, tolerance=0.05)
+                                    if _basis and getattr(_basis, 'avg_price', 0) > 0:
+                                        _new_bp = float(_basis.avg_price)
+                                        _new_inv = float(_basis.invested_eur)
+                                        log(f"✅ Sync: cost basis re-derived for {m}: buy_price €{buy_p:.6f} → €{_new_bp:.6f}, invested €{old_invested:.2f} → €{_new_inv:.2f}", level='warning')
+                                        local['buy_price'] = _new_bp
+                                        local['invested_eur'] = _new_inv
+                                        local['total_invested_eur'] = _new_inv
+                                        _derived_ok = True
+                                except Exception as _basis_err:
+                                    log(f"Sync: derive_cost_basis for {m} failed: {_basis_err}", level='error')
+                                if not _derived_ok:
+                                    log(f"⚠️ Sync: derive failed for {m}, fallback invested €{expected_invested:.2f}", level='warning')
+                                    local['invested_eur'] = expected_invested
+                                    local['total_invested_eur'] = expected_invested
                                 # NEVER overwrite initial_invested_eur if DCA history exists
-                                # When DCAs are done, initial != current is expected
                                 init_inv = float(local.get('initial_invested_eur') or 0)
                                 has_dca_history = int(local.get('dca_buys', 0) or 0) > 0 or len(local.get('dca_events', []) or []) > 0
-                                if not has_dca_history and init_inv > 0 and abs(correct_invested - init_inv) / init_inv > 0.20:
-                                    local['initial_invested_eur'] = correct_invested
+                                if not has_dca_history and init_inv > 0:
+                                    new_inv = float(local.get('invested_eur') or 0)
+                                    if abs(new_inv - init_inv) / init_inv > 0.20:
+                                        local['initial_invested_eur'] = new_inv
                     except Exception as sync_inv_err:
                         log(f"Sync: invested_eur recalc failed for {m}: {sync_inv_err}", level='debug')
 

@@ -315,7 +315,7 @@ class PortfolioService:
             if is_external:
                 status = 'external'
                 status_label = 'EXTERNE POSITIE'
-            elif trailing_activated:
+            elif trailing_activated and live_price and buy_price and live_price >= buy_price:
                 status = 'trailing'
                 status_label = 'TRAILING ACTIEF'
             elif dca_level > 0:

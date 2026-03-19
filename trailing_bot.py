@@ -1073,7 +1073,8 @@ except Exception as _sp_init_err:
 def send_alert(msg):
     try:
         now = time.time()
-        if _last_alert['msg'] == msg and (now - _last_alert['ts']) < ALERT_DEDUPE_SECONDS:
+        dedupe_secs = int(CONFIG.get('ALERT_DEDUPE_SECONDS', ALERT_DEDUPE_SECONDS))
+        if _last_alert['msg'] == msg and (now - _last_alert['ts']) < dedupe_secs:
             # dedupe same alert
             return
         _last_alert['msg'] = msg

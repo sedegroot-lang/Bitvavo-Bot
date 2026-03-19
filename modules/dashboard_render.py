@@ -147,7 +147,8 @@ def determine_status_badge(
     trailing_active: bool,
 ) -> Tuple[str, str]:
     """Return (label, css_class) for the status badge."""
-    if trailing_active:
+    # Only show trailing badge when actually in profit
+    if trailing_active and pnl_eur is not None and not math.isnan(pnl_eur) and pnl_eur > 0:
         return "Trailing actief", "badge-trailing"
     if pnl_eur is None or math.isnan(pnl_eur):
         return "Neutraal", "badge-neutral"
