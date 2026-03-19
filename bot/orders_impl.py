@@ -186,9 +186,13 @@ def place_buy(market, eur_amount, entry_price, order_type=None, *, is_dca: bool 
             if a.get('symbol') == 'EUR':
                 eur_bal = float(a.get('available', 0) or 0)
                 break
-        min_required = CONFIG.get('BASE_AMOUNT_EUR', 25) + CONFIG.get('MIN_BALANCE_RESERVE', 5)
+        # DCA buys only need the DCA amount, not the full BASE_AMOUNT_EUR
+        if is_dca:
+            min_required = float(eur_amount) + float(CONFIG.get('MIN_BALANCE_RESERVE', 0))
+        else:
+            min_required = float(CONFIG.get('BASE_AMOUNT_EUR', 25)) + float(CONFIG.get('MIN_BALANCE_RESERVE', 5))
         if eur_bal < min_required:
-            log(f"EUR balans te laag ({eur_bal:.2f} < {min_required:.2f}), geen nieuwe trade voor {market}", level='warning')
+            log(f"EUR balans te laag ({eur_bal:.2f} < {min_required:.2f}), {'DCA' if is_dca else 'nieuwe trade'} voor {market} overgeslagen", level='warning')
             return {"error": "eur_balance_too_low"}
     except Exception as e:
         log(f"Kon EUR-saldo niet ophalen voor safeguard: {e}", level='warning')
