@@ -568,9 +568,9 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 Vink af wanneer bereikt:
 
 - [x] €465 — Huidige stand (11 maart 2026)
-- [ ] €500 — Stabiel draaien, geen wijzigingen
-- [ ] €600 — BASE → 42
-- [ ] €700 — BASE → 48, DCA → 32
+- [x] €500 — Stabiel draaien, geen wijzigingen (bereikt ~18 maart 2026)
+- [x] €600 — BASE → 42 (overgeslagen — direct naar €700)
+- [x] €700 — BASE → 48, DCA → 32, DCA_DROP → 1,9% (23 maart 2026)
 - [ ] €800 — 4 trades, BASE → 52
 - [ ] €900 — BASE → 56, DCA → 34, trailing → 2,4%
 - [ ] €1.000 ⭐ — Grid BTC aan (€150)
@@ -596,5 +596,6 @@ Vink af wanneer bereikt:
 
 ---
 
-*Laatste update: 11 maart 2026 — Portfolio €465, op weg naar €500*
-*Config gesynchroniseerd met werkelijke bot_config.json + overrides*
+*Laatste update: 23 maart 2026 — Portfolio ~€738, €700 milestone config actief*
+*Config: BASE=48, DCA=32, DCA_DROP=1.9%, 3 slots, grid uit*
+*Volgende mijlpaal: €800 (4 trades, BASE → 52) — wacht 2 weken stabilisatie*
