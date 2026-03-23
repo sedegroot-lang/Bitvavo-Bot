@@ -240,31 +240,40 @@ class TestDashboardCalculations:
     """Test dashboard P/L calculations."""
     
     def test_dashboard_uses_invested_eur_for_display(self):
-        """Test: Dashboard calculate_trade_financials() uses invested_eur for display.
+        """Test: Dashboard calculate_trade_financials() uses the HIGHER of
+        invested_eur vs buy_price*amount to prevent phantom profit display.
         
-        The dashboard shows CURRENT EXPOSURE (invested_eur), not initial investment.
-        This is correct behavior as users want to see their current position's P/L.
+        When invested_eur is consistent with buy_price*amount, it is used.
+        When they diverge, the higher value is used (conservative, never
+        overstates profit).
         """
         from tools.dashboard_flask.app import calculate_trade_financials
         
+        # Case 1: invested_eur matches buy_price*amount → use invested_eur
         trade = {
             'buy_price': 100.0,
             'amount': 1.5,
-            'initial_invested_eur': 100.0,  # Original investment
-            'total_invested_eur': 140.0,  # After DCA
-            'invested_eur': 140.0  # Current exposure (what dashboard should show)
+            'initial_invested_eur': 100.0,
+            'total_invested_eur': 150.0,
+            'invested_eur': 150.0  # Consistent: 100 * 1.5 = 150
         }
-        
-        live_price = 120.0
-        
-        result = calculate_trade_financials(trade, live_price)
-        
-        # Dashboard shows invested_eur (current exposure after DCA buys)
-        assert result['invested'] == 140.0, "Should use invested_eur (current exposure)"
+        result = calculate_trade_financials(trade, 120.0)
+        assert result['invested'] == 150.0, "Should use invested_eur when consistent with buy_price*amount"
         assert result['current_value'] == 180.0, "current_value = price * amount = 120 * 1.5"
-        # P/L is relative to current invested amount
-        assert result['pnl'] == 40.0, "P/L = 180 - 140 = 40"
-        assert abs(result['pnl_pct'] - 28.57) < 0.1, "P/L % = (180/140 - 1) * 100 ≈ 28.57%"
+        assert result['pnl'] == 30.0, "P/L = 180 - 150 = 30"
+        assert abs(result['pnl_pct'] - 20.0) < 0.1, "P/L % = (180/150 - 1) * 100 = 20%"
+
+        # Case 2: invested_eur < buy_price*amount (stale) → use higher to prevent phantom profit
+        trade_stale = {
+            'buy_price': 100.0,
+            'amount': 1.5,
+            'initial_invested_eur': 100.0,
+            'total_invested_eur': 100.0,
+            'invested_eur': 100.0  # Stale: should be 150 (= 100 * 1.5)
+        }
+        result_stale = calculate_trade_financials(trade_stale, 120.0)
+        assert result_stale['invested'] == 150.0, "Should use buy_price*amount when higher than stale invested_eur"
+        assert result_stale['pnl'] == 30.0, "P/L should use correct cost basis"
 
 
 if __name__ == "__main__":

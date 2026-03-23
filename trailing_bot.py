@@ -937,6 +937,32 @@ def validate_and_repair_trades():
                         level='warning',
                     )
 
+            # GUARD 7: buy_price × amount consistency with invested_eur
+            # This is the FINAL safety net. If buy_price and amount are correct
+            # (updated by sync/derive) but invested_eur is stale, fix it.
+            # This handles external buys that sync detects in amount/buy_price
+            # but fails to propagate to invested_eur.
+            try:
+                _bp = float(trade.get('buy_price') or 0)
+                _amt = float(trade.get('amount') or 0)
+                _inv = float(trade.get('invested_eur') or 0)
+                _ptp = float(trade.get('partial_tp_returned_eur') or 0)
+                if _bp > 0 and _amt > 0 and _inv > 0:
+                    _expected_total = round(_bp * _amt, 4)
+                    _expected_active = round(_expected_total - _ptp, 4)
+                    if abs(_inv - _expected_active) / max(_expected_active, 0.01) > 0.02:
+                        log(
+                            f"⚠️ REPAIR [{market}]: invested_eur €{_inv:.2f} inconsistent with "
+                            f"buy_price({_bp:.6f}) × amount({_amt:.6f}) = €{_expected_total:.2f} "
+                            f"(- tp_ret €{_ptp:.2f} = €{_expected_active:.2f}). Fixing.",
+                            level='warning',
+                        )
+                        trade['invested_eur'] = _expected_active
+                        trade['total_invested_eur'] = _expected_total
+                        repairs_made += 1
+            except Exception:
+                pass
+
         except Exception as e:
             log(f"⚠️ REPAIR [{market}]: Error during validation: {e}", level='warning')
     

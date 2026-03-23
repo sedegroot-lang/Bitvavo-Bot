@@ -234,6 +234,32 @@ def sync_with_bitvavo():
                     except Exception as sync_inv_err:
                         log(f"Sync: invested_eur recalc failed for {m}: {sync_inv_err}", level='debug')
 
+                    # ── FINAL CONSISTENCY GUARD ──────────────────────────────────
+                    # After all derive/drift logic, ALWAYS ensure invested_eur is
+                    # consistent with buy_price × amount.  This catches any case
+                    # where buy_price or amount was updated but invested_eur was
+                    # not (e.g. derive succeeds partially, race condition, OneDrive
+                    # revert, or a future regression).
+                    try:
+                        _bp = float(local.get('buy_price') or 0)
+                        _amt = float(local.get('amount') or 0)
+                        _inv = float(local.get('invested_eur') or 0)
+                        _ptp = float(local.get('partial_tp_returned_eur') or 0)
+                        if _bp > 0 and _amt > 0:
+                            _expected_total = round(_bp * _amt, 4)
+                            _expected_active = round(_expected_total - _ptp, 4)
+                            if _inv <= 0 or abs(_inv - _expected_active) / max(_expected_active, 0.01) > 0.02:
+                                log(
+                                    f"🔧 RECONCILE [{m}]: invested_eur €{_inv:.2f} → €{_expected_active:.2f} "
+                                    f"(buy_price={_bp:.6f} × amount={_amt:.6f} - tp_ret={_ptp:.2f})",
+                                    level='warning',
+                                )
+                                local['invested_eur'] = _expected_active
+                                local['total_invested_eur'] = _expected_total
+                                # Keep initial_invested_eur as-is (immutable first-buy value)
+                    except Exception as _recon_err:
+                        log(f"Sync: reconciliation failed for {m}: {_recon_err}", level='debug')
+
                     try:
                         if entry.get('highest_price') and (local.get('highest_price') is None or entry.get('highest_price') > local.get('highest_price')):
                             local['highest_price'] = entry.get('highest_price')

@@ -813,23 +813,31 @@ def calculate_trade_financials(trade: Dict, live_price: Optional[float]) -> Dict
         # No partial TPs, use original amount
         amount = float(trade.get('amount', 0) or 0)
     
-    # CRITICAL: Use invested_eur for display (current exposure after TPs)
-    # invested_eur = current exposure (decreases with TPs, increases with DCAs)
-    # total_invested_eur = total ever bought (for profit calculation only, NOT for display)
-    invested_eur = trade.get('invested_eur')
-    total_invested = trade.get('total_invested_eur')
-    initial_invested = trade.get('initial_invested_eur')
-    
-    # Prefer invested_eur (current exposure), fallback to total_invested, fallback to initial
-    if invested_eur is not None and invested_eur > 0:
-        invested = float(invested_eur)
-    elif total_invested is not None and total_invested > 0:
-        invested = float(total_invested)
-    elif initial_invested is not None and initial_invested > 0:
-        invested = float(initial_invested)
+    # CRITICAL: Guard against stale invested_eur.
+    # When external buys are synced, amount and buy_price get updated by
+    # derive_cost_basis but invested_eur sometimes lags behind.
+    # To prevent showing phantom profits, always use the HIGHER of
+    # invested_eur vs buy_price×amount as cost basis.  This never
+    # overstates profit (conservative) — the bot's sync engine will
+    # eventually reconcile invested_eur, but meanwhile users see safe numbers.
+    invested_eur = float(trade.get('invested_eur') or 0)
+    partial_tp_returned = float(trade.get('partial_tp_returned_eur') or 0)
+    computed_total = buy_price * amount if buy_price > 0 and amount > 0 else 0
+    computed_active = max(computed_total - partial_tp_returned, 0) if computed_total > 0 else 0
+
+    if invested_eur > 0 and computed_active > 0:
+        # Use the HIGHER value as cost basis to prevent phantom profit display.
+        # When invested_eur < computed_active, the most common cause is that
+        # invested_eur wasn't updated after external buys changed amount/buy_price.
+        invested = max(invested_eur, computed_active)
+    elif invested_eur > 0:
+        invested = invested_eur
+    elif computed_active > 0:
+        invested = computed_active
     else:
-        # Absolute fallback: calculate from price * amount (should never happen)
-        invested = buy_price * amount
+        total_invested = float(trade.get('total_invested_eur') or 0)
+        initial_invested = float(trade.get('initial_invested_eur') or 0)
+        invested = total_invested or initial_invested or (buy_price * amount)
     
     if live_price and live_price > 0:
         current_value = live_price * amount  # Uses remaining_amount if partial TP
