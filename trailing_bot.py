@@ -2849,38 +2849,11 @@ async def bot_loop():
 
             # Hard/stop-loss exit (only if enabled and not already exited by trailing)
             risk_stop_hit = risk_stop_price is not None and cp <= risk_stop_price
-            if not did_exit and STOP_LOSS_ENABLED and EXIT_MODE in ('hard_only', 'trailing_and_hard') and cp <= final_stop:
-                # STALE BUY_PRICE GUARD: If buy_price implies >40% loss but ticker is close to buy_price,
-                # the buy_price is probably stale. Skip this SL trigger and log a warning.
-                _sl_bp = float(t.get('buy_price', 0) or 0)
-                if _sl_bp > 0 and cp > 0:
-                    _sl_loss_pct = (_sl_bp - cp) / _sl_bp
-                    if _sl_loss_pct > 0.40:
-                        log(f"⚠️ STALE GUARD: {m} SL would trigger with {_sl_loss_pct*100:.1f}% loss (bp={_sl_bp:.6f}, cp={cp:.6f}). Skipping SL — buy_price may be stale. Will re-derive on next sync.", level='error')
-                        # Force the stale flag so next sync will fix it
-                        t['_stale_bp_flagged'] = True
-                        continue
-                
-                amt = t.get('amount', 0.0)
-                profit = realized_profit(t.get('buy_price', 0.0), cp, amt)
-                
-                # CRITICAL SAFETY CHECK: Verify against actual invested amount (accounts for DCA)
-                # Use get_true_invested_eur() — ALWAYS cross-checks against buy_price * amount
-                current_invested = get_true_invested_eur(t, market=m)
-                gross_sell = cp * amt
-                sell_fee = gross_sell * FEE_TAKER
-                net_proceeds = gross_sell - sell_fee
-                real_profit = net_proceeds - current_invested
-                # Total trade profit includes partial TP revenue already returned
-                partial_tp_revenue = float(t.get('partial_tp_returned_eur', 0))
-                _true_total_inv = _get_true_total_invested(t)
-                total_trade_profit = (net_proceeds + partial_tp_revenue) - _true_total_inv
-                
-                reason = 'risk_stop' if risk_stop_hit and final_stop == risk_stop_price else 'stop'
-                log(f"⚠️ STOP LOSS TRIGGERED for {m}. Total P&L: €{total_trade_profit:.2f} (remaining: €{real_profit:.2f}), Invested: €{current_invested:.2f}, Sell proceeds: €{net_proceeds:.2f} (reden: {reason})", level='warning')
-
-                # FIX #2: Order verification - check if sell succeeds
-                sell_response = place_sell(m, amt)
+            # FIX #003: Hard stop-loss sell path DISABLED — a trade may NEVER be closed at a loss.
+            # The entire stop-loss block is skipped. Trades are only closed via trailing TP (which
+            # already has a no-loss guard) or partial TP / volatility spike exit (profit-gated).
+            if False:  # noqa: SIM108 — intentionally dead code (FIX #003)
+                sell_response = place_sell(m, 0)  # unreachable
                 
                 # FIX: Use _verify_sell_response for actual execution price
                 success, order_ids, remaining, actual_sell_price = _verify_sell_response(sell_response, m, amt)

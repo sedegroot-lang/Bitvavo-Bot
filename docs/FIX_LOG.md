@@ -109,6 +109,36 @@ but wasn't in pending_saldo, it was silently ignored.
 
 ---
 
+## #003 — Disable all time-based exits and loss sells (2026-03-25)
+
+### Symptom
+User does not want any trade to be closed based on time, and no trade may EVER be sold at a loss.
+
+### What was disabled
+
+| Mechanism | File | What it did | Action |
+|-----------|------|-------------|--------|
+| Hard stop-loss | `bot/trailing.py` `check_stop_loss()` | Sold at >15% loss | Function now always returns `(False, "disabled")` |
+| Time stop-loss | `bot/trailing.py` `check_stop_loss()` | Sold after N days + loss | Same: always returns False |
+| 48h exit | `bot/trailing.py` `check_advanced_exit_strategies()` | Sold at >3% profit after 48h | Code removed |
+| 24h tighten | `bot/trailing.py` `check_advanced_exit_strategies()` | Set `time_tighten` flag after 24h | Code removed |
+| time_tighten consumption | `bot/trailing.py` `calculate_stop_levels()` | Tightened trailing stop by 50% | Code removed |
+| Hard SL sell path | `trailing_bot.py` ~L2852 | Executed sell on stop-loss trigger | Wrapped in `if False:` — unreachable |
+
+### Still active (profit-gated, safe)
+- Trailing TP: already has `real_profit <= 0` guard (blocks loss sells)
+- Partial TP: only triggers at configured profit thresholds
+- Volatility spike exit: requires >5% profit
+- Auto-free slots: requires >0.5% profit
+- Max age / max drawdown: both have loss-blocking guards
+
+### Prevention
+- `check_stop_loss()` is a no-op; even if config enables it, nothing happens
+- Hard SL sell path is dead code (`if False:`)
+- Tests updated to assert stop-loss never triggers
+
+---
+
 ## Template for new entries
 
 ```

@@ -300,39 +300,12 @@ def calculate_adaptive_tp(market, entry_price, volatility=None, trend_strength=N
 # ---------------------------------------------------------------------------
 
 def check_stop_loss(market, trade, current_price, enabled=False):
-    """Hard stop-loss override for trailing logic (DISABLED by default).
+    """Hard stop-loss override — DISABLED.
 
-    NOTE: Caller MUST hold ``state.trades_lock`` when *trade* may be mutated
-    based on the return value of this function.
+    FIX #003: All stop-loss and time-stop-loss logic disabled.
+    A trade may NEVER be closed at a loss.
     """
-    try:
-        if not enabled:
-            return False, "Stop loss disabled in config"
-        invested = trade.get("invested_eur", 0)
-        if invested <= 0:
-            return False, "Invalid invested amount"
-        amount = trade.get("amount", 0)
-        current_value = amount * current_price
-        loss_pct = (current_value - invested) / invested
-
-        # FIX SESSION2 #3: Use configurable stop-loss, not hardcoded -15%
-        hard_sl_pct = float(_cfg.get('STOP_LOSS_HARD_PCT', 0.15) or 0.15)
-        if loss_pct < -hard_sl_pct:
-            return True, f"hard_stop_loss ({loss_pct:.2%}, limit -{hard_sl_pct:.0%})"
-
-        trade_ts = trade.get("timestamp", time.time())
-        hold_time = time.time() - trade_ts
-        hold_days = hold_time / 86400
-        # FIX SESSION2 #3b: Use configurable time stop params from config
-        time_stop_days = float(_cfg.get('STOP_LOSS_TIME_DAYS', 7) or 7)
-        time_stop_pct = float(_cfg.get('STOP_LOSS_TIME_PCT', 0.05) or 0.05)
-        if hold_days > time_stop_days and loss_pct < -time_stop_pct:
-            return True, f"time_stop_loss ({hold_days:.1f} days, {loss_pct:.2%}, limit {time_stop_days}d/-{time_stop_pct:.0%})"
-
-        return False, "No stop loss triggered"
-    except Exception as e:
-        log(f"[STOP_LOSS] Error for {market}: {e}", level="error")
-        return False, f"Error: {e}"
+    return False, "Stop loss permanently disabled (FIX #003)"
 
 
 # ---------------------------------------------------------------------------
@@ -392,13 +365,8 @@ def check_advanced_exit_strategies(trade, current_price):
             if profit_pct >= target_pct:
                 return (True, min(1.0, sell_pct), f"partial_tp_{idx + 1}")
 
-    open_timestamp = trade.get("timestamp", time.time())
-    hours_open = (time.time() - open_timestamp) / 3600
-
-    if hours_open > 48 and profit_pct > 0.03:
-        return (True, 1.0, "time_based_exit_48h")
-    if hours_open > 24 and profit_pct > 0.0:
-        trade["time_tighten"] = True
+    # FIX #003: Time-based exits disabled — no 48h exit, no 24h tighten.
+    # A trade may NEVER be closed based on time alone.
 
     highest_price = trade.get("highest_price", buy_price)
     drop_from_peak = (highest_price - current_price) / highest_price if highest_price > 0 else 0
@@ -643,12 +611,8 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                 except Exception as e:
                     log(f"get failed: {e}", level="error")
 
-                # Legacy time tighten
-                try:
-                    if isinstance(trade, dict) and trade.get("time_tighten"):
-                        trailing = buy + (trailing - buy) * 0.5
-                except Exception as e:
-                    log(f"trailing failed: {e}", level="error")
+                # Legacy time tighten — DISABLED (FIX #003)
+                # trade["time_tighten"] is no longer set; skip tightening.
 
                 # Volume weighting
                 try:

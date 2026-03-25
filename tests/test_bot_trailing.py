@@ -74,40 +74,41 @@ class TestRealizedProfit:
 # ---------------------------------------------------------------------------
 
 class TestCheckStopLoss:
+    """FIX #003: check_stop_loss is permanently disabled — always returns False."""
+
     def test_disabled_by_default(self):
         triggered, reason = _trail.check_stop_loss("BTC-EUR", {}, 100.0, enabled=False)
         assert triggered is False
         assert "disabled" in reason.lower()
 
-    def test_triggers_at_15pct_loss(self):
+    def test_never_triggers_even_with_large_loss(self):
         trade = {"invested_eur": 100.0, "amount": 1.0, "timestamp": time.time()}
-        # Price dropped to 80 → 20% loss
+        # Price dropped to 80 → 20% loss — must STILL not trigger (FIX #003)
         triggered, reason = _trail.check_stop_loss("BTC-EUR", trade, 80.0, enabled=True)
-        assert triggered is True
-        assert "hard_stop" in reason
+        assert triggered is False
+        assert "disabled" in reason.lower()
 
     def test_no_trigger_small_loss(self):
         trade = {"invested_eur": 100.0, "amount": 1.0, "timestamp": time.time()}
-        # Price at 95 → 5% loss (below 15% threshold)
         triggered, _ = _trail.check_stop_loss("BTC-EUR", trade, 95.0, enabled=True)
         assert triggered is False
 
-    def test_time_based_7day_stop(self):
+    def test_time_stop_also_disabled(self):
         trade = {
             "invested_eur": 100.0,
             "amount": 1.0,
             "timestamp": time.time() - (8 * 86400),  # 8 days ago
         }
-        # 7% loss after 8 days
+        # 7% loss after 8 days — must STILL not trigger (FIX #003)
         triggered, reason = _trail.check_stop_loss("BTC-EUR", trade, 93.0, enabled=True)
-        assert triggered is True
-        assert "time_stop" in reason
+        assert triggered is False
+        assert "disabled" in reason.lower()
 
-    def test_invalid_invested_amount(self):
+    def test_always_returns_disabled(self):
         trade = {"invested_eur": 0, "amount": 1.0}
         triggered, reason = _trail.check_stop_loss("BTC-EUR", trade, 100.0, enabled=True)
         assert triggered is False
-        assert "invalid" in reason.lower()
+        assert "disabled" in reason.lower()
 
 
 # ---------------------------------------------------------------------------
