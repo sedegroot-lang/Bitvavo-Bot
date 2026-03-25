@@ -420,7 +420,9 @@ class MonitoringManager:
             # voordat we beginnen te controleren (voorkomt valse alerts na herstart)
             time.sleep(max(alert_stale_seconds, 120))
             last_alert_ts = 0.0
-            alert_cooldown = max(600, alert_stale_seconds * 3)  # min 10 min between alerts
+            base_cooldown = max(600, alert_stale_seconds * 3)  # min 10 min between alerts
+            current_cooldown = base_cooldown
+            max_cooldown = 7200  # max 2 uur tussen alerts bij aanhoudende downtime
             while True:
                 try:
                     ts = None
@@ -430,13 +432,21 @@ class MonitoringManager:
                             if content:  # Only parse if file is not empty
                                 data = json.loads(content)
                                 ts = data.get("ts")
-                    if ts is None or time.time() - float(ts) > alert_stale_seconds:
+                    if ts is not None and time.time() - float(ts) <= alert_stale_seconds:
+                        # Heartbeat is healthy — reset exponential backoff
+                        if current_cooldown != base_cooldown:
+                            log("Heartbeat hersteld, backoff gereset.", level="info")
+                        current_cooldown = base_cooldown
+                        last_alert_ts = 0.0
+                    else:
                         now = time.time()
-                        if now - last_alert_ts >= alert_cooldown:
+                        if now - last_alert_ts >= current_cooldown:
                             send_alert(
                                 f"ALERT: heartbeat stale or missing (last_ts={ts}). Bot may be down."
                             )
                             last_alert_ts = now
+                            # Verdubbel de cooldown bij elke herhaalde alert (exponential backoff)
+                            current_cooldown = min(current_cooldown * 2, max_cooldown)
                 except json.JSONDecodeError:
                     # Ignore transient JSON errors from file being written
                     pass
