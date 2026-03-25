@@ -71,6 +71,44 @@ Bot's invested_eur should be within ~1% of bitvavo_cost_basis (difference is fee
 
 ---
 
+## #002 — trading_sync.py filter silently drops positions on API glitch (2026-03-25)
+
+### Symptom
+After bot restart, AVAX-EUR disappeared from open_trades. The sync_debug.json showed
+only 2 mapped markets (NEAR, ALGO) even though trade_log.json had 3 open trades.
+Investigation revealed AVAX was actually sold at 19:23 by the old bot via trailing_tp
+(sell_price=€8.37, profit=+€0.66), so the removal was correct in this case.
+However, the code path that removed it is dangerous for transient API failures.
+
+### Root Cause
+`modules/trading_sync.py` has a `filtered_state` line that retains ONLY markets present
+in the current Bitvavo balance API response:
+```python
+filtered_state = {m: e for m, e in open_state.items() if m in open_markets and open_markets[m] > 0}
+```
+This filter **bypasses** the `DISABLE_SYNC_REMOVE=True` config guard. If the Bitvavo
+balance API has a transient failure (returns incomplete data), ALL positions missing
+from the response are silently deleted from trade_log.json — even though they still
+exist on the exchange.
+
+Additionally, `modules/trading_sync.py` could only reconstruct missing positions from
+`pending_saldo.json`, not from Bitvavo order history. If a position existed on Bitvavo
+but wasn't in pending_saldo, it was silently ignored.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/trading_sync.py` | `filtered_state` now respects `DISABLE_SYNC_REMOVE`. When True, positions missing from API are KEPT (not silently dropped). Logs a warning instead. |
+| `modules/trading_sync.py` | Added auto-discover via `derive_cost_basis()`: if a Bitvavo balance has no matching open trade AND isn't in pending_saldo, the sync now derives cost basis from order history and creates the trade entry automatically. |
+
+### Prevention
+- With `DISABLE_SYNC_REMOVE=True` (default), positions are never silently dropped
+- Auto-discover catches orphan positions via derive_cost_basis
+- `bot/sync_engine.py` already had proper auto-discover; now `modules/trading_sync.py` does too
+
+---
+
 ## Template for new entries
 
 ```

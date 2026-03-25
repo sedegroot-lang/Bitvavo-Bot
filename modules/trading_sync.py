@@ -292,14 +292,73 @@ class TradingSynchronizer:
                         level="info",
                     )
                     changes_made = True
+                else:
+                    # Auto-discover: position exists on Bitvavo but not tracked locally
+                    try:
+                        from modules.cost_basis import derive_cost_basis
+                        amount = open_markets.get(market, 0.0)
+                        basis = derive_cost_basis(ctx.bitvavo, market, amount, tolerance=0.02)
+                        if basis and getattr(basis, 'avg_price', 0) > 0:
+                            new_entry = {
+                                'market': market,
+                                'buy_price': float(basis.avg_price),
+                                'highest_price': float(basis.avg_price),
+                                'amount': amount,
+                                'invested_eur': float(basis.invested_eur),
+                                'initial_invested_eur': float(basis.invested_eur),
+                                'total_invested_eur': float(basis.invested_eur),
+                                'timestamp': time.time(),
+                                'opened_ts': float(basis.earliest_timestamp or time.time()),
+                                'partial_tp_returned_eur': 0.0,
+                                'dca_buys': 0,
+                                'dca_events': [],
+                                'score': 0.0,
+                                'volatility_at_entry': 0.0,
+                                'opened_regime': 'unknown',
+                            }
+                            open_state[market] = new_entry
+                            changes_made = True
+                            log(
+                                f"Sync: AUTO-DISCOVERED {market} on Bitvavo — "
+                                f"invested=€{basis.invested_eur:.2f}, amount={amount:.6f}",
+                                level="warning",
+                            )
+                        else:
+                            log(
+                                f"Sync: {market} found on Bitvavo but derive_cost_basis "
+                                f"returned no data — skipping auto-add",
+                                level="warning",
+                            )
+                    except Exception as disc_err:
+                        log(
+                            f"Sync: auto-discover failed for {market}: {disc_err}",
+                            level="warning",
+                        )
 
-        # retain only markets Bitvavo currently reports
-        filtered_state = {
-            market: entry
-            for market, entry in open_state.items()
-            if market in open_markets and open_markets[market] > 0
-        }
-        open_state = filtered_state
+        # retain only markets Bitvavo currently reports — but respect DISABLE_SYNC_REMOVE
+        if not disable_sync_remove:
+            filtered_state = {
+                market: entry
+                for market, entry in open_state.items()
+                if market in open_markets and open_markets[market] > 0
+            }
+            removed_by_filter = set(open_state.keys()) - set(filtered_state.keys())
+            if removed_by_filter:
+                log(
+                    f"Sync: filter verwijderde {len(removed_by_filter)} trades niet in API: "
+                    f"{removed_by_filter}",
+                    level="info",
+                )
+            open_state = filtered_state
+        else:
+            # DISABLE_SYNC_REMOVE=true: keep tracked trades even if API didn't return them
+            missing_from_api = [m for m in open_state if m not in open_markets]
+            if missing_from_api:
+                log(
+                    f"Sync: DISABLE_SYNC_REMOVE=true — behoud {len(missing_from_api)} "
+                    f"trades niet in API response: {missing_from_api}",
+                    level="warning",
+                )
 
         # align amounts with live balances
         for market, entry in open_state.items():
