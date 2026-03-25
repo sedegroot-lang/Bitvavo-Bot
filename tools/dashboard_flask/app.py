@@ -814,23 +814,15 @@ def calculate_trade_financials(trade: Dict, live_price: Optional[float]) -> Dict
         amount = float(trade.get('amount', 0) or 0)
     
     # CRITICAL: Guard against stale invested_eur.
-    # When external buys are synced, amount and buy_price get updated by
-    # derive_cost_basis but invested_eur sometimes lags behind.
-    # To prevent showing phantom profits, always use the HIGHER of
-    # invested_eur vs buy_price×amount as cost basis.  This never
-    # overstates profit (conservative) — the bot's sync engine will
-    # eventually reconcile invested_eur, but meanwhile users see safe numbers.
+    # The sync engine now always derives cost basis from Bitvavo order history
+    # (see FIX_LOG.md #001), so invested_eur should be authoritative.
+    # Fallback to buy_price × amount only when invested_eur is missing.
     invested_eur = float(trade.get('invested_eur') or 0)
     partial_tp_returned = float(trade.get('partial_tp_returned_eur') or 0)
     computed_total = buy_price * amount if buy_price > 0 and amount > 0 else 0
     computed_active = max(computed_total - partial_tp_returned, 0) if computed_total > 0 else 0
 
-    if invested_eur > 0 and computed_active > 0:
-        # Use the HIGHER value as cost basis to prevent phantom profit display.
-        # When invested_eur < computed_active, the most common cause is that
-        # invested_eur wasn't updated after external buys changed amount/buy_price.
-        invested = max(invested_eur, computed_active)
-    elif invested_eur > 0:
+    if invested_eur > 0:
         invested = invested_eur
     elif computed_active > 0:
         invested = computed_active

@@ -186,16 +186,23 @@ def derive_cost_basis(
     max_iterations: int = 5,
     batch_limit: int = 1000,
 ) -> CostBasisResult | None:
+    """Derive cost basis from Bitvavo order history.
+
+    ALWAYS fetches full trade history (ignores opened_ts) to prevent
+    missing earlier buys that are part of the current position.
+    The opened_ts parameter is kept for API compatibility but NOT used
+    as a filter — see FIX_LOG.md #001 for why.
+    """
     if target_amount <= 0:
         return None
-    start_ts: float | None = None
-    if opened_ts and opened_ts > 0:
-        # START FROM opened_ts, not 7 days before - only count trades from when position opened
-        start_ts = float(opened_ts)
+    # ALWAYS fetch full history — never filter by opened_ts.
+    # opened_ts was previously used as start_ts filter, but this caused
+    # external buys before the recorded opened_ts to be missed, leading
+    # to wrong cost basis (invested_eur too low).  See FIX_LOG.md #001.
     fills = _fetch_trades_with_paging(
         bitvavo,
         market,
-        start_ts=start_ts,
+        start_ts=None,
         limit=batch_limit,
         max_iterations=max_iterations,
     )
@@ -205,34 +212,6 @@ def derive_cost_basis(
         target_amount=target_amount,
         tolerance=tolerance,
     )
-    tolerance_abs = max(1e-8, target_amount * tolerance)
-    if result and result.amount_diff <= tolerance_abs:
-        return result
-    extra = _fetch_trades_with_paging(
-        bitvavo,
-        market,
-        start_ts=None,
-        limit=batch_limit,
-        max_iterations=max_iterations,
-    )
-    if extra:
-        combined: Dict[Tuple[str, float, str, str, str], Dict[str, Any]] = {}
-        for fill in fills + extra:
-            key = (
-                str(fill.get("id") or fill.get("tradeId") or fill.get("tradeid") or fill.get("orderId") or ""),
-                _normalize_ts(fill.get("timestamp")),
-                str(fill.get("side") or ""),
-                str(fill.get("amount") or ""),
-                str(fill.get("price") or ""),
-            )
-            combined[key] = fill
-        merged = list(combined.values())
-        result = _compute_cost_basis_from_fills(
-            merged,
-            market=market,
-            target_amount=target_amount,
-            tolerance=tolerance,
-        )
     return result
 
 

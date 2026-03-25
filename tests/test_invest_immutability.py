@@ -240,12 +240,12 @@ class TestDashboardCalculations:
     """Test dashboard P/L calculations."""
     
     def test_dashboard_uses_invested_eur_for_display(self):
-        """Test: Dashboard calculate_trade_financials() uses the HIGHER of
-        invested_eur vs buy_price*amount to prevent phantom profit display.
-        
-        When invested_eur is consistent with buy_price*amount, it is used.
-        When they diverge, the higher value is used (conservative, never
-        overstates profit).
+        """Test: Dashboard calculate_trade_financials() uses invested_eur as
+        the authoritative cost basis.  The sync engine keeps invested_eur
+        correct via derive_cost_basis (see FIX_LOG.md #001).
+
+        When invested_eur is available, it is used directly.
+        Falls back to buy_price*amount only when invested_eur is missing.
         """
         from tools.dashboard_flask.app import calculate_trade_financials
         
@@ -263,17 +263,27 @@ class TestDashboardCalculations:
         assert result['pnl'] == 30.0, "P/L = 180 - 150 = 30"
         assert abs(result['pnl_pct'] - 20.0) < 0.1, "P/L % = (180/150 - 1) * 100 = 20%"
 
-        # Case 2: invested_eur < buy_price*amount (stale) → use higher to prevent phantom profit
-        trade_stale = {
+        # Case 2: invested_eur is authoritative — used directly even if != buy_price*amount
+        # (derive_cost_basis includes fees, so invested_eur may differ from buy_price*amount)
+        trade_with_fees = {
             'buy_price': 100.0,
             'amount': 1.5,
             'initial_invested_eur': 100.0,
             'total_invested_eur': 100.0,
-            'invested_eur': 100.0  # Stale: should be 150 (= 100 * 1.5)
+            'invested_eur': 100.0  # This is what derive says (includes fees differently)
         }
-        result_stale = calculate_trade_financials(trade_stale, 120.0)
-        assert result_stale['invested'] == 150.0, "Should use buy_price*amount when higher than stale invested_eur"
-        assert result_stale['pnl'] == 30.0, "P/L should use correct cost basis"
+        result_fees = calculate_trade_financials(trade_with_fees, 120.0)
+        assert result_fees['invested'] == 100.0, "Should trust invested_eur from derive_cost_basis"
+        assert result_fees['pnl'] == 80.0, "P/L = 180 - 100 = 80"
+
+        # Case 3: invested_eur is 0/missing → fallback to buy_price*amount
+        trade_missing = {
+            'buy_price': 100.0,
+            'amount': 1.5,
+            'invested_eur': 0,
+        }
+        result_missing = calculate_trade_financials(trade_missing, 120.0)
+        assert result_missing['invested'] == 150.0, "Should fallback to buy_price*amount when invested is 0"
 
 
 if __name__ == "__main__":

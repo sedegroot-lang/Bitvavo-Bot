@@ -1,5 +1,9 @@
 # Copilot Instructions — Bitvavo Trading Bot
 
+## ⚠️ MANDATORY: Read Fix Log Before Any Fix
+
+**Before making ANY bug fix**, read `docs/FIX_LOG.md` to check if the issue has been addressed before. After fixing a bug, log it in `docs/FIX_LOG.md` using the template at the bottom of that file. This prevents re-introducing known bugs and keeps a history of all fixes.
+
 ## Project Overview
 
 A Python-based cryptocurrency trailing-stop trading bot for the Bitvavo exchange. The main entry point is `trailing_bot.py` (~4300 lines monolith). The codebase is progressively being refactored into extracted modules under `bot/`, `core/`, and `modules/`.
@@ -308,3 +312,5 @@ Also: trailing-whitespace, end-of-file-fixer, check-yaml, check-json, detect-pri
 10. **Windows-first**: The bot runs on Windows. Use `os.replace()` not `os.rename()`. Use thread-based timeouts, not signals. Paths may contain spaces (OneDrive).
 11. **GitHub push on bug fixes**: After fixing any bug (code changes in `.py` files), always commit and push the changes to the GitHub repository. Use a descriptive commit message like `fix: <short description>`. This ensures the production bot stays in sync with the repo and fixes are not lost.
 12. **MAX_OPEN_TRADES minimum is 3**: The `MAX_OPEN_TRADES` config value must NEVER be set below 3. This is enforced in `ai/ai_supervisor.py` (clamped to 3) and `ai/suggest_rules.py` (floor of 3 in all suggestions). When changing MAX_OPEN_TRADES or any other config value, **edit ONLY `%LOCALAPPDATA%/BotConfig/bot_config_local.json`** — this file loads last and wins over everything. Do NOT edit `config/bot_config.json` or `config/bot_config_overrides.json` (OneDrive reverts them). The AI suggest rules use `max(3, ...)` as floor, never `max(2, ...)`.
+13. **Fix Log**: Always read `docs/FIX_LOG.md` before making any bug fix. After fixing a bug, log it there. This prevents re-introducing known bugs. Key rule: `derive_cost_basis` must ALWAYS fetch full trade history (no `opened_ts` filter) — see FIX_LOG.md #001.
+14. **invested_eur is derived from order history**: `invested_eur` must ALWAYS be set by `derive_cost_basis()` from Bitvavo's order history. NEVER blindly set `invested_eur = buy_price * amount` — derive includes fees and the real cost. See FIX_LOG.md #001.

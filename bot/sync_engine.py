@@ -156,109 +156,89 @@ def sync_with_bitvavo():
                     if not local.get('buy_price') and entry.get('buy_price') is not None:
                         local['buy_price'] = entry.get('buy_price')
 
-                    # STALE BUY_PRICE DETECTION
-                    try:
-                        _stored_bp = float(local.get('buy_price') or 0)
-                        if _stored_bp > 0 and new_amount > 0:
-                            _ticker = safe_call(bitvavo.tickerPrice, {'market': m})
-                            _ticker_price = float(_ticker.get('price', 0)) if isinstance(_ticker, dict) else 0
-                            if _ticker_price > 0:
-                                _deviation = abs(_stored_bp - _ticker_price) / _ticker_price
-                                if _deviation > 0.50:
-                                    log(f"⚠️ STALE BUY_PRICE detected for {m}: stored €{_stored_bp:.6f} vs ticker €{_ticker_price:.6f} (deviation {_deviation*100:.1f}%). Re-deriving from order history.", level='warning')
-                                    try:
-                                        _fresh_basis = S.derive_cost_basis(bitvavo, m, new_amount, tolerance=0.05)
-                                        if _fresh_basis and getattr(_fresh_basis, 'avg_price', 0) > 0:
-                                            _new_bp = float(_fresh_basis.avg_price)
-                                            _new_inv = float(_fresh_basis.invested_eur)
-                                            log(f"✅ STALE FIX {m}: buy_price €{_stored_bp:.6f} → €{_new_bp:.6f}, invested €{_new_inv:.2f}", level='warning')
-                                            local['buy_price'] = _new_bp
-                                            local['invested_eur'] = _new_inv
-                                            local['initial_invested_eur'] = _new_inv
-                                            local['total_invested_eur'] = _new_inv
-                                            if hasattr(_fresh_basis, 'earliest_timestamp') and _fresh_basis.earliest_timestamp:
-                                                local['opened_ts'] = float(_fresh_basis.earliest_timestamp)
-                                            # Preserve existing DCA history — only reset if truly empty
-                                            if not local.get('dca_events'):
-                                                local.setdefault('dca_buys', 0)
-                                                local.setdefault('dca_events', [])
-                                        else:
-                                            log(f"⚠️ STALE FIX {m}: derive failed, using ticker €{_ticker_price:.6f} as buy_price", level='warning')
-                                            local['buy_price'] = _ticker_price
-                                            _fallback_inv = round(_ticker_price * new_amount, 4)
-                                            local['invested_eur'] = _fallback_inv
-                                            # Only set initial if not already set (preserve DCA history)
-                                            if not local.get('initial_invested_eur'):
-                                                local['initial_invested_eur'] = _fallback_inv
-                                            local['total_invested_eur'] = _fallback_inv
-                                    except Exception as _stale_err:
-                                        log(f"⚠️ STALE FIX {m} failed: {_stale_err}", level='error')
-                    except Exception as _stale_check_err:
-                        log(f"Stale buy_price check failed for {m}: {_stale_check_err}", level='debug')
+                    # ── COST BASIS RECONCILIATION (single authoritative check) ──
+                    # Replace the old 3-layer approach (STALE/DRIFT/CONSISTENCY
+                    # GUARD) that conflicted with each other.  Now: derive_cost_basis
+                    # is the SINGLE source of truth.  See FIX_LOG.md #001.
+                    #
+                    # Trigger re-derive when:
+                    #   1) Amount changed (external buy/sell detected)
+                    #   2) invested_eur is missing or zero
+                    #   3) Periodic re-derive (every 4 hours) as safety net
+                    #   4) buy_price*amount diverges >2% from invested_eur
+                    _need_derive = False
+                    _derive_reason = ''
 
-                    # Recalculate invested_eur when buy_price*amount drifts from tracked invested
-                    # This catches manual buys on the exchange that the bot didn't track
-                    try:
-                        buy_p = float(local.get('buy_price') or 0)
-                        old_invested = float(local.get('invested_eur') or 0)
-                        if buy_p > 0 and new_amount > 0 and old_invested > 0:
-                            expected_invested = round(buy_p * new_amount, 4)
-                            deviation = abs(expected_invested - old_invested) / old_invested
-                            if deviation > 0.05:
-                                log(f"Sync: invested_eur drift for {m}: stored €{old_invested:.2f} vs expected €{expected_invested:.2f} ({deviation*100:.1f}%). Re-deriving cost basis.", level='warning')
-                                _derived_ok = False
-                                try:
-                                    _opened_ts = float(local.get('opened_ts') or 0.0) or None
-                                    _basis = S.derive_cost_basis(bitvavo, m, new_amount, opened_ts=_opened_ts, tolerance=0.05)
-                                    if _basis and getattr(_basis, 'avg_price', 0) > 0:
-                                        _new_bp = float(_basis.avg_price)
-                                        _new_inv = float(_basis.invested_eur)
-                                        log(f"✅ Sync: cost basis re-derived for {m}: buy_price €{buy_p:.6f} → €{_new_bp:.6f}, invested €{old_invested:.2f} → €{_new_inv:.2f}", level='warning')
-                                        local['buy_price'] = _new_bp
-                                        local['invested_eur'] = _new_inv
-                                        local['total_invested_eur'] = _new_inv
-                                        _derived_ok = True
-                                except Exception as _basis_err:
-                                    log(f"Sync: derive_cost_basis for {m} failed: {_basis_err}", level='error')
-                                if not _derived_ok:
-                                    log(f"⚠️ Sync: derive failed for {m}, fallback invested €{expected_invested:.2f}", level='warning')
-                                    local['invested_eur'] = expected_invested
-                                    local['total_invested_eur'] = expected_invested
-                                # NEVER overwrite initial_invested_eur if DCA history exists
-                                init_inv = float(local.get('initial_invested_eur') or 0)
-                                has_dca_history = int(local.get('dca_buys', 0) or 0) > 0 or len(local.get('dca_events', []) or []) > 0
-                                if not has_dca_history and init_inv > 0:
-                                    new_inv = float(local.get('invested_eur') or 0)
-                                    if abs(new_inv - init_inv) / init_inv > 0.20:
-                                        local['initial_invested_eur'] = new_inv
-                    except Exception as sync_inv_err:
-                        log(f"Sync: invested_eur recalc failed for {m}: {sync_inv_err}", level='debug')
+                    # Check 1: amount changed
+                    _amount_change_pct = abs(new_amount - old_amount) / max(old_amount, 1e-12)
+                    if _amount_change_pct > 0.001:  # >0.1% change
+                        _need_derive = True
+                        _derive_reason = f'amount changed {old_amount:.6f} → {new_amount:.6f} ({_amount_change_pct*100:.2f}%)'
 
-                    # ── FINAL CONSISTENCY GUARD ──────────────────────────────────
-                    # After all derive/drift logic, ALWAYS ensure invested_eur is
-                    # consistent with buy_price × amount.  This catches any case
-                    # where buy_price or amount was updated but invested_eur was
-                    # not (e.g. derive succeeds partially, race condition, OneDrive
-                    # revert, or a future regression).
-                    try:
-                        _bp = float(local.get('buy_price') or 0)
-                        _amt = float(local.get('amount') or 0)
-                        _inv = float(local.get('invested_eur') or 0)
+                    # Check 2: invested_eur missing
+                    _cur_inv = float(local.get('invested_eur') or 0)
+                    if _cur_inv <= 0:
+                        _need_derive = True
+                        _derive_reason = 'invested_eur missing or zero'
+
+                    # Check 3: periodic re-derive (every 4 hours)
+                    _last_derive_ts = float(local.get('_last_derive_ts') or 0)
+                    if not _need_derive and (time.time() - _last_derive_ts) > 14400:
+                        _need_derive = True
+                        _derive_reason = 'periodic re-derive (4h safety net)'
+
+                    # Check 4: invested_eur diverges from buy_price*amount
+                    if not _need_derive:
+                        _cur_bp = float(local.get('buy_price') or 0)
                         _ptp = float(local.get('partial_tp_returned_eur') or 0)
-                        if _bp > 0 and _amt > 0:
-                            _expected_total = round(_bp * _amt, 4)
-                            _expected_active = round(_expected_total - _ptp, 4)
-                            if _inv <= 0 or abs(_inv - _expected_active) / max(_expected_active, 0.01) > 0.02:
+                        if _cur_bp > 0 and new_amount > 0 and _cur_inv > 0:
+                            _expected = round(_cur_bp * new_amount - _ptp, 4)
+                            if abs(_cur_inv - _expected) / max(_expected, 0.01) > 0.02:
+                                _need_derive = True
+                                _derive_reason = f'invested_eur €{_cur_inv:.2f} diverges >2% from expected €{_expected:.2f}'
+
+                    if _need_derive:
+                        try:
+                            # ALWAYS use full history — no opened_ts filter (see FIX_LOG.md #001)
+                            _basis = S.derive_cost_basis(bitvavo, m, new_amount, tolerance=0.02)
+                            if _basis and getattr(_basis, 'avg_price', 0) > 0:
+                                _old_bp = float(local.get('buy_price') or 0)
+                                _old_inv = float(local.get('invested_eur') or 0)
+                                _new_bp = float(_basis.avg_price)
+                                _new_inv = float(_basis.invested_eur)
                                 log(
-                                    f"🔧 RECONCILE [{m}]: invested_eur €{_inv:.2f} → €{_expected_active:.2f} "
-                                    f"(buy_price={_bp:.6f} × amount={_amt:.6f} - tp_ret={_ptp:.2f})",
+                                    f"✅ DERIVE [{m}]: {_derive_reason} → "
+                                    f"buy_price €{_old_bp:.6f} → €{_new_bp:.6f}, "
+                                    f"invested €{_old_inv:.2f} → €{_new_inv:.2f} "
+                                    f"(fills={_basis.fills_used}, orders={_basis.buy_order_count})",
                                     level='warning',
                                 )
-                                local['invested_eur'] = _expected_active
-                                local['total_invested_eur'] = _expected_total
-                                # Keep initial_invested_eur as-is (immutable first-buy value)
-                    except Exception as _recon_err:
-                        log(f"Sync: reconciliation failed for {m}: {_recon_err}", level='debug')
+                                local['buy_price'] = _new_bp
+                                local['invested_eur'] = _new_inv
+                                local['total_invested_eur'] = _new_inv
+                                local['_last_derive_ts'] = time.time()
+                                # Update opened_ts to the actual earliest buy
+                                if _basis.earliest_timestamp:
+                                    local['opened_ts'] = float(_basis.earliest_timestamp)
+                                # Update DCA metadata from order count
+                                if _basis.buy_order_count and _basis.buy_order_count > 1:
+                                    _existing_dca = int(local.get('dca_buys') or 0)
+                                    _new_dca = _basis.buy_order_count - 1  # First buy is not DCA
+                                    if _new_dca > _existing_dca:
+                                        local['dca_buys'] = min(_new_dca, int(local.get('dca_max') or DCA_MAX_BUYS))
+                            else:
+                                log(f"⚠️ DERIVE [{m}] failed ({_derive_reason}): no result from order history", level='warning')
+                                # Fallback: ensure invested_eur is at least buy_price*amount
+                                _fb_bp = float(local.get('buy_price') or 0)
+                                if _fb_bp > 0 and new_amount > 0:
+                                    _fb_ptp = float(local.get('partial_tp_returned_eur') or 0)
+                                    _fb_expected = round(_fb_bp * new_amount - _fb_ptp, 4)
+                                    if _cur_inv <= 0 or abs(_cur_inv - _fb_expected) / max(_fb_expected, 0.01) > 0.05:
+                                        log(f"⚠️ FALLBACK [{m}]: invested_eur €{_cur_inv:.2f} → €{_fb_expected:.2f}", level='warning')
+                                        local['invested_eur'] = _fb_expected
+                                        local['total_invested_eur'] = round(_fb_bp * new_amount, 4)
+                        except Exception as _derive_err:
+                            log(f"⚠️ DERIVE [{m}] exception ({_derive_reason}): {_derive_err}", level='error')
 
                     try:
                         if entry.get('highest_price') and (local.get('highest_price') is None or entry.get('highest_price') > local.get('highest_price')):
@@ -328,6 +308,7 @@ def sync_with_bitvavo():
                                 local['buy_price'] = float(basis.avg_price)
                                 _ti_set_initial(local, float(basis.invested_eur), source="sync_derive_existing")
                                 local['opened_ts'] = float(basis.earliest_timestamp or local.get('opened_ts'))
+                                local['_last_derive_ts'] = time.time()
                                 local['dca_buys'] = 0
                                 local['dca_events'] = []
                                 log(f"Sync: Derived initial values for NEW trade {m}: invested=€{basis.invested_eur:.2f}", level='info')
@@ -338,6 +319,7 @@ def sync_with_bitvavo():
                             basis = S.derive_cost_basis(bitvavo, m, float(entry.get('amount') or 0.0), tolerance=0.02)
                             if basis and getattr(basis, 'avg_price', 0) > 0:
                                 local['buy_price'] = float(basis.avg_price)
+                                local['_last_derive_ts'] = time.time()
                         except Exception as e:
                             log(f"derive_cost_basis failed: {e}", level='error')
 

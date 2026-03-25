@@ -939,27 +939,36 @@ def validate_and_repair_trades():
 
             # GUARD 7: buy_price × amount consistency with invested_eur
             # This is the FINAL safety net. If buy_price and amount are correct
-            # (updated by sync/derive) but invested_eur is stale, fix it.
-            # This handles external buys that sync detects in amount/buy_price
-            # but fails to propagate to invested_eur.
+            # (updated by sync/derive) but invested_eur is wildly off, log a warning.
+            # We do NOT blindly overwrite invested_eur with buy_price*amount because
+            # derive_cost_basis computes invested_eur including fees — it may differ
+            # slightly from buy_price*amount.  Only fix if invested_eur == 0.
+            # See FIX_LOG.md #001 for the root cause analysis.
             try:
                 _bp = float(trade.get('buy_price') or 0)
                 _amt = float(trade.get('amount') or 0)
                 _inv = float(trade.get('invested_eur') or 0)
                 _ptp = float(trade.get('partial_tp_returned_eur') or 0)
-                if _bp > 0 and _amt > 0 and _inv > 0:
+                if _bp > 0 and _amt > 0:
                     _expected_total = round(_bp * _amt, 4)
                     _expected_active = round(_expected_total - _ptp, 4)
-                    if abs(_inv - _expected_active) / max(_expected_active, 0.01) > 0.02:
+                    if _inv <= 0:
+                        # invested_eur is missing — use buy_price*amount as fallback
                         log(
-                            f"⚠️ REPAIR [{market}]: invested_eur €{_inv:.2f} inconsistent with "
-                            f"buy_price({_bp:.6f}) × amount({_amt:.6f}) = €{_expected_total:.2f} "
-                            f"(- tp_ret €{_ptp:.2f} = €{_expected_active:.2f}). Fixing.",
+                            f"⚠️ REPAIR [{market}]: invested_eur is 0, setting to "
+                            f"buy_price({_bp:.6f}) × amount({_amt:.6f}) = €{_expected_active:.2f}",
                             level='warning',
                         )
                         trade['invested_eur'] = _expected_active
                         trade['total_invested_eur'] = _expected_total
                         repairs_made += 1
+                    elif abs(_inv - _expected_active) / max(_expected_active, 0.01) > 0.10:
+                        # >10% divergence — log warning but let sync_engine derive fix it
+                        log(
+                            f"⚠️ WARN [{market}]: invested_eur €{_inv:.2f} diverges >10% from "
+                            f"buy_price×amount €{_expected_active:.2f}. Sync engine will re-derive.",
+                            level='warning',
+                        )
             except Exception:
                 pass
 
