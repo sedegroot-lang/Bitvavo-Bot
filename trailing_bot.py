@@ -2056,22 +2056,9 @@ async def bot_loop():
                 f"EUR balance check at {datetime.utcnow().isoformat()}Z"
             )
             log(hb_msg)
-            try:
-                with open(HEARTBEAT_FILE, 'a', encoding='utf-8') as fh:
-                    fh.write(
-                        json.dumps(
-                            {
-                                'ts': int(time.time()),
-                                'open_trades': active_trades,
-                                'open_trades_including_dust': len(open_trades),
-                                'dust_trade_count': dust_count,
-                                'eur_balance': eur_balance if 'eur_balance' in locals() else None,
-                            }
-                        )
-                        + '\n'
-                    )
-            except Exception as e:
-                log(f"encoding failed: {e}", level='error')
+            # NOTE: Heartbeat file wordt elke 30s atomair geschreven door MonitoringManager.
+            # Hier NIET meer appenden — dat corrupteert het JSON-bestand waardoor de
+            # heartbeat monitor ts=None ziet en onterecht alerts stuurt.
             try:
                 bot_loop.last_portfolio_snapshot = write_portfolio_snapshot()
             except Exception:
