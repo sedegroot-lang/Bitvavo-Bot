@@ -21,15 +21,20 @@
 | **Laatste 4 weken** | +€65 (W07-W10) | conservatief, zonder outlier W06 |
 | **Conservatief weekgemiddelde** | ~€14/week | basis voor alle projecties |
 
-### Huidige config (werkelijk, maart 2026)
+### Huidige config (werkelijk, 26 maart 2026)
+
+> **DCA-strategie gewijzigd op 26-03-2026** naar "Hybrid F_CONSERVATIEF" op basis van
+> simulatie over 844 historische trades: €25 flat start, 0.9x multiplier, 2.5% drop.
+> Resultaat: +92% meer P/L dan oude config bij lagere gemiddelde exposure.
 
 ```json
 {
   "MAX_OPEN_TRADES": 3,
-  "BASE_AMOUNT_EUR": 38.0,
-  "DCA_MAX_BUYS": 9,
-  "DCA_AMOUNT_EUR": 30.4,
-  "DCA_DROP_PCT": 0.02,
+  "BASE_AMOUNT_EUR": 48,
+  "DCA_MAX_BUYS": 17,
+  "DCA_AMOUNT_EUR": 25,
+  "DCA_SIZE_MULTIPLIER": 0.9,
+  "DCA_DROP_PCT": 0.025,
   "MIN_SCORE_TO_BUY": 7.0,
   "DEFAULT_TRAILING": 0.025,
   "TRAILING_ACTIVATION_PCT": 0.015,
@@ -40,7 +45,9 @@
 }
 ```
 
-**Max blootstelling huidige config**: €38 + 9 × €30,40 = **€311,60 per slot** → 3 slots = **€934,80 worst case**
+**DCA-bedragen per level (0.9x)**: €25 → €22,50 → €20,25 → €18,23 → ... → €4,63 (level 17)
+**Typische blootstelling** (2 DCA): €48 + 25 + 22,50 = **€95,50/slot** → 3 slots = **€287**
+**Worst case** (17 DCA): €48 + €209 = **€257/slot** → 3 slots = **€770**
 
 ---
 
@@ -81,97 +88,88 @@
 ## Overzicht per €100 Mijlpaal
 
 Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op huidige settings.
+**DCA_SIZE_MULTIPLIER = 0.9** op alle niveaus. **DCA_MAX_BUYS = 17** op alle niveaus.
 
-| Portfolio | Actie | MAX_TRADES | BASE | DCA_MAX | DCA_AMT | DCA_DROP | MIN_SCORE | TRAILING | Grid |
-|-----------|-------|------------|------|---------|---------|----------|-----------|----------|------|
-| **€465** ← nu | *Huidige config* | 3 | 38 | 9 | 30,40 | 2,0% | 7,0 | 2,5% | Uit |
-| **€500** | — geen wijziging | 3 | 38 | 9 | 30,40 | 2,0% | 7,0 | 2,5% | Uit |
-| **€600** | ↑ BASE naar 42 | 3 | **42** | 9 | 30,40 | 2,0% | 7,0 | 2,5% | Uit |
-| **€700** | ↑ BASE naar 48, DCA naar 32 | 3 | **48** | 9 | **32** | 1,9% | 7,0 | 2,5% | Uit |
-| **€800** | ↑ 4 trades, BASE 52 | **4** | **52** | 9 | 32 | 1,9% | 7,0 | 2,5% | Uit |
-| **€900** | ↑ BASE 56, DCA 34 | 4 | **56** | 9 | **34** | 1,8% | 7,0 | 2,4% | Uit |
-| **€1.000** | ↑ Grid BTC aan (€150) | 4 | 56 | 9 | 34 | 1,8% | 7,0 | 2,4% | **€150 BTC** |
-| **€1.100** | ↑ BASE 62 | 4 | **62** | 9 | 34 | 1,8% | 7,0 | 2,4% | €150 BTC |
-| **€1.200** | ↑ 5 trades, DCA 36 | **5** | 62 | 9 | **36** | 1,8% | **6,5** | 2,4% | €150 BTC |
-| **€1.300** | ↑ BASE 68 | 5 | **68** | 9 | 36 | 1,7% | 6,5 | 2,3% | €150 BTC |
-| **€1.400** | ↑ Grid ETH erbij (€250 tot.) | 5 | 68 | 9 | 36 | 1,7% | 6,5 | 2,3% | **€250 BTC+ETH** |
-| **€1.500** | ↑ BASE 75, DCA 40 | 5 | **75** | 9 | **40** | 1,7% | 6,5 | 2,3% | €250 |
-| **€1.600** | ↑ 6 trades | **6** | 75 | 9 | 40 | 1,7% | 6,5 | 2,3% | €250 |
-| **€1.700** | ↑ BASE 80, DCA 44 | 6 | **80** | 9 | **44** | 1,6% | 6,5 | 2,2% | €250 |
-| **€1.800** | ↑ Grid SOL erbij (€400 tot.) | 6 | 80 | 9 | 44 | 1,6% | 6,5 | 2,2% | **€400 3 mktn** |
-| **€1.900** | ↑ BASE 85 | 6 | **85** | 9 | 44 | 1,6% | 6,5 | 2,2% | €400 |
-| **€2.000** | ↑ 7 trades, DCA 10 levels | **7** | 85 | **10** | 44 | 1,6% | 6,5 | 2,2% | €400 |
-| **€2.200** | ↑ BASE 95, DCA 50 | 7 | **95** | 10 | **50** | 1,5% | 6,5 | 2,1% | €400 |
-| **€2.400** | ↑ Grid 4 mktn (€600 tot.) | 7 | 95 | 10 | 50 | 1,5% | 6,5 | 2,1% | **€600 4 mktn** |
-| **€2.600** | ↑ BASE 105, DCA 55 | 7 | **105** | 10 | **55** | 1,5% | 6,0 | 2,1% | €600 |
-| **€2.800** | ↑ 8 trades | **8** | 105 | 10 | 55 | 1,5% | 6,0 | 2,0% | €600 |
-| **€3.000** | ↑ BASE 115, Grid 5 mktn (€800) | 8 | **115** | 10 | **60** | 1,4% | 6,0 | 2,0% | **€800 5 mktn** |
-| **€3.500** | ↑ BASE 130, DCA 70, Grid €1.000 | 8 | **130** | 10 | **70** | 1,4% | 6,0 | 2,0% | **€1.000 5 mktn** |
-| **€4.000** | ↑ 9 trades, BASE 145, Grid 6 mktn | **9** | **145** | 10 | **75** | 1,3% | 6,0 | 1,9% | **€1.400 6 mktn** |
-| **€4.500** | ↑ BASE 155, DCA 85 | 9 | **155** | **11** | **85** | 1,3% | 6,0 | 1,9% | €1.400 |
-| **€5.000** | ↑ 10 trades, Grid €2.000 | **10** | **160** | **12** | **90** | 1,2% | 6,0 | 1,8% | **€2.000 8 mktn** |
+| Portfolio | Actie | MAX_TRADES | BASE | DCA_AMT | DCA_DROP | MIN_SCORE | TRAILING | Grid |
+|-----------|-------|------------|------|---------|----------|-----------|----------|------|
+| **€700** ← nu | *Hybrid F_CONSERVATIEF* | 3 | 48 | 25 | 2,5% | 7,0 | 2,5% | Uit |
+| **€800** | ↑ 4 trades, BASE 52, DCA 27 | **4** | **52** | **27** | 2,5% | 7,0 | 2,5% | Uit |
+| **€900** | ↑ BASE 56, DCA 28 | 4 | **56** | **28** | 2,5% | 7,0 | 2,4% | Uit |
+| **€1.000** | ↑ Grid BTC aan (€150) | 4 | 56 | 28 | 2,5% | 7,0 | 2,4% | **€150 BTC** |
+| **€1.100** | ↑ BASE 62, DCA 30 | 4 | **62** | **30** | 2,5% | 7,0 | 2,4% | €150 BTC |
+| **€1.200** | ↑ 5 trades | **5** | 62 | 30 | 2,5% | **6,5** | 2,4% | €150 BTC |
+| **€1.300** | ↑ BASE 68, DCA 32 | 5 | **68** | **32** | 2,5% | 6,5 | 2,3% | €150 BTC |
+| **€1.400** | ↑ Grid ETH erbij (€250 tot.) | 5 | 68 | 32 | 2,5% | 6,5 | 2,3% | **€250 BTC+ETH** |
+| **€1.500** | ↑ BASE 75, DCA 35 | 5 | **75** | **35** | 2,5% | 6,5 | 2,3% | €250 |
+| **€1.600** | ↑ 6 trades | **6** | 75 | 35 | 2,5% | 6,5 | 2,3% | €250 |
+| **€1.700** | ↑ BASE 80, DCA 38 | 6 | **80** | **38** | 2,5% | 6,5 | 2,2% | €250 |
+| **€1.800** | ↑ Grid SOL erbij (€400 tot.) | 6 | 80 | 38 | 2,5% | 6,5 | 2,2% | **€400 3 mktn** |
+| **€1.900** | ↑ BASE 85 | 6 | **85** | 38 | 2,5% | 6,5 | 2,2% | €400 |
+| **€2.000** | ↑ 7 trades, DCA 40 | **7** | 85 | **40** | 2,3% | 6,5 | 2,2% | €400 |
+| **€2.200** | ↑ BASE 95, DCA 44 | 7 | **95** | **44** | 2,3% | 6,5 | 2,1% | €400 |
+| **€2.400** | ↑ Grid 4 mktn (€600 tot.) | 7 | 95 | 44 | 2,3% | 6,5 | 2,1% | **€600 4 mktn** |
+| **€2.600** | ↑ BASE 105, DCA 48 | 7 | **105** | **48** | 2,3% | 6,0 | 2,1% | €600 |
+| **€2.800** | ↑ 8 trades | **8** | 105 | 48 | 2,3% | 6,0 | 2,0% | €600 |
+| **€3.000** | ↑ BASE 115, DCA 52, Grid 5 mktn | 8 | **115** | **52** | 2,0% | 6,0 | 2,0% | **€800 5 mktn** |
+| **€3.500** | ↑ BASE 130, DCA 58, Grid €1.000 | 8 | **130** | **58** | 2,0% | 6,0 | 2,0% | **€1.000 5 mktn** |
+| **€4.000** | ↑ 9 trades, BASE 145, Grid 6 mktn | **9** | **145** | **65** | 2,0% | 6,0 | 2,0% | **€1.400 6 mktn** |
+| **€4.500** | ↑ BASE 155, DCA 72 | 9 | **155** | **72** | 2,0% | 6,0 | 2,0% | €1.400 |
+| **€5.000** | ↑ 10 trades, DCA 78, Grid €2.000 | **10** | **160** | **78** | 2,0% | 6,0 | 2,0% | **€2.000 8 mktn** |
 
 ---
 
 ## Gedetailleerde Mijlpalen
 
-### 🟢 NU — €465 (Huidige Config)
+### 🟢 NU — €738 (Hybrid F_CONSERVATIEF DCA, 26 maart 2026)
 
-> De bot draait stabiel. Bugs zijn gefixt. Focus: consistent winst maken.
+> DCA-strategie geoptimaliseerd via simulatie (844 trades). €700 milestone actief.
 
-**Geen wijzigingen aan config.** Huidige settings zijn correct voor dit niveau.
+**DCA wijziging toegepast:**
+- DCA_AMOUNT_EUR: 32 → **25** (kleiner startbedrag)
+- DCA_SIZE_MULTIPLIER: 0.8 → **0.9** (tragere afname per level)
+- DCA_DROP_PCT: 1.9% → **2.5%** (breder: alleen bijkopen bij echte dips)
+- DCA_MAX_BUYS: **17** (ongewijzigd — diepe dip-recovery)
 
 **Wat je nu doet:**
 - ✅ 3 trailing trades (al ingesteld)
 - ✅ Grid uit (terecht — te weinig budget)
-- ✅ DCA 9 levels actief (goede recovery bij dips)
-- 🎯 Wacht tot portfolio stabiel boven €500 voor 2 weken
+- ✅ DCA 17 levels actief met 0.9x afname en 2.5% drop
+- 🎯 Wacht tot portfolio stabiel boven €800 voor 2 weken
 
 **Budget check:**
-- Typische blootstelling (3 trades, gem. 2 DCA): 3 × (38 + 2×30) = **€294**
-- Worst case (3 trades, 9 DCA elk): 3 × 312 = **€936** (gebeurt nooit tegelijk)
-- EUR buffer bij typische load: €465 − €294 = **€171 vrij** ✅
+- Typische blootstelling (3 trades, gem. 2 DCA): 3 × (48 + 25 + 22,50) = **€287**
+- Worst case (3 trades, 17 DCA elk): 3 × 257 = **€770** (nooit tegelijk)
+- EUR buffer bij typische load: €738 − €287 = **€451 vrij** ✅
 
-**Verwacht**: €14/week trailing + €25/week storting = ~€39/week groei → **€500 in ~1 week**
+**Verwacht**: €14/week trailing + €25/week storting = ~€39/week groei → **€800 in ~2 weken**
 
 ---
 
-### 📍 €600 — Eerste Verhoging
+### 📍 €600 — ~~Eerste Verhoging~~ (BEREIKT — overgeslagen)
 
-> **Trigger**: Portfolio ≥ €600 gedurende 2 weken. Winrate ≥ 50%.
-
-**Wijziging**: BASE_AMOUNT_EUR **38 → 42** (+€4)
-
-```json
-{ "BASE_AMOUNT_EUR": 42 }
-```
-
-**Waarom alleen BASE?** Meer winst per succesvolle trade, zonder extra risicospreiding. €4 extra per trade = +10% meer euro per win.
-
-**Budget check:**
-- Typisch: 3 × (42 + 2×30) = **€306** → buffer €294 ✅
-- EUR buffer 15% vereist: €600 × 0,15 = €90 → ruim gehaald ✅
+> Milestone overgeslagen — direct van €465 naar €700 gegaan op 23 maart 2026.
 
 ---
 
-### 📍 €700 — Posities Vergroten
+### 📍 €700 — Posities Vergroten + DCA Optimalisatie (BEREIKT)
 
-> **Trigger**: Portfolio ≥ €700 gedurende 2 weken.
+> **Bereikt**: 23 maart 2026. DCA geoptimaliseerd op 26 maart 2026.
 
-**Wijzigingen**: BASE **42 → 48**, DCA_AMOUNT **30,40 → 32**, DCA_DROP **2,0% → 1,9%**
+**Wijzigingen**: BASE **42 → 48**, DCA **→ 25 (0.9x, 2.5% drop)** (Hybrid F_CONSERVATIEF)
 
 ```json
 {
   "BASE_AMOUNT_EUR": 48,
-  "DCA_AMOUNT_EUR": 32,
-  "DCA_DROP_PCT": 0.019
+  "DCA_AMOUNT_EUR": 25,
+  "DCA_SIZE_MULTIPLIER": 0.9,
+  "DCA_DROP_PCT": 0.025
 }
 ```
 
-**Waarom DCA_DROP iets omlaag?** Bij grotere posities wil je dat DCA's dichter bij de entry vallen — snellere recovery bij kleine dips.
+**Waarom DCA_DROP omhoog naar 2.5%?** Simulatie op 844 trades toonde aan dat bredere DCA-afstand alleen bij echte dips bijkoopt (niet bij marktruis). Resultaat: +92% meer P/L bij lagere exposure.
 
 **Budget check:**
-- Typisch: 3 × (48 + 2×32) = **€336** → buffer €364 ✅
+- Typisch: 3 × (48 + 25 + 22,50) = **€287** → buffer €451 ✅
 - 15% reserve: €700 × 0,15 = €105 ✅
 
 ---
@@ -180,20 +178,20 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 > **Trigger**: Portfolio ≥ €800 gedurende 2 weken, winrate ≥ 55%.
 
-**Wijzigingen**: MAX_OPEN_TRADES **3 → 4**, BASE **48 → 52**
+**Wijzigingen**: MAX_OPEN_TRADES **3 → 4**, BASE **48 → 52**, DCA **25 → 27**
 
 ```json
 {
   "MAX_OPEN_TRADES": 4,
-  "BASE_AMOUNT_EUR": 52
+  "BASE_AMOUNT_EUR": 52,
+  "DCA_AMOUNT_EUR": 27
 }
 ```
 
 **Waarom nu een 4e slot?** Meer gelijktijdige trades = meer kansen. Bij €800 is er genoeg buffer voor 4 posities.
 
 **Budget check:**
-- Typisch: 4 × (52 + 2×32) = **€464** → buffer €336 ✅
-- Worst case 4 × (52 + 9×32) = **€1.360** (nooit volledig, bot checkt balans)
+- Typisch: 4 × (52 + 27 + 24,30) = **€413** → buffer €387 ✅
 - 15% reserve: €800 × 0,15 = €120 ✅
 
 ---
@@ -202,18 +200,20 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 > **Trigger**: Portfolio ≥ €900, 4e slot werkt soepel.
 
-**Wijzigingen**: BASE **52 → 56**, DCA_AMOUNT **32 → 34**, DCA_DROP **1,9% → 1,8%**, TRAILING **2,5% → 2,4%**
+**Wijzigingen**: BASE **52 → 56**, DCA_AMOUNT **27 → 28**, TRAILING **2,5% → 2,4%**
 
 ```json
 {
   "BASE_AMOUNT_EUR": 56,
-  "DCA_AMOUNT_EUR": 34,
-  "DCA_DROP_PCT": 0.018,
+  "DCA_AMOUNT_EUR": 28,
   "DEFAULT_TRAILING": 0.024
 }
 ```
 
-**Waarom trailing naar 2,4%?** Bij grotere posities wil je winst iets sneller vastzetten — €56 × 2,4% = €1,34 activatie vs €38 × 2,5% = €0,95 eerder. Proportioneel dezelfde uitkomst.
+**Waarom trailing naar 2,4%?** Bij grotere posities wil je winst iets sneller vastzetten — €56 × 2,4% = €1,34 activatie. Proportioneel dezelfde uitkomst.
+
+**Budget check:**
+- Typisch: 4 × (56 + 28 + 25,20) = **€437** → buffer €463 ✅
 
 ---
 
@@ -253,7 +253,7 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 **Budget check:**
 - Grid: €150 gereserveerd
-- Trailing: 4 slots typisch 4 × (56 + 2×34) = **€496** → vrij: €1.000 − 150 − 496 = **€354** ✅
+- Trailing: 4 slots typisch 4 × (56 + 28 + 25,20) = **€437** → vrij: €1.000 − 150 − 437 = **€413** ✅
 
 ---
 
@@ -261,21 +261,19 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 > **Trigger**: Portfolio ≥ €1.200, grid BTC draait ≥ 4 weken, ≥ 3 completed cycles.
 
-**Wijzigingen**: MAX_OPEN_TRADES **4 → 5**, DCA_AMOUNT **34 → 36**, MIN_SCORE **7,0 → 6,5**
+**Wijzigingen**: MAX_OPEN_TRADES **4 → 5**, MIN_SCORE **7,0 → 6,5**
 
 ```json
 {
   "MAX_OPEN_TRADES": 5,
-  "DCA_AMOUNT_EUR": 36,
   "MIN_SCORE_TO_BUY": 6.5
 }
 ```
 
 **Waarom MIN_SCORE omlaag?** Met 5 slots wil je iets meer trades — 6,5 laat de goede B-kwaliteit setups ook toe.
 
-**Worst case check:**
-- Grid: €150 + Trailing 5 × (62 + 9×36) = 5 × €386 = €1.930 max → ver boven portfolio
-- **Realistisch**: 5 × (62 + 2×36) = **€670** trailing + €150 grid = €820 → buffer €380 ✅
+**Budget check:**
+- Grid: €150 + Trailing 5 × (62 + 30 + 27) = **€595** → totaal €745 → buffer €455 ✅
 
 ---
 
@@ -315,7 +313,7 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 **Budget check:**
 - Grid: €250
-- Trailing: 6 × (75 + 2×40) = **€930** typisch → buffer: €1.600 − 250 − 930 = **€420** ✅
+- Trailing: 6 × (75 + 35 + 31,50) = **€849** typisch → buffer: €1.600 − 250 − 849 = **€501** ✅
 
 ---
 
@@ -341,26 +339,25 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 ---
 
-### ⭐ €2.000 — Zevende Slot + DCA 10 Levels
+### ⭐ €2.000 — Zevende Slot
 
 > **Trigger**: Portfolio ≥ €2.000 voor 4 weken. Grote mijlpaal!
 
-**Wijzigingen**: MAX_OPEN_TRADES **6 → 7**, DCA_MAX_BUYS **9 → 10**
+**Wijzigingen**: MAX_OPEN_TRADES **6 → 7**, DCA_AMOUNT **38 → 40**, DCA_DROP **2,5% → 2,3%**
 
 ```json
 {
   "MAX_OPEN_TRADES": 7,
-  "DCA_MAX_BUYS": 10,
-  "DCA_DROP_PCT": 0.016
+  "DCA_AMOUNT_EUR": 40,
+  "DCA_DROP_PCT": 0.023
 }
 ```
 
-**Waarom nu pas DCA 10?** Meer DCA levels = meer kapitaal nodig per trade bij drawdown. Bij €2.000 is er genoeg buffer om dieper te DCA'en.
+**Waarom DCA_DROP nu iets omlaag?** Bij €2.000 is er genoeg buffer voor iets agressievere DCA. 2,3% is nog steeds breder dan de oude 1,6% en vangt echte dips.
 
 **Budget check:**
 - Grid: €400
-- Trailing: 7 × (85 + 3×44) = **€1.519** realistisch (gem. 3 DCA) → buffer: €2.000 − 400 − 1.519 = **€81** ⚠️ krap
-- Maar: niet alle 7 slots zitten tegelijk in 3 DCA → typisch 7 × (85 + 1×44) = **€903** → buffer €697 ✅
+- Trailing: 7 × (85 + 40 + 36) = **€1.127** typisch → buffer: €2.000 − 400 − 1.127 = **€473** ✅
 
 ---
 
@@ -390,14 +387,14 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 > **Trigger**: Portfolio ≥ €3.000 voor 6 weken. Respect.
 
-**Wijzigingen**: MAX_OPEN_TRADES **7 → 8**, BASE **105 → 115**, Grid €800 met 5 markten
+**Wijzigingen**: MAX_OPEN_TRADES **7 → 8**, BASE **105 → 115**, DCA **48 → 52**, DCA_DROP **2,3% → 2,0%**, Grid €800 met 5 markten
 
 ```json
 {
   "MAX_OPEN_TRADES": 8,
   "BASE_AMOUNT_EUR": 115,
-  "DCA_AMOUNT_EUR": 60,
-  "DCA_DROP_PCT": 0.014,
+  "DCA_AMOUNT_EUR": 52,
+  "DCA_DROP_PCT": 0.020,
   "DEFAULT_TRAILING": 0.020,
   "GRID_TRADING": {
     "preferred_markets": ["BTC-EUR", "ETH-EUR", "SOL-EUR", "ADA-EUR", "DOT-EUR"],
@@ -411,6 +408,10 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 }
 ```
 
+**Budget check:**
+- Grid: €800
+- Trailing: 8 × (115 + 52 + 46,80) = **€1.710** typisch → buffer: €3.000 − 800 − 1.710 = **€490** ✅
+
 **Verwachte opbrengst bij €3.000:**
 - Trailing: 8 slots × ~€2,50/trade × ~2 trades/dag = **€4/dag**
 - Grid: €800 budget × ~0,08%/dag = **€0,64/dag**
@@ -423,7 +424,7 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 ```json
 {
   "BASE_AMOUNT_EUR": 130,
-  "DCA_AMOUNT_EUR": 70,
+  "DCA_AMOUNT_EUR": 58,
   "GRID_TRADING": {
     "max_total_investment": 1000,
     "investment_per_grid": 200
@@ -439,8 +440,8 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 {
   "MAX_OPEN_TRADES": 9,
   "BASE_AMOUNT_EUR": 145,
-  "DCA_AMOUNT_EUR": 75,
-  "DEFAULT_TRAILING": 0.019,
+  "DCA_AMOUNT_EUR": 65,
+  "DEFAULT_TRAILING": 0.020,
   "GRID_TRADING": {
     "preferred_markets": ["BTC-EUR", "ETH-EUR", "SOL-EUR", "ADA-EUR", "DOT-EUR", "LINK-EUR"],
     "investment_per_grid": 235,
@@ -451,13 +452,12 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 ---
 
-### 📍 €4.500 — DCA 11 Levels
+### 📍 €4.500 — DCA Opschalen
 
 ```json
 {
   "BASE_AMOUNT_EUR": 155,
-  "DCA_MAX_BUYS": 11,
-  "DCA_AMOUNT_EUR": 85
+  "DCA_AMOUNT_EUR": 72
 }
 ```
 
@@ -471,11 +471,11 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 {
   "MAX_OPEN_TRADES": 10,
   "BASE_AMOUNT_EUR": 160,
-  "DCA_MAX_BUYS": 12,
-  "DCA_AMOUNT_EUR": 90,
-  "DCA_DROP_PCT": 0.012,
+  "DCA_AMOUNT_EUR": 78,
+  "DCA_DROP_PCT": 0.020,
+  "DCA_SIZE_MULTIPLIER": 0.9,
   "MIN_SCORE_TO_BUY": 6.0,
-  "DEFAULT_TRAILING": 0.018,
+  "DEFAULT_TRAILING": 0.020,
   "TRAILING_ACTIVATION_PCT": 0.012,
   "GRID_TRADING": {
     "enabled": true,
@@ -517,12 +517,16 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 {
   "MAX_OPEN_TRADES": 2,
   "BASE_AMOUNT_EUR": 30,
-  "DCA_MAX_BUYS": 5,
-  "DCA_AMOUNT_EUR": 20,
+  "DCA_AMOUNT_EUR": 15,
+  "DCA_SIZE_MULTIPLIER": 0.9,
+  "DCA_DROP_PCT": 0.030,
   "MIN_SCORE_TO_BUY": 8.0,
   "GRID_TRADING": { "enabled": false }
 }
 ```
+> DCA_MAX_BUYS blijft 17 maar met €15 base en 0.9x multiplier is worst-case DCA-exposure slechts ~€125/slot.
+> DCA_DROP 3,0% zorgt voor brede spacing zodat alleen echte dips aangevuld worden.
+
 **Wacht** tot markt 2 weken stabiel is. Schaal dan geleidelijk terug op.
 
 ### Herstelprotocol
@@ -549,10 +553,11 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 - **Sla geen mijlpaal over** — verliesgevend opschalen vernietigt compounding
 - **Grid onder €1.000** — fees vreten bij kleine orders alle marge op (bewezen: 0 fills bij €7,60/level)
 - **BASE_AMOUNT verhogen als winrate < 50%** — fix eerst je entries
-- **DCA_MAX > 10 onder €2.000** — te veel kapitaal opgesloten bij drawdown
+- **DCA_AMOUNT ophogen zonder budget check** — bereken altijd worst-case exposure (17 DCAs met 0.9x multiplier)
+- **DCA_DROP onder 2,0%** — simulatie bewees: bredere drops = beter rendement
 - **MIN_SCORE onder 6.0** — te veel noise trades
 - **Meerdere dingen tegelijk wijzigen** — onduidelijk wat werkt en wat niet
-- **Trailing onder 1,8%** — te veel vroegtijdige exits bij normale volatiliteit
+- **Trailing onder 2,0%** — te veel vroegtijdige exits bij normale volatiliteit
 
 ### ✅ Altijd doen
 - Check winrate elke 2 weken in het dashboard
@@ -570,32 +575,32 @@ Vink af wanneer bereikt:
 - [x] €465 — Huidige stand (11 maart 2026)
 - [x] €500 — Stabiel draaien, geen wijzigingen (bereikt ~18 maart 2026)
 - [x] €600 — BASE → 42 (overgeslagen — direct naar €700)
-- [x] €700 — BASE → 48, DCA → 32, DCA_DROP → 1,9% (23 maart 2026)
-- [ ] €800 — 4 trades, BASE → 52
-- [ ] €900 — BASE → 56, DCA → 34, trailing → 2,4%
+- [x] €700 — Hybrid F_CONSERVATIEF DCA: DCA=25, MULT=0.9, DROP=2.5% (26 maart 2026)
+- [ ] €800 — 4 trades, BASE → 52, DCA → 27
+- [ ] €900 — BASE → 56, DCA → 28
 - [ ] €1.000 ⭐ — Grid BTC aan (€150)
-- [ ] €1.100 — BASE → 62
+- [ ] €1.100 — BASE → 62, DCA → 30
 - [ ] €1.200 — 5 trades, MIN_SCORE → 6,5
-- [ ] €1.300 — BASE → 68
+- [ ] €1.300 — BASE → 68, DCA → 32
 - [ ] €1.400 — Grid ETH erbij (€250 totaal)
-- [ ] €1.500 — BASE → 75, DCA → 40
+- [ ] €1.500 — BASE → 75, DCA → 35
 - [ ] €1.600 — 6 trades
-- [ ] €1.700 — BASE → 80, DCA → 44
+- [ ] €1.700 — BASE → 80, DCA → 38
 - [ ] €1.800 — Grid SOL erbij (€400 totaal)
 - [ ] €1.900 — BASE → 85
-- [ ] €2.000 ⭐ — 7 trades, DCA 10 levels
-- [ ] €2.200 — BASE → 95, DCA → 50
+- [ ] €2.000 ⭐ — 7 trades, DCA → 40, DROP → 2,3%
+- [ ] €2.200 — BASE → 95, DCA → 44
 - [ ] €2.400 — Grid 4 markten (€600)
-- [ ] €2.600 — BASE → 105, DCA → 55
+- [ ] €2.600 — BASE → 105, DCA → 48
 - [ ] €2.800 — 8 trades
-- [ ] €3.000 ⭐ — Grid 5 markten (€800), stortingen optioneel
-- [ ] €3.500 — BASE → 130, DCA → 70, Grid €1.000
-- [ ] €4.000 — 9 trades, Grid 6 markten (€1.400)
-- [ ] €4.500 — DCA 11 levels, BASE → 155
-- [ ] €5.000 🏆 — 10 trades, DCA 12, Grid €2.000, passief inkomen
+- [ ] €3.000 ⭐ — Grid 5 markten (€800), DROP → 2,0%
+- [ ] €3.500 — BASE → 130, DCA → 58, Grid €1.000
+- [ ] €4.000 — 9 trades, DCA → 65, Grid 6 markten (€1.400)
+- [ ] €4.500 — BASE → 155, DCA → 72
+- [ ] €5.000 🏆 — 10 trades, DCA → 78, Grid €2.000, passief inkomen
 
 ---
 
-*Laatste update: 23 maart 2026 — Portfolio ~€738, €700 milestone config actief*
-*Config: BASE=48, DCA=32, DCA_DROP=1.9%, 3 slots, grid uit*
-*Volgende mijlpaal: €800 (4 trades, BASE → 52) — wacht 2 weken stabilisatie*
+*Laatste update: 26 maart 2026 — Portfolio ~€738, Hybrid F_CONSERVATIEF DCA actief*
+*Config: BASE=48, DCA=25, MULT=0.9, DCA_DROP=2.5%, 3 slots, grid uit*
+*Volgende mijlpaal: €800 (4 trades, BASE → 52, DCA → 27) — wacht 2 weken stabilisatie*
