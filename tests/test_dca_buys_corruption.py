@@ -163,10 +163,12 @@ class TestDCANormalExecution:
         assert trade['dca_events'][0]['dca_level'] == 1
 
     def test_multiple_dcas_in_one_call(self):
-        """With max_buys_per_iteration=3, up to 3 DCAs can happen per call."""
+        """FIX #003: With last_dca_price reference, only 1 DCA triggers per price
+        level even with max_buys_per_iteration=3, because after the first DCA
+        last_dca_price becomes current_price and the next target is below it."""
         call_count = [0]
 
-        def mock_place_buy(market, eur, price):
+        def mock_place_buy(market, eur, price, **kwargs):
             call_count[0] += 1
             return {
                 'status': 'filled',
@@ -180,16 +182,17 @@ class TestDCANormalExecution:
             is_order_success=MagicMock(return_value=True),
         )
         settings = _make_settings(
-            amount_eur=30.0, max_buys=9, drop_pct=0.001,  # tiny drop so all levels trigger
+            amount_eur=30.0, max_buys=9, drop_pct=0.001,  # tiny drop so first level triggers
             max_buys_per_iteration=3,
         )
         trade = _make_trade(buy_price=100.0, amount=1.0, dca_buys=0, dca_events=[])
         mgr = DCAManager(ctx)
         mgr._execute_fixed_dca('TEST-EUR', trade, 50.0, settings, 1.0)
-        # Should have done exactly 3 DCAs (limited by max_buys_per_iteration)
-        assert trade['dca_buys'] == 3
-        assert len(trade['dca_events']) == 3
-        assert call_count[0] == 3
+        # FIX #003: Only 1 DCA triggers — after buying at 50.0, last_dca_price=50.0
+        # and next target = 50.0 * (1-0.001) = 49.95 which is below current 50.0
+        assert trade['dca_buys'] == 1
+        assert len(trade['dca_events']) == 1
+        assert call_count[0] == 1
 
 
 # ===========================================================================
@@ -265,7 +268,7 @@ class TestDCAMinAmountFloor:
         """At level 10, 30 * 0.8^10 = €3.22 → should floor to €5 and succeed."""
         bought_amounts = []
 
-        def mock_place_buy(market, eur, price):
+        def mock_place_buy(market, eur, price, **kwargs):
             bought_amounts.append(eur)
             return {
                 'status': 'filled',

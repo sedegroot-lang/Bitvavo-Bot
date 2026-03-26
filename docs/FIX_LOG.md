@@ -166,6 +166,48 @@ GUARD 5 used `min(max(dca_buys_now, actual_event_count), dca_max_now)` which NEV
 
 ---
 
+## #005 — DCA cascading: multiple buys at same price in one cycle (2026-03-26)
+
+### Symptom
+Bot executed 3 DCAs on NEAR-EUR and 2 on ALGO-EUR within 2 minutes, ALL at the same
+market price (1.0563 / 0.0731). Burned through €175 of €178 balance. Each successive
+DCA had decreasing EUR amounts (36→33→29) due to 0.9x multiplier but the price never
+dropped further between buys.
+
+### Root Cause
+In `_execute_fixed_dca` and `_execute_dynamic_dca`, the DCA target price was calculated
+from `buy_price` (weighted average entry price):
+```python
+target_price = float(trade.get("buy_price", current_price)) * (1 - step_pct)
+```
+After each DCA buy, `buy_price` is recalculated as a weighted average which DROPS (since
+we're averaging down). The while loop immediately checks the next DCA level using this
+new lower `buy_price`. Since the market price hasn't changed, and the new target is still
+above market price, the next DCA triggers too. This cascades until `max_buys_per_iteration`
+(which was 3) is exhausted.
+
+Example with NEAR: buy_price=1.23, current=1.056, drop=2.5%:
+- DCA1: target=1.23*0.975=1.20 → 1.056 < 1.20 → trigger. buy_price drops to ~1.15
+- DCA2: target=1.15*0.975=1.12 → 1.056 < 1.12 → trigger. buy_price drops to ~1.10
+- DCA3: target=1.10*0.975=1.07 → 1.056 < 1.07 → trigger. max_per_iter=3, stops.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/trading_dca.py` `_execute_fixed_dca` | Target calculated from `last_dca_price` instead of `buy_price`. After each DCA, `last_dca_price` = current execution price, so next DCA needs genuine further drop. |
+| `modules/trading_dca.py` `_execute_fixed_dca` | `dca_next_price` after buy also uses `last_dca_price` as reference |
+| `modules/trading_dca.py` `_execute_dynamic_dca` | Same two fixes in the dynamic DCA path |
+| `bot_config_local.json` | `DCA_MAX_BUYS_PER_ITERATION`: 3 → 1 (extra safety — max 1 DCA per 25s bot cycle) |
+| `tests/test_dca_buys_corruption.py` | Updated `test_multiple_dcas_in_one_call` to expect 1 DCA (not 3), fixed mock `**kwargs` |
+
+### Key rule
+DCA target must be based on `last_dca_price` (where the bot LAST bought), not `buy_price`
+(weighted average). Each DCA should require `drop_pct` additional decline from the previous
+DCA execution price. `DCA_MAX_BUYS_PER_ITERATION` should be 1 for safety.
+
+---
+
 ## Template for new entries
 
 ```

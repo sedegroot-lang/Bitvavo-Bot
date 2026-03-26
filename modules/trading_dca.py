@@ -473,7 +473,12 @@ class DCAManager:
         while trade.get("dca_buys", 0) < settings.max_buys and buys_this_call < max_per_iter:
             index = int(trade.get("dca_buys", 0))
             step_pct = float(settings.drop_pct) * (float(settings.step_multiplier) ** index)
-            target_price = float(trade.get("buy_price", current_price)) * (1 - step_pct)
+            # FIX #003: Use last_dca_price as reference to prevent cascading DCAs.
+            # Before: buy_price (weighted avg) drops with each DCA, letting the next
+            # DCA trigger at the same market price.  Now each DCA requires an
+            # additional drop_pct from where the previous DCA actually executed.
+            ref_price = float(trade.get("last_dca_price", trade.get("buy_price", current_price)))
+            target_price = ref_price * (1 - step_pct)
             trade["dca_next_price"] = target_price  # keep persisted target in sync with live calculation
             if current_price > target_price:
                 self._record_dca_audit(market, trade, "skip", "price_above_target", {"price": current_price, "target": target_price, "step_index": index})
@@ -585,10 +590,11 @@ class DCAManager:
                 "tokens_bought": float(actual_dca_tokens),
                 "dca_level": new_dca_buys
             })
-            # update next expected DCA price based on new averaged buy_price
+            # update next expected DCA price based on last_dca_price (not buy_price)
+            # FIX #003: prevents cascading — next DCA needs genuine further drop
             try:
                 next_step = float(settings.drop_pct) * (float(settings.step_multiplier) ** new_dca_buys)
-                trade["dca_next_price"] = float(trade.get("buy_price", current_price)) * (1 - next_step)
+                trade["dca_next_price"] = float(trade.get("last_dca_price", current_price)) * (1 - next_step)
             except Exception as e:
                 self.ctx.log(f"[ERROR] DCA next_price update failed for {market}: {e}")
             log(
@@ -683,7 +689,9 @@ class DCAManager:
         max_per_iter = int(settings.max_buys_per_iteration) if getattr(settings, 'max_buys_per_iteration', None) else dynamic_max_buys
         while trade.get("dca_buys", 0) < dynamic_max_buys and buys_this_call < max_per_iter:
             index = int(trade.get("dca_buys", 0))
-            target_price = float(trade.get("buy_price", current_price)) * (1 - dca_drop_pct * (settings.step_multiplier ** index))
+            # FIX #003: Use last_dca_price as reference to prevent cascading DCAs
+            ref_price = float(trade.get("last_dca_price", trade.get("buy_price", current_price)))
+            target_price = ref_price * (1 - dca_drop_pct * (settings.step_multiplier ** index))
             trade["dca_next_price"] = target_price  # keep UI in sync with volatility/drawdown-adjusted ladder
             if current_price > target_price:
                 self._record_dca_audit(market, trade, "skip", "price_above_target", {"price": current_price, "target": target_price, "step_index": index})
@@ -785,10 +793,11 @@ class DCAManager:
                 "tokens_bought": float(actual_dca_tokens),
                 "dca_level": new_dca_buys
             })
-            # update next expected DCA price based on new averaged buy_price
+            # update next expected DCA price based on last_dca_price (not buy_price)
+            # FIX #003: prevents cascading — next DCA needs genuine further drop
             try:
                 next_step = float(dca_drop_pct) * (float(settings.step_multiplier) ** new_dca_buys)
-                trade["dca_next_price"] = float(trade.get("buy_price", current_price)) * (1 - next_step)
+                trade["dca_next_price"] = float(trade.get("last_dca_price", current_price)) * (1 - next_step)
             except Exception as e:
                 self.ctx.log(f"[ERROR] DCA (dynamic) next_price update failed for {market}: {e}")
             log(
