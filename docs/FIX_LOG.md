@@ -139,6 +139,33 @@ User does not want any trade to be closed based on time, and no trade may EVER b
 
 ---
 
+## #004 — dca_buys inflated to buy_order_count on synced positions (2026-03-26)
+
+### Symptom
+XRP-EUR showed `dca_buys=17` despite having zero DCA events executed. Same for NEAR and ALGO.
+
+### Root Cause
+`modules/sync_validator.py` `auto_add_missing_positions()` set `dca_buys = max(1, result.buy_order_count)` where `buy_order_count` is ALL historical buy orders for the market (including old closed positions). For XRP with 17+ historical buy orders, this set `dca_buys=17` on a brand-new position.
+
+Additionally, `dca_max` was inflated to `max(config_dca_max, dca_buys)` — so with `dca_buys=17` and config `DCA_MAX_BUYS=17`, `dca_max=17`. This made all repair guards in `trailing_bot.py` (GUARD 1 and GUARD 5) ineffective because `dca_buys == dca_max`.
+
+GUARD 5 used `min(max(dca_buys_now, actual_event_count), dca_max_now)` which NEVER reduced `dca_buys` below its current value — even when `dca_events` was empty.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/sync_validator.py` L296 | `dca_buys = 0` for newly synced positions (not `max(1, buy_order_count)`) |
+| `modules/sync_validator.py` L315 | Same fix in FIFO fallback path |
+| `modules/sync_validator.py` L413 | `dca_max` uses config value, not `max(config, dca_buys)` |
+| `trailing_bot.py` GUARD 5 ~L893 | `correct_buys = min(actual_event_count, dca_max_global)` — now based on `dca_events` count, not `max(dca_buys, events)` |
+| trade_log.json | Reset all open trades: `dca_buys=0`, `dca_max` from config |
+
+### Key rule
+`dca_buys` must ALWAYS equal `len(dca_events)`. A newly synced position has `dca_buys=0` because the bot hasn't executed any DCAs. `buy_order_count` from cost_basis includes historical orders from old positions and must NEVER be used as a DCA counter.
+
+---
+
 ## Template for new entries
 
 ```

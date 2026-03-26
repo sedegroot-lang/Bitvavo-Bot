@@ -293,7 +293,11 @@ class SyncValidator:
                         avg_buy_price = result.avg_price
                         initial_invested = invested
                         total_invested = invested
-                        dca_buys = max(1, result.buy_order_count)
+                        # FIX #004: dca_buys=0 for newly synced positions.
+                        # buy_order_count includes ALL historical orders (old closed
+                        # positions too), so it is NOT a reliable DCA counter.
+                        # The bot has not tracked any DCAs for this new entry.
+                        dca_buys = 0
                         self._log(
                             f"Cost basis for {market}: €{avg_buy_price:.6f} ({dca_buys} buy order(s))",
                             level='debug',
@@ -312,7 +316,8 @@ class SyncValidator:
                                     invested = round(fifo_result.invested_eur, 2)
                                     initial_invested = invested
                                     total_invested = invested
-                                    dca_buys = max(1, fifo_result.buy_order_count)
+                                    # FIX #004: same as above — don't use buy_order_count as DCA counter
+                                    dca_buys = 0
                                     self._log(
                                         f"Fallback FIFO cost basis for {market}: €{avg_buy_price:.6f} ({dca_buys} buy order(s))",
                                         level='debug',
@@ -415,8 +420,8 @@ class SyncValidator:
                     'amount': add['amount'],
                     'timestamp': timestamp,
                     'tp_levels_done': [False, False],
-                    'dca_buys': add.get('dca_buys', 1),
-                    'dca_max': max(dca_max_buys, add.get('dca_buys', 1)),
+                    'dca_buys': 0,  # FIX #004: new synced position, no DCAs tracked yet
+                    'dca_max': dca_max_buys,  # FIX #004: use config value, never inflate
                     'dca_next_price': add['price'] * (1 - dca_drop_pct),
                     'tp_last_time': 0.0,
                     'invested_eur': add['invested'],
