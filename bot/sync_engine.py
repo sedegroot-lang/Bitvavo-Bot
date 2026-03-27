@@ -270,19 +270,9 @@ def sync_with_bitvavo():
                     local.setdefault('opened_regime', 'unknown')
 
                     if 'dca_max' not in local:
-                        try:
-                            inferred_max = None
-                            if 'basis' in dir() and basis and getattr(basis, 'buy_order_count', None) is not None:
-                                inferred_max = int(getattr(basis, 'buy_order_count') or 0)
-                        except Exception:
-                            inferred_max = None
-                        try:
-                            if inferred_max and inferred_max > 0:
-                                local['dca_max'] = inferred_max
-                            else:
-                                local['dca_max'] = int(DCA_MAX_BUYS)
-                        except Exception:
-                            local['dca_max'] = int(DCA_MAX_BUYS)
+                        # FIX: dca_max ALWAYS from config, NEVER from buy_order_count
+                        # (buy_order_count includes old closed positions — see FIX_LOG #004/#006)
+                        local['dca_max'] = int(DCA_MAX_BUYS)
 
                     try:
                         existing_next = local.get('dca_next_price')

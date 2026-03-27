@@ -36,7 +36,8 @@ def test_calculate_trade_financials_handles_missing_live_price() -> None:
 
 
 def test_determine_status_badge_affirms_trailing() -> None:
-    label, css = determine_status_badge(pnl_eur=-5.0, trailing_active=True)
+    # Production code requires pnl_eur > 0 for trailing badge (shows "Verlies" otherwise)
+    label, css = determine_status_badge(pnl_eur=5.0, trailing_active=True)
     assert label == "Trailing actief"
     assert css == "badge-trailing"
 

@@ -2364,7 +2364,13 @@ async def bot_loop():
                             log(f"⚠️ STALE GUARD: {m} drawdown SL would trigger with {_dd_loss_pct*100:.1f}% loss (bp={bp:.6f}, cp={cp:.6f}). Skipping — buy_price may be stale.", level='error')
                             t['_stale_bp_flagged'] = True
                             continue
+                        # LOSS GUARD: never sell at a loss (invariant: bot verkoopt NOOIT met verlies)
+                        _dd_invested = get_true_invested_eur(t, market=m)
                         amt = float(t.get('amount', 0.0) or 0.0)
+                        _dd_gross = cp * amt
+                        if _dd_invested > 0 and _dd_gross < _dd_invested:
+                            log(f"🛑 MAX_DRAWDOWN exit BLOCKED for {m}: position in loss (gross=€{_dd_gross:.2f} < invested=€{_dd_invested:.2f}). Only manual intervention may sell at loss.", level='warning')
+                            continue
                         if amt > 0:
                             log(f"Drawdown stop hit for {m} (>{dd_pct*100:.1f}% down), forcing exit.", level='warning')
                             

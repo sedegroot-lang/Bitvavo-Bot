@@ -6,6 +6,7 @@ import json
 import math
 import os
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -417,7 +418,11 @@ class DCAManager:
         # Update trade state
         old_amount = float(trade.get("amount", 0) or 0)
         new_amount = old_amount + base_amount
-        old_invested = float(trade.get("invested_eur", 0) or 0) or (buy_price * old_amount)
+        old_invested = float(trade.get("invested_eur", 0) or 0)
+        if old_invested <= 0:
+            log(f"Pyramid DCA for {market} skipped: invested_eur is 0 (derive_cost_basis needed)")
+            self._record_dca_audit(market, trade, "skip", "pyramid_no_invested_eur")
+            return
         new_invested = old_invested + eur_amount
         new_avg_price = new_invested / new_amount if new_amount > 0 else buy_price
 
@@ -561,6 +566,14 @@ class DCAManager:
 
             prev_amount = float(trade.get("amount", 0.0))
             new_amount = prev_amount + float(actual_dca_tokens)
+            # Snapshot before mutation for rollback on failure
+            _snap = {
+                'invested_eur': float(trade.get('invested_eur', 0) or 0),
+                'dca_buys': int(trade.get('dca_buys', 0)),
+                'dca_events': list(trade.get('dca_events', [])),
+                'buy_price': float(trade.get('buy_price', 0) or 0),
+                'amount': prev_amount,
+            }
             if new_amount > 0:
                 prev_buy = float(trade.get("buy_price", current_price))
                 trade["buy_price"] = (
@@ -568,21 +581,28 @@ class DCAManager:
                 ) / new_amount
             trade["amount"] = new_amount
             # Use TradeInvestment module for all invested_eur mutations
-            from core.trade_investment import add_dca as _ti_add_dca
-            _ti_add_dca(trade, float(actual_dca_eur), source="dca_market_buy")
-            # FIX #007: Use dca_state.record_dca() as SINGLE source of truth
-            # for dca_buys, dca_events, last_dca_price, and dca_next_price.
-            from core.dca_state import record_dca as _ds_record
-            dca_max_limit = int(settings.max_buys or 3)
-            _dca_state = _ds_record(
-                trade, price=float(current_price),
-                amount_eur=float(actual_dca_eur),
-                tokens_bought=float(actual_dca_tokens),
-                dca_max=dca_max_limit, source="bot",
-                drop_pct=float(settings.drop_pct),
-                step_multiplier=float(settings.step_multiplier),
-            )
-            new_dca_buys = _dca_state.dca_buys
+            try:
+                from core.trade_investment import add_dca as _ti_add_dca
+                _ti_add_dca(trade, float(actual_dca_eur), source="dca_market_buy")
+                # FIX #007: Use dca_state.record_dca() as SINGLE source of truth
+                # for dca_buys, dca_events, last_dca_price, and dca_next_price.
+                from core.dca_state import record_dca as _ds_record
+                dca_max_limit = int(settings.max_buys or 3)
+                _dca_state = _ds_record(
+                    trade, price=float(current_price),
+                    amount_eur=float(actual_dca_eur),
+                    tokens_bought=float(actual_dca_tokens),
+                    dca_max=dca_max_limit, source="bot",
+                    drop_pct=float(settings.drop_pct),
+                    step_multiplier=float(settings.step_multiplier),
+                )
+                new_dca_buys = _dca_state.dca_buys
+            except Exception as _dca_err:
+                # Rollback trade to pre-mutation snapshot
+                for _k, _v in _snap.items():
+                    trade[_k] = _v
+                self._log(f"DCA state mutation failed for {market}, rolled back: {_dca_err}", level='error')
+                break
             log(
                 f"DCA buy {trade['dca_buys']} voor {market} op {current_price:.6f} (EUR {eur_amount:.2f})"
             )
@@ -746,6 +766,14 @@ class DCAManager:
 
             prev_amount = float(trade.get("amount", 0.0))
             new_amount = prev_amount + float(actual_dca_tokens)
+            # Snapshot before mutation for rollback on failure
+            _snap = {
+                'invested_eur': float(trade.get('invested_eur', 0) or 0),
+                'dca_buys': int(trade.get('dca_buys', 0)),
+                'dca_events': list(trade.get('dca_events', [])),
+                'buy_price': float(trade.get('buy_price', 0) or 0),
+                'amount': prev_amount,
+            }
             if new_amount > 0:
                 prev_buy = float(trade.get("buy_price", current_price))
                 trade["buy_price"] = (
@@ -753,21 +781,28 @@ class DCAManager:
                 ) / new_amount
             trade["amount"] = new_amount
             # Use TradeInvestment module for all invested_eur mutations
-            from core.trade_investment import add_dca as _ti_add_dca
-            _ti_add_dca(trade, float(actual_dca_eur), source="dca_dynamic_buy")
-            # FIX #007: Use dca_state.record_dca() as SINGLE source of truth
-            # for dca_buys, dca_events, last_dca_price, and dca_next_price.
-            from core.dca_state import record_dca as _ds_record
-            dca_max_limit = int(settings.max_buys or 3)
-            _dca_state = _ds_record(
-                trade, price=float(current_price),
-                amount_eur=float(actual_dca_eur),
-                tokens_bought=float(actual_dca_tokens),
-                dca_max=dca_max_limit, source="bot",
-                drop_pct=float(dca_drop_pct),
-                step_multiplier=float(settings.step_multiplier),
-            )
-            new_dca_buys = _dca_state.dca_buys
+            try:
+                from core.trade_investment import add_dca as _ti_add_dca
+                _ti_add_dca(trade, float(actual_dca_eur), source="dca_dynamic_buy")
+                # FIX #007: Use dca_state.record_dca() as SINGLE source of truth
+                # for dca_buys, dca_events, last_dca_price, and dca_next_price.
+                from core.dca_state import record_dca as _ds_record
+                dca_max_limit = int(settings.max_buys or 3)
+                _dca_state = _ds_record(
+                    trade, price=float(current_price),
+                    amount_eur=float(actual_dca_eur),
+                    tokens_bought=float(actual_dca_tokens),
+                    dca_max=dca_max_limit, source="bot",
+                    drop_pct=float(dca_drop_pct),
+                    step_multiplier=float(settings.step_multiplier),
+                )
+                new_dca_buys = _dca_state.dca_buys
+            except Exception as _dca_err:
+                # Rollback trade to pre-mutation snapshot
+                for _k, _v in _snap.items():
+                    trade[_k] = _v
+                self._log(f"DCA (dynamic) state mutation failed for {market}, rolled back: {_dca_err}", level='error')
+                break
             log(
                 f"DCA (dynamic) buy {trade['dca_buys']} voor {market} op {current_price:.6f} (EUR {eur_amount:.2f})"
             )

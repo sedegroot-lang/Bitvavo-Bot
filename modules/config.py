@@ -29,6 +29,10 @@ RUNTIME_STATE_KEYS = frozenset({
     '_REGIME_ADJ',
     '_REGIME_RESULT',
     '_cb_trades_since_reset',
+    'SYNC_ENABLED',
+    'SYNC_INTERVAL_SECONDS',
+    'MIN_SCORE_TO_BUY',
+    'OPERATOR_ID',
 })
 
 def _default_config() -> dict:

@@ -203,6 +203,10 @@ def _validate_and_fix_trade_data(data: Dict[str, Any]) -> Dict[str, Any]:
             elif dca_buys < actual_dca_count:
                 trade['dca_buys'] = actual_dca_count
                 needs_fix = True
+            # Cap dca_buys to dca_max to prevent over-DCA
+            if int(trade.get('dca_buys', 0)) > dca_max:
+                trade['dca_buys'] = dca_max
+                needs_fix = True
         
         if needs_fix:
             fixed_count += 1

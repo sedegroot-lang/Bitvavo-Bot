@@ -498,9 +498,12 @@ def place_sell(market, amount_base, *, skip_dust: bool = False):
             resp = _place_sell_order(chunk)
             orders.append(resp)
             try:
-                filled = float(resp.get('filledAmount', chunk)) if isinstance(resp, dict) else chunk
+                if isinstance(resp, dict) and not resp.get('error') and not resp.get('errorCode'):
+                    filled = float(resp.get('filledAmount', 0) or 0)
+                else:
+                    filled = 0.0  # API failure or error → nothing confirmed filled
             except Exception:
-                filled = chunk
+                filled = 0.0
             remaining = max(0.0, remaining - filled)
             if remaining <= chunk * 0.05:
                 break

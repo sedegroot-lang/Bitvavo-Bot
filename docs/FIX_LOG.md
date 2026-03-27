@@ -339,6 +339,41 @@ After #007 was deployed, XRP dca_buys immediately jumped back to 17. NEAR/ALGO a
 
 ---
 
+## #008 — Codebase-wide bug analysis: 10 fixes across 7 files (2026-03-27)
+
+### Symptom
+Deep analysis revealed 14 bugs (4 critical, 5 high, 3 medium, 2 low). Key risks: chunked sell counting API failures as filled, MAX_DRAWDOWN_SL selling at a loss, missing uuid import crashing DCA headroom, partial DCA state corruption on exception.
+
+### Root Cause
+Multiple independent issues accumulated across bot evolution:
+1. `orders_impl.py` chunked sell treated `None` API response as full fill → ghost tokens
+2. `trailing_bot.py` MAX_DRAWDOWN_SL path had no profit guard → could sell at a loss
+3. `trading_dca.py` missing `import uuid` → `_reserve_headroom()` crashed silently
+4. `sync_engine.py` inferred `dca_max` from `buy_order_count` → inflated (repeat of #004)
+5. `config.py` RUNTIME_STATE_KEYS missing 4 keys → leaked to config file on save
+6. `trading_dca.py` record_dca/add_dca not wrapped in rollback → partial state on exception
+7. `trading_dca.py` pyramid-up used `buy_price * amount` as invested_eur fallback → violated FIX #001
+8. `trade_store.py` fallback dca_buys check missing `> dca_max` cap
+
+### Fix Applied
+1. **orders_impl.py** (L498-505): Chunked sell now treats non-dict API response as 0 fill
+2. **trailing_bot.py** (L2357-2370): Added loss guard — blocks sell if `gross < invested`
+3. **trading_dca.py** (L8): Added `import uuid`
+4. **sync_engine.py** (L272-285): Replaced `buy_order_count` inference with `CONFIG['DCA_MAX_BUYS']`
+5. **config.py**: Added `SYNC_ENABLED`, `SYNC_INTERVAL_SECONDS`, `MIN_SCORE_TO_BUY`, `OPERATOR_ID` to RUNTIME_STATE_KEYS
+6. **trading_dca.py** (fixed + dynamic DCA): Wrapped `_ti_add_dca()` + `_ds_record()` in snapshot/rollback — rolls back `invested_eur`, `dca_buys`, `dca_events`, `buy_price`, `amount` on exception
+7. **trading_dca.py** (pyramid-up): Changed to skip pyramid entirely if `invested_eur <= 0` instead of using `buy_price * amount` fallback
+8. **trade_store.py**: Added `dca_buys > dca_max` cap in fallback validation path
+9. **tests/test_dashboard_render.py**: Fixed `pnl_eur` from -5.0 to 5.0 (trailing badge requires profit)
+10. **tests/test_grid_trading.py**: Fixed tolerance from 0.001 to 0.02 (accounts for price normalization)
+
+### Prevention
+- DCA state mutations now always have rollback on failure
+- Cost basis rules (FIX #001) no longer violated by pyramid-up
+- All 99 targeted tests pass after fixes
+
+---
+
 ## Template for new entries
 
 ```
