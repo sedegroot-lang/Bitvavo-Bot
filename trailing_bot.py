@@ -883,21 +883,33 @@ def validate_and_repair_trades():
                 repairs_made += 1
 
             # GUARD 5: dca_buys ↔ dca_events consistency
-            # FIX #004: dca_buys must match dca_events length. If dca_events is
-            # empty, dca_buys MUST be 0 — the bot has not executed any DCAs.
-            # Cap at global dca_max (not the trade's potentially inflated value).
+            # FIX #006: dca_buys consistency with dca_events.
+            # - If dca_events is EMPTY and dca_buys > 0: synced position with
+            #   no bot-tracked DCAs → reset to 0.
+            # - If dca_events has entries but fewer than dca_buys: events were
+            #   lost during sync/restart → keep dca_buys (prevent duplicate DCA).
+            # - If dca_buys < dca_events: increase to match.
             dca_events = trade.get('dca_events', []) or []
             actual_event_count = len(dca_events)
             dca_buys_now = int(trade.get('dca_buys', 0) or 0)
-            correct_buys = min(actual_event_count, dca_max_global)
-            if dca_buys_now != correct_buys:
+            if actual_event_count == 0 and dca_buys_now > 0:
+                # No events tracked at all → synced position, reset to 0
                 log(
-                    f"⚠️ REPAIR [{market}]: dca_buys={dca_buys_now}, "
-                    f"events={actual_event_count}, max={dca_max_global} "
-                    f"→ setting dca_buys={correct_buys}",
+                    f"⚠️ REPAIR [{market}]: dca_buys={dca_buys_now} but "
+                    f"dca_events is empty → setting dca_buys=0",
                     level='warning',
                 )
-                trade['dca_buys'] = correct_buys
+                trade['dca_buys'] = 0
+                repairs_made += 1
+            elif dca_buys_now < actual_event_count:
+                # More events than dca_buys → increase to match
+                capped = min(actual_event_count, dca_max_global)
+                log(
+                    f"⚠️ REPAIR [{market}]: dca_buys={dca_buys_now} < "
+                    f"events={actual_event_count} → setting dca_buys={capped}",
+                    level='warning',
+                )
+                trade['dca_buys'] = capped
                 repairs_made += 1
 
             # GUARD 6: invested_eur ↔ initial + sum(dca_events) consistency

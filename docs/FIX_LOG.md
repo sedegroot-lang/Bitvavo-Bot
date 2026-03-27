@@ -247,20 +247,21 @@ XRP also showed `invested_eur=€41.86` while `buy_price*amount=€66.95` (37% t
 |------|--------|
 | `trailing_bot.py` GUARD 5 | Fixed `dca_max_now` → `dca_max_global` (NameError that silently crashed the guard) |
 | `bot/sync_engine.py` | Removed dca_buys inflation from `buy_order_count`. Comment explains: dca_buys must ONLY change when bot executes a DCA buy |
-| `modules/trade_store.py` | Validation now ALWAYS sets `dca_buys = len(dca_events)`, both up and down. Reducing is safe because DCA targets use `last_dca_price`, not dca_buys count |
+| `modules/trade_store.py` | Validation: reduce dca_buys to 0 only when `dca_events` is empty. When events exist but fewer than dca_buys (events lost during sync/restart), keep dca_buys to prevent duplicate DCAs |
 | `modules/cost_basis.py` | FIFO dust threshold: `pos_amount <= 1e-8` → `pos_amount < 1e-6 or pos_cost < €1.00`. Catches crypto dust without affecting legitimate partial sells |
-| `data/trade_log.json` | Fixed all trades: XRP dca_buys 17→0, NEAR 17→3, ALGO 17→2. XRP invested_eur €41.86→€66.95. Cleared XRP _last_derive_ts to force fresh re-derive |
+| `data/trade_log.json` | XRP: dca_buys 17→0, invested_eur €41.86→€66.95. NEAR/ALGO: dca_buys kept at 17 (legitimate, events partially lost) |
 
 ### Key Rules
-- `dca_buys` must ALWAYS equal `len(dca_events)`. NEVER derive from `buy_order_count`.
-- `invested_eur` must be consistent with `buy_price * amount` (within fee margin).
-- FIFO position reset must catch crypto dust (value < €1), not just amount < 1e-8.
-- After selling, if remaining position value < €1, it's dust from an old position.
+- `dca_buys=0` when `dca_events` is empty (synced position, no bot-tracked DCAs)
+- `dca_buys >= len(dca_events)` when events exist (events can be lost during sync/restart, keep dca_buys to prevent duplicate DCA)
+- NEVER derive `dca_buys` from `buy_order_count` (includes old closed positions)
+- `invested_eur` must be consistent with `buy_price * amount` (within fee margin)
+- FIFO position reset must catch crypto dust (value < €1), not just amount < 1e-8
 
 ### Prevention
-- GUARD 5 now works (NameError fixed) and enforces `dca_buys == len(dca_events)` every cycle
+- GUARD 5 now works (NameError fixed) — resets dca_buys to 0 only when dca_events is empty
+- When dca_events exist but fewer than dca_buys (events lost), dca_buys is preserved
 - sync_engine no longer touches dca_buys during re-derives
-- trade_store validation reduces dca_buys downward (not just upward)
 - FIFO uses value-based dust detection (€1 threshold) to prevent old history contamination
 
 ---
