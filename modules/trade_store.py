@@ -185,19 +185,24 @@ def _validate_and_fix_trade_data(data: Dict[str, Any]) -> Dict[str, Any]:
             expected_total = initial + dca_sum
             if dca_sum > 0 and abs(total - expected_total) > 0.50:
                 log(f"VALIDATION WARN [{market}]: total_invested_eur={total:.2f} != initial({initial:.2f}) + DCA({dca_sum:.2f}) = {expected_total:.2f} — NOT auto-correcting (initial may include synced DCA costs)", level='warning')
-        if actual_dca_count == 0 and dca_buys > 0:
-            # FIX #006: No events tracked → synced position, no bot DCAs.
-            # Reset dca_buys to 0.
-            log(f"VALIDATION FIX [{market}]: dca_buys={dca_buys} -> 0 (no dca_events, synced position)", level='warning')
-            trade['dca_buys'] = 0
-            needs_fix = True
-        elif dca_buys < actual_dca_count:
-            # More events than dca_buys → increase to match
-            log(f"VALIDATION FIX [{market}]: dca_buys={dca_buys} -> {actual_dca_count} (matched to dca_events)", level='warning')
-            trade['dca_buys'] = actual_dca_count
-            needs_fix = True
-        # If dca_buys > actual_dca_count > 0: events were lost during
-        # sync/restart. Keep dca_buys to prevent duplicate DCA at same level.
+        # FIX #007: Use dca_state.sync_derived_fields() as SINGLE source of truth
+        # for dca_buys ↔ dca_events consistency. Replaces manual Rule 4 logic.
+        try:
+            from core.dca_state import sync_derived_fields as _ds_sync
+            _ds_state, _ds_repairs = _ds_sync(trade, dca_max)
+            if _ds_repairs:
+                for _r in _ds_repairs:
+                    log(f"VALIDATION FIX [{market}]: (dca_state) {_r}", level='warning')
+                needs_fix = True
+        except Exception as _ds_err:
+            log(f"VALIDATION WARN [{market}]: dca_state sync failed: {_ds_err}", level='warning')
+            # Fallback: basic consistency check
+            if actual_dca_count == 0 and dca_buys > 0:
+                trade['dca_buys'] = 0
+                needs_fix = True
+            elif dca_buys < actual_dca_count:
+                trade['dca_buys'] = actual_dca_count
+                needs_fix = True
         
         if needs_fix:
             fixed_count += 1

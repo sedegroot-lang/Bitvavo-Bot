@@ -11,7 +11,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 from modules.logging_utils import file_lock, locked_write_json
-import uuid
 
 
 @dataclass
@@ -417,19 +416,24 @@ class DCAManager:
 
         # Update trade state
         old_amount = float(trade.get("amount", 0) or 0)
+        new_amount = old_amount + base_amount
         old_invested = float(trade.get("invested_eur", 0) or 0) or (buy_price * old_amount)
         new_invested = old_invested + eur_amount
-        new_amount = old_amount + base_amount
         new_avg_price = new_invested / new_amount if new_amount > 0 else buy_price
 
         trade["buy_price"] = round(new_avg_price, 8)
         trade["amount"] = round(new_amount, 8)
-        trade["invested_eur"] = round(new_invested, 4)
-        trade["total_invested_eur"] = round(
-            float(trade.get("total_invested_eur", 0) or 0) + eur_amount, 4
+        # Use TradeInvestment module for invested_eur consistency
+        from core.trade_investment import add_dca as _ti_add_dca
+        _ti_add_dca(trade, float(eur_amount), source="pyramid_up")
+        # FIX #007: Use dca_state.record_dca() as SINGLE source of truth
+        from core.dca_state import record_dca as _ds_record
+        _ds_record(
+            trade, price=float(current_price),
+            amount_eur=float(eur_amount),
+            tokens_bought=float(base_amount),
+            dca_max=max_adds, source="pyramid",
         )
-        trade["dca_buys"] = pyramid_buys + 1
-        trade["last_dca_price"] = current_price
 
         log(
             f"✅ Pyramid DCA #{pyramid_buys + 1} for {market}: "
@@ -555,11 +559,6 @@ class DCAManager:
             except Exception as e:
                 self._log(f"actual_dca_eur failed: {e}", level='error')
 
-            import uuid
-            import time as time_module
-            event_id = str(uuid.uuid4())
-            event_timestamp = time_module.time()
-            
             prev_amount = float(trade.get("amount", 0.0))
             new_amount = prev_amount + float(actual_dca_tokens)
             if new_amount > 0:
@@ -571,32 +570,19 @@ class DCAManager:
             # Use TradeInvestment module for all invested_eur mutations
             from core.trade_investment import add_dca as _ti_add_dca
             _ti_add_dca(trade, float(actual_dca_eur), source="dca_market_buy")
-            new_dca_buys = int(trade.get("dca_buys", 0)) + 1
-            # GUARD: Never exceed global max_buys — use settings.max_buys (from global
-            # config) as authoritative limit; per-trade dca_max can be corrupted.
+            # FIX #007: Use dca_state.record_dca() as SINGLE source of truth
+            # for dca_buys, dca_events, last_dca_price, and dca_next_price.
+            from core.dca_state import record_dca as _ds_record
             dca_max_limit = int(settings.max_buys or 3)
-            if new_dca_buys > dca_max_limit:
-                log(f"⚠️ GUARD: dca_buys {new_dca_buys} would exceed dca_max {dca_max_limit} for {market}, capping")
-                new_dca_buys = dca_max_limit
-            trade["dca_buys"] = new_dca_buys
-            trade["dca_max"] = dca_max_limit  # Keep per-trade max in sync
-            trade["last_dca_price"] = float(current_price)
-            # Add DCA event with unique ID and ACTUAL amounts
-            trade.setdefault("dca_events", []).append({
-                "event_id": event_id,
-                "timestamp": event_timestamp,
-                "price": float(current_price),
-                "amount_eur": float(actual_dca_eur),
-                "tokens_bought": float(actual_dca_tokens),
-                "dca_level": new_dca_buys
-            })
-            # update next expected DCA price based on last_dca_price (not buy_price)
-            # FIX #003: prevents cascading — next DCA needs genuine further drop
-            try:
-                next_step = float(settings.drop_pct) * (float(settings.step_multiplier) ** new_dca_buys)
-                trade["dca_next_price"] = float(trade.get("last_dca_price", current_price)) * (1 - next_step)
-            except Exception as e:
-                self.ctx.log(f"[ERROR] DCA next_price update failed for {market}: {e}")
+            _dca_state = _ds_record(
+                trade, price=float(current_price),
+                amount_eur=float(actual_dca_eur),
+                tokens_bought=float(actual_dca_tokens),
+                dca_max=dca_max_limit, source="bot",
+                drop_pct=float(settings.drop_pct),
+                step_multiplier=float(settings.step_multiplier),
+            )
+            new_dca_buys = _dca_state.dca_buys
             log(
                 f"DCA buy {trade['dca_buys']} voor {market} op {current_price:.6f} (EUR {eur_amount:.2f})"
             )
@@ -758,11 +744,6 @@ class DCAManager:
             except Exception as e:
                 self._log(f"actual_dca_eur failed: {e}", level='error')
 
-            import uuid
-            import time as time_module
-            event_id = str(uuid.uuid4())
-            event_timestamp = time_module.time()
-            
             prev_amount = float(trade.get("amount", 0.0))
             new_amount = prev_amount + float(actual_dca_tokens)
             if new_amount > 0:
@@ -774,32 +755,19 @@ class DCAManager:
             # Use TradeInvestment module for all invested_eur mutations
             from core.trade_investment import add_dca as _ti_add_dca
             _ti_add_dca(trade, float(actual_dca_eur), source="dca_dynamic_buy")
-            new_dca_buys = int(trade.get("dca_buys", 0)) + 1
-            # GUARD: Never exceed global max_buys — use settings.max_buys (from global
-            # config) as authoritative limit; per-trade dca_max can be corrupted.
+            # FIX #007: Use dca_state.record_dca() as SINGLE source of truth
+            # for dca_buys, dca_events, last_dca_price, and dca_next_price.
+            from core.dca_state import record_dca as _ds_record
             dca_max_limit = int(settings.max_buys or 3)
-            if new_dca_buys > dca_max_limit:
-                log(f"⚠️ GUARD: dca_buys {new_dca_buys} would exceed dca_max {dca_max_limit} for {market}, capping")
-                new_dca_buys = dca_max_limit
-            trade["dca_buys"] = new_dca_buys
-            trade["dca_max"] = dca_max_limit  # Keep per-trade max in sync
-            trade["last_dca_price"] = float(current_price)
-            # Add DCA event with unique ID and ACTUAL amounts
-            trade.setdefault("dca_events", []).append({
-                "event_id": event_id,
-                "timestamp": event_timestamp,
-                "price": float(current_price),
-                "amount_eur": float(actual_dca_eur),
-                "tokens_bought": float(actual_dca_tokens),
-                "dca_level": new_dca_buys
-            })
-            # update next expected DCA price based on last_dca_price (not buy_price)
-            # FIX #003: prevents cascading — next DCA needs genuine further drop
-            try:
-                next_step = float(dca_drop_pct) * (float(settings.step_multiplier) ** new_dca_buys)
-                trade["dca_next_price"] = float(trade.get("last_dca_price", current_price)) * (1 - next_step)
-            except Exception as e:
-                self.ctx.log(f"[ERROR] DCA (dynamic) next_price update failed for {market}: {e}")
+            _dca_state = _ds_record(
+                trade, price=float(current_price),
+                amount_eur=float(actual_dca_eur),
+                tokens_bought=float(actual_dca_tokens),
+                dca_max=dca_max_limit, source="bot",
+                drop_pct=float(dca_drop_pct),
+                step_multiplier=float(settings.step_multiplier),
+            )
+            new_dca_buys = _dca_state.dca_buys
             log(
                 f"DCA (dynamic) buy {trade['dca_buys']} voor {market} op {current_price:.6f} (EUR {eur_amount:.2f})"
             )

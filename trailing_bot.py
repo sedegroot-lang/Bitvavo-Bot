@@ -841,19 +841,21 @@ def validate_and_repair_trades():
             invested = float(trade.get('invested_eur', 0) or 0)
             total_invested = float(trade.get('total_invested_eur', invested) or invested)
 
-            # GUARD 0: per-trade dca_max must always equal global DCA_MAX_BUYS —
-            # prevents stale values when config changes and corrupted legacy trades.
-            if dca_max_local != dca_max_global:
-                log(f"⚠️ REPAIR [{market}]: dca_max {dca_max_local} != global {dca_max_global}, syncing", level='warning')
-                trade['dca_max'] = dca_max_global
+            # GUARD 0+1+4+5 UNIFIED: Use dca_state.sync_derived_fields() as
+            # SINGLE source of truth for dca_buys, dca_max, last_dca_price.
+            # FIX #007: Replaces 4 separate guards that had overlapping/conflicting logic.
+            # dca_buys is NOW always len(dca_events). Desync is structurally impossible.
+            try:
+                from core.dca_state import sync_derived_fields as _ds_sync
+                _dca_state, _dca_repairs = _ds_sync(trade, dca_max_global)
+                for _r in _dca_repairs:
+                    log(f"⚠️ DCA-REPAIR [{market}]: {_r}", level='warning')
+                    repairs_made += 1
+                # Re-read dca_buys after sync (may have changed)
+                dca_buys = trade.get('dca_buys', 0)
                 dca_max_local = dca_max_global
-                repairs_made += 1
-
-            # GUARD 1: dca_buys > dca_max
-            if dca_buys > dca_max_local:
-                log(f"⚠️ REPAIR [{market}]: dca_buys {dca_buys} > dca_max {dca_max_local}, resetting to {dca_max_local}", level='warning')
-                trade['dca_buys'] = dca_max_local
-                repairs_made += 1
+            except Exception as _ds_err:
+                log(f"⚠️ dca_state.sync_derived_fields failed for {market}: {_ds_err}", level='error')
             
             # GUARD 2: Negative invested_eur — delegate to TradeInvestment module
             if invested < 0:
@@ -865,51 +867,9 @@ def validate_and_repair_trades():
             if total_invested > max_reasonable_invested:
                 reasonable_value = base_amount * (1 + min(dca_buys, dca_max_local))
                 log(f"⚠️ REPAIR [{market}]: total_invested_eur {total_invested:.2f} unreasonably high (max {max_reasonable_invested:.2f}), resetting invested_eur to {reasonable_value:.2f}", level='warning')
-                # Only reset invested_eur (current exposure), keep total_invested_eur
-                # as-is if it reflects cumulative DCAs. Only reset total if it's also
-                # clearly wrong relative to initial_invested + dca amounts.
                 trade['invested_eur'] = reasonable_value
-                # Only reset total if absurdly higher than reasonable (>5x)
                 if total_invested > reasonable_value * 5:
                     trade['total_invested_eur'] = reasonable_value
-                repairs_made += 1
-            
-            # GUARD 4: Missing required fields
-            if 'dca_buys' not in trade:
-                trade['dca_buys'] = 0
-                repairs_made += 1
-            if 'dca_max' not in trade:
-                trade['dca_max'] = dca_max_global
-                repairs_made += 1
-
-            # GUARD 5: dca_buys ↔ dca_events consistency
-            # FIX #006: dca_buys consistency with dca_events.
-            # - If dca_events is EMPTY and dca_buys > 0: synced position with
-            #   no bot-tracked DCAs → reset to 0.
-            # - If dca_events has entries but fewer than dca_buys: events were
-            #   lost during sync/restart → keep dca_buys (prevent duplicate DCA).
-            # - If dca_buys < dca_events: increase to match.
-            dca_events = trade.get('dca_events', []) or []
-            actual_event_count = len(dca_events)
-            dca_buys_now = int(trade.get('dca_buys', 0) or 0)
-            if actual_event_count == 0 and dca_buys_now > 0:
-                # No events tracked at all → synced position, reset to 0
-                log(
-                    f"⚠️ REPAIR [{market}]: dca_buys={dca_buys_now} but "
-                    f"dca_events is empty → setting dca_buys=0",
-                    level='warning',
-                )
-                trade['dca_buys'] = 0
-                repairs_made += 1
-            elif dca_buys_now < actual_event_count:
-                # More events than dca_buys → increase to match
-                capped = min(actual_event_count, dca_max_global)
-                log(
-                    f"⚠️ REPAIR [{market}]: dca_buys={dca_buys_now} < "
-                    f"events={actual_event_count} → setting dca_buys={capped}",
-                    level='warning',
-                )
-                trade['dca_buys'] = capped
                 repairs_made += 1
 
             # GUARD 6: invested_eur ↔ initial + sum(dca_events) consistency

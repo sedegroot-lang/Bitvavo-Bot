@@ -266,6 +266,46 @@ XRP also showed `invested_eur=€41.86` while `buy_price*amount=€66.95` (37% t
 
 ---
 
+## #007 — Event-sourced DCA state: dca_buys desync structurally impossible (2026-03-27)
+
+### Symptom
+dca_buys kept desyncing from actual DCA events due to 6+ different code paths
+independently mutating the counter: `_execute_fixed_dca`, `_execute_dynamic_dca`,
+`_execute_pyramid_up`, `sync_engine`, `trade_store` validation, and `trailing_bot`
+GUARD 5. Each had slightly different logic, and bugs in one weren't caught by others.
+
+### Root Cause
+`dca_buys` was a standalone mutable counter updated independently in 6+ places.
+`dca_events` was a separate list that should have been the source of truth but wasn't
+— many code paths updated `dca_buys` without touching `dca_events` (e.g., pyramid_up),
+or used `dca_buys` as the authoritative value when events were the ground truth.
+
+### Fix Applied — Event-sourced architecture (`core/dca_state.py`)
+
+| File | Change |
+|------|--------|
+| `core/dca_state.py` | **NEW MODULE**: Event-sourced DCA state. `dca_events` is the SINGLE source of truth. `dca_buys = len(dca_events)` ALWAYS. Provides `record_dca()` (only way to add DCA), `sync_derived_fields()` (recompute from events), `validate_events()`, `detect_untracked_buys()`. |
+| `modules/trading_dca.py` `_execute_fixed_dca` | Replaced 20 lines of inline state mutations with `dca_state.record_dca()` call |
+| `modules/trading_dca.py` `_execute_dynamic_dca` | Same: replaced inline mutations with `record_dca()` |
+| `modules/trading_dca.py` `_execute_pyramid_up` | Now uses `add_dca()` + `record_dca()` (was directly assigning invested_eur and NOT creating events) |
+| `trailing_bot.py` GUARD 0+1+4+5 | Replaced 4 separate DCA guards with single `sync_derived_fields()` call |
+| `bot/sync_engine.py` | Added `sync_derived_fields()` call after every cost basis re-derive |
+| `modules/trade_store.py` | Replaced manual Rule 4 (dca_buys consistency) with `sync_derived_fields()` call + fallback |
+| `tests/test_dca_state.py` | **35 tests** covering: bot DCA, manual detection, restart recovery, cascading prevention, inflated dca_buys |
+
+### Key Design Rules
+- `record_dca()` is the **ONLY** way to add a DCA — it atomically: creates event, appends to events list, recomputes dca_buys, updates last_dca_price, calculates dca_next_price
+- `sync_derived_fields()` is the **ONLY** validation — recomputes all derived DCA fields from events
+- `dca_buys` stored in trade dict for backward compat, but always recomputed from events
+- `_execute_pyramid_up` now records events (was silently skipping event creation)
+
+### Prevention
+- dca_buys desync is **structurally impossible**: only `record_dca()` can increment it, and it always equals `len(dca_events)`
+- All 4 integration points (trading_dca, trailing_bot, sync_engine, trade_store) use the same module
+- 35 unit tests cover all 5 scenarios from the user's DCA redesign specification
+
+---
+
 ## Template for new entries
 
 ```

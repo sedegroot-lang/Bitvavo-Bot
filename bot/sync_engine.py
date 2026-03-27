@@ -224,6 +224,15 @@ def sync_with_bitvavo():
                                 # buy_order_count includes ALL historical orders (old closed
                                 # positions too), so it inflates dca_buys massively.
                                 # dca_buys must ONLY change when the bot executes a DCA buy.
+                                # FIX #007: Re-sync DCA derived fields from events after derive
+                                try:
+                                    from core.dca_state import sync_derived_fields as _ds_sync
+                                    _dca_max_cfg = int(CONFIG.get('DCA_MAX_BUYS', 5) or 5)
+                                    _ds_state, _ds_repairs = _ds_sync(local, _dca_max_cfg)
+                                    for _ds_r in _ds_repairs:
+                                        log(f"⚠️ DCA-SYNC [{m}]: {_ds_r}", level='warning')
+                                except Exception as _ds_err:
+                                    log(f"⚠️ DCA sync_derived_fields failed [{m}]: {_ds_err}", level='warning')
                             else:
                                 log(f"⚠️ DERIVE [{m}] failed ({_derive_reason}): no result from order history", level='warning')
                                 # Fallback: ensure invested_eur is at least buy_price*amount

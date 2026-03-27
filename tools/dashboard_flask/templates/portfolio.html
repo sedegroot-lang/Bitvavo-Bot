@@ -265,7 +265,7 @@
             <div class="card-value-item">
                 <span class="value-icon">💰</span>
                 <span class="value-label">INVEST</span>
-                <span class="value-amount">€{{ "%.2f"|format(card.invested) }}</span>
+                <span class="value-amount" data-invested="{{ card.market }}">€{{ "%.2f"|format(card.invested) }}</span>
             </div>
             <div class="card-value-item">
                 <span class="value-icon">📊</span>
@@ -1100,7 +1100,7 @@ function buildTradeCardElement(card) {
             <div class="card-value-item">
                 <span class="value-icon">💰</span>
                 <span class="value-label">INVEST</span>
-                <span class="value-amount">${formatEuro(card.invested || 0)}</span>
+                <span class="value-amount" data-invested="${card.market}">${formatEuro(card.invested || 0)}</span>
             </div>
             <div class="card-value-item">
                 <span class="value-icon">📊</span>
@@ -1192,6 +1192,10 @@ function updateCardFromData(cardEl, cardData) {
 
     const currentEl = cardEl.querySelector(`[data-current="${cardData.market}"]`);
     if (currentEl) currentEl.textContent = formatEuro(cardData.current_value || 0);
+
+    // FIX #007: Update INVEST display when invested_eur changes (e.g. after DCA)
+    const investedEl = cardEl.querySelector(`[data-invested="${cardData.market}"]`);
+    if (investedEl) investedEl.textContent = formatEuro(cardData.invested || 0);
 
     const liveEl = cardEl.querySelector(`[data-live-price="${cardData.market}"]`);
     if (liveEl && cardData.live_price !== undefined) liveEl.textContent = formatPriceCompact(cardData.live_price);
