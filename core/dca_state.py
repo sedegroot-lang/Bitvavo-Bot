@@ -199,13 +199,15 @@ def sync_derived_fields(trade: Trade, dca_max: int) -> Tuple[DCAState, List[str]
     state = compute_state(trade, dca_max)
     repairs: List[str] = []
 
-    # Sync dca_buys from events (THE source of truth)
+    # Sync dca_buys from events, but never LOWER below stored value.
+    # Stored dca_buys may include historical/synced buys with no events (FIX #008).
     stored_buys = int(trade.get("dca_buys", 0) or 0)
-    if stored_buys != state.dca_buys:
+    effective_buys = max(state.dca_buys, stored_buys)
+    if stored_buys != effective_buys:
         repairs.append(
-            f"dca_buys {stored_buys} → {state.dca_buys} (from {len(state.events)} events)"
+            f"dca_buys {stored_buys} → {effective_buys} (from {len(state.events)} events)"
         )
-        trade["dca_buys"] = state.dca_buys
+        trade["dca_buys"] = effective_buys
 
     # Sync last_dca_price
     if state.has_events:
@@ -216,19 +218,13 @@ def sync_derived_fields(trade: Trade, dca_max: int) -> Tuple[DCAState, List[str]
             )
             trade["last_dca_price"] = state.last_dca_price
 
-    # Sync dca_max to global config value
+    # Sync dca_max: only SET if trade has no dca_max yet (new trade).
+    # Per-trade dca_max is preserved once set — global config is the default,
+    # not a forced override. (FIX #008: prevents resetting user overrides)
     stored_max = int(trade.get("dca_max", 0) or 0)
-    if stored_max != dca_max:
-        repairs.append(f"dca_max {stored_max} → {dca_max}")
+    if stored_max <= 0:
+        repairs.append(f"dca_max {stored_max} → {dca_max} (initialized from config)")
         trade["dca_max"] = dca_max
-
-    # Cap dca_buys to dca_max (should never happen with event-sourced, but safety)
-    if state.dca_buys > dca_max:
-        repairs.append(
-            f"dca_buys {state.dca_buys} exceeds dca_max {dca_max} — events may include manual buys"
-        )
-        # Don't truncate events, but cap the stored counter for guard compatibility
-        trade["dca_buys"] = min(state.dca_buys, dca_max)
 
     return state, repairs
 
