@@ -278,9 +278,9 @@ def sync_with_bitvavo():
                             inferred_max = None
                         try:
                             if inferred_max and inferred_max > 0:
-                                local['dca_max'] = max(inferred_max, int(local.get('dca_buys', 0) or 0))
+                                local['dca_max'] = inferred_max
                             else:
-                                local['dca_max'] = max(int(DCA_MAX_BUYS), int(local.get('dca_buys', 0) or 0))
+                                local['dca_max'] = int(DCA_MAX_BUYS)
                         except Exception:
                             local['dca_max'] = int(DCA_MAX_BUYS)
 

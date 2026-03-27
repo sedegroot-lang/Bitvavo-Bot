@@ -306,6 +306,39 @@ or used `dca_buys` as the authoritative value when events were the ground truth.
 
 ---
 
+## #007b — dca_buys re-inflation via trading_sync.py cache + sync_engine dca_max (2026-06-24)
+
+### Symptom
+After #007 was deployed, XRP dca_buys immediately jumped back to 17. NEAR/ALGO also 17.
+
+### Root Cause (2 missed code paths in #007)
+
+1. **`modules/trading_sync.py` L609**: When a trade disappears and reappears (common during sync),
+   `removed_cache` stores the old dca_buys. On restore, `max(current, cached)` was used — this
+   only increases, so the inflated value 17 was restored from cache every time.
+
+2. **`bot/sync_engine.py` L281**: `dca_max = max(inferred_max, dca_buys)` used dca_buys to inflate
+   dca_max. When dca_buys was already 17 (from cache), dca_max also became 17.
+
+3. **Snapshot save** in trading_sync.py saved the inflated dca_buys to cache, perpetuating the cycle.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/trading_sync.py` L609 | Replaced `max()` restore with `setdefault()` — cache value only used if no existing value |
+| `modules/trading_sync.py` post-restore | Added `sync_derived_fields()` call after cache restore — events override any cached dca_buys |
+| `modules/trading_sync.py` snapshot save | Snapshot now uses `len(dca_events)` as source of truth instead of raw `dca_buys` |
+| `bot/sync_engine.py` L281 | Removed `max(..., dca_buys)` — dca_max now comes from `inferred_max` or config `DCA_MAX_BUYS`, never inflated by dca_buys |
+| `data/trade_log.json` | Corrected: XRP dca_buys=0, NEAR=3, ALGO=2 (matching event counts) |
+
+### Prevention
+- `sync_derived_fields()` now called after EVERY trade state restoration (trading_sync cache restore)
+- Cache snapshot stores event-derived count, not raw field
+- dca_max no longer uses dca_buys as input (prevents circular inflation)
+
+---
+
 ## Template for new entries
 
 ```

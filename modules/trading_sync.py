@@ -606,10 +606,7 @@ class TradingSynchronizer:
                     ) <= ctx.sync_removed_cache_max_age:
                         cached_buys = cache_entry.get("dca_buys")
                         if isinstance(cached_buys, (int, float)):
-                            entry["dca_buys"] = max(
-                                int(entry.get("dca_buys", 0) or 0),
-                                int(cached_buys),
-                            )
+                            entry.setdefault("dca_buys", int(cached_buys))
                         for price_key in ("dca_next_price", "last_dca_price"):
                             val = cache_entry.get(price_key)
                             if isinstance(val, (int, float)) and val > 0:
@@ -622,6 +619,12 @@ class TradingSynchronizer:
                             entry["tp_last_time"] = float(tp_last_val)
                         removed_cache.pop(market, None)
                 open_trades[market] = entry
+                # --- FIX #007b: enforce event-sourced DCA state after cache restore ---
+                try:
+                    from core.dca_state import sync_derived_fields
+                    sync_derived_fields(entry)
+                except Exception:
+                    pass
                 log(
                     f"Sync: added open trade {market} (amount={entry.get('amount')},"
                     f" price={entry.get('buy_price')})",
@@ -635,7 +638,12 @@ class TradingSynchronizer:
                     continue
                 snapshot: Dict[str, Any] = {"saved_ts": time.time()}
                 try:
-                    snapshot["dca_buys"] = int(trade_entry.get("dca_buys", 0) or 0)
+                    # Use event count as source of truth for dca_buys in cache
+                    events = trade_entry.get("dca_events")
+                    if isinstance(events, list):
+                        snapshot["dca_buys"] = len(events)
+                    else:
+                        snapshot["dca_buys"] = int(trade_entry.get("dca_buys", 0) or 0)
                 except Exception:
                     snapshot["dca_buys"] = 0
                 last_dca_price = trade_entry.get("last_dca_price")
