@@ -97,7 +97,11 @@ def _compute_cost_basis_from_fills(
             avg_cost = pos_cost / pos_amount if pos_amount else 0.0
             pos_amount -= sold
             pos_cost -= avg_cost * sold
-            if pos_amount <= 1e-8:
+            # FIX #006: generous dust threshold to prevent old position
+            # costs from bleeding into current position's cost basis.
+            # Old threshold (1e-8) missed crypto dust (e.g. 0.01 XRP).
+            # Now also reset when remaining value < €1 (clearly dust).
+            if pos_amount < 1e-6 or (pos_amount > 0 and pos_cost < 1.0):
                 pos_amount = 0.0
                 pos_cost = 0.0
                 buy_order_ids.clear()

@@ -220,12 +220,10 @@ def sync_with_bitvavo():
                                 # Update opened_ts to the actual earliest buy
                                 if _basis.earliest_timestamp:
                                     local['opened_ts'] = float(_basis.earliest_timestamp)
-                                # Update DCA metadata from order count
-                                if _basis.buy_order_count and _basis.buy_order_count > 1:
-                                    _existing_dca = int(local.get('dca_buys') or 0)
-                                    _new_dca = _basis.buy_order_count - 1  # First buy is not DCA
-                                    if _new_dca > _existing_dca:
-                                        local['dca_buys'] = min(_new_dca, int(local.get('dca_max') or DCA_MAX_BUYS))
+                                # FIX #006: NEVER update dca_buys from buy_order_count.
+                                # buy_order_count includes ALL historical orders (old closed
+                                # positions too), so it inflates dca_buys massively.
+                                # dca_buys must ONLY change when the bot executes a DCA buy.
                             else:
                                 log(f"⚠️ DERIVE [{m}] failed ({_derive_reason}): no result from order history", level='warning')
                                 # Fallback: ensure invested_eur is at least buy_price*amount

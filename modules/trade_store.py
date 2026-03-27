@@ -185,14 +185,14 @@ def _validate_and_fix_trade_data(data: Dict[str, Any]) -> Dict[str, Any]:
             expected_total = initial + dca_sum
             if dca_sum > 0 and abs(total - expected_total) > 0.50:
                 log(f"VALIDATION WARN [{market}]: total_invested_eur={total:.2f} != initial({initial:.2f}) + DCA({dca_sum:.2f}) = {expected_total:.2f} — NOT auto-correcting (initial may include synced DCA costs)", level='warning')
-        if dca_buys < actual_dca_count:
+        if dca_buys != actual_dca_count:
+            # FIX #006: dca_buys must ALWAYS equal len(dca_events).
+            # If dca_buys > events, it was inflated by buy_order_count from old
+            # positions (see FIX #004/#006). Reducing is safe because DCA
+            # targets are based on last_dca_price, not dca_buys count.
             log(f"VALIDATION FIX [{market}]: dca_buys={dca_buys} -> {actual_dca_count} (matched to dca_events)", level='warning')
             trade['dca_buys'] = actual_dca_count
             needs_fix = True
-        elif dca_buys > actual_dca_count:
-            # dca_buys > events: events may have been lost after a sync/restart.
-            # Do NOT reset dca_buys downward — that would cause a duplicate DCA at the same level.
-            log(f"VALIDATION WARN [{market}]: dca_buys={dca_buys} > dca_events={actual_dca_count} — events possibly lost, keeping dca_buys to prevent duplicate DCA", level='warning')
         
         if needs_fix:
             fixed_count += 1

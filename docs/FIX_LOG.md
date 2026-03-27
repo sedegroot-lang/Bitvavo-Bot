@@ -208,6 +208,63 @@ DCA execution price. `DCA_MAX_BUYS_PER_ITERATION` should be 1 for safety.
 
 ---
 
+## #006 — dca_buys=17 re-inflation + XRP invested_eur wrong (2026-03-27)
+
+### Symptom
+XRP-EUR dashboard showed 17 DCAs (only 0 real), +56.32% profit when the trade was
+actually near breakeven or loss. All three open trades (XRP, NEAR, ALGO) had `dca_buys=17`.
+XRP also showed `invested_eur=€41.86` while `buy_price*amount=€66.95` (37% too low).
+
+### Root Cause (5 overlapping bugs)
+
+1. **GUARD 5 NameError (`dca_max_now` undefined)**: `trailing_bot.py` GUARD 5 referenced
+   `dca_max_now` which doesn't exist (should be `dca_max_global`). This crashed the guard
+   silently, so it NEVER corrected inflated `dca_buys` values.
+
+2. **sync_engine re-inflates dca_buys from buy_order_count**: `bot/sync_engine.py`'s 4-hour
+   periodic re-derive set `dca_buys = buy_order_count - 1` from ALL historical orders
+   (including old closed positions). With 17+ historical buys, this set dca_buys=16 or 17
+   every 4 hours, undoing any correction from FIX #004.
+
+3. **trade_store validation refused to reduce dca_buys**: `modules/trade_store.py`
+   `_validate_and_fix_trade_data()` only increased dca_buys upward to match dca_events.
+   When `dca_buys > dca_events`, it warned but KEPT the inflated value "to prevent
+   duplicate DCA". For synced positions with 0 real DCAs, this preserved dca_buys=17.
+
+4. **FIFO dust threshold too tight (1e-8)**: `modules/cost_basis.py` reset the position
+   only when `pos_amount <= 1e-8`. Crypto dust from old positions (e.g., 0.01 XRP worth
+   €0.01) exceeded this threshold, causing old position costs at cheap prices to bleed
+   into the current position's cost basis. This made `invested_eur` too low.
+
+5. **XRP invested_eur set from contaminated derive**: The FIFO included old cheap XRP buys
+   from previous positions. Because old position sells left dust > 1e-8, the position
+   never fully reset. New buys were averaged with old cheap costs, producing
+   `invested_eur=€41.86` instead of the correct ~€66.95.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `trailing_bot.py` GUARD 5 | Fixed `dca_max_now` → `dca_max_global` (NameError that silently crashed the guard) |
+| `bot/sync_engine.py` | Removed dca_buys inflation from `buy_order_count`. Comment explains: dca_buys must ONLY change when bot executes a DCA buy |
+| `modules/trade_store.py` | Validation now ALWAYS sets `dca_buys = len(dca_events)`, both up and down. Reducing is safe because DCA targets use `last_dca_price`, not dca_buys count |
+| `modules/cost_basis.py` | FIFO dust threshold: `pos_amount <= 1e-8` → `pos_amount < 1e-6 or pos_cost < €1.00`. Catches crypto dust without affecting legitimate partial sells |
+| `data/trade_log.json` | Fixed all trades: XRP dca_buys 17→0, NEAR 17→3, ALGO 17→2. XRP invested_eur €41.86→€66.95. Cleared XRP _last_derive_ts to force fresh re-derive |
+
+### Key Rules
+- `dca_buys` must ALWAYS equal `len(dca_events)`. NEVER derive from `buy_order_count`.
+- `invested_eur` must be consistent with `buy_price * amount` (within fee margin).
+- FIFO position reset must catch crypto dust (value < €1), not just amount < 1e-8.
+- After selling, if remaining position value < €1, it's dust from an old position.
+
+### Prevention
+- GUARD 5 now works (NameError fixed) and enforces `dca_buys == len(dca_events)` every cycle
+- sync_engine no longer touches dca_buys during re-derives
+- trade_store validation reduces dca_buys downward (not just upward)
+- FIFO uses value-based dust detection (€1 threshold) to prevent old history contamination
+
+---
+
 ## Template for new entries
 
 ```

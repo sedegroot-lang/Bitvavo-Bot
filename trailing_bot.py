@@ -893,7 +893,7 @@ def validate_and_repair_trades():
             if dca_buys_now != correct_buys:
                 log(
                     f"⚠️ REPAIR [{market}]: dca_buys={dca_buys_now}, "
-                    f"events={actual_event_count}, max={dca_max_now} "
+                    f"events={actual_event_count}, max={dca_max_global} "
                     f"→ setting dca_buys={correct_buys}",
                     level='warning',
                 )
