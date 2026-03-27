@@ -431,7 +431,7 @@ Op basis van de codebase-structuur zijn dit bekende risicogebieden die extra aan
 - **`TAKE_PROFIT_TARGETS` array én `TAKE_PROFIT_TARGET_1/2/3/4/5` keys**: Zijn dit duplicaten? Worden ze gesynchroniseerd?
 - **`STOP_LOSS_ENABLED: false` EN `ENABLE_STOP_LOSS: false`**: Twee keys voor hetzelfde? Welke wint?
 - **`MAX_OPEN_TRADES: 3` in de config maar regime past `max_trades_mult: 0.7` toe**: Resulteert dit in 2.1 trades (naar beneden afgerond naar 2)? Is dit de bedoeling?
-- **Telegram Bot Token in plaintext**: `"TELEGRAM_BOT_TOKEN": "8397921391:AAGYxTWiK6HFlvXUnEg989v0Vb_JTO_7ccc"` — dit is een beveiligingsrisico.
+- **Telegram Bot Token in plaintext**: `"TELEGRAM_BOT_TOKEN": "[REDACTED]"` — dit is een beveiligingsrisico.
 
 ---
 
