@@ -44,22 +44,46 @@ def _default_config() -> dict:
     }
 
 def _load_state() -> dict:
-    """Load runtime state from data/bot_state.json."""
+    """Load runtime state from data/bot_state.json.
+    
+    Compares OneDrive copy with local copy outside OneDrive.
+    Uses the freshest version to protect against OneDrive reverts.
+    """
+    od_state = {}
     try:
         if os.path.exists(STATE_PATH):
             with open(STATE_PATH, encoding='utf-8') as f:
-                state = json.load(f)
-                return state if isinstance(state, dict) else {}
+                od_state = json.load(f)
+                if not isinstance(od_state, dict):
+                    od_state = {}
     except Exception:
         pass
-    return {}
+    # Compare with local copy outside OneDrive
+    try:
+        from core.local_state import load_freshest
+        result = load_freshest(STATE_PATH, od_state)
+        if result:
+            result.pop('_save_ts', None)
+            return result
+    except Exception:
+        pass
+    return od_state
 
 def _save_state(config: dict) -> None:
-    """Extract and save runtime state keys to data/bot_state.json."""
+    """Extract and save runtime state keys to data/bot_state.json.
+    
+    Also mirrors to %LOCALAPPDATA%/BotConfig/state/ to protect against OneDrive reverts.
+    """
     state = {k: config[k] for k in RUNTIME_STATE_KEYS if k in config}
     if not state:
         return
     os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
+    # Stamp for freshness comparison
+    try:
+        from core.local_state import stamp_data
+        stamp_data(state)
+    except Exception:
+        pass
     tmp = STATE_PATH + '.tmp'
     try:
         with open(tmp, 'w', encoding='utf-8') as f:
@@ -71,6 +95,12 @@ def _save_state(config: dict) -> None:
                 os.remove(tmp)
         except Exception:
             pass
+    # Mirror to local storage outside OneDrive
+    try:
+        from core.local_state import mirror_to_local
+        mirror_to_local(STATE_PATH, state)
+    except Exception:
+        pass
 
 def load_config() -> dict:
     """

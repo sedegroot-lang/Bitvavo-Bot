@@ -9,6 +9,7 @@ from typing import Any, Dict
 
 from modules import storage
 from modules.logging_utils import locked_write_json, log
+from core.local_state import mirror_to_local, load_freshest, stamp_data
 
 TRADE_JSON_DEFAULT = 'trade_log.json'
 TRADE_DATASET = 'trade_log'
@@ -88,6 +89,17 @@ def load_snapshot(json_path: str | os.PathLike[str] = TRADE_JSON_DEFAULT) -> Dic
 
     snapshot = _load_snapshot_table()
     if snapshot:
+        # Compare with local copy — use the freshest one
+        freshest = load_freshest(str(path), snapshot)
+        if freshest:
+            local_ts = float(freshest.get('_save_ts', 0) or 0)
+            snap_ts = float(snapshot.get('_save_ts', 0) or 0)
+            if local_ts > snap_ts + 1:
+                # Local copy is newer — OneDrive reverted the file
+                log(f"TradeStore: LOCAL copy is newer than OneDrive ({local_ts:.0f} > {snap_ts:.0f}) — using local", level='warning')
+                freshest.pop('_save_ts', None)
+                _persist_snapshot(freshest, file_meta)
+                return freshest
         return snapshot
 
     if json_doc is None and path.exists():
@@ -102,6 +114,13 @@ def load_snapshot(json_path: str | os.PathLike[str] = TRADE_JSON_DEFAULT) -> Dic
         if json_doc:
             _persist_snapshot(json_doc, file_meta)
             return json_doc
+
+    # Last resort: try local copy
+    local_only = load_freshest(str(path), None)
+    if local_only:
+        log(f"TradeStore: OneDrive file missing, restored from local copy", level='warning')
+        local_only.pop('_save_ts', None)
+        return local_only
 
     return {'open': {}, 'closed': []}
 
@@ -242,9 +261,14 @@ def save_snapshot(
         except Exception as exc:
             log(f"TradeStore: backup schrijven mislukt ({backup_file}): {exc}", level='warning')
 
+    # Stamp data with _save_ts so local_state can compare freshness
+    stamp_data(data)
     locked_write_json(str(path), data, indent=indent)
     meta = _collect_file_meta(path)
     _persist_snapshot(data, meta)
+
+    # Mirror to %LOCALAPPDATA% — safe from OneDrive reverts
+    mirror_to_local(str(path), data)
 
 
 def touch_snapshot_timestamp(json_path: str | os.PathLike[str] = TRADE_JSON_DEFAULT) -> None:

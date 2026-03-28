@@ -20,7 +20,10 @@ def _isolate_storage(tmp_path):
 
 def test_load_snapshot_returns_defaults_when_json_missing(tmp_path):
     missing = tmp_path / "trade_log.json"
-    data = load_snapshot(missing)
+    # Patch local_state to avoid picking up real local copy
+    from unittest.mock import patch
+    with patch('modules.trade_store.load_freshest', return_value={}):
+        data = load_snapshot(missing)
     assert isinstance(data, dict)
     assert data.get("open", {}) == {}
     assert data.get("closed", []) == []
