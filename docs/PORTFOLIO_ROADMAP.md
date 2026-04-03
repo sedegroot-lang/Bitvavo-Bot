@@ -21,18 +21,17 @@
 | **Laatste 4 weken** | +€65 (W07-W10) | conservatief, zonder outlier W06 |
 | **Conservatief weekgemiddelde** | ~€14/week | basis voor alle projecties |
 
-### Huidige config (werkelijk, 26 maart 2026)
+### Huidige config (werkelijk, 3 april 2026)
 
-> **DCA-strategie gewijzigd op 26-03-2026** naar "Hybrid F_CONSERVATIEF" op basis van
-> simulatie over 844 historische trades: €25 flat start, 0.9x multiplier, 2.5% drop.
-> Resultaat: +92% meer P/L dan oude config bij lagere gemiddelde exposure.
+> **Roadmap €800 fase geactiveerd op 03-04-2026.** 4e trade slot open, BASE en DCA verhoogd.
+> HODL scheduler uitgeschakeld.
 
 ```json
 {
-  "MAX_OPEN_TRADES": 3,
-  "BASE_AMOUNT_EUR": 48,
+  "MAX_OPEN_TRADES": 4,
+  "BASE_AMOUNT_EUR": 52,
   "DCA_MAX_BUYS": 17,
-  "DCA_AMOUNT_EUR": 25,
+  "DCA_AMOUNT_EUR": 27,
   "DCA_SIZE_MULTIPLIER": 0.9,
   "DCA_DROP_PCT": 0.025,
   "MIN_SCORE_TO_BUY": 7.0,
@@ -45,9 +44,9 @@
 }
 ```
 
-**DCA-bedragen per level (0.9x)**: €25 → €22,50 → €20,25 → €18,23 → ... → €4,63 (level 17)
-**Typische blootstelling** (2 DCA): €48 + 25 + 22,50 = **€95,50/slot** → 3 slots = **€287**
-**Worst case** (17 DCA): €48 + €209 = **€257/slot** → 3 slots = **€770**
+**DCA-bedragen per level (0.9x)**: €27 → €24,30 → €21,87 → €19,68 → ... → €5,03 (level 17)
+**Typische blootstelling** (2 DCA): €52 + 27 + 24,30 = **€103,30/slot** → 4 slots = **€413**
+**Worst case** (17 DCA): €52 + €227 = **€279/slot** → 4 slots = **€1.116**
 
 ---
 
@@ -576,7 +575,7 @@ Vink af wanneer bereikt:
 - [x] €500 — Stabiel draaien, geen wijzigingen (bereikt ~18 maart 2026)
 - [x] €600 — BASE → 42 (overgeslagen — direct naar €700)
 - [x] €700 — Hybrid F_CONSERVATIEF DCA: DCA=25, MULT=0.9, DROP=2.5% (26 maart 2026)
-- [ ] €800 — 4 trades, BASE → 52, DCA → 27
+- [x] €800 — 4 trades, BASE → 52, DCA → 27 (3 april 2026)
 - [ ] €900 — BASE → 56, DCA → 28
 - [ ] €1.000 ⭐ — Grid BTC aan (€150)
 - [ ] €1.100 — BASE → 62, DCA → 30
@@ -601,6 +600,6 @@ Vink af wanneer bereikt:
 
 ---
 
-*Laatste update: 26 maart 2026 — Portfolio ~€738, Hybrid F_CONSERVATIEF DCA actief*
-*Config: BASE=48, DCA=25, MULT=0.9, DCA_DROP=2.5%, 3 slots, grid uit*
-*Volgende mijlpaal: €800 (4 trades, BASE → 52, DCA → 27) — wacht 2 weken stabilisatie*
+*Laatste update: 3 april 2026 — Portfolio ~€800, Roadmap €800 fase actief, HODL scheduler uit*
+*Config: BASE=52, DCA=27, MULT=0.9, DCA_DROP=2.5%, 4 slots, grid uit*
+*Volgende mijlpaal: €900 (BASE → 56, DCA → 28, TRAILING → 2,4%) — wacht 2 weken stabilisatie*
