@@ -2742,7 +2742,21 @@ async def bot_loop():
                 except Exception as _obi_sell_err:
                     log(f"[OBI] {m}: Sell-side check error: {_obi_sell_err}", level='debug')
 
-            if not _obi_delay_sell and (EXIT_MODE in ('trailing_only', 'trailing_and_hard') or not STOP_LOSS_ENABLED) and activation_ok and cp <= trailing and cp > t.get('buy_price', 0.0):
+            # ── Swing Momentum Gate: delay sell if higher-low structure intact ──
+            _swing_gate_delay = False
+            if CONFIG.get('SWING_MOMENTUM_GATE_ENABLED', True) and activation_ok and cp <= trailing and cp > t.get('buy_price', 0.0):
+                try:
+                    _bp_gate = float(t.get('buy_price', 0.0) or 0.0)
+                    _pp_gate = (cp - _bp_gate) / _bp_gate if _bp_gate > 0 else 0
+                    # Only apply gate in early profit phases (< 10% profit)
+                    if _pp_gate > 0 and _pp_gate < 0.10:
+                        if _trail.check_swing_momentum_gate(m, _bp_gate, cp):
+                            _swing_gate_delay = True
+                            _log_throttled(f'swing_gate_{m}', f"[SWING_GATE] {m}: Higher-low structure intact, delaying trailing sell (profit={_pp_gate*100:.1f}%)", level='info')
+                except Exception as _sg_err:
+                    log(f"[SWING_GATE] {m}: Check error: {_sg_err}", level='debug')
+
+            if not _obi_delay_sell and not _swing_gate_delay and (EXIT_MODE in ('trailing_only', 'trailing_and_hard') or not STOP_LOSS_ENABLED) and activation_ok and cp <= trailing and cp > t.get('buy_price', 0.0):
                 amt = t.get('amount', 0.0)
                 profit = realized_profit(t.get('buy_price', 0.0), cp, amt)
                 

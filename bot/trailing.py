@@ -33,6 +33,108 @@ from modules.logging_utils import log, locked_write_json
 _cfg: dict = {}
 _open_trades: dict = {}  # reference to the global open_trades dict
 
+
+# ---------------------------------------------------------------------------
+# DCA-aware trailing multiplier
+# ---------------------------------------------------------------------------
+def _dca_trailing_multiplier(trade: Optional[dict]) -> float:
+    """Return a trailing-distance multiplier based on DCA count.
+
+    More DCA buys = the coin was in a long consolidation range.
+    Breakouts from consolidation tend to be strong — give the trailing
+    more room to breathe.
+    """
+    if not isinstance(trade, dict):
+        return 1.0
+    dca = int(trade.get("dca_buys", 0) or 0)
+    if dca >= 9:
+        return 1.8
+    if dca >= 4:
+        return 1.4
+    if dca >= 1:
+        return 1.15
+    return 1.0
+
+
+# ---------------------------------------------------------------------------
+# Profit-phase classification (for phase-aware trailing)
+# ---------------------------------------------------------------------------
+def _profit_phase(profit_pct: float) -> int:
+    """Classify profit into a trading phase.
+
+    Phase 1 (Breakout Discovery): 0–3% — wide trailing, let the move develop
+    Phase 2 (Trend Riding):       3–10% — moderate trailing, swing structure
+    Phase 3 (Profit Protection):  10–25% — tighter, parabolic tightening
+    Phase 4 (Moon Bag):           25%+ — wide again, protect remaining bag
+    """
+    if profit_pct < 0.03:
+        return 1
+    if profit_pct < 0.10:
+        return 2
+    if profit_pct < 0.25:
+        return 3
+    return 4
+
+
+def _phase_atr_multiplier(phase: int, base_atr_mult: float) -> float:
+    """Adjust ATR multiplier based on profit phase."""
+    if phase == 1:
+        return base_atr_mult * 1.25   # 25% wider in discovery
+    if phase == 2:
+        return base_atr_mult * 1.1    # 10% wider in trend riding
+    if phase == 3:
+        return base_atr_mult * 0.85   # tighter in profit protection
+    return base_atr_mult * 1.2        # wider again for moon bag
+
+
+# ---------------------------------------------------------------------------
+# Swing-structure momentum gate
+# ---------------------------------------------------------------------------
+def check_swing_momentum_gate(market: str, buy_price: float, current_price: float) -> bool:
+    """Check if higher-low swing structure is intact (bullish momentum gate).
+
+    Returns True if trend structure supports holding the position: the most
+    recent swing lows form a higher-low pattern AND momentum indicators are
+    not deeply bearish.
+
+    Used to override trailing sell signals in early profit phases — if the
+    trend structure is intact, a small dip below the trailing stop is likely
+    a normal pullback, not a reversal.
+    """
+    try:
+        c5m = _get_htf_candles(market, "5m", 40)
+        if not c5m or len(c5m) < 20:
+            return False
+
+        low_vals = [float(c[3]) for c in c5m]
+        close_vals = [float(c[4]) for c in c5m]
+
+        # Find swing lows (local minima in 5-bar window)
+        swing_lows = []
+        for i in range(5, len(low_vals) - 5):
+            if low_vals[i] == min(low_vals[i - 5:i + 6]):
+                swing_lows.append(low_vals[i])
+
+        if len(swing_lows) < 2:
+            return False
+
+        # Higher-low check: last swing low > previous swing low
+        higher_low = swing_lows[-1] > swing_lows[-2] * 0.998
+
+        # Both recent swing lows above buy_price (trend is above entry)
+        above_entry = swing_lows[-1] > buy_price * 0.99
+
+        # Simple momentum: price above SMA10 on 5m
+        if len(close_vals) >= 10:
+            sma10 = sum(close_vals[-10:]) / 10
+            momentum_ok = close_vals[-1] > sma10 * 0.998
+        else:
+            momentum_ok = False
+
+        return higher_low and above_entry and momentum_ok
+    except Exception:
+        return False
+
 # ---------------------------------------------------------------------------
 # HTF candle cache — avoids 3 redundant API calls per trade per loop tick
 # ---------------------------------------------------------------------------
@@ -505,6 +607,24 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                 except Exception as e:
                     log(f"get failed: {e}", level="error")
 
+                # ── DCA-aware trailing multiplier ──
+                # More DCA buys → longer consolidation → wider trailing on breakout
+                try:
+                    _dca_mult = _dca_trailing_multiplier(trade)
+                    if _dca_mult > 1.0:
+                        base_percent *= _dca_mult
+                except Exception:
+                    pass
+
+                # ── Phase-aware ATR multiplier ──
+                _current_phase = 1
+                try:
+                    if buy is not None and buy > 0 and used_high > buy:
+                        _pp = (used_high - buy) / buy
+                        _current_phase = _profit_phase(_pp)
+                except Exception:
+                    pass
+
                 # Per-market ATR multipliers
                 atr_mult = ATR_MULTIPLIER
                 try:
@@ -537,7 +657,9 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                         trend_mult = 1.3
 
                 if atr_val is not None:
-                    base_trailing = max(atr_mult * atr_val, used_high * base_percent * 0.5)
+                    _phase_atr = _phase_atr_multiplier(_current_phase, atr_mult)
+                    _dca_mult_atr = _dca_trailing_multiplier(trade)
+                    base_trailing = max(_phase_atr * atr_val * _dca_mult_atr, used_high * base_percent * 0.5)
                     base_trailing *= trend_mult
                     trailing = used_high - base_trailing
                 else:
