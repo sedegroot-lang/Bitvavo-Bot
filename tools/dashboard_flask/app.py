@@ -1192,33 +1192,44 @@ def calculate_portfolio_totals(cards: List[Dict], heartbeat: Dict = None) -> Dic
     total_pnl = sum(c.get('pnl', 0) for c in cards)
     total_pnl_pct = ((total_current / total_invested) - 1) * 100 if total_invested > 0 else 0
     
-    # Get EUR balance - use cached balances to reduce API calls
+    # Get ALL balances from Bitvavo and compute real total (like Bitvavo does)
     eur_balance = 0
+    total_account_value = total_current  # fallback: just trade cards
     try:
         balances = get_cached_balances()
-        for bal in balances:
-            if bal.get('symbol') == 'EUR':
-                eur_balance = float(bal.get('available', 0) or 0) + float(bal.get('inOrder', 0) or 0)
-                break
+        if balances:
+            # Compute total portfolio value from ALL Bitvavo balances × live prices
+            live_total = 0.0
+            for bal in balances:
+                symbol = bal.get('symbol', '')
+                available = float(bal.get('available', 0) or 0)
+                in_order = float(bal.get('inOrder', 0) or 0)
+                total_amount = available + in_order
+                if total_amount <= 0:
+                    continue
+                if symbol == 'EUR':
+                    eur_balance = total_amount
+                    live_total += total_amount
+                else:
+                    market = f"{symbol}-EUR"
+                    price = get_live_price(market)
+                    if price:
+                        live_total += total_amount * price
+            if live_total > 0:
+                total_account_value = live_total
+            else:
+                total_account_value = total_current + eur_balance
+        else:
+            total_account_value = total_current + eur_balance
     except Exception as e:
-        logger.warning(f"Failed to get cached EUR balance: {e}")
+        logger.warning(f"Failed to compute live portfolio total: {e}")
+        total_account_value = total_current + eur_balance
     
-    # Fallback to heartbeat if cache is empty
+    # Fallback to heartbeat EUR if we got nothing from API
     if eur_balance == 0 and heartbeat:
         eur_balance = float(heartbeat.get('eur_balance', 0) or 0)
-    
-    # Calculate total account value — prefer account_overview.json which includes ALL holdings
-    total_account_value = total_current + eur_balance
-    try:
-        _ao_path = PROJECT_ROOT / 'data' / 'account_overview.json'
-        if _ao_path.exists():
-            with open(_ao_path, 'r', encoding='utf-8') as _ao_f:
-                _ao = json.load(_ao_f)
-            _ao_total = float(_ao.get('total_account_value_eur', 0) or 0)
-            if _ao_total > 0:
-                total_account_value = _ao_total
-    except Exception as _ao_err:
-        logger.debug(f"account_overview fallback: {_ao_err}")
+        if total_account_value == total_current:
+            total_account_value = total_current + eur_balance
     
     # Get deposit data for real profit calculation
     total_deposited = get_total_deposited()

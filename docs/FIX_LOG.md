@@ -419,6 +419,32 @@ For LINK-EUR specifically:
 
 ---
 
+## #010 — Dashboard portfolio value excluded BTC/ETH and used stale data (2026-04-06)
+
+### Symptom
+Dashboard showed "Account Waarde" as €795.39 while Bitvavo's real portfolio value was €820.90 — a €25.51 gap.
+
+### Root Cause
+Two overlapping issues:
+1. **HODL assets (BTC, ETH) excluded from trade cards**: The dashboard card builder skips `HODL_SYMBOLS = ['BTC', 'ETH']`, so `total_current` (sum of card values) misses these assets (~€10.34 combined).
+2. **Stale `account_overview.json` used as override**: `calculate_portfolio_totals()` read `data/account_overview.json` which is only updated when the bot is running. When the bot is stopped, prices become stale (2.5 days old in this case → ~€19 price drift).
+3. The dashboard never independently computed the real portfolio total from ALL Bitvavo balances × live prices.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `tools/dashboard_flask/app.py` | `calculate_portfolio_totals()` now computes real total from ALL Bitvavo balances × live prices via `get_cached_balances()` + `get_live_price()`. Removed stale `account_overview.json` dependency. |
+| `tools/dashboard_flask/services/portfolio_service.py` | `calculate_totals()` now computes real total from ALL balances × live prices via `price_service.get_all_balances()` + `price_service.get_price()`. Removed `account_overview.json` dependency. |
+| `tools/dashboard_flask/services/price_service.py` | Added `get_all_balances()` method with API call + file fallback to `data/sync_raw_balances.json`. |
+
+### Prevention
+- Dashboard now independently calculates portfolio total — never depends on bot-generated files for the headline number.
+- All Bitvavo balances (BTC, ETH, and any other asset) are included in the total, matching what Bitvavo itself shows.
+- Graceful fallback: if API fails, reads cached `sync_raw_balances.json`; if that fails too, falls back to `total_current + eur_balance`.
+
+---
+
 ## Template for new entries
 
 ```

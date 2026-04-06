@@ -390,17 +390,39 @@ class PortfolioService:
         total_current = sum(c.current_value for c in cards)
         total_pnl = sum(c.pnl for c in cards)
         eur_balance = float(heartbeat.get('eur_balance', 0) or 0)
-        # Use account_overview total when available (includes EUR in grid orders + all crypto)
-        account_overview = self.data_service.load_account_overview()
-        overview_total = float(account_overview.get('total_account_value_eur', 0) or 0)
         total_deposited = self.data_service.get_total_deposited()
+        
+        # Compute real total from ALL Bitvavo balances × live prices (like Bitvavo does)
+        account_value = total_current + eur_balance  # fallback
+        try:
+            all_balances = self.price_service.get_all_balances()
+            if all_balances:
+                live_total = 0.0
+                for bal in all_balances:
+                    symbol = bal.get('symbol', '')
+                    available = float(bal.get('available', 0) or 0)
+                    in_order = float(bal.get('inOrder', 0) or 0)
+                    total_amount = available + in_order
+                    if total_amount <= 0:
+                        continue
+                    if symbol == 'EUR':
+                        eur_balance = total_amount
+                        live_total += total_amount
+                    else:
+                        market = f"{symbol}-EUR"
+                        price = self.price_service.get_price(market)
+                        if price:
+                            live_total += total_amount * price
+                if live_total > 0:
+                    account_value = live_total
+        except Exception as e:
+            logger.debug(f"Live portfolio total calc error: {e}")
         
         # Count winning/losing/trailing trades
         winning_trades = sum(1 for c in cards if c.pnl > 0)
         losing_trades = sum(1 for c in cards if c.pnl < 0)
         trailing_active_count = sum(1 for c in cards if c.trailing_activated)
         
-        account_value = overview_total if overview_total > 0 else (total_current + eur_balance)
         real_profit = account_value - total_deposited
         
         # Calculate period P&L from closed trades

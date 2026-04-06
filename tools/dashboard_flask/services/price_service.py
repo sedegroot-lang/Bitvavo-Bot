@@ -137,3 +137,34 @@ class PriceService:
     def invalidate_prices(self) -> None:
         """Invalidate all price caches."""
         self.cache.delete('prices:batch')
+
+    def get_all_balances(self) -> List[Dict]:
+        """Fetch all Bitvavo balances with caching."""
+        cache_key = 'balances:all'
+        cached = self.cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            client = self._get_client()
+            if client is None:
+                return []
+            result = client.balance({})
+            if isinstance(result, list):
+                self.cache.set(cache_key, result, 30)
+                return result
+        except Exception as e:
+            logger.error(f"Error fetching balances: {e}")
+
+        # Fallback: try reading cached file
+        try:
+            import json
+            bal_path = os.path.join(_project_root, 'data', 'sync_raw_balances.json')
+            if os.path.exists(bal_path):
+                with open(bal_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                if isinstance(data, list):
+                    return data
+        except Exception:
+            pass
+        return []
