@@ -258,6 +258,15 @@
     animation: live-pulse 1.5s infinite;
 }
 
+.price-dot.stop-dot {
+    background: #f5a623;
+}
+
+.price-stop .price-value {
+    color: #f5a623 !important;
+    font-weight: 600;
+}
+
 @keyframes live-pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.6; transform: scale(1.2); }

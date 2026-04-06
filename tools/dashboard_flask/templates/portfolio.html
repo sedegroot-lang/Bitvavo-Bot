@@ -274,7 +274,7 @@
             </div>
         </div>
         
-        <!-- Price Row: Entry → Live -->
+        <!-- Price Row: Entry → Live → Trailing Stop -->
         <div class="card-price-row">
             <div class="price-entry">
                 <span class="price-dot entry-dot"></span>
@@ -287,6 +287,15 @@
                 <span class="price-label">LIVE PRICE</span>
                 <span class="price-value live-pulse" data-live-price="{{ card.market }}">€{{ "%.6f"|format(card.live_price) if card.live_price and card.live_price < 0.01 else ("%.4f"|format(card.live_price) if card.live_price and card.live_price < 1 else ("%.2f"|format(card.live_price) if card.live_price else "-")) }}</span>
             </div>
+            {% set stop = card.trailing_stop|default(card.stop_price|default(0, true), true)|float %}
+            {% if stop > 0 %}
+            <span class="price-arrow">|</span>
+            <div class="price-stop">
+                <span class="price-dot stop-dot"></span>
+                <span class="price-label">TRAILING STOP</span>
+                <span class="price-value" data-stop-price="{{ card.market }}" style="color: #f5a623;">€{{ "%.6f"|format(stop) if stop < 0.01 else ("%.4f"|format(stop) if stop < 1 else "%.2f"|format(stop)) }}</span>
+            </div>
+            {% endif %}
         </div>
         
         <!-- Trailing Progress (compact) -->
@@ -1121,6 +1130,18 @@ function buildTradeCardElement(card) {
                 <span class="price-label">LIVE PRICE</span>
                 <span class="price-value live-pulse" data-live-price="${card.market}">${card.live_price ? formatPriceCompact(card.live_price) : '-'}</span>
             </div>
+            ${(function() {
+                const stop = card.trailing_stop || card.stop_price || 0;
+                if (stop > 0) {
+                    return `<span class="price-arrow">|</span>
+                    <div class="price-stop">
+                        <span class="price-dot stop-dot"></span>
+                        <span class="price-label">TRAILING STOP</span>
+                        <span class="price-value" data-stop-price="${card.market}" style="color: #f5a623;">${formatPriceCompact(stop)}</span>
+                    </div>`;
+                }
+                return '';
+            })()}
         </div>
 
         <div class="card-trailing-row" data-market="${card.market}">
@@ -1199,6 +1220,11 @@ function updateCardFromData(cardEl, cardData) {
 
     const liveEl = cardEl.querySelector(`[data-live-price="${cardData.market}"]`);
     if (liveEl && cardData.live_price !== undefined) liveEl.textContent = formatPriceCompact(cardData.live_price);
+
+    // Update trailing stop price display
+    const stopEl = cardEl.querySelector(`[data-stop-price="${cardData.market}"]`);
+    const stopVal = parseFloat(cardData.trailing_stop) || parseFloat(cardData.stop_price) || 0;
+    if (stopEl && stopVal > 0) stopEl.textContent = formatPriceCompact(stopVal);
 
     const trailingFill = cardEl.querySelector(`[data-trailing-fill="${cardData.market}"]`);
     const trailingPctEl = cardEl.querySelector(`[data-trailing-pct="${cardData.market}"]`);
