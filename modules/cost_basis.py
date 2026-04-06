@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -36,6 +37,28 @@ def _to_float(value: Any, default: float = 0.0) -> float:
     return num
 
 
+def _fifo_remove(lots: deque, qty: float) -> float:
+    """Remove *qty* units from the front of the FIFO lot queue.
+
+    Returns the total EUR cost removed.
+    """
+    removed_cost = 0.0
+    remaining = qty
+    while remaining > 1e-12 and lots:
+        lot = lots[0]  # [amount, cost_per_unit, timestamp, order_id]
+        lot_amt = lot[0]
+        lot_cpu = lot[1]
+        if lot_amt <= remaining + 1e-12:
+            lots.popleft()
+            removed_cost += lot_amt * lot_cpu
+            remaining -= lot_amt
+        else:
+            lot[0] = lot_amt - remaining
+            removed_cost += remaining * lot_cpu
+            remaining = 0.0
+    return removed_cost
+
+
 def _compute_cost_basis_from_fills(
     fills: Iterable[Dict[str, Any]],
     *,
@@ -43,14 +66,23 @@ def _compute_cost_basis_from_fills(
     target_amount: float,
     tolerance: float,
 ) -> CostBasisResult | None:
+    """Compute cost basis using true FIFO lot tracking.
+
+    FIX #009: Replaced average-cost sell deduction with per-lot FIFO.
+    Average cost caused residual cost from old buy/sell cycles to bleed
+    into the current position when computed position > actual balance
+    (e.g. due to fills missing from the API).  True FIFO correctly
+    attributes cost to the most recent purchases.
+    """
     if target_amount <= 0:
         return None
     market_base = market.split("-")[0].upper() if market else ""
     fills_sorted = sorted(fills, key=lambda item: _normalize_ts(item.get("timestamp")))
+
+    # FIFO lot queue: each entry is [remaining_amount, cost_per_unit, timestamp, order_id]
+    lots: deque = deque()
     pos_amount = 0.0
     pos_cost = 0.0
-    earliest_ts: float | None = None
-    buy_order_ids: Set[str] = set()
 
     for fill in fills_sorted:
         side = str(fill.get("side") or "").lower()
@@ -67,10 +99,6 @@ def _compute_cost_basis_from_fills(
             eur_cost = price * amount
             if fee_curr == "EUR":
                 eur_cost += fee
-            pos_cost += eur_cost
-            pos_amount += base_delta
-            if base_delta > 0 and earliest_ts is None:
-                earliest_ts = _normalize_ts(fill.get("timestamp"))
             if base_delta > 0:
                 order_id = str(
                     fill.get("orderId")
@@ -84,7 +112,10 @@ def _compute_cost_basis_from_fills(
                 )
                 if not order_id:
                     order_id = f"{_normalize_ts(fill.get('timestamp'))}-{price}-{amount}"
-                buy_order_ids.add(order_id)
+                cost_per_unit = eur_cost / base_delta
+                lots.append([base_delta, cost_per_unit, _normalize_ts(fill.get("timestamp")), order_id])
+                pos_cost += eur_cost
+                pos_amount += base_delta
         elif side == "sell":
             base_delta = amount
             if fee_curr == market_base and fee > 0:
@@ -94,26 +125,46 @@ def _compute_cost_basis_from_fills(
             sold = min(base_delta, pos_amount)
             if sold <= 0:
                 continue
-            avg_cost = pos_cost / pos_amount if pos_amount else 0.0
+            removed_cost = _fifo_remove(lots, sold)
             pos_amount -= sold
-            pos_cost -= avg_cost * sold
+            pos_cost -= removed_cost
             # FIX #006: generous dust threshold to prevent old position
             # costs from bleeding into current position's cost basis.
-            # Old threshold (1e-8) missed crypto dust (e.g. 0.01 XRP).
-            # Now also reset when remaining value < €1 (clearly dust).
             if pos_amount < 1e-6 or (pos_amount > 0 and pos_cost < 1.0):
                 pos_amount = 0.0
                 pos_cost = 0.0
-                buy_order_ids.clear()
+                lots.clear()
+
     if pos_amount <= 0 or pos_cost <= 0:
         return None
+
+    # FIX #009: When computed position exceeds actual balance (phantom
+    # holdings due to missing sells in API), FIFO-remove the excess
+    # oldest lots so cost basis reflects only the most recent purchases.
     amount_diff = abs(pos_amount - target_amount)
     tolerance_abs = max(1e-8, target_amount * tolerance)
+    if pos_amount > target_amount + tolerance_abs:
+        excess = pos_amount - target_amount
+        removed_cost = _fifo_remove(lots, excess)
+        pos_amount -= excess
+        pos_cost -= removed_cost
+        amount_diff = abs(pos_amount - target_amount)
+
     invested = pos_cost
     if amount_diff > tolerance_abs and pos_amount > 0:
         avg_cost = pos_cost / pos_amount
         invested = avg_cost * target_amount
     avg_price = invested / target_amount if target_amount > 0 else 0.0
+
+    # Derive earliest_ts and buy_order_ids from remaining lots
+    earliest_ts: float | None = None
+    buy_order_ids: Set[str] = set()
+    for lot in lots:
+        if lot[0] > 1e-12:
+            if earliest_ts is None or lot[2] < earliest_ts:
+                earliest_ts = lot[2]
+            buy_order_ids.add(lot[3])
+
     return CostBasisResult(
         invested_eur=invested,
         avg_price=avg_price,

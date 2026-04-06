@@ -286,3 +286,73 @@ class TestInvestedEurNotBlind:
         assert result is not None
         assert result.avg_price > 10.0, "avg_price should be > fill price because of fees"
         assert result.avg_price == pytest.approx(10.10, abs=0.01)
+
+
+# ────────── Test: FIFO excess removal (FIX_LOG #009) ──────────
+
+class TestFifoExcessRemoval:
+    """When fills yield more position than actual balance (phantom holdings
+    due to missing sells in API), FIFO should remove oldest lots so cost
+    basis reflects only the most recent purchases.
+    See docs/FIX_LOG.md #009.
+    """
+
+    def test_phantom_holdings_removed_fifo(self):
+        """Simulate LINK-like scenario: old buys at high price never sold
+        in trade history but not on exchange. Target < computed position.
+        FIFO should remove old expensive lots, cost reflects recent buys."""
+        fills = [
+            # Old buys at €20 each — these are "phantom" holdings
+            _fill('buy', 20.0, 3.0, fee=0.06, ts=1000),    # 3 @ 20 = €60.06
+            # Many buy/sell cycles in between (net zero)
+            _fill('buy', 15.0, 2.0, fee=0.03, ts=2000),    # 2 @ 15 = €30.03
+            _fill('sell', 16.0, 2.0, ts=3000),               # sell 2
+            _fill('buy', 12.0, 2.0, fee=0.02, ts=4000),    # 2 @ 12 = €24.02
+            _fill('sell', 13.0, 2.0, ts=5000),               # sell 2
+            # Current position buys at €8
+            _fill('buy', 8.0, 5.0, fee=0.04, ts=6000),     # 5 @ 8 = €40.04
+            _fill('buy', 7.5, 4.0, fee=0.03, ts=7000),     # 4 @ 7.5 = €30.03
+        ]
+        # Computed pos after all fills: 3 (phantom) + 5 + 4 = 12 units
+        # But actual balance is only 9 (the recent buys)
+        result = _compute_cost_basis_from_fills(
+            fills, market='TEST-EUR', target_amount=9.0, tolerance=0.02
+        )
+        assert result is not None
+        # FIFO removes oldest 3 units (€20 lots) → remaining = 5+4 = 9
+        # Cost should be ~40.04 + 30.03 = €70.07 (not €20-avg inflated)
+        assert result.invested_eur == pytest.approx(70.07, abs=0.5)
+        assert result.avg_price == pytest.approx(70.07 / 9.0, abs=0.1)
+        assert result.position_amount == pytest.approx(9.0, abs=0.01)
+        # Earliest timestamp should be lot at ts=6000 (stored as 6000000 ms in fill)
+        assert result.earliest_timestamp == pytest.approx(6000000.0, abs=1.0)
+
+    def test_no_excess_no_fifo_removal(self):
+        """When computed position matches target, no FIFO removal needed."""
+        fills = [
+            _fill('buy', 10.0, 5.0, ts=1000),
+            _fill('sell', 12.0, 2.0, ts=2000),
+            _fill('buy', 9.0, 2.0, ts=3000),
+        ]
+        result = _compute_cost_basis_from_fills(
+            fills, market='TEST-EUR', target_amount=5.0, tolerance=0.02
+        )
+        assert result is not None
+        # FIFO sell: remove 2 oldest units at €10 each → cost −20
+        # Remaining: 3@10 + 2@9 = 30+18 = €48
+        assert result.invested_eur == pytest.approx(48.0, abs=0.5)
+
+    def test_fifo_sell_removes_oldest_lots(self):
+        """True FIFO: sells consume cheapest (oldest) lots first."""
+        fills = [
+            _fill('buy', 5.0, 3.0, ts=1000),    # 3 @ €5 = €15
+            _fill('buy', 10.0, 3.0, ts=2000),   # 3 @ €10 = €30
+            _fill('sell', 8.0, 3.0, ts=3000),   # Sell 3 → FIFO removes €5 lot
+        ]
+        result = _compute_cost_basis_from_fills(
+            fills, market='TEST-EUR', target_amount=3.0, tolerance=0.02
+        )
+        assert result is not None
+        # After FIFO sell: only the €10 lot remains → cost = €30
+        assert result.invested_eur == pytest.approx(30.0, abs=0.01)
+        assert result.avg_price == pytest.approx(10.0, abs=0.01)

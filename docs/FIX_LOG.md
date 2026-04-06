@@ -374,6 +374,51 @@ Multiple independent issues accumulated across bot evolution:
 
 ---
 
+## #009 — FIFO cost basis: average-cost sell method inflated invested_eur (2026-04-06)
+
+### Symptom
+LINK-EUR `invested_eur` was €72.90 in the bot, but Bitvavo showed cost basis of €70.87 (2.86% off).
+Other markets showed smaller but similar discrepancies (XRP 0.44%, NEAR 0.06%).
+
+### Root Cause
+`_compute_cost_basis_from_fills()` in `modules/cost_basis.py` used **average-cost** accounting
+for sells, but the code comment called it "FIFO". With average cost, each sell deducts
+`avg_cost × sold_amount` from `pos_cost`. This means old expensive lots and new cheap lots
+are blended together — residual cost from historical buy/sell cycles bleeds into the current
+position's cost basis.
+
+For LINK-EUR specifically:
+- The trade history showed 12.028 LINK after processing all fills (93 fills)
+- The actual Bitvavo balance was 9.426 LINK
+- The 2.602 LINK phantom excess came from the very first buys (never sold in the API)
+- With average-cost scaling (`avg_cost × target_amount`), the expensive phantom lots
+  inflated the cost: €7.73/unit × 9.426 = €72.90
+- True cost of the 2 actual buys: 5.468 @ 7.5967 + 3.958 @ 7.4102 = €71.06
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/cost_basis.py` | Replaced average-cost sell deduction with **true FIFO lot tracking** using a `deque` of `[amount, cost_per_unit, timestamp, order_id]` lots. Sells now consume the oldest lots first. |
+| `modules/cost_basis.py` | Added `_fifo_remove(lots, qty)` helper for FIFO lot consumption. |
+| `modules/cost_basis.py` | When `pos_amount > target_amount + tolerance` (phantom holdings from missing API sells), FIFO-remove the excess oldest lots before computing `invested_eur`. |
+| `modules/cost_basis.py` | `earliest_timestamp` and `buy_order_ids` now derived from **remaining** lots (not first buy ever). This correctly reflects when the current position started. |
+| `tests/test_cost_basis_sync.py` | Added `TestFifoExcessRemoval` class with 3 tests: phantom holdings, no-excess, and FIFO sell ordering. |
+
+### Result after fix
+| | Before (avg cost) | After (FIFO) | Bitvavo |
+|---|---|---|---|
+| LINK invested_eur | €72.90 | €71.06 | €70.87 |
+| Diff vs Bitvavo | 2.86% | 0.27% | — |
+
+### Prevention
+- True FIFO lot tracking ensures sells always consume oldest lots
+- Phantom excess lots are FIFO-removed to match actual balance
+- `earliest_timestamp` reflects the actual current position, not historical first buy
+- 70 tests pass including 3 new FIFO-specific tests
+
+---
+
 ## Template for new entries
 
 ```
