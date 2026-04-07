@@ -526,10 +526,13 @@ class GridManager:
         if not self.bitvavo or not order_id:
             return False
         try:
-            resp = self._safe_call(self.bitvavo.cancelOrder, market, order_id)
+            operator_id = self.bot_config.get('OPERATOR_ID')
+            resp = self._safe_call(self.bitvavo.cancelOrder, market, order_id, operator_id)
             if isinstance(resp, dict) and resp.get('orderId'):
                 log(f"[Grid] Cancelled order {order_id} for {market}", level='info')
                 return True
+            elif isinstance(resp, dict) and resp.get('errorCode'):
+                log(f"[Grid] Cancel order failed {market}/{order_id}: {resp.get('error')}", level='warning')
             return False
         except Exception as e:
             log(f"[Grid] Cancel order failed {market}/{order_id}: {e}", level='warning')

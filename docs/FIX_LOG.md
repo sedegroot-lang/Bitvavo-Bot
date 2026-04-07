@@ -465,6 +465,29 @@ Grid trading enabled in config but no orders appeared on Bitvavo. No grid-relate
 
 ---
 
+## #012 — Grid cancelOrder fails without operatorId → orphaned orders (2026-04-07)
+
+### Symptom
+User saw 11 open orders on Bitvavo instead of expected 9. Two orphaned BTC-EUR buy orders (€31.70 each at 55619 and 57998) remained on the exchange after a vol-adaptive rebalance from 5→18 grids.
+
+### Root Cause
+`GridManager._cancel_order()` called `self.bitvavo.cancelOrder(market, order_id)` without passing the `operatorId` parameter. The Bitvavo API returns HTTP 400 `"operatorId parameter is required"` when this is missing. During the vol-adaptive rebalance, the initial 2 grid orders could not be cancelled, and the code silently continued placing 9 new orders — leaving 11 total.
+
+The `trailing_bot.py` monolith already passed `operatorId` correctly (`bitvavo.cancelOrder(market, orderId, operatorId=str(OPERATOR_ID))`), but the extracted grid module was missing it.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/grid_trading.py` `_cancel_order()` | Added `operator_id = self.bot_config.get('OPERATOR_ID')` and passed it as third arg to `cancelOrder()`. Also added error logging for API error responses. |
+| Bitvavo exchange | Manually cancelled the 2 orphaned orders (ids `...676e96` and `...6770a3`) via API with operatorId. |
+
+### Prevention
+- `_cancel_order()` now always passes `operatorId` from config, matching `trailing_bot.py` convention.
+- Error responses from cancel are now logged explicitly instead of silently returning False.
+
+---
+
 ## Template for new entries
 
 ```
