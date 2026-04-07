@@ -445,6 +445,26 @@ Two overlapping issues:
 
 ---
 
+## #011 — Grid trading zombie states + budget_cfg reads wrong config (2026-04-07)
+
+### Symptom
+Grid trading enabled in config but no orders appeared on Bitvavo. No grid-related log entries.
+
+### Root Cause
+1. **Zombie grid states**: Old BTC-EUR and ETH-EUR grids in `data/grid_states.json` had `status: "running"` but `config.enabled: false` and all orders `cancelled`. These counted as "active" grids (`active_count = 2 >= max_grids`), blocking new grid creation.
+2. **budget_cfg hardcoded path**: `_auto_create_grids()` read `BUDGET_RESERVATION` directly from `config/bot_config.json` instead of the merged `self.bot_config`. Local overrides (grid_pct, trailing_pct) were invisible to the grid module.
+
+### Fix Applied
+1. Cleared `data/grid_states.json` (backup in `data/grid_states_backup_old.json`) to allow fresh grid creation.
+2. Changed `_auto_create_grids()` in `modules/grid_trading.py` to read `self.bot_config.get('BUDGET_RESERVATION', {})` instead of raw file read.
+3. Added `max_grids: 1` to GRID_TRADING config (only BTC-EUR per roadmap €1000 phase).
+
+### Prevention
+- Grid module now uses merged config (respects local overrides).
+- Explicit `max_grids` in config prevents default-value surprises.
+
+---
+
 ## Template for new entries
 
 ```
