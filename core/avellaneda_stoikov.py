@@ -188,6 +188,9 @@ def calculate_dynamic_grid_levels(
     # 6. Generate grid levels
     # Half above skewed mid (sell), half below (buy)
     levels_per_side = num_levels // 2
+    # Number of sell levels to actually generate (may be reduced below)
+    sell_count = 0 if buy_only else levels_per_side
+
     if buy_only:
         # Not enough base asset for even one sell: full budget to buy-side
         amount_per_buy = total_investment_eur / levels_per_side
@@ -197,9 +200,19 @@ def calculate_dynamic_grid_levels(
         naive_per_level = total_investment_eur / num_levels
         sell_budget_needed = naive_per_level * levels_per_side
         sell_budget_actual = min(sell_budget_needed, base_eur_value)
-        buy_budget = total_investment_eur - sell_budget_actual
-        amount_per_buy = buy_budget / levels_per_side
-        amount_per_sell = sell_budget_actual / levels_per_side
+        # Determine how many sell levels can meet minimum order (€5)
+        min_order = 5.0
+        affordable_sells = min(int(sell_budget_actual / min_order), levels_per_side) if sell_budget_actual >= min_order else 0
+        sell_count = affordable_sells
+        if affordable_sells == 0:
+            # Can't afford even one sell above minimum → full budget to buys
+            buy_budget = total_investment_eur
+            amount_per_buy = buy_budget / levels_per_side
+            amount_per_sell = 0.0
+        else:
+            buy_budget = total_investment_eur - sell_budget_actual
+            amount_per_buy = buy_budget / levels_per_side
+            amount_per_sell = sell_budget_actual / affordable_sells
     else:
         amount_per_buy = total_investment_eur / num_levels
         amount_per_sell = total_investment_eur / num_levels
@@ -207,6 +220,7 @@ def calculate_dynamic_grid_levels(
     levels = []
 
     # Spacing increases further from mid (non-linear for volatility adaptation)
+    sells_placed = 0
     for i in range(1, levels_per_side + 1):
         # Spacing increases quadratically further from mid
         spacing_mult = 1.0 + 0.3 * (i - 1)  # Level 1: 1.0x, Level 5: 2.2x
@@ -224,7 +238,7 @@ def calculate_dynamic_grid_levels(
             "level_id": i - 1,
             "spread_pct": round(level_spread * 100, 3),
         })
-        if not buy_only:
+        if sells_placed < sell_count:
             levels.append({
                 "price": round(sell_price, 8),
                 "side": "sell",
@@ -232,6 +246,7 @@ def calculate_dynamic_grid_levels(
                 "level_id": levels_per_side + i - 1,
                 "spread_pct": round(level_spread * 100, 3),
             })
+            sells_placed += 1
 
     # Sort by price
     levels.sort(key=lambda x: x["price"])

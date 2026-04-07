@@ -488,6 +488,32 @@ The `trailing_bot.py` monolith already passed `operatorId` correctly (`bitvavo.c
 
 ---
 
+## #013 — Grid proportional budget: sell levels below minimum → budget wasted (2026-04-07)
+
+### Symptom
+With 0.00041638 BTC (~€24.57) from earlier grid fills, the proportional budget split divided
+sell budget equally across all sell levels (e.g. 9 levels × €2.73 each). Bitvavo requires minimum
+€5 per order, so ALL sell levels were skipped by the `amount_eur < 5.0` filter, wasting the entire
+sell budget and deploying only ~€134 instead of ~€158.
+
+### Root Cause
+Proportional allocation divided `sell_budget_actual` by `levels_per_side` (total sell levels),
+not by the number of sell levels that can actually meet the minimum order. When per-level amount
+falls below €5, every sell level gets filtered out.
+
+### Fix Applied
+- `core/avellaneda_stoikov.py`: Calculate `affordable_sells = min(int(sell_budget_actual / 5.0), levels_per_side)`.
+  Concentrate sell budget into `affordable_sells` levels closest to mid-price. Track `sells_placed` counter in
+  the generation loop to stop generating sell levels beyond what's affordable.
+- `modules/grid_trading.py` (static fallback): Same logic — `affordable_sells` count, `sells_placed` counter,
+  skip sell levels once the affordable count is reached.
+
+### Prevention
+- Both A-S and static grid paths now calculate the maximum number of sell levels that meet the €5 minimum
+  before allocating budget, preventing budget waste from below-minimum sell orders.
+
+---
+
 ## Template for new entries
 
 ```

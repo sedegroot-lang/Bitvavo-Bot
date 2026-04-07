@@ -735,10 +735,12 @@ class GridManager:
         # Count how many buy vs sell levels there will be
         buy_count = sum(1 for p in prices if self._normalize_price(config.market, p) < current_price)
         sell_count = n - buy_count
+        affordable_sells = sell_count  # default: all sell levels affordable
         if buy_only and buy_count > 0:
             # Not enough base asset for even one sell: full budget to buy-side
             amount_per_buy_eur = config.total_investment / buy_count
             amount_per_sell_eur = 0.0
+            affordable_sells = 0
             log(f"[Grid] {config.market}: buy-only mode, full budget to {buy_count} buy levels "
                 f"(EUR {amount_per_buy_eur:.2f}/level)", level='info')
         elif sell_count > 0 and buy_count > 0:
@@ -746,18 +748,28 @@ class GridManager:
             naive_per_level = config.total_investment / n
             sell_budget_needed = naive_per_level * sell_count
             sell_budget_actual = min(sell_budget_needed, base_eur_value)
-            buy_budget = config.total_investment - sell_budget_actual
-            amount_per_buy_eur = buy_budget / buy_count
-            amount_per_sell_eur = sell_budget_actual / sell_count if sell_count > 0 else 0.0
-            if sell_budget_actual < sell_budget_needed:
+            # Determine how many sell levels can meet minimum order (€5)
+            min_order_sell = 5.0
+            affordable_sells = min(int(sell_budget_actual / min_order_sell), sell_count) if sell_budget_actual >= min_order_sell else 0
+            if affordable_sells == 0:
+                # Can't place even one sell above minimum → full budget to buys
+                buy_budget = config.total_investment
+                amount_per_buy_eur = buy_budget / buy_count
+                amount_per_sell_eur = 0.0
+            else:
+                buy_budget = config.total_investment - sell_budget_actual
+                amount_per_buy_eur = buy_budget / buy_count
+                amount_per_sell_eur = sell_budget_actual / affordable_sells
+            if affordable_sells < sell_count:
                 log(f"[Grid] {config.market}: proportional budget — {base_asset} balance "
                     f"covers EUR {base_eur_value:.2f} of EUR {sell_budget_needed:.2f} sell budget, "
                     f"buy={buy_count}x EUR {amount_per_buy_eur:.2f}, "
-                    f"sell={sell_count}x EUR {amount_per_sell_eur:.2f}", level='info')
+                    f"sell={affordable_sells}x EUR {amount_per_sell_eur:.2f}", level='info')
         else:
             amount_per_buy_eur = config.total_investment / n
             amount_per_sell_eur = config.total_investment / n
 
+        sells_placed = 0
         for i, price in enumerate(prices):
             norm_price = self._normalize_price(config.market, price)
             if norm_price <= 0:
@@ -766,8 +778,8 @@ class GridManager:
             # Buy below current price, sell above
             side = 'buy' if norm_price < current_price else 'sell'
 
-            # Skip sell levels in buy-only mode
-            if buy_only and side == 'sell':
+            # Skip sell levels beyond what we can afford
+            if side == 'sell' and sells_placed >= affordable_sells:
                 continue
 
             # Convert EUR amount to base currency amount
@@ -784,6 +796,8 @@ class GridManager:
                 side=side,
                 amount=norm_amount,
             ))
+            if side == 'sell':
+                sells_placed += 1
 
         return levels
 
