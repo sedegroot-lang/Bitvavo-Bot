@@ -1714,6 +1714,8 @@ class GridManager:
         grid_invested = sum(s.config.total_investment for s in self.grids.values()
                            if s.status in ('running', 'placing_orders', 'initialized'))
         remaining_budget = min(available_eur * 0.8, max_grid_investment - grid_invested)
+        # Cap investment_per_grid to remaining budget to avoid rounding mismatch
+        investment_per_grid = min(investment_per_grid, remaining_budget)
 
         log(f"[Grid] Budget check: EUR={available_eur:.2f}, max_invest={max_grid_investment:.0f}, "
             f"already_invested={grid_invested:.0f}, remaining={remaining_budget:.2f}, "
