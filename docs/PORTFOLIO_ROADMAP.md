@@ -21,32 +21,41 @@
 | **Laatste 4 weken** | +€65 (W07-W10) | conservatief, zonder outlier W06 |
 | **Conservatief weekgemiddelde** | ~€14/week | basis voor alle projecties |
 
-### Huidige config (werkelijk, 3 april 2026)
+### Huidige config (werkelijk, 7 april 2026)
 
-> **Roadmap €800 fase geactiveerd op 03-04-2026.** 4e trade slot open, BASE en DCA verhoogd.
+> **Roadmap €1.000 fase geactiveerd op 07-04-2026.** BASE en DCA verhoogd, trailing strakker, Grid BTC aan.
+> €900 fase overgeslagen (portfolio sprong van €800 naar €1.050).
 > HODL scheduler uitgeschakeld.
 
 ```json
 {
   "MAX_OPEN_TRADES": 4,
-  "BASE_AMOUNT_EUR": 52,
+  "BASE_AMOUNT_EUR": 56,
   "DCA_MAX_BUYS": 17,
-  "DCA_AMOUNT_EUR": 27,
+  "DCA_AMOUNT_EUR": 28,
   "DCA_SIZE_MULTIPLIER": 0.9,
   "DCA_DROP_PCT": 0.025,
   "MIN_SCORE_TO_BUY": 7.0,
-  "DEFAULT_TRAILING": 0.025,
+  "DEFAULT_TRAILING": 0.024,
   "TRAILING_ACTIVATION_PCT": 0.015,
   "HARD_SL_ALT_PCT": 0.25,
   "TAKE_PROFIT_TARGETS": [0.03, 0.06, 0.1],
   "TAKE_PROFIT_PERCENTAGES": [0.3, 0.35, 0.35],
-  "GRID_TRADING": { "enabled": false }
+  "GRID_TRADING": {
+    "enabled": true,
+    "preferred_markets": ["BTC-EUR"],
+    "investment_per_grid": 150,
+    "max_total_investment": 150,
+    "num_grids": 5
+  },
+  "BUDGET_RESERVATION": { "grid_pct": 15, "trailing_pct": 85 }
 }
 ```
 
-**DCA-bedragen per level (0.9x)**: €27 → €24,30 → €21,87 → €19,68 → ... → €5,03 (level 17)
-**Typische blootstelling** (2 DCA): €52 + 27 + 24,30 = **€103,30/slot** → 4 slots = **€413**
-**Worst case** (17 DCA): €52 + €227 = **€279/slot** → 4 slots = **€1.116**
+**DCA-bedragen per level (0.9x)**: €28 → €25,20 → €22,68 → €20,41 → ... → €5,21 (level 17)
+**Typische blootstelling** (2 DCA): €56 + 28 + 25,20 = **€109,20/slot** → 4 slots = **€437**
+**Grid BTC**: €150 gereserveerd (15% van portfolio)
+**Worst case** (17 DCA): €56 + €239 = **€295/slot** → 4 slots = **€1.180**
 
 ---
 
@@ -91,10 +100,10 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 | Portfolio | Actie | MAX_TRADES | BASE | DCA_AMT | DCA_DROP | MIN_SCORE | TRAILING | Grid |
 |-----------|-------|------------|------|---------|----------|-----------|----------|------|
-| **€700** ← nu | *Hybrid F_CONSERVATIEF* | 3 | 48 | 25 | 2,5% | 7,0 | 2,5% | Uit |
-| **€800** | ↑ 4 trades, BASE 52, DCA 27 | **4** | **52** | **27** | 2,5% | 7,0 | 2,5% | Uit |
-| **€900** | ↑ BASE 56, DCA 28 | 4 | **56** | **28** | 2,5% | 7,0 | 2,4% | Uit |
-| **€1.000** | ↑ Grid BTC aan (€150) | 4 | 56 | 28 | 2,5% | 7,0 | 2,4% | **€150 BTC** |
+| **€700** ✅ | *Hybrid F_CONSERVATIEF* | 3 | 48 | 25 | 2,5% | 7,0 | 2,5% | Uit |
+| **€800** ✅ | ↑ 4 trades, BASE 52, DCA 27 | **4** | **52** | **27** | 2,5% | 7,0 | 2,5% | Uit |
+| **€900** ⏭️ | ↑ BASE 56, DCA 28 | 4 | **56** | **28** | 2,5% | 7,0 | 2,4% | Uit |
+| **€1.000** ← nu | ↑ Grid BTC aan (€150) | 4 | 56 | 28 | 2,5% | 7,0 | 2,4% | **€150 BTC** |
 | **€1.100** | ↑ BASE 62, DCA 30 | 4 | **62** | **30** | 2,5% | 7,0 | 2,4% | €150 BTC |
 | **€1.200** | ↑ 5 trades | **5** | 62 | 30 | 2,5% | **6,5** | 2,4% | €150 BTC |
 | **€1.300** | ↑ BASE 68, DCA 32 | 5 | **68** | **32** | 2,5% | 6,5 | 2,3% | €150 BTC |
@@ -195,9 +204,12 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 ---
 
-### 📍 €900 — Posities Verder Verhogen
+### 📍 €900 — ~~Posities Verder Verhogen~~ (OVERGESLAGEN)
 
-> **Trigger**: Portfolio ≥ €900, 4e slot werkt soepel.
+> Milestone overgeslagen — direct van €800 naar €1.000+ gegaan op 7 april 2026.
+> Wijzigingen (BASE 56, DCA 28, TRAILING 2.4%) meegenomen in €1.000 activatie.
+
+> ~~**Trigger**: Portfolio ≥ €900, 4e slot werkt soepel.~~
 
 **Wijzigingen**: BASE **52 → 56**, DCA_AMOUNT **27 → 28**, TRAILING **2,5% → 2,4%**
 
@@ -216,9 +228,10 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 ---
 
-### ⭐ €1.000 — GRID TRADING TERUG
+### ⭐ €1.000 — GRID TRADING TERUG (GEACTIVEERD)
 
-> **Trigger**: Portfolio ≥ €1.000 voor 4 weken stabiel. Winrate ≥ 55%. Dit is een grote mijlpaal.
+> **Geactiveerd**: 7 april 2026. Portfolio €1.050. Grid BTC aan met €150.
+> ~~**Trigger**: Portfolio ≥ €1.000 voor 4 weken stabiel. Winrate ≥ 55%.~~ Dit is een grote mijlpaal.
 
 **Wijziging**: Grid BTC aan met €150 budget
 
