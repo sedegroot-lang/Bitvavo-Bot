@@ -56,6 +56,7 @@ def mock_bitvavo():
     bv.ordersOpen = MagicMock(return_value=[])
     bv.tickerPrice = MagicMock(return_value={'price': '90000'})
     bv.ticker24h = MagicMock(return_value={'volumeQuote': '500000'})
+    bv.balance = MagicMock(return_value=[{'symbol': 'BTC', 'available': '1.0'}])
     bv.candles = MagicMock(return_value=[
         [int(time.time() * 1000) - i * 3600000, '89000', '91000', '88500', str(89000 + (i % 10) * 100), '10']
         for i in range(48)

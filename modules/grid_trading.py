@@ -654,6 +654,25 @@ class GridManager:
         levels = []
         n = config.num_grids
 
+        # ── Check base asset balance for budget allocation ──
+        base_asset = config.market.split('-')[0]
+        base_balance = 0.0
+        try:
+            bals = self._safe_call(self.bitvavo.balance, {'symbol': base_asset})
+            if isinstance(bals, list):
+                for b in bals:
+                    if isinstance(b, dict) and b.get('symbol') == base_asset:
+                        base_balance = float(b.get('available', 0) or 0)
+                        break
+            elif isinstance(bals, dict):
+                base_balance = float(bals.get('available', 0) or 0)
+        except Exception:
+            pass
+        # EUR value of base asset we can actually place sell orders for
+        base_eur_value = base_balance * current_price if current_price > 0 else 0.0
+        # If we can't even cover one minimum sell order, treat as buy-only
+        buy_only = base_eur_value < 5.0
+
         # ── Try Avellaneda-Stoikov dynamic spacing ──
         if self.bot_config.get('AVELLANEDA_STOIKOV_GRID', True):
             try:
@@ -666,6 +685,8 @@ class GridManager:
                         num_levels=n,
                         total_investment_eur=config.total_investment,
                         market=config.market,
+                        buy_only=buy_only,
+                        base_eur_value=base_eur_value,
                     )
                     as_levels = as_result.get('levels', [])
                     if as_levels:
@@ -711,7 +732,31 @@ class GridManager:
             prices = [config.lower_price + step * i for i in range(n)]
 
         # Investment per grid level in EUR
-        amount_per_level_eur = config.total_investment / n
+        # Count how many buy vs sell levels there will be
+        buy_count = sum(1 for p in prices if self._normalize_price(config.market, p) < current_price)
+        sell_count = n - buy_count
+        if buy_only and buy_count > 0:
+            # Not enough base asset for even one sell: full budget to buy-side
+            amount_per_buy_eur = config.total_investment / buy_count
+            amount_per_sell_eur = 0.0
+            log(f"[Grid] {config.market}: buy-only mode, full budget to {buy_count} buy levels "
+                f"(EUR {amount_per_buy_eur:.2f}/level)", level='info')
+        elif sell_count > 0 and buy_count > 0:
+            # Proportional: sell budget = what we can actually place (capped by base asset value)
+            naive_per_level = config.total_investment / n
+            sell_budget_needed = naive_per_level * sell_count
+            sell_budget_actual = min(sell_budget_needed, base_eur_value)
+            buy_budget = config.total_investment - sell_budget_actual
+            amount_per_buy_eur = buy_budget / buy_count
+            amount_per_sell_eur = sell_budget_actual / sell_count if sell_count > 0 else 0.0
+            if sell_budget_actual < sell_budget_needed:
+                log(f"[Grid] {config.market}: proportional budget — {base_asset} balance "
+                    f"covers EUR {base_eur_value:.2f} of EUR {sell_budget_needed:.2f} sell budget, "
+                    f"buy={buy_count}x EUR {amount_per_buy_eur:.2f}, "
+                    f"sell={sell_count}x EUR {amount_per_sell_eur:.2f}", level='info')
+        else:
+            amount_per_buy_eur = config.total_investment / n
+            amount_per_sell_eur = config.total_investment / n
 
         for i, price in enumerate(prices):
             norm_price = self._normalize_price(config.market, price)
@@ -721,7 +766,12 @@ class GridManager:
             # Buy below current price, sell above
             side = 'buy' if norm_price < current_price else 'sell'
 
+            # Skip sell levels in buy-only mode
+            if buy_only and side == 'sell':
+                continue
+
             # Convert EUR amount to base currency amount
+            amount_per_level_eur = amount_per_buy_eur if side == 'buy' else amount_per_sell_eur
             amount = amount_per_level_eur / norm_price
             norm_amount = self._normalize_amount(config.market, amount)
 

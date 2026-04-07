@@ -43,6 +43,7 @@ def _make_manager(investment: float = 50.0, num_grids: int = 10, **overrides) ->
         'filledAmount': '0',
     }
     mock_bv.cancelOrder.return_value = {'orderId': 'cancelled'}
+    mock_bv.balance.return_value = [{'symbol': 'ETH', 'available': '100.0'}]
 
     config = {
         'GRID_TRADING': {

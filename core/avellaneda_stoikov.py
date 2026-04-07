@@ -158,6 +158,8 @@ def calculate_dynamic_grid_levels(
     recent_fills: int = 10,
     fill_window_hours: float = 24.0,
     market: str = "BTC-EUR",
+    buy_only: bool = False,
+    base_eur_value: float = 0.0,
 ) -> Dict[str, Any]:
     """Calculate dynamic grid levels using Avellaneda-Stoikov model.
 
@@ -186,7 +188,21 @@ def calculate_dynamic_grid_levels(
     # 6. Generate grid levels
     # Half above skewed mid (sell), half below (buy)
     levels_per_side = num_levels // 2
-    amount_per_level = total_investment_eur / num_levels
+    if buy_only:
+        # Not enough base asset for even one sell: full budget to buy-side
+        amount_per_buy = total_investment_eur / levels_per_side
+        amount_per_sell = 0.0
+    elif base_eur_value > 0 and levels_per_side > 0:
+        # Proportional: sell budget capped by available base asset value
+        naive_per_level = total_investment_eur / num_levels
+        sell_budget_needed = naive_per_level * levels_per_side
+        sell_budget_actual = min(sell_budget_needed, base_eur_value)
+        buy_budget = total_investment_eur - sell_budget_actual
+        amount_per_buy = buy_budget / levels_per_side
+        amount_per_sell = sell_budget_actual / levels_per_side
+    else:
+        amount_per_buy = total_investment_eur / num_levels
+        amount_per_sell = total_investment_eur / num_levels
 
     levels = []
 
@@ -204,17 +220,18 @@ def calculate_dynamic_grid_levels(
         levels.append({
             "price": round(buy_price, 8),
             "side": "buy",
-            "amount_eur": round(amount_per_level, 2),
+            "amount_eur": round(amount_per_buy, 2),
             "level_id": i - 1,
             "spread_pct": round(level_spread * 100, 3),
         })
-        levels.append({
-            "price": round(sell_price, 8),
-            "side": "sell",
-            "amount_eur": round(amount_per_level, 2),
-            "level_id": levels_per_side + i - 1,
-            "spread_pct": round(level_spread * 100, 3),
-        })
+        if not buy_only:
+            levels.append({
+                "price": round(sell_price, 8),
+                "side": "sell",
+                "amount_eur": round(amount_per_sell, 2),
+                "level_id": levels_per_side + i - 1,
+                "spread_pct": round(level_spread * 100, 3),
+            })
 
     # Sort by price
     levels.sort(key=lambda x: x["price"])
