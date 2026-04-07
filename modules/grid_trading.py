@@ -1678,14 +1678,8 @@ class GridManager:
         available_eur = self._get_eur_balance()
 
         # Budget reservation: dynamic or static mode
-        budget_cfg = {}
-        try:
-            import json as _json
-            cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'bot_config.json')
-            with open(cfg_path, 'r', encoding='utf-8-sig') as _f:
-                budget_cfg = _json.load(_f).get('BUDGET_RESERVATION', {})
-        except Exception:
-            pass
+        # Use merged bot_config (includes local overrides) instead of reading raw file
+        budget_cfg = self.bot_config.get('BUDGET_RESERVATION', {})
         if budget_cfg.get('enabled', False):
             mode = budget_cfg.get('mode', 'static')
             if mode == 'dynamic':
