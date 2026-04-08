@@ -21,18 +21,18 @@
 | **Laatste 4 weken** | +€65 (W07-W10) | conservatief, zonder outlier W06 |
 | **Conservatief weekgemiddelde** | ~€14/week | basis voor alle projecties |
 
-### Huidige config (werkelijk, 7 april 2026)
+### Huidige config (werkelijk, 8 april 2026)
 
-> **Roadmap €1.000 fase geactiveerd op 07-04-2026.** BASE en DCA verhoogd, trailing strakker, Grid BTC aan.
+> **Roadmap €1.100 fase geactiveerd op 08-04-2026.** BASE 56→62, DCA 28→30.
 > €900 fase overgeslagen (portfolio sprong van €800 naar €1.050).
-> HODL scheduler uitgeschakeld.
+> Grid BTC actief sinds €1.000 fase (07-04-2026). HODL scheduler uitgeschakeld.
 
 ```json
 {
   "MAX_OPEN_TRADES": 4,
-  "BASE_AMOUNT_EUR": 56,
+  "BASE_AMOUNT_EUR": 62,
   "DCA_MAX_BUYS": 17,
-  "DCA_AMOUNT_EUR": 28,
+  "DCA_AMOUNT_EUR": 30,
   "DCA_SIZE_MULTIPLIER": 0.9,
   "DCA_DROP_PCT": 0.025,
   "MIN_SCORE_TO_BUY": 7.0,
@@ -52,10 +52,10 @@
 }
 ```
 
-**DCA-bedragen per level (0.9x)**: €28 → €25,20 → €22,68 → €20,41 → ... → €5,21 (level 17)
-**Typische blootstelling** (2 DCA): €56 + 28 + 25,20 = **€109,20/slot** → 4 slots = **€437**
+**DCA-bedragen per level (0.9x)**: €30 → €27,00 → €24,30 → €21,87 → ... → €5,58 (level 17)
+**Typische blootstelling** (2 DCA): €62 + 30 + 27,00 = **€119,00/slot** → 4 slots = **€476**
 **Grid BTC**: €150 gereserveerd (15% van portfolio)
-**Worst case** (17 DCA): €56 + €239 = **€295/slot** → 4 slots = **€1.180**
+**Worst case** (17 DCA): €62 + €256 = **€318/slot** → 4 slots = **€1.272**
 
 ---
 
@@ -103,8 +103,8 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 | **€700** ✅ | *Hybrid F_CONSERVATIEF* | 3 | 48 | 25 | 2,5% | 7,0 | 2,5% | Uit |
 | **€800** ✅ | ↑ 4 trades, BASE 52, DCA 27 | **4** | **52** | **27** | 2,5% | 7,0 | 2,5% | Uit |
 | **€900** ⏭️ | ↑ BASE 56, DCA 28 | 4 | **56** | **28** | 2,5% | 7,0 | 2,4% | Uit |
-| **€1.000** ← nu | ↑ Grid BTC aan (€150) | 4 | 56 | 28 | 2,5% | 7,0 | 2,4% | **€150 BTC** |
-| **€1.100** | ↑ BASE 62, DCA 30 | 4 | **62** | **30** | 2,5% | 7,0 | 2,4% | €150 BTC |
+| **€1.000** ✅ | ↑ Grid BTC aan (€150) | 4 | 56 | 28 | 2,5% | 7,0 | 2,4% | **€150 BTC** |
+| **€1.100** ← nu | ↑ BASE 62, DCA 30 | 4 | **62** | **30** | 2,5% | 7,0 | 2,4% | €150 BTC |
 | **€1.200** | ↑ 5 trades | **5** | 62 | 30 | 2,5% | **6,5** | 2,4% | €150 BTC |
 | **€1.300** | ↑ BASE 68, DCA 32 | 5 | **68** | **32** | 2,5% | 6,5 | 2,3% | €150 BTC |
 | **€1.400** | ↑ Grid ETH erbij (€250 tot.) | 5 | 68 | 32 | 2,5% | 6,5 | 2,3% | **€250 BTC+ETH** |
@@ -589,9 +589,9 @@ Vink af wanneer bereikt:
 - [x] €600 — BASE → 42 (overgeslagen — direct naar €700)
 - [x] €700 — Hybrid F_CONSERVATIEF DCA: DCA=25, MULT=0.9, DROP=2.5% (26 maart 2026)
 - [x] €800 — 4 trades, BASE → 52, DCA → 27 (3 april 2026)
-- [ ] €900 — BASE → 56, DCA → 28
-- [ ] €1.000 ⭐ — Grid BTC aan (€150)
-- [ ] €1.100 — BASE → 62, DCA → 30
+- [x] €900 — BASE → 56, DCA → 28 (overgeslagen → meegenomen in €1.000)
+- [x] €1.000 ⭐ — Grid BTC aan (€150) (7 april 2026)
+- [x] €1.100 ← nu — BASE → 62, DCA → 30 (8 april 2026)
 - [ ] €1.200 — 5 trades, MIN_SCORE → 6,5
 - [ ] €1.300 — BASE → 68, DCA → 32
 - [ ] €1.400 — Grid ETH erbij (€250 totaal)
@@ -613,6 +613,6 @@ Vink af wanneer bereikt:
 
 ---
 
-*Laatste update: 3 april 2026 — Portfolio ~€800, Roadmap €800 fase actief, HODL scheduler uit*
-*Config: BASE=52, DCA=27, MULT=0.9, DCA_DROP=2.5%, 4 slots, grid uit*
-*Volgende mijlpaal: €900 (BASE → 56, DCA → 28, TRAILING → 2,4%) — wacht 2 weken stabilisatie*
+*Laatste update: 8 april 2026 — Portfolio ~€1.087, Roadmap €1.100 fase actief, Grid BTC draait*
+*Config: BASE=62, DCA=30, MULT=0.9, DCA_DROP=2.5%, 4 slots, grid BTC €150*
+*Volgende mijlpaal: €1.200 (5 trades, MIN_SCORE → 6,5) — wacht 2 weken stabilisatie*
