@@ -64,6 +64,27 @@ def sync_with_bitvavo():
         except Exception as e:
             log(f"Sync: failed to load HODL markets: {e}", level='warning')
 
+        # Exclude grid-managed markets from trailing sync (FIX #014)
+        grid_markets = set()
+        try:
+            grid_cfg = CONFIG.get('GRID_TRADING') or {}
+            if grid_cfg.get('enabled'):
+                import json as _json
+                _grid_states_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    'data', 'grid_states.json',
+                )
+                if os.path.exists(_grid_states_path):
+                    with open(_grid_states_path, 'r', encoding='utf-8') as _gf:
+                        _gs = _json.load(_gf)
+                    for _gm, _gv in _gs.items():
+                        if isinstance(_gv, dict) and _gv.get('status') in ('running', 'paused', 'initialized'):
+                            grid_markets.add(_gm.upper())
+                    if grid_markets:
+                        log(f"Sync: excluding grid markets from trailing: {grid_markets}", level='info')
+        except Exception as e:
+            log(f"Sync: failed to load grid markets: {e}", level='warning')
+
         DCA_MAX_BUYS = int(CONFIG.get('DCA_MAX_BUYS', 3))
         DCA_DROP_PCT = float(CONFIG.get('DCA_DROP_PCT', 0.05))
 
@@ -78,6 +99,10 @@ def sync_with_bitvavo():
 
             if market.upper() in hodl_markets:
                 log(f"Sync: skipping HODL asset {market} (managed by HODL scheduler)", level='info')
+                continue
+
+            if market.upper() in grid_markets:
+                log(f"Sync: skipping grid asset {market} (managed by grid module)", level='info')
                 continue
 
             try:

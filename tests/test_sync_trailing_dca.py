@@ -29,6 +29,7 @@ class _FakeCostBasis:
     invested_eur: float = 0.0
     earliest_timestamp: float = 0.0
     buy_order_count: int = 0
+    fills_used: int = 0
 
 
 class _FakeState:

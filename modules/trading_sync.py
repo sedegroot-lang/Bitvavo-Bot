@@ -360,7 +360,9 @@ class TradingSynchronizer:
                     level="warning",
                 )
 
-        # align amounts with live balances
+        # align amounts with live balances AND re-derive invested_eur when
+        # amount changed (FIX #014: trading_sync updated amount without
+        # recalculating invested_eur, causing invested_eur to go stale).
         for market, entry in open_state.items():
             live_amount = open_markets.get(market)
             if live_amount is None:
@@ -370,8 +372,37 @@ class TradingSynchronizer:
             except Exception:
                 current_amount = 0.0
             if abs(current_amount - live_amount) > 1e-8:
+                pct_change = abs(current_amount - live_amount) / max(current_amount, 1e-12)
                 entry["amount"] = live_amount
                 changes_made = True
+                # If amount changed significantly (>0.1%), re-derive cost basis
+                # so invested_eur stays accurate (see FIX_LOG #014).
+                if pct_change > 0.001:
+                    try:
+                        from modules.cost_basis import derive_cost_basis
+                        _basis = derive_cost_basis(
+                            ctx.bitvavo, market, live_amount, tolerance=0.02
+                        )
+                        if _basis and getattr(_basis, "avg_price", 0) > 0:
+                            old_inv = float(entry.get("invested_eur", 0) or 0)
+                            entry["buy_price"] = float(_basis.avg_price)
+                            entry["invested_eur"] = float(_basis.invested_eur)
+                            entry["total_invested_eur"] = float(_basis.invested_eur)
+                            if _basis.earliest_timestamp:
+                                entry.setdefault("opened_ts", float(_basis.earliest_timestamp))
+                            log(
+                                f"Sync: amount changed for {market} "
+                                f"({current_amount:.6f} → {live_amount:.6f}, "
+                                f"{pct_change*100:.1f}%) — re-derived invested "
+                                f"€{old_inv:.2f} → €{_basis.invested_eur:.2f}",
+                                level="warning",
+                            )
+                    except Exception as deriv_err:
+                        log(
+                            f"Sync: derive_cost_basis failed for {market} "
+                            f"after amount change: {deriv_err}",
+                            level="error",
+                        )
 
         if changes_made:
             data["open"] = open_state

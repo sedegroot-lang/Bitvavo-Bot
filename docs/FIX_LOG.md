@@ -514,6 +514,43 @@ falls below €5, every sell level gets filtered out.
 
 ---
 
+## #014 — invested_eur not updated after amount change in trading_sync + BTC grid ghost trade (2026-04-08)
+
+### Symptom
+1. **UNI-EUR**: Dashboard showed invested=€49.04 but actual cost basis was €91.22. A second buy
+   (DCA) was executed on Bitvavo, the amount was updated but invested_eur was NOT recalculated.
+2. **BTC-EUR**: Dashboard showed a ghost trade with invested=€0.03. This was BTC dust from the
+   grid trading module being picked up as a regular trade by the sync engine.
+
+### Root Cause
+
+1. **`modules/trading_sync.py`** (startup sync): When live amount differs from trade_log amount,
+   `entry["amount"] = live_amount` was updated but `invested_eur` was NOT recalculated via
+   `derive_cost_basis()`. The amount-only update meant that by the time `bot/sync_engine.py`
+   ran its 4-check reconciliation, Check 1 (amount changed) no longer triggered because the
+   amount already matched. Check 4 (divergence >2%) should have caught it eventually but
+   the bug persisted from the startup sync gap.
+
+2. **`bot/sync_engine.py`**: The balance iteration loop excluded HODL markets but NOT grid-managed
+   markets. BTC balance (from active grid orders) was detected as a new position and created
+   as a dust trade entry.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/trading_sync.py` | When amount changes >0.1%, now calls `derive_cost_basis()` to recalculate `buy_price`, `invested_eur`, `total_invested_eur` from Bitvavo order history |
+| `bot/sync_engine.py` | Added grid market exclusion: reads `data/grid_states.json` for running/paused/initialized grids, skips those markets in the balance sync loop |
+| `data/trade_log.json` | UNI-EUR: `invested_eur` corrected 49.04 → 91.22 via `derive_cost_basis()` |
+| `tests/test_sync_trailing_dca.py` | Fixed pre-existing test failure: added missing `fills_used` field to `_FakeCostBasis` dataclass |
+
+### Prevention
+- `trading_sync.py` now derives cost basis on ANY significant amount change, not just updating amount
+- Grid-managed markets are excluded from sync_engine balance detection (same pattern as HODL exclusion)
+- **Rule**: When updating `amount`, ALWAYS recalculate `invested_eur` via `derive_cost_basis()` — NEVER update amount alone
+
+---
+
 ## Template for new entries
 
 ```
