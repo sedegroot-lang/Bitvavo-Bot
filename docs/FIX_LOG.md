@@ -706,6 +706,35 @@ Three code paths all had the same flaw — **no fallback to the trade archive** 
 
 ---
 
+## #021 — Grid orders never placed: corrupt state + missing min base amount check (2026-04-09)
+
+### Symptom
+Grid trading enabled in config but no new orders placed on Bitvavo. BTC-EUR grid detected as "zombie" and paused. ETH-EUR grid had fake `test-order-123` order IDs causing 97.92% phantom stop-loss.
+
+### Root Cause
+1. **Corrupt grid_states.json**: BTC-EUR had `auto_created: false`, 8 levels with amounts ~0.00007 BTC (below Bitvavo min 0.0001 BTC), €50 investment. ETH-EUR had `order_id: "test-order-123"` — test data that leaked into production state. Origin: likely dashboard/manual creation with wrong params or state file corruption.
+2. **No min BASE amount validation**: `create_grid()` and `_calculate_grid_levels()` only checked EUR value ≥ €5.50 per level, not Bitvavo's minimum base order size. For BTC at €85k: €6.25/level = 0.0000735 BTC < 0.0001 minimum. All orders rejected by `_place_limit_order()`.
+3. **No recovery for never-started grids**: `is_broken` cleanup check only matched `status in ('stopped', 'error')` — grids stuck in `initialized` or `placing_orders` (never reached 'running') were never cleaned up.
+4. **`_cancel_order` passed operatorId positionally**: `self._safe_call(self.bitvavo.cancelOrder, market, order_id, operator_id)` passed operatorId as positional arg instead of keyword, potentially causing cancel failures.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `data/grid_states.json` | Reset to `{}` (backup in `grid_states_backup_corrupt_20260409.json`). Auto_manage will create fresh grids with correct dynamic budget params. |
+| `modules/grid_trading.py` `_calculate_grid_levels()` | Added min BASE amount check: reduces `num_grids` until `investment/n/price >= min_order_size`. Returns empty if impossible. |
+| `modules/grid_trading.py` `_auto_create_grids()` | Added per-candidate min base amount check. Skips markets where order amounts would be below minimum, reduces grid count per market when needed. |
+| `modules/grid_trading.py` `auto_manage()` Step 4 | Extended `is_broken` to also match `initialized` and `placing_orders` status + `cancelled` levels + 5-min grace period. Prevents stuck grids from blocking new creation indefinitely. |
+| `modules/grid_trading.py` `_cancel_order()` | Changed operatorId to keyword argument: `**{'operatorId': str(operator_id)}` — matches trailing_bot.py convention. |
+
+### Prevention
+- Min base amount validation prevents creating levels that `_place_limit_order()` will reject.
+- Broken grid cleanup now catches all non-running states with 0 trades after 5-min grace.
+- Dynamic budget + proper num_grids reduction ensures BTC grid levels are large enough.
+- This is the 3rd grid state corruption fix (see #011, #012). Consider adding grid state validation on load.
+
+---
+
 ## Template for new entries
 
 ```

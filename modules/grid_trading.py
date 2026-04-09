@@ -542,7 +542,10 @@ class GridManager:
             return False
         try:
             operator_id = self.bot_config.get('OPERATOR_ID')
-            resp = self._safe_call(self.bitvavo.cancelOrder, market, order_id, operator_id)
+            kwargs = {}
+            if operator_id:
+                kwargs['operatorId'] = str(operator_id)
+            resp = self._safe_call(self.bitvavo.cancelOrder, market, order_id, **kwargs)
             if isinstance(resp, dict) and resp.get('orderId'):
                 log(f"[Grid] Cancelled order {order_id} for {market}", level='info')
                 return True
@@ -737,6 +740,19 @@ class GridManager:
         while n > 3 and (config.total_investment / n) < min_order_eur:
             n -= 1
             config.num_grids = n
+
+        # ── Enforce minimum BASE amount (e.g. BTC min 0.0001) ──
+        min_base = self._get_min_order_size(config.market)
+        if min_base > 0 and current_price > 0:
+            while n > 3 and (config.total_investment / n / current_price) < min_base:
+                n -= 1
+                config.num_grids = n
+            if (config.total_investment / n / current_price) < min_base:
+                log(f"[Grid] Cannot create levels for {config.market}: "
+                    f"investment {config.total_investment:.0f} EUR / {n} grids "
+                    f"= {config.total_investment/n/current_price:.8f} {config.market.split('-')[0]} "
+                    f"< min {min_base}", level='warning')
+                return []
 
         # ── Fallback: static arithmetic/geometric spacing ──
         if config.grid_mode == 'geometric':
@@ -1703,8 +1719,10 @@ class GridManager:
         cutoff = time.time() - 86400
         for market in list(self.grids.keys()):
             state = self.grids[market]
-            is_broken = (state.status in ('stopped', 'error') and state.total_trades == 0
-                         and all(l.status in ('pending', 'error') for l in state.levels))
+            is_broken = (state.status in ('stopped', 'error', 'initialized', 'placing_orders')
+                         and state.total_trades == 0
+                         and all(l.status in ('pending', 'error', 'cancelled') for l in state.levels)
+                         and (time.time() - state.last_update) > 300)  # Give 5 min grace period
             is_stale = (state.status in ('stopped', 'error') and state.last_update < cutoff)
             # Detect "zombie" grids: status=running but no active orders on exchange
             # IMPORTANT: Don't count cancelled sells that are waiting for counter-order
@@ -1835,11 +1853,28 @@ class GridManager:
             market = candidate['market']
             actual_investment = min(investment_per_grid, remaining_budget)
 
+            # ── Enforce minimum BASE amount for this market ──
+            market_price = candidate.get('price', 0)
+            if market_price > 0:
+                min_base = self._get_min_order_size(market)
+                effective_num = num_grids
+                if min_base > 0:
+                    while effective_num > 3 and (actual_investment / effective_num / market_price) < min_base:
+                        effective_num -= 1
+                    if (actual_investment / effective_num / market_price) < min_base:
+                        log(f"[Grid] Skipping {market}: {actual_investment:.0f} EUR / {effective_num} grids "
+                            f"= {actual_investment/effective_num/market_price:.8f} < min {min_base}",
+                            level='warning')
+                        continue
+                    if effective_num != num_grids:
+                        log(f"[Grid] {market}: reduced grids {num_grids}→{effective_num} "
+                            f"for min base amount {min_base}", level='info')
+
             state = self.create_grid(
                 market=market,
                 lower_price=candidate['suggested_lower'],
                 upper_price=candidate['suggested_upper'],
-                num_grids=num_grids,
+                num_grids=effective_num if market_price > 0 else num_grids,
                 total_investment=actual_investment,
                 grid_mode=grid_mode,
                 auto_rebalance=True,
