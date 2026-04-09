@@ -769,6 +769,28 @@ Partial TP sells correctly keep `sell_all=False` (only sell a portion).
 
 ---
 
+## #023 — SOL/NEAR invested_eur not reflecting sells and manual buys (2026-04-09)
+
+### Symptom
+SOL-EUR showed invested_eur=€24.06 but Bitvavo order history: 3 buys (€36.08) minus 2 sells (€14.10) = net €21.90. The 2 sells were not deducted from invested_eur. NEAR-EUR showed invested_eur=€4.50 after user manually bought €5.50 more — amount synced (8.60 tokens) but cost stayed at €4.50.
+
+### Root Cause
+The sync engine's immutability guard (`invested_sync.py`) only updates invested_eur when it's 0 or missing. Once set, it's never overwritten by normal sync cycles. This is correct for normal operation (prevents partial TP corruption) but means manual buys and untracked sells are never reconciled into invested_eur.
+
+### Fix Applied
+| File | Change |
+|------|--------|
+| `data/trade_log.json` | SOL-EUR: invested_eur 24.06→21.90, total_invested_eur 24.06→21.90 (FIFO-derived) |
+| `data/trade_log.json` | NEAR-EUR: invested_eur 4.50→10.00, total_invested_eur 4.50→10.00, amount 4.72→8.60 (FIFO-derived) |
+
+Values derived via `modules.cost_basis.derive_cost_basis()` using full FIFO lot tracking from Bitvavo order history.
+
+### Prevention
+- When users report cost basis discrepancies, run `derive_cost_basis()` to get the true FIFO value and compare with stored invested_eur
+- The sync engine correctly protects invested_eur from overwrites; manual corrections need explicit FIFO verification
+
+---
+
 ## Template for new entries
 
 ```
