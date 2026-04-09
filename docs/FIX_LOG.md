@@ -602,6 +602,25 @@ Three interrelated bugs:
 
 ---
 
+## #017 — Grid vol-adaptive inflates num_grids 5→20, dead config keys (2026-04-09)
+
+### Symptom
+BTC-EUR grid had 11 open orders on Bitvavo instead of ~5 (user configured `num_grids: 5`). `investment_per_grid` and `max_total_investment` in config were hardcoded at 150 despite BUDGET_RESERVATION dynamic mode handling it.
+
+### Root Cause
+1. **Volatility-adaptive runaway**: `get_volatility_adjusted_num_grids()` in `core/avellaneda_stoikov.py` has `max_grids=20` default. With BTC's low hourly volatility (σ≈0.0013), `vol_ratio = 0.26`, `adjusted = 5/0.26 ≈ 19` → capped at 20. The calling code in `auto_manage()` passed `config.num_grids` (the already-mutated state value) instead of the original user config.
+2. **Dead config keys**: `investment_per_grid` and `max_total_investment` in GRID_TRADING are overridden when `BUDGET_RESERVATION.enabled=true, mode="dynamic"` — the actual investment is `total_account_value × grid_pct / max_grids`. Hardcoded 150 was misleading.
+
+### Fix Applied
+1. `modules/grid_trading.py` Step 3b: Read `user_num_grids` from GRID_TRADING config (original value, not mutated state). Pass `max_grids=min(20, user_num_grids * 2)` to cap volatility scaling (5→max 10, not 5→20).
+2. Removed `investment_per_grid` and `max_total_investment` from `bot_config_local.json` — BUDGET_RESERVATION dynamic mode provides the actual values.
+
+### Prevention
+- Volatility-adaptive now capped at 2× user-configured num_grids. Uses original config as base, not the mutated grid state.
+- Dead config keys removed to avoid confusion about what actually controls investment sizing.
+
+---
+
 ## Template for new entries
 
 ```

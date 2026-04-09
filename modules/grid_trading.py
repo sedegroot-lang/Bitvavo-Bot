@@ -1605,6 +1605,8 @@ class GridManager:
         # Auto-adjust num_grids if real-time volatility deviates >30% from grid creation
         # Cooldown: only check every 6 hours to prevent over-triggering
         vol_adapt_cooldown = 6 * 3600  # 6 hours
+        gcfg_va = self.bot_config.get('GRID_TRADING', {})
+        user_num_grids = int(gcfg_va.get('num_grids', 8))  # Original user-configured value
         for market, state in list(self.grids.items()):
             if state.status != 'running':
                 continue
@@ -1619,7 +1621,10 @@ class GridManager:
                 candles = self._get_candles(market, '1h', 72)
                 if not candles or len(candles) < 24:
                     continue
-                adjusted = get_volatility_adjusted_num_grids(config.num_grids, candles)
+                # Use user-configured num_grids as base, cap max at 2× user value
+                vol_max_grids = min(20, user_num_grids * 2)
+                adjusted = get_volatility_adjusted_num_grids(user_num_grids, candles,
+                                                              max_grids=vol_max_grids)
                 # Enforce minimum order value: never increase num_grids beyond affordable
                 min_order_eur = 5.50
                 max_affordable_grids = max(3, int(config.total_investment / min_order_eur))
