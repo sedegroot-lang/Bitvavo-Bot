@@ -179,7 +179,8 @@ def _finalize_close_trade(
     # Carry forward useful metadata from open trade
     for _meta_key in ('score', 'rsi_at_entry', 'volume_24h_eur', 'volatility_at_entry',
                       'opened_regime', 'macd_at_entry', 'sma_short_at_entry', 'sma_long_at_entry',
-                      'dca_buys', 'tp_levels_done'):
+                      'dca_buys', 'tp_levels_done', 'highest_price', 'trailing_activation_pct',
+                      'base_trailing_pct'):
         if _meta_key not in closed_entry and trade and _meta_key in trade:
             closed_entry[_meta_key] = trade[_meta_key]
     archive_trade(**closed_entry)

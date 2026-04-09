@@ -551,6 +551,27 @@ falls below €5, every sell level gets filtered out.
 
 ---
 
+## #015 — highest_price lost on trade archival, blocking trailing analysis (2026-04-08)
+
+### Symptom
+All 354 archived trailing_tp trades have `highest_price=0` or missing. Without peak price data, it's impossible to backtest trailing stop configurations (activation %, trailing %, stepped levels) because we don't know how high each trade went before exit.
+
+### Root Cause
+`_finalize_close_trade()` in `trailing_bot.py` computed `max_profit_pct` from the open trade's `highest_price`, but never carried the raw `highest_price` value into the archived `closed_entry`. The metadata carry-forward loop only included `score`, `rsi_at_entry`, `volume_24h_eur`, `volatility_at_entry`, `opened_regime`, `macd_at_entry`, `sma_short_at_entry`, `sma_long_at_entry`, `dca_buys`, `tp_levels_done` — no trailing-related fields.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `trailing_bot.py` `_finalize_close_trade()` | Added `highest_price`, `trailing_activation_pct`, `base_trailing_pct` to the metadata carry-forward loop. These fields are now preserved in archived trades. |
+
+### Prevention
+- New trades closed after this fix will have `highest_price` in their archive record
+- After 4-8 weeks of data accumulation, trailing settings can be properly backtested using real peak data
+- **Rule**: When adding new per-trade tracking fields, always ensure they are included in `_finalize_close_trade()`'s metadata carry-forward list
+
+---
+
 ## Template for new entries
 
 ```
