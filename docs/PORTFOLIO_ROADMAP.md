@@ -37,10 +37,9 @@
   "DCA_DROP_PCT": 0.025,
   "MIN_SCORE_TO_BUY": 7.0,
   "DEFAULT_TRAILING": 0.024,
-  "TRAILING_ACTIVATION_PCT": 0.015,
+  "TRAILING_ACTIVATION_PCT": 0.020,
+  "TAKE_PROFIT_ENABLED": false,
   "HARD_SL_ALT_PCT": 0.25,
-  "TAKE_PROFIT_TARGETS": [0.03, 0.06, 0.1],
-  "TAKE_PROFIT_PERCENTAGES": [0.3, 0.35, 0.35],
   "GRID_TRADING": {
     "enabled": true,
     "preferred_markets": ["BTC-EUR"],
@@ -604,6 +603,6 @@ Vink af wanneer bereikt:
 
 ---
 
-*Laatste update: 10 april 2026 — Roadmap geherstructureerd: grotere stappen (€200-€500), grid SOL→LINK, 2 grids tot €2.500*
-*Config: BASE=62, DCA=30, MULT=0.9, DCA_DROP=2.5%, 5 slots, grid BTC €150, MIN_SCORE=7.0*
+*Laatste update: 9 april 2026 — Trailing activation 1.5→2.0%, Partial TP uitgeschakeld, roadmap geherstructureerd*
+*Config: BASE=62, DCA=30, MULT=0.9, DCA_DROP=2.5%, 5 slots, grid BTC €150, MIN_SCORE=7.0, TRAILING_ACT=2.0%, Partial TP=UIT*
 *Volgende mijlpaal: €1.400 (BASE → 68, DCA → 32, Grid +ETH) — wacht 2 weken stabilisatie*
