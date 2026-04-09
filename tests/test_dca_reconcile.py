@@ -301,6 +301,36 @@ class TestReconcileFinancials:
         result = reconcile_trade(bv, "UNI-EUR", trade)
         assert not result.amount_corrected
 
+    def test_initial_invested_eur_corrected_after_sync(self):
+        """After sync, initial_invested_eur may be set to total cost → corrected to initial buy only."""
+        fills = [
+            _make_fill(order_id="ord-initial", amount=20, price=2.5, fee=0.25, timestamp=1700000000000),
+            _make_fill(order_id="ord-dca1", amount=15, price=2.3, fee=0.15, timestamp=1700001000000),
+        ]
+        bv = _mock_bitvavo(fills)
+        # initial_invested_eur wrongly set to total cost (84.90) instead of initial only (50.25)
+        trade = _make_trade(
+            initial_invested_eur=84.90,
+            invested_eur=84.90,
+            total_invested_eur=84.90,
+            amount=35.0,
+        )
+        result = reconcile_trade(bv, "UNI-EUR", trade)
+        # initial_invested_eur should be corrected to initial buy cost: 20*2.5 + 0.25 = 50.25
+        assert trade["initial_invested_eur"] == pytest.approx(50.25, abs=0.01)
+        assert any("initial_invested_eur" in r for r in result.repairs)
+
+    def test_initial_invested_eur_not_changed_without_dcas(self):
+        """Without DCA orders, initial_invested_eur is not touched even if slightly off."""
+        fills = [
+            _make_fill(order_id="ord-initial", amount=20, price=2.5, fee=0.25, timestamp=1700000000000),
+        ]
+        bv = _mock_bitvavo(fills)
+        trade = _make_trade(initial_invested_eur=51.0, invested_eur=51.0, total_invested_eur=51.0)
+        result = reconcile_trade(bv, "UNI-EUR", trade)
+        # No DCAs → don't touch initial_invested_eur (slight diff is OK)
+        assert trade["initial_invested_eur"] == 51.0
+
 
 # ---------------------------------------------------------------------------
 # Dry run

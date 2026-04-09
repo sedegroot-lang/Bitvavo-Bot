@@ -336,12 +336,23 @@ def reconcile_trade(
                     trade["buy_price"] = round(expected_bp, 12)
                     buy_price_corrected = True
 
-        # Update initial_invested_eur if not set
+        # Correct initial_invested_eur from the FIRST buy order on Bitvavo.
+        # After sync recreates trades, initial_invested_eur may be set to the
+        # total cost (including DCAs) instead of just the initial buy.
         initial_inv = float(trade.get("initial_invested_eur", 0) or 0)
         initial_cost = initial_order["total_cost"] + initial_order["total_fee"]
-        if initial_inv <= 0 and initial_cost > 0:
-            trade["initial_invested_eur"] = round(initial_cost, 4)
-            repairs.append(f"initial_invested_eur: €0 → €{initial_cost:.2f}")
+        if initial_cost > 0:
+            if initial_inv <= 0:
+                trade["initial_invested_eur"] = round(initial_cost, 4)
+                repairs.append(f"initial_invested_eur: €0 → €{initial_cost:.2f}")
+            elif dca_orders and abs(initial_inv - initial_cost) / initial_cost > 0.05:
+                # initial_invested_eur significantly differs from first buy AND
+                # there are DCA orders — likely set to total cost after sync
+                repairs.append(
+                    f"initial_invested_eur: €{initial_inv:.2f} → €{initial_cost:.2f} "
+                    f"(was total cost, corrected to initial buy only)"
+                )
+                trade["initial_invested_eur"] = round(initial_cost, 4)
 
     events_total = len(trade.get("dca_events", [])) if not dry_run else bot_dca_count + events_added
 

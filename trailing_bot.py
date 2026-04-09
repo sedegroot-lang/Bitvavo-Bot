@@ -1938,6 +1938,24 @@ async def bot_loop():
     except Exception as sync_err:
         log(f"Sync validation failed: {sync_err}", level='error')
     
+    # DCA reconcile after sync: recover lost DCA events from Bitvavo SSOT (FIX #016)
+    # Must run AFTER sync_validator adds missing positions, not before bot_loop.
+    try:
+        if open_trades:
+            from core.dca_reconcile import reconcile_all_trades as _reconcile_post_sync
+            _recon_results = _reconcile_post_sync(bitvavo, open_trades, dca_max=int(CONFIG.get('DCA_MAX_BUYS', 3)))
+            _recon_fixes = sum(1 for r in _recon_results if r.events_added > 0 or r.amount_corrected or r.invested_corrected)
+            if _recon_fixes > 0:
+                save_trades()
+                for r in _recon_results:
+                    if r.repairs:
+                        log(f"🔄 RECONCILE [{r.market}]: {', '.join(r.repairs)}", level='warning')
+                log(f"🔄 Post-sync reconcile: {_recon_fixes} trade(s) repaired from Bitvavo SSOT", level='warning')
+            else:
+                log("✅ Post-sync reconcile: all trades match Bitvavo", level='info')
+    except Exception as recon_err:
+        log(f"⚠️ Post-sync DCA reconcile failed: {recon_err}", level='warning')
+
     start_time = time.time()
     last_config_reload = start_time
     last_sync_check = start_time  # Track last sync validation
@@ -4490,18 +4508,8 @@ if __name__ == '__main__':
     except Exception as e:
         log(f"⚠️ Trade validation failed on startup: {e}", level='warning')
     
-    # DCA reconcile on startup: recover any lost DCA events from Bitvavo (FIX #016)
-    try:
-        from core.dca_reconcile import reconcile_all_trades as _reconcile_startup
-        _recon_results = _reconcile_startup(bitvavo, open_trades, dca_max=int(CONFIG.get('DCA_MAX_BUYS', 3)))
-        _recon_fixes = sum(1 for r in _recon_results if r.events_added > 0 or r.amount_corrected or r.invested_corrected)
-        if _recon_fixes > 0:
-            save_trades()
-            log(f"🔄 Startup reconcile: {_recon_fixes} trade(s) repaired from Bitvavo SSOT", level='warning')
-        else:
-            log("✅ Startup reconcile: all trades match Bitvavo", level='info')
-    except Exception as e:
-        log(f"⚠️ Startup DCA reconcile failed: {e}", level='warning')
+    # NOTE: DCA reconcile moved to bot_loop() after sync_validator — see FIX #016.
+    # Running it here is too early: open_trades may be empty if trade_log was wiped.
 
     # Single-instance check via shared helper (best-effort)
     try:
