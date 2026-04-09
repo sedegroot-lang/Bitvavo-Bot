@@ -106,23 +106,14 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 | **€1.000** ✅ | ↑ Grid BTC aan (€150) | 4 | 56 | 28 | 2,5% | 7,0 | 2,4% | **€150 BTC** |
 | **€1.100** ✅ | ↑ BASE 62, DCA 30 | 4 | **62** | **30** | 2,5% | 7,0 | 2,4% | €150 BTC |
 | **€1.200** ← nu | ↑ 5 trades | **5** | 62 | 30 | 2,5% | 7,0 | 2,4% | €150 BTC |
-| **€1.300** | ↑ BASE 68, DCA 32 | 5 | **68** | **32** | 2,5% | 7,0 | 2,3% | €150 BTC |
-| **€1.400** | ↑ Grid ETH erbij (€250 tot.) | 5 | 68 | 32 | 2,5% | 7,0 | 2,3% | **€250 BTC+ETH** |
-| **€1.500** | ↑ BASE 75, DCA 35 | 5 | **75** | **35** | 2,5% | 7,0 | 2,3% | €250 |
-| **€1.600** | ↑ 6 trades | **6** | 75 | 35 | 2,5% | 7,0 | 2,3% | €250 |
-| **€1.700** | ↑ BASE 80, DCA 38 | 6 | **80** | **38** | 2,5% | 7,0 | 2,2% | €250 |
-| **€1.800** | ↑ Grid SOL erbij (€400 tot.) | 6 | 80 | 38 | 2,5% | 7,0 | 2,2% | **€400 3 mktn** |
-| **€1.900** | ↑ BASE 85 | 6 | **85** | 38 | 2,5% | 7,0 | 2,2% | €400 |
-| **€2.000** | ↑ 7 trades, DCA 40 | **7** | 85 | **40** | 2,3% | 7,0 | 2,2% | €400 |
-| **€2.200** | ↑ BASE 95, DCA 44 | 7 | **95** | **44** | 2,3% | 7,0 | 2,1% | €400 |
-| **€2.400** | ↑ Grid 4 mktn (€600 tot.) | 7 | 95 | 44 | 2,3% | 7,0 | 2,1% | **€600 4 mktn** |
-| **€2.600** | ↑ BASE 105, DCA 48 | 7 | **105** | **48** | 2,3% | 7,0 | 2,1% | €600 |
-| **€2.800** | ↑ 8 trades | **8** | 105 | 48 | 2,3% | 7,0 | 2,0% | €600 |
-| **€3.000** | ↑ BASE 115, DCA 52, Grid 5 mktn | 8 | **115** | **52** | 2,0% | 7,0 | 2,0% | **€800 5 mktn** |
-| **€3.500** | ↑ BASE 130, DCA 58, Grid €1.000 | 8 | **130** | **58** | 2,0% | 7,0 | 2,0% | **€1.000 5 mktn** |
-| **€4.000** | ↑ 9 trades, BASE 145, Grid 6 mktn | **9** | **145** | **65** | 2,0% | 7,0 | 2,0% | **€1.400 6 mktn** |
-| **€4.500** | ↑ BASE 155, DCA 72 | 9 | **155** | **72** | 2,0% | 7,0 | 2,0% | €1.400 |
-| **€5.000** | ↑ 10 trades, DCA 78, Grid €2.000 | **10** | **160** | **78** | 2,0% | 7,0 | 2,0% | **€2.000 8 mktn** |
+| **€1.400** | ↑ BASE 68, DCA 32, Grid +ETH | 5 | **68** | **32** | 2,5% | 7,0 | 2,3% | **€250 BTC+ETH** |
+| **€1.600** | ↑ 6 trades, BASE 75, DCA 35 | **6** | **75** | **35** | 2,5% | 7,0 | 2,3% | €250 |
+| **€2.000** | ↑ 7 trades, BASE 85, DCA 40 | **7** | **85** | **40** | 2,3% | 7,0 | 2,2% | **€350 BTC+ETH** |
+| **€2.500** | ↑ BASE 100, DCA 46, Grid +LINK | 7 | **100** | **46** | 2,3% | 7,0 | 2,1% | **€500 3 mktn** |
+| **€3.000** | ↑ 8 trades, BASE 115, DCA 52, +XRP | **8** | **115** | **52** | 2,0% | 7,0 | 2,0% | **€700 4 mktn** |
+| **€3.500** | ↑ BASE 130, DCA 58, Grid €900 | 8 | **130** | **58** | 2,0% | 7,0 | 2,0% | **€900 4 mktn** |
+| **€4.000** | ↑ 9 trades, BASE 145, DCA 65, +DOT | **9** | **145** | **65** | 2,0% | 7,0 | 2,0% | **€1.200 5 mktn** |
+| **€5.000** | ↑ 10 trades, BASE 160, DCA 78 | **10** | **160** | **78** | 2,0% | 7,0 | 2,0% | **€1.800 6 mktn** |
 
 ---
 
@@ -288,14 +279,18 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 ---
 
-### 📍 €1.400 — Grid Uitbreiden met ETH
+### 📍 €1.400 — Posities Vergroten + Grid ETH
 
 > **Trigger**: Portfolio ≥ €1.400, grid BTC rendabel (positieve winst).
+> Combineert oude €1.300 + €1.400 stappen — grotere sprongen = minder overhead.
 
-**Wijziging**: Grid uitbreiden naar BTC + ETH, totaal €250
+**Wijzigingen**: BASE **62 → 68**, DCA **30 → 32**, Grid uitbreiden naar BTC + ETH (€250)
 
 ```json
 {
+  "BASE_AMOUNT_EUR": 68,
+  "DCA_AMOUNT_EUR": 32,
+  "DEFAULT_TRAILING": 0.023,
   "GRID_TRADING": {
     "preferred_markets": ["BTC-EUR", "ETH-EUR"],
     "investment_per_grid": 125,
@@ -308,97 +303,101 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 }
 ```
 
-**Per grid**: €125 / 5 levels = €25/level. ETH heeft iets grotere moves, dus iets hogere winst per cycle.
+**Per grid**: €125 / 5 levels = €25/level. ETH helpt diversificatie — iets grotere moves dan BTC, meer grid-cycli.
+
+**Budget check:**
+- Grid: €250 + Trailing 5 × (68 + 32 + 28,80) = **€644** → totaal €894 → buffer €506 (36%) ✅
 
 ---
 
-### ⭐ €1.600 — Zesde Trade Slot
+### ⭐ €1.600 — Zesde Trade Slot + Opschalen
 
-> **Trigger**: Portfolio ≥ €1.600, 5 slots werken stabiel.
+> **Trigger**: Portfolio ≥ €1.600, 5 slots werken stabiel ≥ 2 weken.
+> Combineert oude €1.500 + €1.600 stappen.
 
-**Wijziging**: MAX_OPEN_TRADES **5 → 6**
+**Wijzigingen**: MAX_OPEN_TRADES **5 → 6**, BASE **68 → 75**, DCA **32 → 35**
 
 ```json
-{ "MAX_OPEN_TRADES": 6 }
+{
+  "MAX_OPEN_TRADES": 6,
+  "BASE_AMOUNT_EUR": 75,
+  "DCA_AMOUNT_EUR": 35
+}
 ```
 
 **Budget check:**
 - Grid: €250
-- Trailing: 6 × (75 + 35 + 31,50) = **€849** typisch → buffer: €1.600 − 250 − 849 = **€501** ✅
+- Trailing: 6 × (75 + 35 + 31,50) = **€849** → totaal €1.099 → buffer €501 (31%) ✅
 
 ---
 
-### 📍 €1.800 — Grid SOL Erbij
-
-> **Trigger**: Portfolio ≥ €1.800, grid BTC+ETH ≥ 10 completed cycles totaal.
-
-**Wijziging**: Grid naar 3 markten, totaal €400
-
-```json
-{
-  "GRID_TRADING": {
-    "preferred_markets": ["BTC-EUR", "ETH-EUR", "SOL-EUR"],
-    "investment_per_grid": 135,
-    "max_total_investment": 400
-  },
-  "BUDGET_RESERVATION": {
-    "grid_pct": 22,
-    "trailing_pct": 78
-  }
-}
-```
-
----
-
-### ⭐ €2.000 — Zevende Slot
+### ⭐ €2.000 — Zevende Slot + Grid Opschalen
 
 > **Trigger**: Portfolio ≥ €2.000 voor 4 weken. Grote mijlpaal!
+> Combineert oude €1.700–€2.000 stappen. Grid blijft 2 markten — hogere bedragen per level = minder fee-drag.
 
-**Wijzigingen**: MAX_OPEN_TRADES **6 → 7**, DCA_AMOUNT **38 → 40**, DCA_DROP **2,5% → 2,3%**
+**Wijzigingen**: MAX_OPEN_TRADES **6 → 7**, BASE **75 → 85**, DCA **35 → 40**, DCA_DROP **2,5% → 2,3%**, Grid budget omhoog naar €350
 
 ```json
 {
   "MAX_OPEN_TRADES": 7,
+  "BASE_AMOUNT_EUR": 85,
   "DCA_AMOUNT_EUR": 40,
-  "DCA_DROP_PCT": 0.023
-}
-```
-
-**Waarom DCA_DROP nu iets omlaag?** Bij €2.000 is er genoeg buffer voor iets agressievere DCA. 2,3% is nog steeds breder dan de oude 1,6% en vangt echte dips.
-
-**Budget check:**
-- Grid: €400
-- Trailing: 7 × (85 + 40 + 36) = **€1.127** typisch → buffer: €2.000 − 400 − 1.127 = **€473** ✅
-
----
-
-### 📍 €2.400 — Grid 4 Markten
-
-> **Trigger**: Portfolio ≥ €2.400.
-
-**Wijziging**: Grid naar 4 markten + ADA, totaal €600
-
-```json
-{
+  "DCA_DROP_PCT": 0.023,
+  "DEFAULT_TRAILING": 0.022,
   "GRID_TRADING": {
-    "preferred_markets": ["BTC-EUR", "ETH-EUR", "SOL-EUR", "ADA-EUR"],
-    "investment_per_grid": 150,
-    "max_total_investment": 600
-  },
-  "BUDGET_RESERVATION": {
-    "grid_pct": 25,
-    "trailing_pct": 75
+    "investment_per_grid": 175,
+    "max_total_investment": 350
   }
 }
 ```
 
+**Waarom 2 grids houden?** €350 / 2 markten = €175/markt / 5 levels = **€35/level** — comfortabel. 3 markten zou €117/markt = €23/level zijn → te dun, meer fee-drag. Pas bij €2.500+ is 3 markten zinvol.
+
+**Budget check:**
+- Grid: €350
+- Trailing: 7 × (85 + 40 + 36) = **€1.127** → totaal €1.477 → buffer €523 (26%) ✅
+
 ---
 
-### ⭐ €3.000 — Achtste Slot + Grid 5 Markten
+### 📍 €2.500 — Grid LINK Erbij
 
-> **Trigger**: Portfolio ≥ €3.000 voor 6 weken. Respect.
+> **Trigger**: Portfolio ≥ €2.500, grid BTC+ETH ≥ 20 completed cycles totaal.
+> LINK als 3e grid i.p.v. SOL — LINK heeft bewezen hogere winrate (90%) en betere PnL in grid-analyse.
 
-**Wijzigingen**: MAX_OPEN_TRADES **7 → 8**, BASE **105 → 115**, DCA **48 → 52**, DCA_DROP **2,3% → 2,0%**, Grid €800 met 5 markten
+**Wijzigingen**: BASE **85 → 100**, DCA **40 → 46**, Grid naar 3 markten (BTC+ETH+LINK), totaal €500
+
+```json
+{
+  "BASE_AMOUNT_EUR": 100,
+  "DCA_AMOUNT_EUR": 46,
+  "DEFAULT_TRAILING": 0.021,
+  "GRID_TRADING": {
+    "preferred_markets": ["BTC-EUR", "ETH-EUR", "LINK-EUR"],
+    "investment_per_grid": 167,
+    "max_total_investment": 500
+  },
+  "BUDGET_RESERVATION": {
+    "grid_pct": 20,
+    "trailing_pct": 80
+  }
+}
+```
+
+**Waarom LINK i.p.v. SOL?** Grid-analyse toonde: LINK-EUR had 90% winrate (+€7,11 PnL), SOL-EUR was negatief (-€6,14). LINK heeft goede mean-reversion, voldoende volume op Bitvavo, en lagere correlatie met BTC/ETH.
+
+**Budget check:**
+- Grid: €500
+- Trailing: 7 × (100 + 46 + 41,40) = **€1.312** → totaal €1.812 → buffer €688 (28%) ✅
+
+---
+
+### ⭐ €3.000 — Achtste Slot + Grid XRP
+
+> **Trigger**: Portfolio ≥ €3.000 voor 4 weken. Respect!
+> XRP als 4e grid — hoogste volume op Bitvavo, strakke spread, goede grid-fit.
+
+**Wijzigingen**: MAX_OPEN_TRADES **7 → 8**, BASE **100 → 115**, DCA **46 → 52**, DCA_DROP **2,3% → 2,0%**, Grid €700 met 4 markten
 
 ```json
 {
@@ -408,44 +407,52 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
   "DCA_DROP_PCT": 0.020,
   "DEFAULT_TRAILING": 0.020,
   "GRID_TRADING": {
-    "preferred_markets": ["BTC-EUR", "ETH-EUR", "SOL-EUR", "ADA-EUR", "DOT-EUR"],
-    "investment_per_grid": 160,
-    "max_total_investment": 800
+    "preferred_markets": ["BTC-EUR", "ETH-EUR", "LINK-EUR", "XRP-EUR"],
+    "investment_per_grid": 175,
+    "max_total_investment": 700
   },
   "BUDGET_RESERVATION": {
-    "grid_pct": 27,
-    "trailing_pct": 73
+    "grid_pct": 23,
+    "trailing_pct": 77
   }
 }
 ```
 
 **Budget check:**
-- Grid: €800
-- Trailing: 8 × (115 + 52 + 46,80) = **€1.710** typisch → buffer: €3.000 − 800 − 1.710 = **€490** ✅
+- Grid: €700
+- Trailing: 8 × (115 + 52 + 46,80) = **€1.710** → totaal €2.410 → buffer €590 (20%) ✅
 
 **Verwachte opbrengst bij €3.000:**
 - Trailing: 8 slots × ~€2,50/trade × ~2 trades/dag = **€4/dag**
-- Grid: €800 budget × ~0,08%/dag = **€0,64/dag**
-- **Totaal**: ~€4,60/dag → **€32/week** → **€140/maand**
+- Grid: €700 budget × ~0,08%/dag = **€0,56/dag**
+- **Totaal**: ~€4,56/dag → **€32/week** → **€140/maand**
 
 ---
 
 ### 📍 €3.500 — Posities Opschalen
+
+> Grid 4 markten met meer kapitaal per level.
 
 ```json
 {
   "BASE_AMOUNT_EUR": 130,
   "DCA_AMOUNT_EUR": 58,
   "GRID_TRADING": {
-    "max_total_investment": 1000,
-    "investment_per_grid": 200
+    "investment_per_grid": 225,
+    "max_total_investment": 900
   }
 }
 ```
 
+**Budget check:**
+- Grid: €900
+- Trailing: 8 × (130 + 58 + 52,20) = **€1.922** → totaal €2.822 → buffer €678 (19%) ✅
+
 ---
 
-### 📍 €4.000 — Negende Slot + Grid 6 Markten
+### 📍 €4.000 — Negende Slot + Grid DOT
+
+> 5e grid markt: DOT. Portfolio groot genoeg voor verdere diversificatie.
 
 ```json
 {
@@ -454,21 +461,14 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
   "DCA_AMOUNT_EUR": 65,
   "DEFAULT_TRAILING": 0.020,
   "GRID_TRADING": {
-    "preferred_markets": ["BTC-EUR", "ETH-EUR", "SOL-EUR", "ADA-EUR", "DOT-EUR", "LINK-EUR"],
-    "investment_per_grid": 235,
-    "max_total_investment": 1400
+    "preferred_markets": ["BTC-EUR", "ETH-EUR", "LINK-EUR", "XRP-EUR", "DOT-EUR"],
+    "investment_per_grid": 240,
+    "max_total_investment": 1200
+  },
+  "BUDGET_RESERVATION": {
+    "grid_pct": 30,
+    "trailing_pct": 70
   }
-}
-```
-
----
-
-### 📍 €4.500 — DCA Opschalen
-
-```json
-{
-  "BASE_AMOUNT_EUR": 155,
-  "DCA_AMOUNT_EUR": 72
 }
 ```
 
@@ -477,6 +477,7 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 ### 🏆 €5.000 — Einddoel: Passief Inkomen
 
 > **Portfolio machine.** Bot draait zichzelf. Stortingen niet meer nodig.
+> 6e grid markt: AVAX. Volledige diversificatie.
 
 ```json
 {
@@ -490,25 +491,25 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
   "TRAILING_ACTIVATION_PCT": 0.012,
   "GRID_TRADING": {
     "enabled": true,
-    "preferred_markets": ["BTC-EUR", "ETH-EUR", "SOL-EUR", "ADA-EUR", "DOT-EUR", "LINK-EUR", "AVAX-EUR", "MATIC-EUR"],
-    "investment_per_grid": 250,
-    "max_total_investment": 2000,
+    "preferred_markets": ["BTC-EUR", "ETH-EUR", "LINK-EUR", "XRP-EUR", "DOT-EUR", "AVAX-EUR"],
+    "investment_per_grid": 300,
+    "max_total_investment": 1800,
     "num_grids": 8,
     "grid_mode": "arithmetic",
     "trailing_tp_enabled": true,
     "volatility_adaptive": true
   },
   "BUDGET_RESERVATION": {
-    "grid_pct": 40,
-    "trailing_pct": 60
+    "grid_pct": 36,
+    "trailing_pct": 64
   }
 }
 ```
 
 **Verwachte opbrengst bij €5.000:**
 - Trailing: 10 slots, ~€3/trade, ~3 trades/dag = **€9/dag**
-- Grid: €2.000 × ~0,08%/dag = **€1,60/dag**
-- **Totaal**: ~€10,50/dag → **€73/week** → **€315/maand**
+- Grid: €1.800 × ~0,08%/dag = **€1,44/dag**
+- **Totaal**: ~€10,44/dag → **€73/week** → **€315/maand**
 
 ---
 
@@ -592,26 +593,17 @@ Vink af wanneer bereikt:
 - [x] €1.000 ⭐ — Grid BTC aan (€150) (7 april 2026)
 - [x] €1.100 ✅ — BASE → 62, DCA → 30 (8 april 2026)
 - [x] €1.200 ← nu — 5 trades (9 april 2026)
-- [ ] €1.300 — BASE → 68, DCA → 32
-- [ ] €1.400 — Grid ETH erbij (€250 totaal)
-- [ ] €1.500 — BASE → 75, DCA → 35
-- [ ] €1.600 — 6 trades
-- [ ] €1.700 — BASE → 80, DCA → 38
-- [ ] €1.800 — Grid SOL erbij (€400 totaal)
-- [ ] €1.900 — BASE → 85
-- [ ] €2.000 ⭐ — 7 trades, DCA → 40, DROP → 2,3%
-- [ ] €2.200 — BASE → 95, DCA → 44
-- [ ] €2.400 — Grid 4 markten (€600)
-- [ ] €2.600 — BASE → 105, DCA → 48
-- [ ] €2.800 — 8 trades
-- [ ] €3.000 ⭐ — Grid 5 markten (€800), DROP → 2,0%
-- [ ] €3.500 — BASE → 130, DCA → 58, Grid €1.000
-- [ ] €4.000 — 9 trades, DCA → 65, Grid 6 markten (€1.400)
-- [ ] €4.500 — BASE → 155, DCA → 72
-- [ ] €5.000 🏆 — 10 trades, DCA → 78, Grid €2.000, passief inkomen
+- [ ] €1.400 — BASE → 68, DCA → 32, Grid +ETH (€250)
+- [ ] €1.600 — 6 trades, BASE → 75, DCA → 35
+- [ ] €2.000 ⭐ — 7 trades, BASE → 85, DCA → 40, Grid €350
+- [ ] €2.500 — BASE → 100, DCA → 46, Grid +LINK (€500)
+- [ ] €3.000 ⭐ — 8 trades, BASE → 115, DCA → 52, Grid +XRP (€700)
+- [ ] €3.500 — BASE → 130, DCA → 58, Grid €900
+- [ ] €4.000 — 9 trades, BASE → 145, DCA → 65, Grid +DOT (€1.200)
+- [ ] €5.000 🏆 — 10 trades, BASE → 160, DCA → 78, Grid +AVAX (€1.800)
 
 ---
 
-*Laatste update: 9 april 2026 — Roadmap €1.200 fase actief, Grid BTC draait*
+*Laatste update: 10 april 2026 — Roadmap geherstructureerd: grotere stappen (€200-€500), grid SOL→LINK, 2 grids tot €2.500*
 *Config: BASE=62, DCA=30, MULT=0.9, DCA_DROP=2.5%, 5 slots, grid BTC €150, MIN_SCORE=7.0*
-*Volgende mijlpaal: €1.300 (BASE → 68, DCA → 32) — wacht 2 weken stabilisatie*
+*Volgende mijlpaal: €1.400 (BASE → 68, DCA → 32, Grid +ETH) — wacht 2 weken stabilisatie*
