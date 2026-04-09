@@ -662,6 +662,10 @@ def _decimals_from_str_num(s: Any) -> Optional[int]:
 def get_min_order_size(market: str) -> float:
     info = get_market_info(market)
     if info:
+        min_base = info.get("minOrderInBaseAsset")
+        if min_base:
+            return float(min_base)
+        # Legacy field names as fallback
         min_size = info.get("minOrderSize")
         min_amount = info.get("minOrderAmount")
         return float(min_size or min_amount or 0)
@@ -677,7 +681,7 @@ def get_amount_precision(market: str) -> int:
                 return int(prec)
             except Exception as e:
                 log(f"return int(prec) failed: {e}", level='debug')
-        d = _decimals_from_str_num(info.get('minOrderAmount'))
+        d = _decimals_from_str_num(info.get('minOrderInBaseAsset') or info.get('minOrderAmount'))
         if d is not None:
             return max(0, min(8, d))
     return 8
@@ -701,7 +705,7 @@ def get_price_precision(market: str) -> int:
 def get_amount_step(market: str) -> float:
     info = get_market_info(market)
     if info:
-        step = info.get('minOrderAmount')
+        step = info.get('minOrderInBaseAsset') or info.get('minOrderAmount')
         if step is not None:
             try:
                 return float(step)

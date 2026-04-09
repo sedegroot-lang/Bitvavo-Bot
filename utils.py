@@ -31,6 +31,9 @@ def get_min_order_size(market: str, bitvavo, safe_call) -> float:
     """Return Bitvavo min order size/amount for market (best-effort)."""
     info = safe_call(bitvavo.markets, {"market": market})
     if info and isinstance(info, list) and len(info) > 0:
+        min_base = info[0].get("minOrderInBaseAsset")
+        if min_base:
+            return float(min_base)
         min_size = info[0].get("minOrderSize")
         min_amount = info[0].get("minOrderAmount")
         return float(min_size or min_amount or 0)

@@ -90,6 +90,10 @@ def manager(mock_bitvavo, grid_config, tmp_path):
     """Create a GridManager with mocked dependencies."""
     mgr = GridManager(mock_bitvavo, grid_config)
     mgr.GRID_STATE_FILE = str(tmp_path / 'grid_states.json')
+    # Patch mirror_to_local to avoid writing to real LocalAppData
+    from unittest.mock import patch as _patch
+    _patcher = _patch('core.local_state.mirror_to_local', return_value=None)
+    _patcher.start()
     # Mock API module to avoid import errors
     mock_api = MagicMock()
     mock_api.safe_call = MagicMock(side_effect=lambda func, *a, **kw: func(*a, **kw))
@@ -103,7 +107,8 @@ def manager(mock_bitvavo, grid_config, tmp_path):
     ])
     mock_api.get_eur_balance = MagicMock(return_value=200.0)
     mgr._api_module = mock_api
-    return mgr
+    yield mgr
+    _patcher.stop()
 
 
 # ==================== BASIC TESTS ====================

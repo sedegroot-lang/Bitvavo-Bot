@@ -713,25 +713,36 @@ Grid trading enabled in config but no new orders placed on Bitvavo. BTC-EUR grid
 
 ### Root Cause
 1. **Corrupt grid_states.json**: BTC-EUR had `auto_created: false`, 8 levels with amounts ~0.00007 BTC (below Bitvavo min 0.0001 BTC), €50 investment. ETH-EUR had `order_id: "test-order-123"` — test data that leaked into production state. Origin: likely dashboard/manual creation with wrong params or state file corruption.
-2. **No min BASE amount validation**: `create_grid()` and `_calculate_grid_levels()` only checked EUR value ≥ €5.50 per level, not Bitvavo's minimum base order size. For BTC at €85k: €6.25/level = 0.0000735 BTC < 0.0001 minimum. All orders rejected by `_place_limit_order()`.
-3. **No recovery for never-started grids**: `is_broken` cleanup check only matched `status in ('stopped', 'error')` — grids stuck in `initialized` or `placing_orders` (never reached 'running') were never cleaned up.
-4. **`_cancel_order` passed operatorId positionally**: `self._safe_call(self.bitvavo.cancelOrder, market, order_id, operator_id)` passed operatorId as positional arg instead of keyword, potentially causing cancel failures.
+2. **Wrong Bitvavo API field name in `get_min_order_size()`**: `bot/api.py` looked for `minOrderSize`/`minOrderAmount` but Bitvavo API returns `minOrderInBaseAsset`. Result: `get_min_order_size()` always returned `0.0`, so min-size validation in `_place_limit_order()` was **never effective**. Orders with tiny amounts passed all checks and were rejected by Bitvavo API directly.
+3. **No min BASE amount validation in level creation**: `_calculate_grid_levels()` only checked EUR value ≥ €5.50 per level, not Bitvavo's minimum base order size.
+4. **A-S dynamic spacing path bypassed min base check**: The Avellaneda-Stoikov path created levels and returned early before the static path's min base validation. Levels with amounts below minimum were created unchecked.
+5. **`load_freshest` restored old corrupt state from LocalAppData**: After clearing `data/grid_states.json`, `mirror_to_local`'s copy at `%LOCALAPPDATA%/BotConfig/state/grid_states.json` still had the corrupt state with higher `_save_ts`, so it was loaded as "freshest". Both files needed to be deleted.
+6. **No recovery for never-started grids**: `is_broken` cleanup only matched `status in ('stopped', 'error')` — grids stuck in `initialized` or `placing_orders` were never cleaned up.
+7. **`_cancel_order` passed operatorId positionally**: Caused cancel failures for corrupt ETH-EUR grid.
+8. **Test fixture pollution**: Grid tests' `_save_states()` called `mirror_to_local()` writing to real `%LOCALAPPDATA%` path, contaminating production state with test data.
 
 ### Fix Applied
 
 | File | Change |
 |------|--------|
-| `data/grid_states.json` | Reset to `{}` (backup in `grid_states_backup_corrupt_20260409.json`). Auto_manage will create fresh grids with correct dynamic budget params. |
-| `modules/grid_trading.py` `_calculate_grid_levels()` | Added min BASE amount check: reduces `num_grids` until `investment/n/price >= min_order_size`. Returns empty if impossible. |
-| `modules/grid_trading.py` `_auto_create_grids()` | Added per-candidate min base amount check. Skips markets where order amounts would be below minimum, reduces grid count per market when needed. |
-| `modules/grid_trading.py` `auto_manage()` Step 4 | Extended `is_broken` to also match `initialized` and `placing_orders` status + `cancelled` levels + 5-min grace period. Prevents stuck grids from blocking new creation indefinitely. |
-| `modules/grid_trading.py` `_cancel_order()` | Changed operatorId to keyword argument: `**{'operatorId': str(operator_id)}` — matches trailing_bot.py convention. |
+| `data/grid_states.json` + `%LOCALAPPDATA%` copy | Both deleted (backup in `grid_states_backup_corrupt_20260409.json`). Auto_manage creates fresh grids with correct dynamic budget params. |
+| `bot/api.py` `get_min_order_size()` | Added `minOrderInBaseAsset` as primary field lookup (Bitvavo's actual field name). Kept legacy field names as fallback. |
+| `bot/api.py` `get_amount_precision()`, `get_amount_step()` | Also fixed to check `minOrderInBaseAsset` before legacy `minOrderAmount`. |
+| `utils.py` `get_min_order_size()` | Same: added `minOrderInBaseAsset` as primary lookup. |
+| `modules/grid_trading.py` `_normalize_amount()` | Fixed fallback field from `minOrderAmount` to `minOrderInBaseAsset`. |
+| `modules/grid_trading.py` `_calculate_grid_levels()` | Added min BASE amount check in BOTH A-S dynamic and static paths. Reduces `num_grids` until possible, returns empty if impossible. |
+| `modules/grid_trading.py` `_auto_create_grids()` | Added per-candidate min base amount check. |
+| `modules/grid_trading.py` `auto_manage()` Step 4 | Extended `is_broken` to also match `initialized`/`placing_orders` + 5-min grace. |
+| `modules/grid_trading.py` `_cancel_order()` | Changed operatorId to keyword argument. |
+| `tests/test_grid_trading.py` | Patched `mirror_to_local` in fixture to prevent test writes to production `%LOCALAPPDATA%`. |
 
 ### Prevention
-- Min base amount validation prevents creating levels that `_place_limit_order()` will reject.
+- **Field name fix is the critical fix**: `get_min_order_size()` now correctly reads `minOrderInBaseAsset` from Bitvavo API, so all min-size checks actually work.
+- Min base amount validation in both A-S and static paths prevents creating levels below minimum.
 - Broken grid cleanup now catches all non-running states with 0 trades after 5-min grace.
-- Dynamic budget + proper num_grids reduction ensures BTC grid levels are large enough.
-- This is the 3rd grid state corruption fix (see #011, #012). Consider adding grid state validation on load.
+- Test fixture mocks `mirror_to_local` to prevent test data contaminating production LocalAppData state.
+- Both `data/` and `%LOCALAPPDATA%` copies must be cleared when resetting state (load_freshest picks the newer).
+- This is the 3rd grid state corruption fix (see #011, #012). The test pollution was likely the origin of the corrupt state.
 
 ---
 

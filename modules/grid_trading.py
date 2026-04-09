@@ -195,7 +195,7 @@ class GridManager:
         # Fallback: use our own market info
         info = self._get_market_info(market)
         if info:
-            min_amt = info.get('minOrderAmount')
+            min_amt = info.get('minOrderInBaseAsset') or info.get('minOrderAmount')
             if min_amt:
                 try:
                     d_amt = Decimal(str(amount))
@@ -708,6 +708,7 @@ class GridManager:
                     )
                     as_levels = as_result.get('levels', [])
                     if as_levels:
+                        min_base = self._get_min_order_size(config.market)
                         for lvl in as_levels:
                             norm_price = self._normalize_price(config.market, lvl['price'])
                             if norm_price <= 0:
@@ -720,6 +721,11 @@ class GridManager:
                             amount = amount_eur / norm_price
                             norm_amount = self._normalize_amount(config.market, amount)
                             if norm_amount <= 0:
+                                continue
+                            # Skip levels below Bitvavo minimum BASE amount
+                            if min_base > 0 and norm_amount < min_base:
+                                log(f"[Grid A-S] Skipping {config.market} level: "
+                                    f"{norm_amount} < min {min_base}", level='debug')
                                 continue
                             levels.append(GridLevel(
                                 level_id=lvl['level_id'],
@@ -819,6 +825,13 @@ class GridManager:
             norm_amount = self._normalize_amount(config.market, amount)
 
             if norm_amount <= 0:
+                continue
+
+            # Skip levels below Bitvavo minimum BASE amount
+            min_base = self._get_min_order_size(config.market)
+            if min_base > 0 and norm_amount < min_base:
+                log(f"[Grid] Skipping {config.market} level: "
+                    f"{norm_amount} < min {min_base}", level='debug')
                 continue
 
             levels.append(GridLevel(
