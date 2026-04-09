@@ -404,7 +404,12 @@ def load_config(force: bool = False) -> Dict:
 _last_good_trades: Dict = {}  # fallback when file read fails
 
 def load_trades(force: bool = False) -> Dict:
-    """Load trade log data with fallback to last known good snapshot."""
+    """Load trade log data with fallback to last known good snapshot.
+
+    When the trade_log has 0 open trades (e.g. OneDrive sync revert) but we
+    have a _last_good_trades snapshot with real trades, return the last-known-
+    good data.  This prevents all positions from briefly showing as 'external'.
+    """
     global _last_good_trades
     if not force:
         cached = get_cached('trades')
@@ -416,6 +421,14 @@ def load_trades(force: bool = False) -> Dict:
             data = load_trade_snapshot(str(TRADE_LOG_PATH))
             if data and data.get('open'):
                 _last_good_trades = data
+                set_cached('trades', data)
+                return data
+            # Empty open trades but we have a last-known-good: OneDrive likely reverted
+            if _last_good_trades and _last_good_trades.get('open'):
+                logger.warning("trade_log has 0 open trades but last_good has %d — using fallback (OneDrive revert?)",
+                               len(_last_good_trades.get('open', {})))
+                set_cached('trades', _last_good_trades)
+                return _last_good_trades
             set_cached('trades', data)
             return data
     except Exception as e:

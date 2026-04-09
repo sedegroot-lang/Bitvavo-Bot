@@ -621,6 +621,31 @@ BTC-EUR grid had 11 open orders on Bitvavo instead of ~5 (user configured `num_g
 
 ---
 
+## #018 — Dashboard shows all trades as "Externe Positie" after OneDrive revert (2026-04-09)
+
+### Symptom
+All 5 open trades (UNI, XRP, LINK, LTC, NEAR) periodically show as "EXTERN POSITIE" on the dashboard with +€0.00 P&L. Happens frequently and resolves after a few minutes when the bot saves again.
+
+### Root Cause
+Two-layer failure when OneDrive reverts `trade_log.json` to an older/empty version:
+
+1. **`load_freshest()` preferred stale local mirror**: The local mirror in `%LOCALAPPDATA%` had a newer `_save_ts` but only contained BTC-EUR (from a partial save during a previous restart). Since it was "newer", `load_freshest` picked it over the OneDrive copy that had all 5 real trades. Result: `open_trades` only contained BTC-EUR (which is skipped as HODL), so all 5 trailing trades fell through to "external balance" detection.
+
+2. **Dashboard `load_trades()` returned empty data**: When `data.get('open')` was falsy (empty dict), `_last_good_trades` was correctly NOT updated, but the empty data was still cached and returned. The fallback to `_last_good_trades` only triggered on exceptions, not on "valid but empty" responses.
+
+### Fix Applied
+| File | Change |
+|------|--------|
+| `core/local_state.py` | `load_freshest()` now checks data quality: if local is newer but has 0 open trades while OneDrive has real trades (and delta < 600s), uses OneDrive instead. Prevents stale mirror from winning. |
+| `tools/dashboard_flask/app.py` | `load_trades()` fallback is now active: when trade_log returns 0 open trades but `_last_good_trades` has data, returns the last-known-good snapshot immediately instead of caching the empty data. |
+| `tests/test_local_state.py` | 6 new tests for `load_freshest` data quality scenarios. |
+
+### Prevention
+- Dashboard never shows external positions when it previously had real trade data (last-known-good fallback).
+- `load_freshest` uses data quality heuristic in addition to timestamps — empty local mirror can't override OneDrive with real trades.
+
+---
+
 ## Template for new entries
 
 ```

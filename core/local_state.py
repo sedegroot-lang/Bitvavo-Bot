@@ -106,8 +106,25 @@ def load_freshest(
     if local_data and isinstance(local_data, dict):
         local_ts = float(local_data.get('_save_ts', 0) or 0)
 
-    # Pick the one with the highest _save_ts
+    # For trade_log.json: also compare data quality (number of open trades).
+    # A newer file with 0 open trades should NOT beat an older file with real trades,
+    # because OneDrive sync reverts can create a "newer" but empty file.
+    od_open_count = len((onedrive_data or {}).get('open', {}))
+    local_open_count = len((local_data or {}).get('open', {}))
+
+    # Pick the one with the highest _save_ts, but prefer more data when timestamps are close
     if local_ts > od_ts and local_data:
+        # Local is newer — but if it has fewer open trades and the delta is small,
+        # prefer the one with more data (OneDrive may have the real save)
+        if od_open_count > local_open_count and local_open_count == 0 and (local_ts - od_ts) < 600:
+            _log.warning(
+                "local_state: LOCAL is newer for %s but has 0 open trades vs OneDrive %d "
+                "— using OneDrive (likely stale local mirror)",
+                filename, od_open_count,
+            )
+            result = dict(onedrive_data)
+            result.pop('_save_ts', None)
+            return result
         _log.info(
             "local_state: using LOCAL copy of %s (local_ts=%.0f > od_ts=%.0f, delta=%.0fs)",
             filename, local_ts, od_ts, local_ts - od_ts,
