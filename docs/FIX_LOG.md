@@ -746,6 +746,29 @@ Grid trading enabled in config but no new orders placed on Bitvavo. BTC-EUR grid
 
 ---
 
+## #022 — Sell orders leave dust: place_sell uses min(trade, balance) instead of full balance (2026-04-09)
+
+### Symptom
+NEAR-EUR trailing TP sold 46.84 tokens but left 3.88 tokens (~€4.50) behind. Sync engine re-adopted this as a new trade, then auto_free_slot sold it, but the cycle repeated. Dashboard showed ghost NEAR positions.
+
+### Root Cause
+`place_sell()` in `bot/orders_impl.py` line 451 used `sell_amount = min(amount_base, available)`. When the Bitvavo balance (`available`) is larger than the trade-tracked amount (`amount_base`) — due to rounding, DCA differences, or partial fill accounting — only the trade amount is sold, leaving tokens behind.
+
+### Fix Applied
+| File | Change |
+|------|--------|
+| `bot/orders_impl.py` | Added `sell_all: bool = False` parameter to `place_sell()`. When `sell_all=True`, uses `max(amount_base, available)` to sell the full Bitvavo balance |
+| `trailing_bot.py` | Pass-through `sell_all` in wrapper. All full-exit paths (trailing TP, max age, drawdown stop) now pass `sell_all=True` |
+| `modules/trading_liquidation.py` | Auto-free-slot calls `place_sell(market, amount, sell_all=True)` |
+
+Partial TP sells correctly keep `sell_all=False` (only sell a portion).
+
+### Prevention
+- Full exits always use `sell_all=True` — no dust left behind
+- Partial sells remain conservative with `min()` to avoid over-selling
+
+---
+
 ## Template for new entries
 
 ```

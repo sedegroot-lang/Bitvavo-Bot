@@ -214,7 +214,7 @@ class LiquidationManager:
                 f"Auto-free: probeer {market} (waarde {value:.2f} EUR, winst {profit_pct*100:.2f}%) te sluiten.",
                 level="info",
             )
-            if ctx.place_sell(market, amount):
+            if ctx.place_sell(market, amount, sell_all=True):
                 trade = open_trades.get(market, {})
                 sell_revenue = price * amount
                 invested_eur = float(trade.get("invested_eur", 0) or 0)

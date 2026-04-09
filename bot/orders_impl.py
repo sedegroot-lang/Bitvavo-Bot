@@ -322,7 +322,7 @@ def place_buy(market, eur_amount, entry_price, order_type=None, *, is_dca: bool 
 
 # ─── place_sell ─────────────────────────────────────────────────────
 
-def place_sell(market, amount_base, *, skip_dust: bool = False):
+def place_sell(market, amount_base, *, skip_dust: bool = False, sell_all: bool = False):
     global _BALANCE_API_FAILURE_TS
     S = _get_state()
     log = S.log
@@ -437,9 +437,11 @@ def place_sell(market, amount_base, *, skip_dust: bool = False):
         log(f"⚠️ Spread breed bij exit {market}: {spread_pct*100:.2f}%", level='warning')
     if sell_slip is not None and sell_slip > 0.01:
         log(f"⚠️ Verwachte sell-slippage hoog voor {market}: {sell_slip*100:.2f}%", level='warning')
-    sell_amount = min(amount_base, available)
+    sell_amount = max(amount_base, available) if sell_all else min(amount_base, available)
     if sell_amount < amount_base * 0.95:
         log(f"Waarschuwing: verkoophoeveelheid ({sell_amount:.8f}) veel lager dan gevraagd ({amount_base:.8f}) voor {symbol}")
+    if sell_all and available > amount_base * 1.001:
+        log(f"[sell_all] {symbol}: verkoop volledig saldo {available:.8f} (trade amount was {amount_base:.8f})", level='info')
     norm_amount = S.normalize_amount(market, sell_amount)
     if norm_amount <= 0:
         log(f"Sell amount voor {market} normaliseerde naar 0, verkoop overgeslagen.", level='warning')

@@ -1871,12 +1871,12 @@ def check_advanced_exit_strategies(trade, current_price):
     return _trail.check_advanced_exit_strategies(trade, current_price)
 
 
-def place_sell(market, amount_base, *, skip_dust: bool = False):
+def place_sell(market, amount_base, *, skip_dust: bool = False, sell_all: bool = False):
     if TEST_MODE or not LIVE_TRADING:
         log(f"(SIM) SELL {market} amount={amount_base:.8f} [TEST_MODE]")
         return {"simulated": True}
     from bot.orders_impl import place_sell as _impl
-    return _impl(market, amount_base, skip_dust=skip_dust)
+    return _impl(market, amount_base, skip_dust=skip_dust, sell_all=sell_all)
 def _cleanup_market_dust(market: str) -> None:
     from bot.orders_impl import _cleanup_market_dust as _impl
     return _impl(market)
@@ -2352,7 +2352,7 @@ async def bot_loop():
                             log(f"Max trade age reached for {m} (>{max_age_h}h), forcing exit.", level='warning')
                             
                             # FIX #2: Order verification with actual price
-                            sell_response = place_sell(m, amt)
+                            sell_response = place_sell(m, amt, sell_all=True)
                             
                             success, order_ids, remaining, actual_sell_price = _verify_sell_response(sell_response, m, amt)
                             if not success:
@@ -2412,7 +2412,7 @@ async def bot_loop():
                             log(f"Drawdown stop hit for {m} (>{dd_pct*100:.1f}% down), forcing exit.", level='warning')
                             
                             # FIX #2: Order verification with actual price
-                            sell_response = place_sell(m, amt)
+                            sell_response = place_sell(m, amt, sell_all=True)
                             
                             success, order_ids, remaining, actual_sell_price = _verify_sell_response(sell_response, m, amt)
                             if not success:
@@ -2824,7 +2824,7 @@ async def bot_loop():
                     t['_sell_in_progress'] = True
                     
                     # FIX #2: Order verification - check if sell succeeds
-                    sell_response = place_sell(m, amt)
+                    sell_response = place_sell(m, amt, sell_all=True)
                     
                     # FIX #3: Verify sell response properly
                     success, order_ids, remaining, actual_sell_price = _verify_sell_response(sell_response, m, amt)
