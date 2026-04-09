@@ -158,6 +158,68 @@ def get_all_trades(
             return []
 
 
+def recover_cost_from_archive(market: str, current_amount: float) -> Optional[Dict[str, Any]]:
+    """Recover cost basis for an orphaned position from the trade archive.
+
+    When the sync engine finds a Bitvavo balance with no matching trade_log entry
+    and derive_cost_basis fails (e.g. old fills purged), this function checks the
+    archive for the most recent partial_tp or open trade for the same market.  If
+    the archived buy_price is plausible it returns a dict with recovered values.
+
+    Returns ``None`` when no usable archive data is found.
+
+    Returned dict keys:
+        buy_price, invested_eur, initial_invested_eur, total_invested_eur, source
+    """
+    try:
+        trades = get_all_trades(market=market)
+        if not trades:
+            return None
+
+        # Sort newest first
+        trades.sort(key=lambda t: t.get('timestamp', 0), reverse=True)
+
+        # 1. Look for the most recent partial_tp — that means the position was
+        #    partially sold and a remainder still exists on the exchange.
+        for t in trades:
+            reason = str(t.get('reason', ''))
+            if 'partial_tp' not in reason:
+                continue
+            archived_bp = float(t.get('buy_price', 0) or 0)
+            if archived_bp <= 0:
+                continue
+            # The remaining invested_eur after a partial TP:
+            # the original trade invested more, but part was returned.
+            invested = round(current_amount * archived_bp, 2)
+            return {
+                'buy_price': archived_bp,
+                'invested_eur': invested,
+                'initial_invested_eur': invested,
+                'total_invested_eur': invested,
+                'source': f'archive_partial_tp ({reason})',
+            }
+
+        # 2. Fall back to the most recent closed trade for this market and use
+        #    its buy_price as best estimate.
+        for t in trades:
+            archived_bp = float(t.get('buy_price', 0) or 0)
+            if archived_bp <= 0:
+                continue
+            invested = round(current_amount * archived_bp, 2)
+            return {
+                'buy_price': archived_bp,
+                'invested_eur': invested,
+                'initial_invested_eur': invested,
+                'total_invested_eur': invested,
+                'source': f'archive_last_trade ({t.get("reason", "?")})',
+            }
+
+        return None
+    except Exception as e:
+        print(f"[ARCHIVE] recover_cost_from_archive({market}) failed: {e}")
+        return None
+
+
 def get_archive_stats(phase: Optional[str] = None) -> Dict[str, Any]:
     """Get archive statistics, optionally filtered by phase."""
     with LOCK:

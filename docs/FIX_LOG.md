@@ -678,6 +678,34 @@ Additionally, 2 stale BTC-EUR buy orders at €57,141 and €59,586 (from pre-FI
 
 ---
 
+## #020 — Orphaned partial-TP positions adopted with wrong invested_eur (2026-04-09)
+
+### Symptom
+SOL-EUR appeared in open trades with `invested_eur = €12.02` instead of the real cost basis (~€77 × 0.17 = ~€13.20). This is a recurring pattern: after a `partial_tp` sell, the remaining position loses its trade_log entry (restart, OneDrive revert, etc.), and when the sync engine re-adopts it, `derive_cost_basis` finds 0 orders (old fills purged from Bitvavo API), so it falls back to `amount × current_ticker_price` — producing a tiny `invested_eur` unrelated to the real cost.
+
+### Root Cause
+Three code paths all had the same flaw — **no fallback to the trade archive** when `derive_cost_basis` fails:
+
+1. `modules/sync_validator.py` `auto_add_missing_positions()`: Falls back to `amount × current_price` when derive fails.
+2. `bot/sync_engine.py` new-trade adoption: No invested_eur set at all when derive fails (later "corrected" by `get_true_invested_eur` to `buy_price × amount` where `buy_price` = current ticker).
+3. The trade archive **already contains** the partial_tp record with the correct `buy_price`, but nobody checked it.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/trade_archive.py` | Added `recover_cost_from_archive(market, amount)` — looks up the most recent partial_tp entry (or last closed trade) in the archive and recovers `buy_price`, `invested_eur`, etc. |
+| `modules/sync_validator.py` `auto_add_missing_positions()` | Added archive recovery fallback between FIFO/buy-trade fallbacks and the final current-price fallback. If derive_cost_basis AND FIFO both fail, checks the archive before falling back to ticker price. |
+| `bot/sync_engine.py` new-trade branch | Added archive recovery when `derive_cost_basis` returns None or throws — before the trade is added with no `invested_eur`. |
+| `tests/test_archive_recovery.py` | 6 new tests: partial_tp recovery, last-trade fallback, unknown market → None, key completeness, empty archive, zero buy_price. |
+
+### Prevention
+- Orphaned partial-TP positions now get their original buy_price from the archive instead of the current ticker price.
+- The fix is purely additive (new fallback layer) — existing derive_cost_basis logic is unchanged and still takes priority when it works.
+- Archive data is persistent (never deleted) and backed up to `%LOCALAPPDATA%`, so it survives OneDrive reverts.
+
+---
+
 ## Template for new entries
 
 ```

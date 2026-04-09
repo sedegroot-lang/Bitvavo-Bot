@@ -390,8 +390,30 @@ def sync_with_bitvavo():
                             _ti_set_initial(new_local, float(basis.invested_eur), source="sync_new_trade")
                             new_local['opened_ts'] = float(basis.earliest_timestamp or time.time())
                             log(f"Sync: NEW trade {m} detected with invested=€{basis.invested_eur:.2f}", level='info')
+                        else:
+                            # FIX #020: Archive fallback for orphaned partial-TP remainders
+                            try:
+                                from modules.trade_archive import recover_cost_from_archive
+                                recovered = recover_cost_from_archive(m, float(entry.get('amount') or 0.0))
+                                if recovered:
+                                    new_local['buy_price'] = recovered['buy_price']
+                                    _ti_set_initial(new_local, recovered['invested_eur'], source="sync_archive_recovery")
+                                    log(f"Sync: Recovered {m} cost from archive: €{recovered['invested_eur']:.2f} ({recovered['source']})", level='info')
+                            except Exception:
+                                pass
                     except Exception as e:
                         log(f"Sync: Failed to derive cost basis for new trade {m}: {e}", level='warning')
+                        # FIX #020: Try archive recovery even when derive throws
+                        try:
+                            from core.trade_investment import set_initial as _ti_set_initial
+                            from modules.trade_archive import recover_cost_from_archive
+                            recovered = recover_cost_from_archive(m, float(entry.get('amount') or 0.0))
+                            if recovered:
+                                new_local['buy_price'] = recovered['buy_price']
+                                _ti_set_initial(new_local, recovered['invested_eur'], source="sync_archive_recovery")
+                                log(f"Sync: Recovered {m} cost from archive after derive failure: €{recovered['invested_eur']:.2f} ({recovered['source']})", level='info')
+                        except Exception:
+                            pass
 
                     try:
                         new_local['highest_price'] = max(float(new_local.get('highest_price') or 0.0), float(new_local.get('buy_price') or 0.0))

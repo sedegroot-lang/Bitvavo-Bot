@@ -336,7 +336,25 @@ class SyncValidator:
                                             )
                         except Exception as te:
                             self._log(f"Could not get trade history for {market}: {te}", level='debug')
-                    
+
+                    # FIX #020: Archive-based cost recovery for orphaned partial-TP positions
+                    if avg_buy_price is None:
+                        try:
+                            from modules.trade_archive import recover_cost_from_archive
+                            recovered = recover_cost_from_archive(market, amount)
+                            if recovered:
+                                avg_buy_price = recovered['buy_price']
+                                invested = recovered['invested_eur']
+                                initial_invested = recovered['initial_invested_eur']
+                                total_invested = recovered['total_invested_eur']
+                                self._log(
+                                    f"Recovered cost basis for {market} from archive: "
+                                    f"€{avg_buy_price:.6f} ({recovered['source']})",
+                                    level='info',
+                                )
+                        except Exception as ae:
+                            self._log(f"Archive cost recovery failed for {market}: {ae}", level='debug')
+
                     # Fallback to current price if no trade history available
                     if avg_buy_price is None:
                         ticker = self.bitvavo.tickerPrice({'market': market})
