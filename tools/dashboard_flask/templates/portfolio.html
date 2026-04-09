@@ -246,8 +246,8 @@
                     <span class="card-name">{{ card.crypto_name }}</span>
                 </div>
             </div>
-            <span class="card-status {% if card.trailing_activated %}status-trailing{% elif card.status == 'external' %}status-external{% else %}status-active{% endif %}">
-                {% if card.trailing_activated %}TRAILING ACTIEF{% elif card.status == 'external' %}EXTERNE POSITIE{% else %}ACTIEF{% endif %}
+            <span class="card-status {% if card.trailing_activated and card.pnl >= 0 %}status-trailing{% elif card.status == 'external' %}status-external{% else %}status-active{% endif %}">
+                {% if card.trailing_activated and card.pnl >= 0 %}TRAILING ACTIEF{% elif card.status == 'external' %}EXTERNE POSITIE{% else %}ACTIEF{% endif %}
             </span>
             {% if card.pnl >= 0 %}<span class="card-tag tag-profit">WINST</span>{% endif %}
         </div>
@@ -301,7 +301,7 @@
         <!-- Trailing Progress (compact) -->
         <div class="card-trailing-row" data-market="{{ card.market }}">
             <span class="trailing-label">
-                {% if card.trailing_activated %}🎯 Trailing actief{% else %}⏳ Naar activatie{% endif %}
+                {% if card.trailing_activated and card.pnl >= 0 %}🎯 Trailing actief{% elif card.trailing_activated %}⏸️ Trailing wacht (verlies){% else %}⏳ Naar activatie{% endif %}
             </span>
             {% set trail_pct = card.trailing_progress|default(0, true)|float %}
             {% set safe_trail_pct = [0, [trail_pct, 100]|min]|max %}  {# Clamp between 0-100 #}
@@ -508,7 +508,7 @@
                     <div class="risk-item">
                         <span class="risk-label">Status:</span>
                         <span class="risk-value">
-                            {% if card.trailing_activated %}
+                            {% if card.trailing_activated and card.pnl >= 0 %}
                                 <span class="badge-success">✓ Trailing Actief</span>
                             {% elif card.pnl_pct >= 5 %}
                                 <span class="badge-warning">⚠ Overweeg TP Activatie</span>
@@ -1087,8 +1087,8 @@ function buildTradeCardElement(card) {
                     <span class="card-name">${card.crypto_name || card.market || ''}</span>
                 </div>
             </div>
-            <span class="card-status ${card.trailing_activated ? 'status-trailing' : (card.status === 'external' ? 'status-external' : 'status-active')}">
-                ${card.trailing_activated ? 'TRAILING ACTIEF' : (card.status === 'external' ? 'EXTERNE POSITIE' : 'ACTIEF')}
+            <span class="card-status ${(card.trailing_activated && (Number(card.pnl) || 0) >= 0) ? 'status-trailing' : (card.status === 'external' ? 'status-external' : 'status-active')}">
+                ${(card.trailing_activated && (Number(card.pnl) || 0) >= 0) ? 'TRAILING ACTIEF' : (card.status === 'external' ? 'EXTERNE POSITIE' : 'ACTIEF')}
             </span>
             <button class="card-edit-btn" onclick="openTradeEditor('${card.market}', ${card.buy_price || 0}, ${card.invested || 0}, ${card.amount || 0})" title="Edit trade">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1145,7 +1145,7 @@ function buildTradeCardElement(card) {
         </div>
 
         <div class="card-trailing-row" data-market="${card.market}">
-            <span class="trailing-label">${card.trailing_activated ? '🎯 Trailing actief' : '⏳ Naar activatie'}</span>
+            <span class="trailing-label">${(card.trailing_activated && (Number(card.pnl) || 0) >= 0) ? '🎯 Trailing actief' : (card.trailing_activated ? '⏸️ Trailing wacht (verlies)' : '⏳ Naar activatie')}</span>
             <div class="trailing-bar-simple" title="Voortgang naar trailing activatie - ${trailingPct.toFixed(1)}%">
                 <div class="trailing-fill ${trailingFillClass}"
                     style="width: ${trailingPct > 0 && trailingPct < 5 ? 5 : trailingPct}%; min-width: ${trailingPct > 0 && trailingPct < 5 ? 5 : 0}%;"

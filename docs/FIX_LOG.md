@@ -572,6 +572,36 @@ All 354 archived trailing_tp trades have `highest_price=0` or missing. Without p
 
 ---
 
+## #016 — GUARD 6 NameError + trailing actief template + DCA reconcile SSOT (2026-04-09)
+
+### Symptom
+Three interrelated bugs:
+1. **GUARD 6 NameError**: `name 'dca_events' is not defined` crash every ~60min in `validate_and_repair_trades()` for ALL open trades — invested_eur consistency check was silently failing.
+2. **"Trailing actief" in loss**: Dashboard showed "TRAILING ACTIEF" badge for trades at -3% loss (e.g. UNI-EUR at -3.02%). Misleading — trailing should only show when trade is in profit.
+3. **Missing DCA events**: UNI-EUR had 3 DCAs on Bitvavo but bot only tracked 2 — DCA #1 (2026-04-08 16:59, €41.94 @ €2.7037) was lost during a bot restart.
+
+### Root Cause
+1. **GUARD 6**: Line 888 of `trailing_bot.py` used bare variable name `dca_events` instead of `trade.get('dca_events', [])`. Python scope: the name was never defined in the function scope.
+2. **Template bypass**: `portfolio.html` checked `card.trailing_activated` at 5 separate locations (lines 250, 304, 512, 1091, 1148) — this is a permanent boolean flag that stays True once set. The Python status computation at `app.py:907` correctly checked `live_price >= buy_price`, but the Jinja2 template bypassed it entirely.
+3. **DCA loss**: Bot was restarted between DCA #1 and DCA #2 buys. DCA #1 was executed, but its event was never persisted because the bot wasn't running when it happened (executed by a previous instance that was killed).
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `trailing_bot.py` line 882-885 | **GUARD 6 NameError**: Replaced bare `dca_events` with `_guard6_events = trade.get('dca_events', []) or []` |
+| `portfolio.html` 5 locations | **Trailing actief in loss**: Added `card.pnl >= 0` check to all 5 trailing_activated conditionals. Added "⏸️ Trailing wacht (verlies)" state for trades that have trailing activated but are in loss. |
+| `core/dca_reconcile.py` (NEW) | **Bitvavo SSOT reconcile engine**: Fetches all filled buy trades from Bitvavo, groups by orderId, compares with bot's dca_events, recovers missing events (source="reconcile"), corrects amount/invested_eur/buy_price, enriches existing events with order_id. |
+| `trailing_bot.py` bot_loop + startup | Integrated reconcile: runs at startup and every 5 minutes in bot loop. Auto-saves if any repairs made. |
+| `tests/test_dca_reconcile.py` (NEW) | 19 tests covering: fill grouping, no-fills, matched events, missing DCA recovery, partial recovery, fuzzy timestamp matching, financial corrections, dry-run mode, error handling, order_id enrichment, batch processing, market exclusion. |
+
+### Prevention
+- **SSOT**: Bitvavo order history is now the single source of truth. Every 5 minutes, the reconcile engine checks all open trades and recovers any missing DCA events automatically. Lost events during restarts are now self-healing.
+- **Template safety**: All trailing_activated checks now require positive P&L. Added visual "wacht" state for clarity.
+- **Variable scoping**: GUARD 6 now uses explicit `_guard6_` prefix to avoid variable name collisions in the large validate function.
+
+---
+
 ## Template for new entries
 
 ```

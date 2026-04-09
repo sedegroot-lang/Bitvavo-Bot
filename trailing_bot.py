@@ -879,9 +879,10 @@ def validate_and_repair_trades():
             # tokens are in the balance but events were lost — don't reduce it.
             initial_inv = float(trade.get('initial_invested_eur', 0) or 0)
             partial_tp_returned = float(trade.get('partial_tp_returned_eur', 0) or 0)
-            if initial_inv > 0 and dca_events:
+            _guard6_events = trade.get('dca_events', []) or []
+            if initial_inv > 0 and _guard6_events:
                 dca_eur_sum = sum(
-                    float(ev.get('amount_eur', 0) or 0) for ev in dca_events
+                    float(ev.get('amount_eur', 0) or 0) for ev in _guard6_events
                 )
                 expected_invested = initial_inv + dca_eur_sum - partial_tp_returned
                 current_invested = float(trade.get('invested_eur', 0) or 0)
@@ -1941,6 +1942,7 @@ async def bot_loop():
     last_config_reload = start_time
     last_sync_check = start_time  # Track last sync validation
     last_trade_integrity_check = start_time  # Track trade data validation
+    last_dca_reconcile = start_time  # Track Bitvavo DCA reconcile (SSOT)
 
     while RUNNING:
         # Auto-stop for dry-run sanity tests
@@ -2018,6 +2020,22 @@ async def bot_loop():
                 validate_and_repair_trades()
         except Exception as integrity_err:
             log(f"[INTEGRITY] Check failed: {integrity_err}", level='warning')
+
+        # DCA RECONCILE: Use Bitvavo order history as SSOT every 5 min (FIX #016)
+        try:
+            dca_reconcile_interval = 300  # 5 minutes
+            if open_trades and (time.time() - last_dca_reconcile) >= dca_reconcile_interval:
+                last_dca_reconcile = time.time()
+                from core.dca_reconcile import reconcile_all_trades as _reconcile_all
+                results = _reconcile_all(bitvavo, open_trades, dca_max=int(CONFIG.get('DCA_MAX_BUYS', 3)))
+                any_repairs = any(r.events_added > 0 or r.amount_corrected or r.invested_corrected for r in results)
+                if any_repairs:
+                    save_trades()
+                    for r in results:
+                        if r.repairs:
+                            log(f"🔄 RECONCILE [{r.market}]: {', '.join(r.repairs)}", level='warning')
+        except Exception as recon_err:
+            log(f"[RECONCILE] DCA reconcile failed: {recon_err}", level='warning')
         
         # Heartbeat: update last alive timestamp and periodic log for monitoring
         try:
@@ -4472,6 +4490,19 @@ if __name__ == '__main__':
     except Exception as e:
         log(f"⚠️ Trade validation failed on startup: {e}", level='warning')
     
+    # DCA reconcile on startup: recover any lost DCA events from Bitvavo (FIX #016)
+    try:
+        from core.dca_reconcile import reconcile_all_trades as _reconcile_startup
+        _recon_results = _reconcile_startup(bitvavo, open_trades, dca_max=int(CONFIG.get('DCA_MAX_BUYS', 3)))
+        _recon_fixes = sum(1 for r in _recon_results if r.events_added > 0 or r.amount_corrected or r.invested_corrected)
+        if _recon_fixes > 0:
+            save_trades()
+            log(f"🔄 Startup reconcile: {_recon_fixes} trade(s) repaired from Bitvavo SSOT", level='warning')
+        else:
+            log("✅ Startup reconcile: all trades match Bitvavo", level='info')
+    except Exception as e:
+        log(f"⚠️ Startup DCA reconcile failed: {e}", level='warning')
+
     # Single-instance check via shared helper (best-effort)
     try:
         from scripts.helpers.single_instance import ensure_single_instance_or_exit  # type: ignore[import]
