@@ -314,3 +314,41 @@ Also: trailing-whitespace, end-of-file-fixer, check-yaml, check-json, detect-pri
 12. **MAX_OPEN_TRADES minimum is 3**: The `MAX_OPEN_TRADES` config value must NEVER be set below 3. This is enforced in `ai/ai_supervisor.py` (clamped to 3) and `ai/suggest_rules.py` (floor of 3 in all suggestions). When changing MAX_OPEN_TRADES or any other config value, **edit ONLY `%LOCALAPPDATA%/BotConfig/bot_config_local.json`** — this file loads last and wins over everything. Do NOT edit `config/bot_config.json` or `config/bot_config_overrides.json` (OneDrive reverts them). The AI suggest rules use `max(3, ...)` as floor, never `max(2, ...)`.
 13. **Fix Log**: Always read `docs/FIX_LOG.md` before making any bug fix. After fixing a bug, log it there. This prevents re-introducing known bugs. Key rule: `derive_cost_basis` must ALWAYS fetch full trade history (no `opened_ts` filter) — see FIX_LOG.md #001.
 14. **invested_eur is derived from order history**: `invested_eur` must ALWAYS be set by `derive_cost_basis()` from Bitvavo's order history. NEVER blindly set `invested_eur = buy_price * amount` — derive includes fees and the real cost. See FIX_LOG.md #001.
+
+---
+
+## 12. AI Verification & Analysis Protocol
+
+Copilot must **proactively verify and analyze** — not just execute blindly. These checks are mandatory.
+
+### Health Check Command
+When the user says **"check"**, **"analyseer"**, **"status"**, or **"hoe gaat het"**:
+```powershell
+python scripts/helpers/ai_health_check.py
+```
+This runs 7 automated checks: config, open trades, performance, budget, processes, errors, roadmap alignment.
+
+### Before ANY Config Change
+1. Read current local config (`%LOCALAPPDATA%/BotConfig/bot_config_local.json`)
+2. Verify change matches the active roadmap phase in `docs/PORTFOLIO_ROADMAP.md`
+3. Calculate budget impact: `(BASE + DCA + DCA×0.9) × MAX_TRADES + GRID_INVESTMENT`
+4. Verify 15% EUR reserve is maintained
+5. After applying: verify with readback, update roadmap, commit+push
+
+### Before ANY Bug Fix
+1. Read `docs/FIX_LOG.md` — check if issue was fixed before
+2. Read relevant existing tests
+3. Check `/memories/repo/cost_basis_rules.md` if touching invested_eur/sync/derive
+4. After fix: add FIX_LOG entry, run tests, commit+push
+
+### After ANY Code Change
+1. Run relevant tests: `python -m pytest tests/<relevant_file> -v`
+2. Check errors on changed files
+3. Run health check: `python scripts/helpers/ai_health_check.py`
+4. Commit and push with descriptive message
+
+### Lessons Learned
+Copilot maintains `/memories/repo/lessons_learned.md` — check before repeating past mistakes, update after learning new ones.
+
+### MIN_SCORE_TO_BUY = 7.0 (LOCKED)
+MIN_SCORE_TO_BUY stays at **7.0** at all roadmap phases. Never lower it unless the user explicitly asks.
