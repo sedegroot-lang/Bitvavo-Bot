@@ -79,6 +79,13 @@ def archive_trade(
             with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(archive, f, indent=2)
             temp_path.replace(ARCHIVE_PATH)
+
+            # Mirror to %LOCALAPPDATA% — safe from OneDrive reverts
+            try:
+                from core.local_state import mirror_to_local
+                mirror_to_local(str(ARCHIVE_PATH), archive)
+            except Exception:
+                pass
             
             return True
             
@@ -109,7 +116,18 @@ def get_all_trades(
             
             with open(ARCHIVE_PATH, 'r', encoding='utf-8') as f:
                 archive = json.load(f)
-            
+
+            # Use the freshest copy (local vs OneDrive)
+            try:
+                from core.local_state import load_freshest
+                freshest = load_freshest(str(ARCHIVE_PATH), archive)
+                if freshest and isinstance(freshest.get('trades'), list):
+                    if len(freshest['trades']) >= len(archive.get('trades', [])):
+                        freshest.pop('_save_ts', None)
+                        archive = freshest
+            except Exception:
+                pass
+
             trades = archive.get("trades", [])
             
             # Apply filters

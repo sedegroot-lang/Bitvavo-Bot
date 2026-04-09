@@ -381,11 +381,20 @@ class GridManager:
     # ==================== STATE PERSISTENCE ====================
 
     def _load_states(self) -> None:
-        """Load grid states from disk."""
+        """Load grid states from disk, comparing OneDrive vs local copy."""
         try:
             if os.path.exists(self.GRID_STATE_FILE):
                 with open(self.GRID_STATE_FILE, 'r', encoding='utf-8-sig') as f:
                     data = json.load(f)
+                # Use the freshest copy (local vs OneDrive)
+                try:
+                    from core.local_state import load_freshest
+                    freshest = load_freshest(self.GRID_STATE_FILE, data)
+                    if freshest:
+                        freshest.pop('_save_ts', None)
+                        data = freshest
+                except Exception:
+                    pass
 
                 for market, state_data in data.items():
                     config_data = state_data.get('config', {})
@@ -462,6 +471,12 @@ class GridManager:
 
             os.makedirs(os.path.dirname(self.GRID_STATE_FILE) or '.', exist_ok=True)
             write_json_compat(self.GRID_STATE_FILE, data, indent=2)
+            # Mirror to %LOCALAPPDATA% — safe from OneDrive reverts
+            try:
+                from core.local_state import mirror_to_local
+                mirror_to_local(self.GRID_STATE_FILE, data)
+            except Exception:
+                pass
         except Exception as e:
             log(f"[Grid] Failed to save states: {e}", level='error')
 
