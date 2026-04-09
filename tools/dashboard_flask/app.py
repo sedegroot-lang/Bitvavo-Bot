@@ -992,6 +992,17 @@ def build_trade_cards(trades: Dict, config: Dict) -> List[Dict]:
             dca_hybrid = bool(config.get('DCA_HYBRID', False))
             dca_mode = 'hybrid' if dca_hybrid else ('pyramid' if pyramid_up_enabled else 'average_down')
             
+            # Smart DCA status: detect if Smart DCA is blocking an otherwise ready DCA
+            smart_dca_enabled = bool(config.get('SMART_DCA_ENABLED', False))
+            smart_dca_waiting = False
+            if smart_dca_enabled and dca_next_price and live_price:
+                try:
+                    _dca_ready = float(live_price) <= float(dca_next_price)
+                    _dca_remaining = dca_max_levels - dca_level if dca_max_levels else 1
+                    smart_dca_waiting = _dca_ready and _dca_remaining > 0
+                except Exception:
+                    pass
+            
             # NOTE: dca_level can show high values for old trades due to order history detection
             # TODO: Improve bot's DCA logging to track only actual DCA safety buys, not all buy orders
             # For now, display the raw value - if incorrect, it's a bot logging issue to fix
@@ -1028,6 +1039,8 @@ def build_trade_cards(trades: Dict, config: Dict) -> List[Dict]:
                 'dca_next_price': dca_next_price,  # Price level for next DCA trigger
                 'dca_buy_amount': dca_buy_eur,  # EUR amount per DCA buy
                 'dca_mode': dca_mode,  # 'hybrid', 'pyramid', or 'average_down'
+                'smart_dca_waiting': smart_dca_waiting,  # True when Smart DCA is blocking execution
+                'smart_dca_enabled': smart_dca_enabled,  # Whether Smart DCA feature is on
                 'pyramid_price': pyramid_price,  # Price level for pyramid-up trigger
                 'trailing_progress': trailing_progress,  # Add trailing progress to card
                 'trailing_stop': trailing_stop,

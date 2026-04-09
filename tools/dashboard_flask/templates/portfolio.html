@@ -341,8 +341,8 @@
                 </span>
                 {% set dca_dist = card.dca_distance_pct|default(0, true)|float %}
                 {% set dca_trig = card.dca_trigger_pct|default(2, true)|float %}
-                <span class="dca-detail-item" data-dca-dist="{{ card.market }}" title="Nog {{ "%.2f"|format(dca_dist) }}% prijsdrop nodig voor DCA (trigger: {{ "%.1f"|format(dca_trig) }}%)" style="{% if dca_dist <= 0 %}color: #16c784; font-weight: 700;{% elif dca_dist < 0.5 %}color: #f5a623;{% endif %}">
-                    {% if dca_dist <= 0 %}✅ DCA KLAAR{% else %}📏 Nog {{ "%.2f"|format(dca_dist) }}% tot DCA{% endif %}
+                <span class="dca-detail-item" data-dca-dist="{{ card.market }}" title="{% if card.smart_dca_waiting|default(false) %}Smart DCA wacht op Bollinger Band squeeze{% elif dca_dist <= 0 %}DCA prijsconditie bereikt{% else %}Nog {{ "%.2f"|format(dca_dist) }}% prijsdrop nodig voor DCA (trigger: {{ "%.1f"|format(dca_trig) }}%){% endif %}" style="{% if card.smart_dca_waiting|default(false) %}color: #f5a623; font-weight: 700;{% elif dca_dist <= 0 %}color: #16c784; font-weight: 700;{% elif dca_dist < 0.5 %}color: #f5a623;{% endif %}">
+                    {% if card.smart_dca_waiting|default(false) %}⏳ SMART DCA WACHT{% elif dca_dist <= 0 %}✅ DCA KLAAR{% else %}📏 Nog {{ "%.2f"|format(dca_dist) }}% tot DCA{% endif %}
                 </span>
                 <span class="dca-detail-item" title="Bedrag per DCA buy">
                     💰 Koop: <strong>€{{ "%.2f"|format(dca_buy_amount) }}</strong>
@@ -2240,9 +2240,15 @@ function updateTradeCards(prices) {
             }
             const dcaTrigPct = parseFloat(cardData.dca_trigger_pct) || 2.0;
             const dcaDist = Math.max(0, dcaTrigPct - priceDrop);
+            const smartDcaWaiting = cardData.smart_dca_waiting || false;
             const dcaDistEl = card.querySelector(`[data-dca-dist="${market}"]`);
             if (dcaDistEl) {
-                if (dcaDist <= 0) {
+                if (smartDcaWaiting && dcaDist <= 0) {
+                    dcaDistEl.textContent = '⏳ SMART DCA WACHT';
+                    dcaDistEl.title = 'Smart DCA wacht op Bollinger Band squeeze';
+                    dcaDistEl.style.color = '#f5a623';
+                    dcaDistEl.style.fontWeight = '700';
+                } else if (dcaDist <= 0) {
                     dcaDistEl.textContent = '✅ DCA KLAAR';
                     dcaDistEl.style.color = '#16c784';
                     dcaDistEl.style.fontWeight = '700';
