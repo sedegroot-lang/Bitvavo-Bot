@@ -13,6 +13,10 @@ from pathlib import Path
 ARCHIVE_PATH = Path("data/trade_archive.json")
 LOCK = threading.Lock()
 
+# Trades before this timestamp are "dev" phase, after are "production"
+# 2026-03-09 00:00:00 local time (CET)
+PRODUCTION_CUTOFF_TS = 1773010800.0
+
 
 def _ensure_archive_exists() -> None:
     """Create archive file if it doesn't exist."""
@@ -57,6 +61,7 @@ def archive_trade(
                 archive = json.load(f)
             
             # Create trade record
+            phase = "production" if timestamp >= PRODUCTION_CUTOFF_TS else "dev"
             trade_record = {
                 "market": market,
                 "buy_price": buy_price,
@@ -66,6 +71,7 @@ def archive_trade(
                 "timestamp": timestamp,
                 "reason": reason,
                 "archived_at": time.time(),
+                "phase": phase,
                 **extra_data  # Include DCA info, TP levels, etc.
             }
             
@@ -97,7 +103,8 @@ def archive_trade(
 def get_all_trades(
     exclude_sync_removed: bool = False,
     since_timestamp: Optional[float] = None,
-    market: Optional[str] = None
+    market: Optional[str] = None,
+    phase: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Retrieve trades from archive with optional filters.
@@ -106,6 +113,7 @@ def get_all_trades(
         exclude_sync_removed: If True, filter out sync_removed trades
         since_timestamp: Only return trades after this timestamp
         market: Only return trades for this market
+        phase: Only return trades with this phase ("dev" or "production")
     
     Returns:
         List of trade records
@@ -139,6 +147,9 @@ def get_all_trades(
             
             if market is not None:
                 trades = [t for t in trades if t.get("market") == market]
+
+            if phase is not None:
+                trades = [t for t in trades if _get_phase(t) == phase]
             
             return trades
             
@@ -147,8 +158,8 @@ def get_all_trades(
             return []
 
 
-def get_archive_stats() -> Dict[str, Any]:
-    """Get archive statistics."""
+def get_archive_stats(phase: Optional[str] = None) -> Dict[str, Any]:
+    """Get archive statistics, optionally filtered by phase."""
     with LOCK:
         try:
             _ensure_archive_exists()
@@ -157,6 +168,8 @@ def get_archive_stats() -> Dict[str, Any]:
                 archive = json.load(f)
             
             trades = archive.get("trades", [])
+            if phase is not None:
+                trades = [t for t in trades if _get_phase(t) == phase]
             real_trades = [t for t in trades if t.get("reason") != "sync_removed"]
             
             total_profit = sum(t.get("profit", 0) for t in real_trades)
@@ -272,6 +285,48 @@ def cleanup_duplicates() -> int:
             
         except Exception as e:
             print(f"[ARCHIVE ERROR] Cleanup failed: {e}")
+            return 0
+
+
+def _get_phase(trade: Dict[str, Any]) -> str:
+    """Return the phase of a trade: 'dev' or 'production'."""
+    if "phase" in trade:
+        return trade["phase"]
+    # Fallback for trades not yet tagged: derive from timestamp
+    ts = float(trade.get("timestamp", 0) or 0)
+    return "production" if ts >= PRODUCTION_CUTOFF_TS else "dev"
+
+
+def tag_phases() -> int:
+    """One-time migration: add 'phase' field to all existing archive trades."""
+    with LOCK:
+        try:
+            _ensure_archive_exists()
+            with open(ARCHIVE_PATH, 'r', encoding='utf-8') as f:
+                archive = json.load(f)
+
+            tagged = 0
+            for trade in archive.get("trades", []):
+                if "phase" not in trade:
+                    trade["phase"] = _get_phase(trade)
+                    tagged += 1
+
+            if tagged > 0:
+                archive["metadata"]["phases_tagged_at"] = time.time()
+                temp_path = ARCHIVE_PATH.with_suffix('.tmp')
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    json.dump(archive, f, indent=2)
+                temp_path.replace(ARCHIVE_PATH)
+
+                try:
+                    from core.local_state import mirror_to_local
+                    mirror_to_local(str(ARCHIVE_PATH), archive)
+                except Exception:
+                    pass
+
+            return tagged
+        except Exception as e:
+            print(f"[ARCHIVE ERROR] tag_phases failed: {e}")
             return 0
 
 
