@@ -646,6 +646,38 @@ Two-layer failure when OneDrive reverts `trade_log.json` to an older/empty versi
 
 ---
 
+## #019 — Dashboard deposit total wrong + stale grid orders (2026-04-09)
+
+### Symptom
+Dashboard "totaal gestort" showed €230 instead of €1620.01. Two conflicting deposit files existed:
+- `config/deposits.json` (correct, API-synced, 18 deposits, €1620.01)
+- `data/deposits.json` (wrong, 2 manual entries, €230)
+
+Additionally, 2 stale BTC-EUR buy orders at €57,141 and €59,586 (from pre-FIX #017) were still live on Bitvavo but not tracked in `grid_states.json`.
+
+### Root Cause
+1. `data_service.py` loaded deposits from `data/deposits.json` (old manual file) instead of `config/deposits.json` (API-synced).
+2. `app.py` performance stats (line 2681) also read from `data/deposits.json`.
+3. `get_total_deposited()` in data_service used `deposits.get('entries', [])` for dict format — should be `deposits.get('deposits', [])`.
+4. Old grid orders were orphaned when FIX #017 switched to new grid_states.json — the old orders were never cancelled.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `tools/dashboard_flask/services/data_service.py` `load_deposits()` | Changed path from `data/deposits.json` to `config/deposits.json`. Changed default from `[]` to `{'total_deposited_eur': 0, 'deposits': []}`. Updated return type hint to `Dict`. |
+| `tools/dashboard_flask/services/data_service.py` `get_total_deposited()` | Fixed dict branch to use `data.get('deposits', [])` instead of `data.get('entries', [])`. |
+| `tools/dashboard_flask/app.py` line 2681 | Changed `PROJECT_ROOT / 'data' / 'deposits.json'` to `PROJECT_ROOT / 'config' / 'deposits.json'`. |
+| `data/deposits.json` | Deleted (old manual file). |
+| Bitvavo exchange | Cancelled 2 stale BTC-EUR buy orders at €57,141 and €59,586 via API. |
+| `config/deposits.json` | Fresh sync from Bitvavo API: 18 deposits, €1620.01 (including new €150 deposit). |
+
+### Prevention
+- Single source of truth for deposits: `config/deposits.json` (API-synced). No manual `data/deposits.json`.
+- Both `data_service.py` and `app.py` now read from the same path.
+
+---
+
 ## Template for new entries
 
 ```

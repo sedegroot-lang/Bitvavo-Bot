@@ -2678,7 +2678,7 @@ def performance():
     total_open_invested = sum(t.get('invested_eur', t.get('total_invested_eur', 0)) for t in open_trades.values())
     
     # Get total deposits from deposits.json
-    deposits_path = PROJECT_ROOT / 'data' / 'deposits.json'
+    deposits_path = PROJECT_ROOT / 'config' / 'deposits.json'
     total_deposits = 0
     if deposits_path.exists():
         try:

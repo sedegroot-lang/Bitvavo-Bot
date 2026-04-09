@@ -183,26 +183,26 @@ class DataService:
     
     # ========== Deposits ==========
     
-    def load_deposits(self) -> List[Dict[str, Any]]:
-        """Load deposits history."""
+    def load_deposits(self) -> Dict[str, Any]:
+        """Load deposits history from config/deposits.json (Bitvavo API-synced)."""
         return self.cache.get_or_set(
             'deposits',
             lambda: self._load_json(
-                self._project_root / 'data' / 'deposits.json',
-                []
+                self._project_root / 'config' / 'deposits.json',
+                {'total_deposited_eur': 0, 'deposits': []}
             ),
             self.TTL_DEPOSITS
         )
     
     def get_total_deposited(self) -> float:
-        """Calculate total deposited amount."""
-        deposits = self.load_deposits()
-        if isinstance(deposits, list):
-            return sum(float(d.get('amount', 0)) for d in deposits)
-        elif isinstance(deposits, dict):
-            # Handle legacy format
-            entries = deposits.get('entries', [])
+        """Calculate total deposited amount from config/deposits.json."""
+        data = self.load_deposits()
+        if isinstance(data, dict):
+            entries = data.get('deposits', [])
             return sum(float(d.get('amount', 0)) for d in entries)
+        elif isinstance(data, list):
+            # Legacy plain-list fallback
+            return sum(float(d.get('amount', 0)) for d in data)
         return 0.0
     
     # ========== AI Suggestions ==========
