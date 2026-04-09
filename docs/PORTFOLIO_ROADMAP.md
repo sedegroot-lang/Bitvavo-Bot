@@ -23,13 +23,13 @@
 
 ### Huidige config (werkelijk, 8 april 2026)
 
-> **Roadmap €1.100 fase geactiveerd op 08-04-2026.** BASE 56→62, DCA 28→30.
+> **Roadmap €1.200 fase geactiveerd op 09-04-2026.** MAX_OPEN_TRADES 4→5.
 > €900 fase overgeslagen (portfolio sprong van €800 naar €1.050).
 > Grid BTC actief sinds €1.000 fase (07-04-2026). HODL scheduler uitgeschakeld.
 
 ```json
 {
-  "MAX_OPEN_TRADES": 4,
+  "MAX_OPEN_TRADES": 5,
   "BASE_AMOUNT_EUR": 62,
   "DCA_MAX_BUYS": 17,
   "DCA_AMOUNT_EUR": 30,
@@ -53,9 +53,9 @@
 ```
 
 **DCA-bedragen per level (0.9x)**: €30 → €27,00 → €24,30 → €21,87 → ... → €5,58 (level 17)
-**Typische blootstelling** (2 DCA): €62 + 30 + 27,00 = **€119,00/slot** → 4 slots = **€476**
+**Typische blootstelling** (2 DCA): €62 + 30 + 27,00 = **€119,00/slot** → 5 slots = **€595**
 **Grid BTC**: €150 gereserveerd (15% van portfolio)
-**Worst case** (17 DCA): €62 + €256 = **€318/slot** → 4 slots = **€1.272**
+**Worst case** (17 DCA): €62 + €256 = **€318/slot** → 5 slots = **€1.590**
 
 ---
 
@@ -104,25 +104,25 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 | **€800** ✅ | ↑ 4 trades, BASE 52, DCA 27 | **4** | **52** | **27** | 2,5% | 7,0 | 2,5% | Uit |
 | **€900** ⏭️ | ↑ BASE 56, DCA 28 | 4 | **56** | **28** | 2,5% | 7,0 | 2,4% | Uit |
 | **€1.000** ✅ | ↑ Grid BTC aan (€150) | 4 | 56 | 28 | 2,5% | 7,0 | 2,4% | **€150 BTC** |
-| **€1.100** ← nu | ↑ BASE 62, DCA 30 | 4 | **62** | **30** | 2,5% | 7,0 | 2,4% | €150 BTC |
-| **€1.200** | ↑ 5 trades | **5** | 62 | 30 | 2,5% | **6,5** | 2,4% | €150 BTC |
-| **€1.300** | ↑ BASE 68, DCA 32 | 5 | **68** | **32** | 2,5% | 6,5 | 2,3% | €150 BTC |
-| **€1.400** | ↑ Grid ETH erbij (€250 tot.) | 5 | 68 | 32 | 2,5% | 6,5 | 2,3% | **€250 BTC+ETH** |
-| **€1.500** | ↑ BASE 75, DCA 35 | 5 | **75** | **35** | 2,5% | 6,5 | 2,3% | €250 |
-| **€1.600** | ↑ 6 trades | **6** | 75 | 35 | 2,5% | 6,5 | 2,3% | €250 |
-| **€1.700** | ↑ BASE 80, DCA 38 | 6 | **80** | **38** | 2,5% | 6,5 | 2,2% | €250 |
-| **€1.800** | ↑ Grid SOL erbij (€400 tot.) | 6 | 80 | 38 | 2,5% | 6,5 | 2,2% | **€400 3 mktn** |
-| **€1.900** | ↑ BASE 85 | 6 | **85** | 38 | 2,5% | 6,5 | 2,2% | €400 |
-| **€2.000** | ↑ 7 trades, DCA 40 | **7** | 85 | **40** | 2,3% | 6,5 | 2,2% | €400 |
-| **€2.200** | ↑ BASE 95, DCA 44 | 7 | **95** | **44** | 2,3% | 6,5 | 2,1% | €400 |
-| **€2.400** | ↑ Grid 4 mktn (€600 tot.) | 7 | 95 | 44 | 2,3% | 6,5 | 2,1% | **€600 4 mktn** |
-| **€2.600** | ↑ BASE 105, DCA 48 | 7 | **105** | **48** | 2,3% | 6,0 | 2,1% | €600 |
-| **€2.800** | ↑ 8 trades | **8** | 105 | 48 | 2,3% | 6,0 | 2,0% | €600 |
-| **€3.000** | ↑ BASE 115, DCA 52, Grid 5 mktn | 8 | **115** | **52** | 2,0% | 6,0 | 2,0% | **€800 5 mktn** |
-| **€3.500** | ↑ BASE 130, DCA 58, Grid €1.000 | 8 | **130** | **58** | 2,0% | 6,0 | 2,0% | **€1.000 5 mktn** |
-| **€4.000** | ↑ 9 trades, BASE 145, Grid 6 mktn | **9** | **145** | **65** | 2,0% | 6,0 | 2,0% | **€1.400 6 mktn** |
-| **€4.500** | ↑ BASE 155, DCA 72 | 9 | **155** | **72** | 2,0% | 6,0 | 2,0% | €1.400 |
-| **€5.000** | ↑ 10 trades, DCA 78, Grid €2.000 | **10** | **160** | **78** | 2,0% | 6,0 | 2,0% | **€2.000 8 mktn** |
+| **€1.100** ✅ | ↑ BASE 62, DCA 30 | 4 | **62** | **30** | 2,5% | 7,0 | 2,4% | €150 BTC |
+| **€1.200** ← nu | ↑ 5 trades | **5** | 62 | 30 | 2,5% | 7,0 | 2,4% | €150 BTC |
+| **€1.300** | ↑ BASE 68, DCA 32 | 5 | **68** | **32** | 2,5% | 7,0 | 2,3% | €150 BTC |
+| **€1.400** | ↑ Grid ETH erbij (€250 tot.) | 5 | 68 | 32 | 2,5% | 7,0 | 2,3% | **€250 BTC+ETH** |
+| **€1.500** | ↑ BASE 75, DCA 35 | 5 | **75** | **35** | 2,5% | 7,0 | 2,3% | €250 |
+| **€1.600** | ↑ 6 trades | **6** | 75 | 35 | 2,5% | 7,0 | 2,3% | €250 |
+| **€1.700** | ↑ BASE 80, DCA 38 | 6 | **80** | **38** | 2,5% | 7,0 | 2,2% | €250 |
+| **€1.800** | ↑ Grid SOL erbij (€400 tot.) | 6 | 80 | 38 | 2,5% | 7,0 | 2,2% | **€400 3 mktn** |
+| **€1.900** | ↑ BASE 85 | 6 | **85** | 38 | 2,5% | 7,0 | 2,2% | €400 |
+| **€2.000** | ↑ 7 trades, DCA 40 | **7** | 85 | **40** | 2,3% | 7,0 | 2,2% | €400 |
+| **€2.200** | ↑ BASE 95, DCA 44 | 7 | **95** | **44** | 2,3% | 7,0 | 2,1% | €400 |
+| **€2.400** | ↑ Grid 4 mktn (€600 tot.) | 7 | 95 | 44 | 2,3% | 7,0 | 2,1% | **€600 4 mktn** |
+| **€2.600** | ↑ BASE 105, DCA 48 | 7 | **105** | **48** | 2,3% | 7,0 | 2,1% | €600 |
+| **€2.800** | ↑ 8 trades | **8** | 105 | 48 | 2,3% | 7,0 | 2,0% | €600 |
+| **€3.000** | ↑ BASE 115, DCA 52, Grid 5 mktn | 8 | **115** | **52** | 2,0% | 7,0 | 2,0% | **€800 5 mktn** |
+| **€3.500** | ↑ BASE 130, DCA 58, Grid €1.000 | 8 | **130** | **58** | 2,0% | 7,0 | 2,0% | **€1.000 5 mktn** |
+| **€4.000** | ↑ 9 trades, BASE 145, Grid 6 mktn | **9** | **145** | **65** | 2,0% | 7,0 | 2,0% | **€1.400 6 mktn** |
+| **€4.500** | ↑ BASE 155, DCA 72 | 9 | **155** | **72** | 2,0% | 7,0 | 2,0% | €1.400 |
+| **€5.000** | ↑ 10 trades, DCA 78, Grid €2.000 | **10** | **160** | **78** | 2,0% | 7,0 | 2,0% | **€2.000 8 mktn** |
 
 ---
 
@@ -273,16 +273,15 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
 
 > **Trigger**: Portfolio ≥ €1.200, grid BTC draait ≥ 4 weken, ≥ 3 completed cycles.
 
-**Wijzigingen**: MAX_OPEN_TRADES **4 → 5**, MIN_SCORE **7,0 → 6,5**
+**Wijzigingen**: MAX_OPEN_TRADES **4 → 5**
 
 ```json
 {
-  "MAX_OPEN_TRADES": 5,
-  "MIN_SCORE_TO_BUY": 6.5
+  "MAX_OPEN_TRADES": 5
 }
 ```
 
-**Waarom MIN_SCORE omlaag?** Met 5 slots wil je iets meer trades — 6,5 laat de goede B-kwaliteit setups ook toe.
+**MIN_SCORE blijft 7,0** — hogere drempel houdt kwaliteit hoog, ook met meer slots.
 
 **Budget check:**
 - Grid: €150 + Trailing 5 × (62 + 30 + 27) = **€595** → totaal €745 → buffer €455 ✅
@@ -486,7 +485,7 @@ Hieronder elk bedrag met de exacte actie. **"—"** = geen wijziging, blijf op h
   "DCA_AMOUNT_EUR": 78,
   "DCA_DROP_PCT": 0.020,
   "DCA_SIZE_MULTIPLIER": 0.9,
-  "MIN_SCORE_TO_BUY": 6.0,
+  "MIN_SCORE_TO_BUY": 7.0,
   "DEFAULT_TRAILING": 0.020,
   "TRAILING_ACTIVATION_PCT": 0.012,
   "GRID_TRADING": {
@@ -591,8 +590,8 @@ Vink af wanneer bereikt:
 - [x] €800 — 4 trades, BASE → 52, DCA → 27 (3 april 2026)
 - [x] €900 — BASE → 56, DCA → 28 (overgeslagen → meegenomen in €1.000)
 - [x] €1.000 ⭐ — Grid BTC aan (€150) (7 april 2026)
-- [x] €1.100 ← nu — BASE → 62, DCA → 30 (8 april 2026)
-- [ ] €1.200 — 5 trades, MIN_SCORE → 6,5
+- [x] €1.100 ✅ — BASE → 62, DCA → 30 (8 april 2026)
+- [x] €1.200 ← nu — 5 trades (9 april 2026)
 - [ ] €1.300 — BASE → 68, DCA → 32
 - [ ] €1.400 — Grid ETH erbij (€250 totaal)
 - [ ] €1.500 — BASE → 75, DCA → 35
@@ -613,6 +612,6 @@ Vink af wanneer bereikt:
 
 ---
 
-*Laatste update: 8 april 2026 — Portfolio ~€1.087, Roadmap €1.100 fase actief, Grid BTC draait*
-*Config: BASE=62, DCA=30, MULT=0.9, DCA_DROP=2.5%, 4 slots, grid BTC €150*
-*Volgende mijlpaal: €1.200 (5 trades, MIN_SCORE → 6,5) — wacht 2 weken stabilisatie*
+*Laatste update: 9 april 2026 — Roadmap €1.200 fase actief, Grid BTC draait*
+*Config: BASE=62, DCA=30, MULT=0.9, DCA_DROP=2.5%, 5 slots, grid BTC €150, MIN_SCORE=7.0*
+*Volgende mijlpaal: €1.300 (BASE → 68, DCA → 32) — wacht 2 weken stabilisatie*
