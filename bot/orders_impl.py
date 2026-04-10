@@ -560,12 +560,13 @@ def place_sell(market, amount_base, *, skip_dust: bool = False, sell_all: bool =
                 prec = S.get_amount_precision(market)
                 _post_norm = float(Decimal(str(_post_avail)).quantize(
                     Decimal('1.' + '0' * max(0, prec)), rounding=ROUND_DOWN))
-                if _post_norm >= _post_min and _post_norm > 0:
+                _min_eur = 5.0  # Bitvavo minimum order value in EUR
+                if _post_norm >= _post_min and _post_norm > 0 and _post_val >= _min_eur:
                     log(f"[sell_sweep] {symbol}: {_post_avail:.8f} remaining after sell (EUR {_post_val:.2f}), selling remainder", level='info')
                     _sweep_resp = _place_sell_order(_post_norm)
                     log(f"[sell_sweep] {symbol}: sweep resp={_sweep_resp}", level='info')
                 elif _post_avail > 0:
-                    log(f"[sell_sweep] {symbol}: {_post_avail:.8f} remaining (EUR {_post_val:.2f}) below min order — unsellable dust", level='debug')
+                    log(f"[sell_sweep] {symbol}: {_post_avail:.8f} remaining (EUR {_post_val:.2f}) below min order (base={_post_min}, min EUR={_min_eur}) — unsellable dust", level='debug')
         except Exception as _sweep_err:
             log(f"[sell_sweep] {symbol}: sweep check failed: {_sweep_err}", level='debug')
 
