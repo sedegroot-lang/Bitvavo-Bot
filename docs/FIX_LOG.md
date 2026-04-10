@@ -820,6 +820,25 @@ Three bugs combined:
 
 ---
 
+## #028 — Dashboard portfolio page crash: mixed timestamp types in sort (2026-04-10)
+
+### Symptom
+Dashboard `/portfolio` page threw `TypeError: '<' not supported between instances of 'float' and 'str'` when sorting closed trades.
+
+### Root Cause
+Some trades in the archive have `timestamp` as a string (e.g. from manual edits or older format), while most have it as a float. Python's `sorted()` can't compare `float < str`.
+
+### Fix
+Wrapped `x.get('timestamp', 0)` in `float(... or 0)` in all 3 sort locations:
+- `tools/dashboard_flask/blueprints/main/routes.py` line 234
+- `tools/dashboard_flask/app.py` line 1982
+- `tools/dashboard_flask/app.py` line 3634
+
+### Prevention
+Always coerce archive field values to the expected type before comparison. Trade archive can contain mixed types from different code paths.
+
+---
+
 ## #027 — Incomplete sells leaving dust: get_amount_step used minOrder instead of quantityDecimals (2026-04-10)
 
 ### Symptom
