@@ -27,6 +27,25 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Optional, Dict, Any, List
 
+
+def _ts_to_float(v):
+    """Convert a timestamp value (float, int, or datetime string) to float."""
+    if not v:
+        return 0.0
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        pass
+    try:
+        return datetime.strptime(str(v), '%Y-%m-%d %H:%M:%S').timestamp()
+    except (ValueError, TypeError):
+        pass
+    try:
+        return datetime.fromisoformat(str(v)).timestamp()
+    except (ValueError, TypeError):
+        return 0.0
+
+
 # Add project root to path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -1979,7 +1998,7 @@ def portfolio():
     trades_count = max(1, min(trades_count, 500))  # clamp 1-500
     closed_trades_raw = trades.get('closed', [])
     # Sort by timestamp descending and take last N
-    closed_trades_sorted = sorted(closed_trades_raw, key=lambda x: float(x.get('timestamp', 0) or 0), reverse=True)[:trades_count]
+    closed_trades_sorted = sorted(closed_trades_raw, key=lambda x: _ts_to_float(x.get('timestamp', 0)), reverse=True)[:trades_count]
     
     # Format closed trades for display
     closed_trades = []
@@ -3631,7 +3650,7 @@ def notifications():
     # Build real alerts from closed trades (last 20)
     trades = load_trades()
     closed_trades_raw = trades.get('closed', [])
-    sorted_trades = sorted(closed_trades_raw, key=lambda t: float(t.get('close_ts', t.get('timestamp', 0)) or 0), reverse=True)[:20]
+    sorted_trades = sorted(closed_trades_raw, key=lambda t: _ts_to_float(t.get('close_ts', t.get('timestamp', 0))), reverse=True)[:20]
     
     alerts = []
     for t in sorted_trades:

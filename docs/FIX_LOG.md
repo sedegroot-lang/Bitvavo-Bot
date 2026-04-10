@@ -839,6 +839,34 @@ Always coerce archive field values to the expected type before comparison. Trade
 
 ---
 
+## #029 — Dashboard portfolio crash: datetime string timestamps can't be float-converted (2026-04-10)
+
+### Symptom
+Dashboard `/portfolio` page threw `ValueError: could not convert string to float: '2026-04-10 20:12:20'` when sorting closed trades.
+
+### Root Cause
+Fix #028 wrapped timestamps in `float()`, but some archive entries have `timestamp` as a datetime string (`'%Y-%m-%d %H:%M:%S'` format) which `float()` can't parse. Need a multi-format parser.
+
+### Fix
+Added `_ts_to_float(v)` helper in both `routes.py` and `app.py` that tries:
+1. `float(v)` — handles numeric and numeric-string timestamps
+2. `datetime.strptime(v, '%Y-%m-%d %H:%M:%S').timestamp()` — handles datetime strings
+3. `datetime.fromisoformat(v).timestamp()` — handles ISO format strings
+4. Falls back to `0.0` on any error
+
+Applied in all 3 sort locations (same as #028).
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `tools/dashboard_flask/blueprints/main/routes.py` | Added `_ts_to_float` helper + `datetime` import, used in sort |
+| `tools/dashboard_flask/app.py` | Added `_ts_to_float` helper, used in 2 sort locations |
+
+### Prevention
+Use `_ts_to_float()` for all timestamp sorting/comparison in the dashboard. Never assume timestamps are numeric — the trade archive contains mixed formats.
+
+---
+
 ## #027 — Incomplete sells leaving dust: get_amount_step used minOrder instead of quantityDecimals (2026-04-10)
 
 ### Symptom

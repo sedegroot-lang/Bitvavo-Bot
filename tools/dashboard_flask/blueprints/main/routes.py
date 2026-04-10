@@ -1,7 +1,26 @@
 """Main blueprint routes."""
 import logging
+from datetime import datetime
 from flask import render_template, redirect, url_for, request
 from . import main_bp
+
+
+def _ts_to_float(v):
+    """Convert a timestamp value (float, int, or datetime string) to float."""
+    if not v:
+        return 0.0
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        pass
+    try:
+        return datetime.strptime(str(v), '%Y-%m-%d %H:%M:%S').timestamp()
+    except (ValueError, TypeError):
+        pass
+    try:
+        return datetime.fromisoformat(str(v)).timestamp()
+    except (ValueError, TypeError):
+        return 0.0
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +250,7 @@ def portfolio():
         if not (t.get('market') in open_markets and t.get('reason') == 'trailing_tp')
     ]
 
-    closed_trades_sorted = sorted(closed_trades_filtered, key=lambda x: float(x.get('timestamp', 0) or 0), reverse=True)[:trades_count]
+    closed_trades_sorted = sorted(closed_trades_filtered, key=lambda x: _ts_to_float(x.get('timestamp', 0)), reverse=True)[:trades_count]
     
     # Format closed trades for display
     closed_trades = []
