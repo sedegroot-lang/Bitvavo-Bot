@@ -214,7 +214,13 @@ class LiquidationManager:
                 f"Auto-free: probeer {market} (waarde {value:.2f} EUR, winst {profit_pct*100:.2f}%) te sluiten.",
                 level="info",
             )
-            if ctx.place_sell(market, amount, sell_all=True):
+            sell_resp = ctx.place_sell(market, amount, sell_all=True)
+            sell_ok = (
+                isinstance(sell_resp, dict)
+                and not sell_resp.get('error')
+                and not sell_resp.get('errorCode')
+            )
+            if sell_ok:
                 trade = open_trades.get(market, {})
                 sell_revenue = price * amount
                 invested_eur = float(trade.get("invested_eur", 0) or 0)
@@ -246,8 +252,9 @@ class LiquidationManager:
                 open_trades.pop(market, None)
                 freed += 1
             else:
+                _err = sell_resp.get('error', 'unknown') if isinstance(sell_resp, dict) else str(sell_resp)
                 log(
-                    f"Auto-free: verkoop van {market} mislukt, positie blijft open.",
+                    f"Auto-free: verkoop van {market} mislukt ({_err}), positie blijft open.",
                     level="warning",
                 )
 

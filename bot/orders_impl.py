@@ -509,6 +509,21 @@ def place_sell(market, amount_base, *, skip_dust: bool = False, sell_all: bool =
             remaining = max(0.0, remaining - filled)
             if remaining <= chunk * 0.05:
                 break
+        # Attempt to sell any remaining dust after chunking
+        if remaining > 0:
+            _rem_norm = S.normalize_amount(market, remaining)
+            _rem_min = S.get_min_order_size(market)
+            if _rem_norm >= _rem_min and _rem_norm > 0:
+                log(f"[chunk] Selling remaining {_rem_norm:.8f} {symbol} after chunked sell", level='info')
+                resp = _place_sell_order(_rem_norm)
+                orders.append(resp)
+                try:
+                    if isinstance(resp, dict) and not resp.get('error') and not resp.get('errorCode'):
+                        remaining = max(0.0, remaining - float(resp.get('filledAmount', 0) or 0))
+                except Exception:
+                    pass
+            elif _rem_norm > 0:
+                log(f"[chunk] Remaining {_rem_norm:.8f} {symbol} below min order {_rem_min:.8f} — unsellable dust", level='warning')
         log(f"SELL chunked ({chunk_count}) resp={orders}")
         if not skip_dust:
             try:
@@ -625,7 +640,7 @@ def _cleanup_market_dust(market: str) -> None:
     S = _get_state()
     log = S.log
     DUST_SWEEP_ENABLED = bool(S.CONFIG.get('DUST_SWEEP_ENABLED', True))
-    DUST_THRESHOLD_EUR = float(S.CONFIG.get('DUST_THRESHOLD_EUR', 1.0))
+    DUST_THRESHOLD_EUR = float(S.CONFIG.get('DUST_THRESHOLD_EUR', 5.0))
     if not DUST_SWEEP_ENABLED or DUST_THRESHOLD_EUR <= 0:
         return
     if S.TEST_MODE or not S.LIVE_TRADING:

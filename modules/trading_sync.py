@@ -249,11 +249,22 @@ class TradingSynchronizer:
             if len(closed_state) > max_closed:
                 closed_state = closed_state[-max_closed:]
 
-        missing = [
-            market
-            for market, amount in open_markets.items()
-            if market not in open_state and amount > 0
-        ]
+        # Filter out dust positions below SYNC_DUST_VALUE_EUR before adopting
+        _dust_thr = float(ctx.config.get('SYNC_DUST_VALUE_EUR', 5.0))
+        missing = []
+        for market, amount in open_markets.items():
+            if market in open_state or amount <= 0:
+                continue
+            # EUR value check to prevent adopting dust positions
+            _price = None
+            try:
+                _price = float(ctx.safe_call(ctx.bitvavo.tickerPrice, {'market': market}).get('price', 0) or 0)
+            except Exception:
+                pass
+            if _price and _price > 0 and amount * _price < _dust_thr:
+                log(f"Sync: skip {market} — value €{amount * _price:.2f} below dust threshold €{_dust_thr:.0f}", level='info')
+                continue
+            missing.append(market)
         try:
             max_trades = max(1, int(ctx.config.get("MAX_OPEN_TRADES", 5)))
             reserved = len(self._get_pending_markets())

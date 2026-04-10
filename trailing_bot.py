@@ -2387,6 +2387,10 @@ async def bot_loop():
                             }
                             _finalize_close_trade(m, t, closed_entry)
                             log(f"✅ Max age exit successful: {m} - Profit: €{profit:.2f} (Order ID: {sell_order_id})", level='info')
+                            try:
+                                _cleanup_market_dust(m)
+                            except Exception:
+                                pass
                             continue
             except Exception as e:
                 log(f"operation failed: {e}", level='debug')
@@ -2446,6 +2450,10 @@ async def bot_loop():
                                 'reason': 'max_drawdown',
                             }
                             _finalize_close_trade(m, t, closed_entry)
+                            try:
+                                _cleanup_market_dust(m)
+                            except Exception:
+                                pass
                             continue
             except Exception as e:
                 log(f"operation failed: {e}", level='debug')
@@ -2873,6 +2881,11 @@ async def bot_loop():
                     }
                     _finalize_close_trade(m, t, closed_entry, update_market_profits=True, profit_for_market=total_trade_profit)
                     log(f"✅ Trailing TP closed successfully: {m} - Real Profit: €{real_profit:.2f} @ €{final_sell_price:.8f} (Order ID: {sell_order_id})", level='info')
+                    # Sweep any remaining dust after full sell (trade is now removed from open_trades)
+                    try:
+                        _cleanup_market_dust(m)
+                    except Exception:
+                        pass
                     did_exit = True
 
             # Hard/stop-loss exit (only if enabled and not already exited by trailing)

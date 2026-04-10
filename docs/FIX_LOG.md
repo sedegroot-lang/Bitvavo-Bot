@@ -791,6 +791,35 @@ Values derived via `modules.cost_basis.derive_cost_basis()` using full FIFO lot 
 
 ---
 
+## #024 — Dust adopt→fake-sell→re-adopt infinite loop after chunked sells (2026-04-10)
+
+### Symptom
+After trailing TP sold LINK-EUR in chunks (€99.74 + €37.50), ~0.28 LINK (~€2.10) remained as dust. This dust was below Bitvavo's €5 minimum order size, making it unsellable. The sync engine adopted it as a new trade → auto_free_slot tried to sell → got "below_minimum_order_size" error but treated error dict as truthy (success) → removed trade without selling → sync re-adopted → loop repeated 26 times creating 26 fake "auto_free_slot" closed trades.
+
+### Root Cause
+Three bugs combined:
+1. **auto_free_slot truthy check**: `if ctx.place_sell(...)` — error dicts like `{"error": "below_minimum_order_size"}` are truthy in Python, so failed sells were treated as successes
+2. **trading_sync.py no EUR threshold**: Unlike sync_engine.py (€5 threshold), trading_sync adopted ANY non-zero balance as a new trade
+3. **Chunked sell leaves dust**: After chunks, remaining 0.28 LINK (€2.10) was below €5 min order and couldn't be sold or cleaned up
+
+### Fix Applied
+| File | Change |
+|------|--------|
+| `modules/trading_liquidation.py` | auto_free_slot: `sell_resp` checked for `error`/`errorCode` keys instead of truthy test |
+| `modules/trading_sync.py` | Added €5 EUR dust threshold (SYNC_DUST_VALUE_EUR) before adopting new positions |
+| `bot/orders_impl.py` | Chunked sell: attempts to sell remaining after all chunks; logs "unsellable dust" if below min order |
+| `bot/orders_impl.py` | DUST_THRESHOLD_EUR default raised from €1 to €5 (matching Bitvavo's min order) |
+| `trailing_bot.py` | Added `_cleanup_market_dust(m)` after trailing_tp, max_age, and drawdown exits |
+| `data/trade_log.json` | Removed 26 fake LINK-EUR auto_free_slot closed trade entries |
+
+### Prevention
+- Sell response is now properly validated (not just truthy check)
+- Sync won't adopt positions below €5 (Bitvavo's min order size)
+- Post-exit dust sweep attempts cleanup immediately
+- Chunked sells attempt to sell remaining dust; log clearly when below minimum
+
+---
+
 ## Template for new entries
 
 ```
