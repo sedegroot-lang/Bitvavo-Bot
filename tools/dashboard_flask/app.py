@@ -1198,7 +1198,7 @@ def _calculate_period_pnl() -> Dict:
                 pass
 
         for trade in closed:
-            ts = float(trade.get('timestamp', 0) or 0)
+            ts = _ts_to_float(trade.get('timestamp', 0))
             if ts <= 0:
                 continue
             profit = float(trade.get('profit', 0) or 0)
@@ -2674,7 +2674,7 @@ def performance():
                    'July', 'August', 'September', 'October', 'November', 'December']
     monthly_data = {}  # key: (year, month) -> {pnl, trades, wins, invested}
     for trade in closed_trades:
-        close_ts = trade.get('close_ts') or trade.get('timestamp') or 0
+        close_ts = _ts_to_float(trade.get('close_ts') or trade.get('timestamp') or 0)
         if close_ts > 0:
             try:
                 dt = datetime.datetime.fromtimestamp(close_ts)
@@ -2805,7 +2805,7 @@ def performance():
     # Build daily P/L from actual closed trades
     daily_pnl = {}
     for trade in closed_trades:
-        close_ts = trade.get('close_ts') or trade.get('timestamp') or 0
+        close_ts = _ts_to_float(trade.get('close_ts') or trade.get('timestamp') or 0)
         if close_ts > 0:
             try:
                 trade_date = datetime.fromtimestamp(close_ts).strftime('%Y-%m-%d')
@@ -3075,7 +3075,7 @@ def reports():
     bot_heartbeat = {
         'status': 'online' if is_bot_online(heartbeat, config) else 'offline',
         'last_update': heartbeat.get('ts', 0),
-        'trades_today': len([t for t in trades.get('closed', []) if t.get('close_ts', 0) > time.time() - 86400]),
+        'trades_today': len([t for t in trades.get('closed', []) if _ts_to_float(t.get('close_ts', 0)) > time.time() - 86400]),
     }
     
     ai_heartbeat = {
@@ -3654,7 +3654,7 @@ def notifications():
     
     alerts = []
     for t in sorted_trades:
-        ts = t.get('close_ts') or t.get('timestamp') or 0
+        ts = _ts_to_float(t.get('close_ts') or t.get('timestamp') or 0)
         profit = t.get('profit', 0)
         market = t.get('market', 'UNKNOWN')
         reason = t.get('reason', 'unknown')

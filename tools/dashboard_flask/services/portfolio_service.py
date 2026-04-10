@@ -1,7 +1,26 @@
 """Portfolio business logic service."""
 from dataclasses import dataclass
+from datetime import datetime as _datetime
 from typing import List, Dict, Optional, Any
 import logging
+
+
+def _ts_to_float(v):
+    """Convert a timestamp value (float, int, or datetime string) to float."""
+    if not v:
+        return 0.0
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        pass
+    try:
+        return _datetime.strptime(str(v), '%Y-%m-%d %H:%M:%S').timestamp()
+    except (ValueError, TypeError):
+        pass
+    try:
+        return _datetime.fromisoformat(str(v)).timestamp()
+    except (ValueError, TypeError):
+        return 0.0
 
 from .data_service import DataService
 from .price_service import PriceService
@@ -448,7 +467,7 @@ class PortfolioService:
                 except Exception:
                     pass
             for _t in _closed:
-                _ts = float(_t.get('timestamp', 0) or 0)
+                _ts = _ts_to_float(_t.get('timestamp', 0))
                 if _ts <= 0:
                     continue
                 _profit = float(_t.get('profit', 0) or 0)

@@ -860,10 +860,11 @@ Applied in all 3 sort locations (same as #028).
 | File | Change |
 |------|--------|
 | `tools/dashboard_flask/blueprints/main/routes.py` | Added `_ts_to_float` helper + `datetime` import, used in sort |
-| `tools/dashboard_flask/app.py` | Added `_ts_to_float` helper, used in 2 sort locations |
+| `tools/dashboard_flask/app.py` | Added `_ts_to_float` helper, used in 7 locations (sort, comparison, alerts, performance, reports) |
+| `tools/dashboard_flask/services/portfolio_service.py` | Added `_ts_to_float` helper, used in PnL calculation |
 
 ### Prevention
-Use `_ts_to_float()` for all timestamp sorting/comparison in the dashboard. Never assume timestamps are numeric — the trade archive contains mixed formats.
+Use `_ts_to_float()` for all timestamp sorting/comparison in the dashboard. Never assume timestamps are numeric — the trade archive contains mixed formats (unix epoch floats, datetime strings like `'2026-04-10 20:12:20'`, ISO format, None).
 
 ---
 
