@@ -347,19 +347,16 @@ class ManagedProcess:
         self.last_restart_time = now
         debug_log(f"ManagedProcess.start: {self.name} - is_running={self.is_running()} restart_attempts={self.restart_attempts}")
         if self.is_running():
-            print(f"[start_bot] {self.name} draait al (pid={self.proc.pid}).")
             debug_log(f"ManagedProcess.start: {self.name} draait al (pid={self.proc.pid})")
             return
         if self.restart_attempts >= 3:
-            print(f"[start_bot] {self.name} exited too many times, not restarting.")
+            print(f"   ❌ {self.name} herhaaldelijk gefaald, gestopt")
             debug_log(f"ManagedProcess.start: {self.name} exited too many times, not restarting.")
             return
         
         # Note: We rely on each script's own ensure_single_instance_or_exit() check
         # to prevent duplicates. No need to check here as it causes race conditions.
         
-        # DEBUG: log exact command being started
-        print(f"[start_bot] DEBUG: Starting {self.name} with command: {self.command}")
         debug_log(f"ManagedProcess.start: {self.name} command={self.command}")
         
         self._wait_for_singleton_release()
@@ -380,7 +377,16 @@ class ManagedProcess:
             setattr(self.proc, 'start_time', time.time())
         except Exception:
             pass
-        print(f"[start_bot] {self.name} gestart (pid={self.proc.pid}).")
+        _display_names = {
+            'monitor': '🔍 Monitor daemon',
+            'ai_supervisor': '🧠 AI Supervisor',
+            'auto_retrain': '📊 Auto retrain',
+            'auto_backup': '💾 Auto backup',
+            'flask_dashboard': '🌐 Dashboard → http://localhost:5001',
+            'pairs_runner': '🔄 Pairs arbitrage',
+        }
+        _label = _display_names.get(self.name, self.name)
+        print(f"   ✅ {_label} (pid={self.proc.pid})")
         debug_log(f"ManagedProcess.start: {self.name} gestart (pid={self.proc.pid}) cmd={self.command}")
         # Post-start verification: wait briefly and ensure the process stayed alive.
         try:
@@ -388,7 +394,7 @@ class ManagedProcess:
             if self.proc.poll() is not None:
                 rc = self.proc.poll()
                 debug_log(f"ManagedProcess.start: {self.name} exited quickly (pid={self.proc.pid}) rc={rc}")
-                print(f"[start_bot] {self.name} exited quickly (rc={rc}). Zie {self.stdout_log_path.name}/{self.stderr_log_path.name} voor output.")
+                print(f"   ⚠️  {self.name} exited (rc={rc}), zie logs/start_bot/ voor details")
                 # Detect singleton guard message and disable auto_restart for monitor
                 singleton_msgs = [
                     "monitor draait al", "Another instance holds the startup mutex", "monitor al actief"
@@ -404,7 +410,7 @@ class ManagedProcess:
                     except Exception:
                         log_tail = ''
                 if self.name == "monitor" and any(msg in log_tail for msg in singleton_msgs):
-                    print(f"[start_bot] monitor singleton detected, not restarting.")
+                    print(f"   ⚠️  monitor singleton gedetecteerd")
                     debug_log(f"ManagedProcess.start: monitor singleton detected, disabling auto_restart.")
                     self.auto_restart = False
                 self.restart_attempts += 1
@@ -421,7 +427,6 @@ class ManagedProcess:
         debug_log(f"ManagedProcess.stop: {self.name} - proc={self.proc}")
         if not self.proc or self.proc.poll() is not None:
             return
-        print(f"[start_bot] {self.name} stoppen (pid={self.proc.pid}).")
         debug_log(f"ManagedProcess.stop: {self.name} stoppen (pid={self.proc.pid})")
         try:
             if os.name == "nt":
@@ -447,13 +452,10 @@ class ManagedProcess:
         if self.proc and self.proc.poll() is not None:
             rc = self.proc.returncode
             debug_log(f"ManagedProcess.ensure: {self.name} detected exit rc={rc}, restarting")
-            print(f"[start_bot] {self.name} gestopt (rc={rc}), poging tot herstart...")
+            print(f"   ⚠️ {self.name} gestopt (rc={rc}), herstart...")
             self._close_log_handles()
             self.proc = None
-            # Wait 3 seconds to allow mutex cleanup on Windows
-            print(f"[start_bot] Wachten 3 seconden voor mutex cleanup...")
             time.sleep(3)
-        print(f"[start_bot] {self.name} opnieuw starten...")
         self.start()
 
     def is_running(self) -> bool:
@@ -532,7 +534,6 @@ def _start_hodl_scheduler() -> None:
         scheduler = HodlScheduler()
     except Exception as exc:
         debug_log(f"hodl_scheduler: init mislukt {exc}")
-        print(f"[start_bot] Hodl scheduler kon niet initialiseren: {exc}")
         return
     if not scheduler.enabled:
         debug_log("hodl_scheduler: niet geactiveerd in config")
@@ -560,7 +561,7 @@ def _start_hodl_scheduler() -> None:
         return
     _hodl_scheduler_thread = threading.Thread(target=_worker, name='hodl-dca-scheduler', daemon=True)
     _hodl_scheduler_thread.start()
-    print(f"[start_bot] Hodl scheduler gestart (interval {interval}s).")
+    debug_log(f"hodl_scheduler: gestart (interval {interval}s)")
 
 
 def _parent_running_start_bot() -> tuple[bool, Optional[tuple[int, str]]]:
@@ -710,8 +711,7 @@ def prefetch_icons() -> None:
     if not prefetch_script.exists():
         return
     try:
-        print("[start_bot] Icon prefetch gestart in background...")
-        # Start in background zonder te wachten
+        debug_log("prefetch_icons: gestart")
         subprocess.Popen(
             [PYTHON, str(prefetch_script)],
             cwd=str(BASE_DIR),
@@ -719,9 +719,8 @@ def prefetch_icons() -> None:
             stderr=subprocess.DEVNULL,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
         )
-        print("[start_bot] ✓ Icon prefetch draait op achtergrond")
     except Exception as e:
-        print(f"[start_bot] Icon prefetch fout: {e}")
+        debug_log(f"prefetch_icons: fout {e}")
 
 
 def build_processes(mode: str, include_dashboard: bool, include_pairs: bool) -> list[ManagedProcess]:
@@ -771,7 +770,7 @@ def build_processes(mode: str, include_dashboard: bool, include_pairs: bool) -> 
             )
         )
     else:
-        print("[start_bot] Warning: Flask dashboard niet gevonden in tools/dashboard_flask/app.py")
+        debug_log("flask_dashboard: app.py niet gevonden")
     
     # Note: Dashboard watchdog removed - Flask dashboard is self-managing
     # Flask dashboard runs as subprocess and handles its own health monitoring
@@ -786,7 +785,7 @@ def build_processes(mode: str, include_dashboard: bool, include_pairs: bool) -> 
                 )
             )
         else:
-            print("[start_bot] Pairs-runner draait al, geen nieuwe instantie gestart.")
+            debug_log("pairs_runner draait al, overslaan")
     return processes
     # ...existing code...
     return processes
@@ -1081,7 +1080,7 @@ def run_housekeeping(now: float, last_run: Optional[float]) -> float:
         return last_run
     if not HOUSEKEEPING_SCRIPT.exists():
         return now
-    print("[start_bot] Housekeeping starten...")
+    debug_log("housekeeping: starten")
     tasks: list[tuple[list[str], str]] = [
         ([PYTHON, str(HOUSEKEEPING_SCRIPT), "--compress"], "trade backups"),
         (
@@ -1101,11 +1100,12 @@ def run_housekeeping(now: float, last_run: Optional[float]) -> float:
     ]
     for command, label in tasks:
         try:
-            subprocess.run(command, cwd=str(BASE_DIR), check=True)
+            subprocess.run(command, cwd=str(BASE_DIR), check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as exc:
-            print(f"[start_bot] Housekeeping mislukt ({label}), rc={exc.returncode}")
+            debug_log(f"housekeeping: mislukt ({label}), rc={exc.returncode}")
         except Exception as exc:  # noqa: BLE001 - best effort cleanup
-            print(f"[start_bot] Housekeeping fout ({label}): {exc}")
+            debug_log(f"housekeeping: fout ({label}): {exc}")
     return now
 
 
@@ -1186,7 +1186,7 @@ def main() -> None:
                     print(f"[start_bot] Warning: kon PID file {pidfile} niet verwijderen: {e}")
             
             if removed_count > 0:
-                print(f"[start_bot] {removed_count} oude PID/lock files verwijderd.")
+                print(f"   🧹 {removed_count} oude PID/lock files opgeruimd")
     except ImportError:
         # psutil not available - skip cleanup
         pass
@@ -1213,20 +1213,17 @@ def main() -> None:
     if not parent_is_launcher:
         existing_instances = _list_running_start_bot_pids()
         if existing_instances:
-            print(f"[start_bot] WAARSCHUWING: Er draait mogelijk nog een start_bot (pid(s): {existing_instances}).")
-            print(f"[start_bot] Probeer bestaande instantie(s) te stoppen...")
+            print(f"   \u26a0\ufe0f  Bestaande bot gevonden (pid: {existing_instances}), stoppen...")
             debug_log(f"main: andere start_bot actief {existing_instances}")
             _terminate_start_bot_instances(existing_instances)
-            time.sleep(3)  # Increased from 1 to 3 seconds for mutex cleanup
+            time.sleep(3)
             remaining = _list_running_start_bot_pids()
             if remaining:
-                print(f"[start_bot] WAARSCHUWING: Kon bestaande proces(sen) niet stoppen: {remaining}")
-                print(f"[start_bot] Ga toch door met starten (single-instance mutex is uitgeschakeld)...")
-                # Continue anyway - don't return/exit
+                debug_log(f"main: kon processen niet stoppen: {remaining}")
             else:
-                print("[start_bot] Oude start_bot proces(sen) gestopt, ga verder met start.")
+                debug_log("main: oude processen gestopt")
     else:
-        print("[start_bot] Launched by automation wrapper - skipping duplicate detection.")
+        debug_log("main: launched by wrapper, skip duplicate check")
 
     # Single-instance check: prevent duplicate start_bot processes using mutex+PID guard
     # RE-ENABLED: Use allow_claim=False so a second launch exits cleanly
@@ -1299,20 +1296,8 @@ def main() -> None:
     # Prefetch coin icons for dashboard (runs quickly, skips cached)
     prefetch_icons()
 
-    # Sync invested_eur with Bitvavo trades before starting bot
-    # This ensures trade_log.json has correct invested values
-    try:
-        from scripts.sync_invested_eur import sync_invested_eur
-        print("[start_bot] Syncing invested_eur with Bitvavo trades...")
-        result = sync_invested_eur(dry_run=False)
-        if result['total'] > 0:
-            print(f"[start_bot] Corrected {result['total']} position(s)")
-        else:
-            print("[start_bot] All invested_eur values correct")
-        debug_log(f"main: sync_invested_eur completed, {result['total']} corrections")
-    except Exception as e:
-        print(f"[start_bot] Warning: invested_eur sync failed: {e}")
-        debug_log(f"main: sync_invested_eur failed: {e}")
+    # Note: invested_eur sync happens inside trailing_bot.py on startup
+    # via modules.invested_sync — no need to run it here.
 
     processes = build_processes(args.mode, args.with_dashboard, include_pairs)
     debug_log(f"main: build_processes {[(p.name, p.command) for p in processes]}")
@@ -1321,7 +1306,6 @@ def main() -> None:
         # Check of er al een monitor draait
         monitor_pids = _find_running_script_pids('monitor.py')
         if monitor_pids:
-            print(f"[start_bot] Er draait al een monitor (pid(s): {monitor_pids}), geen nieuwe starten.")
             debug_log(f"main: monitor(s) actief, geen nieuwe starten: {monitor_pids}")
             processes = [p for p in processes if p.name != "monitor"]
     if args.no_autorestart:
@@ -1334,6 +1318,9 @@ def main() -> None:
     for proc in processes:
         proc.auto_restart = False
     
+    print("")
+    print("   Starting services...")
+    print("")
     for proc in processes:
         debug_log(f"main: start process {proc.name}")
         proc.start()
@@ -1359,7 +1346,11 @@ def main() -> None:
         # Non-critical: if enabling fails, continue running with existing settings
         pass
     
-    print("[start_bot] Alle processen gestart. Ctrl+C om alles te stoppen.")
+    print("")
+    print("   " + "─" * 50)
+    print(f"   ✅ Alle {len(processes)} services gestart")
+    print("   " + "─" * 50)
+    print("")
     debug_log("main: alle processen gestart")
     try:
         _start_daily_report_scheduler()
@@ -1381,7 +1372,8 @@ def main() -> None:
                 proc.ensure()
                 debug_log(f"main: ensure process {proc.name}")
     except KeyboardInterrupt:
-        print("[start_bot] Stop-signaal ontvangen, processen afsluiten...")
+        print("")
+        print("   🛑 Stop-signaal ontvangen, services afsluiten...")
         debug_log("main: KeyboardInterrupt ontvangen, processen afsluiten")
         for proc in processes:
             proc.stop()
