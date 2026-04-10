@@ -23,7 +23,7 @@ def test_dca_fixed_updates_weighted_average():
     place_calls: List[Any] = []
     saves: Dict[str, int] = {"count": 0}
 
-    def place_buy(market: str, eur_amount: float, price: float) -> Dict[str, Any]:
+    def place_buy(market: str, eur_amount: float, price: float, **kwargs) -> Dict[str, Any]:
         place_calls.append((market, eur_amount, price))
         return {"orderId": "ok"}
 
@@ -40,7 +40,7 @@ def test_dca_fixed_updates_weighted_average():
         get_candles=lambda market, interval, limit: _make_candles(90.0, 60),
         close_prices=lambda candles: [float(row[4]) for row in candles],
         rsi=lambda prices, period: 25.0,
-        trade_log_path="nonexistent.json",
+        trade_log_path="test_dca_fixed.json",
     )
     manager = DCAManager(ctx)
     trade = {"buy_price": 100.0, "amount": 0.1, "dca_buys": 0}
@@ -75,7 +75,7 @@ def test_dca_fixed_updates_weighted_average():
 def test_dca_respects_exposure_headroom():
     place_calls: List[Any] = []
 
-    def place_buy(market: str, eur_amount: float, price: float) -> Dict[str, Any]:
+    def place_buy(market: str, eur_amount: float, price: float, **kwargs) -> Dict[str, Any]:
         place_calls.append((market, eur_amount, price))
         return {"orderId": "ok"}
 
@@ -92,7 +92,7 @@ def test_dca_respects_exposure_headroom():
         get_candles=lambda market, interval, limit: _make_candles(90.0, 60),
         close_prices=lambda candles: [float(row[4]) for row in candles],
         rsi=lambda prices, period: 25.0,
-        trade_log_path="nonexistent.json",
+        trade_log_path="test_dca_headroom.json",
     )
     manager = DCAManager(ctx)
     trade = {"buy_price": 100.0, "amount": 0.1, "dca_buys": 0}
@@ -231,7 +231,7 @@ def test_ai_auto_apply_respects_cooldown(tmp_path, monkeypatch):
     config_path.write_text(json.dumps(initial_config), encoding="utf-8")
 
     storage.configure(tmp_path / "data")
-    ai_supervisor = importlib.reload(importlib.import_module("ai_supervisor"))
+    ai_supervisor = importlib.reload(importlib.import_module("ai.ai_supervisor"))
     try:
         monkeypatch.setattr(ai_supervisor, "CONFIG_FILE", str(config_path))
         monkeypatch.setattr(ai_supervisor, "CHANGE_HISTORY_FILE", str(history_path))

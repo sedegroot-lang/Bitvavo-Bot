@@ -247,6 +247,7 @@ class TestDashboardCalculations:
         When invested_eur is available, it is used directly.
         Falls back to buy_price*amount only when invested_eur is missing.
         """
+        pytest.importorskip("flask", reason="flask not installed")
         from tools.dashboard_flask.app import calculate_trade_financials
         
         # Case 1: invested_eur matches buy_price*amount → use invested_eur

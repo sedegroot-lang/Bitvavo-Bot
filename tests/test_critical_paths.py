@@ -471,7 +471,8 @@ class TestConfigStateSeparation:
         
         with patch.object(cfg_mod, 'CONFIG_PATH', str(config_file)), \
              patch.object(cfg_mod, 'STATE_PATH', str(state_file)), \
-             patch.object(cfg_mod, 'LOCAL_OVERRIDE_PATH', str(tmp_path / 'nonexistent_local.json')):
+             patch.object(cfg_mod, 'LOCAL_OVERRIDE_PATH', str(tmp_path / 'nonexistent_local.json')), \
+             patch.object(cfg_mod, '_load_state', return_value=state_data):
             result = cfg_mod.load_config()
         
         assert result['BASE_AMOUNT_EUR'] == 12.0
