@@ -231,7 +231,7 @@ def portfolio():
         if not (t.get('market') in open_markets and t.get('reason') == 'trailing_tp')
     ]
 
-    closed_trades_sorted = sorted(closed_trades_filtered, key=lambda x: x.get('timestamp', 0), reverse=True)[:trades_count]
+    closed_trades_sorted = sorted(closed_trades_filtered, key=lambda x: float(x.get('timestamp', 0) or 0), reverse=True)[:trades_count]
     
     # Format closed trades for display
     closed_trades = []

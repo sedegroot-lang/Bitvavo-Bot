@@ -1979,7 +1979,7 @@ def portfolio():
     trades_count = max(1, min(trades_count, 500))  # clamp 1-500
     closed_trades_raw = trades.get('closed', [])
     # Sort by timestamp descending and take last N
-    closed_trades_sorted = sorted(closed_trades_raw, key=lambda x: x.get('timestamp', 0), reverse=True)[:trades_count]
+    closed_trades_sorted = sorted(closed_trades_raw, key=lambda x: float(x.get('timestamp', 0) or 0), reverse=True)[:trades_count]
     
     # Format closed trades for display
     closed_trades = []
@@ -3631,7 +3631,7 @@ def notifications():
     # Build real alerts from closed trades (last 20)
     trades = load_trades()
     closed_trades_raw = trades.get('closed', [])
-    sorted_trades = sorted(closed_trades_raw, key=lambda t: t.get('close_ts', t.get('timestamp', 0)), reverse=True)[:20]
+    sorted_trades = sorted(closed_trades_raw, key=lambda t: float(t.get('close_ts', t.get('timestamp', 0)) or 0), reverse=True)[:20]
     
     alerts = []
     for t in sorted_trades:
