@@ -837,3 +837,26 @@ What was changed and where.
 ### Prevention
 How we prevent recurrence.
 ```
+
+---
+
+## #025 — Dust positions counted as open trades, blocking new entries (2026-04-10)
+
+### Symptom
+Dust positions (< €5 EUR value) left after partial sells were treated as real open trades. This caused:
+- Phantom "capacity full" when only a few real trades existed
+- Main loop managing trailing/DCA on unsellable dust (wasteful)
+- Correlation shield including dust in calculations
+- Liquidation capacity checks blocked by dust
+
+### Root Cause
+Multiple places used `len(open_trades)` to count trades without filtering out dust positions below the €5 Bitvavo minimum order threshold.
+
+### Fix Applied
+1. **`trailing_bot.py` main loop** (L2260): Skip dust trades — compute EUR value, skip if < `DUST_TRADE_THRESHOLD_EUR`
+2. **`trailing_bot.py` correlation shield** (L3042): Use `count_active_open_trades()` instead of `len(open_trades)`, skip dust in market iteration
+3. **`modules/trading_liquidation.py`** (L166): Count only non-dust trades for capacity check
+4. **`modules/trading_sync.py`** (L271): Count only non-dust trades for adoption room calculation
+
+### Prevention
+All capacity/counting checks now use value-based filtering against `DUST_TRADE_THRESHOLD_EUR` (default €5). Entry checks already used `count_active_open_trades()` which was correct — now all other paths are consistent.
