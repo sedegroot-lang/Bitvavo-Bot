@@ -268,7 +268,17 @@ class TradingSynchronizer:
         try:
             max_trades = max(1, int(ctx.config.get("MAX_OPEN_TRADES", 5)))
             reserved = len(self._get_pending_markets())
-            room = max(0, max_trades - (len(open_state) + reserved))
+            # Count only non-dust trades for capacity check
+            _dust_thr = float(ctx.config.get('DUST_TRADE_THRESHOLD_EUR', ctx.config.get('MIN_ORDER_EUR', 5.0)))
+            _active_count = 0
+            for _sm, _st in open_state.items():
+                if not isinstance(_st, dict):
+                    continue
+                _sp = ctx.get_current_price(_sm) if hasattr(ctx, 'get_current_price') else None
+                _sa = float(_st.get('amount', 0) or 0)
+                if _sp and _sa > 0 and (float(_sp) * _sa) >= _dust_thr:
+                    _active_count += 1
+            room = max(0, max_trades - (_active_count + reserved))
             if room < len(missing):
                 missing = missing[:room]
         except Exception:

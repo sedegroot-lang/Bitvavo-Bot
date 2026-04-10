@@ -2257,6 +2257,12 @@ async def bot_loop():
             cp = get_current_price(m)
             if not cp:
                 continue
+
+            # Skip dust positions — not real trades, don't manage trailing/DCA
+            _dust_val, _ = _compute_trade_value_eur(m, t)
+            if _dust_val is not None and _dust_val < DUST_TRADE_THRESHOLD_EUR:
+                log(f"[DUST_SKIP] {m}: waarde €{_dust_val:.2f} < drempel €{DUST_TRADE_THRESHOLD_EUR:.0f}, overgeslagen", level='debug')
+                continue
             
             # Log price check for debugging highest_price tracking
             try:
@@ -3033,12 +3039,19 @@ async def bot_loop():
         # ── Cascade Correlation Shield: check portfolio correlation risk ──
         _corr_block_entries = False
         _corr_tighten_stops = False
-        if CONFIG.get('CORRELATION_SHIELD_ENABLED', True) and len(open_trades) >= 2:
+        _active_trade_count = count_active_open_trades(threshold=DUST_TRADE_THRESHOLD_EUR)
+        if CONFIG.get('CORRELATION_SHIELD_ENABLED', True) and _active_trade_count >= 2:
             try:
                 from core.correlation_shield import check_cascade_risk
                 _corr_candles = {}
                 _corr_prices = {}
                 for _cm in list(open_trades.keys()):
+                    # Skip dust positions in correlation analysis
+                    _cm_t = open_trades.get(_cm)
+                    if isinstance(_cm_t, dict):
+                        _cm_val, _ = _compute_trade_value_eur(_cm, _cm_t)
+                        if _cm_val is not None and _cm_val < DUST_TRADE_THRESHOLD_EUR:
+                            continue
                     try:
                         _corr_candles[_cm] = get_candles(_cm, '1m', 60)
                         _cp = get_current_price(_cm)

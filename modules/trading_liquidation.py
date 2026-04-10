@@ -163,7 +163,17 @@ class LiquidationManager:
         cfg = ctx.config
         log = ctx.log
 
-        current = len(open_trades) if isinstance(open_trades, dict) else 0
+        # Count only non-dust trades for capacity check
+        dust_thr = float(cfg.get('DUST_TRADE_THRESHOLD_EUR', cfg.get('MIN_ORDER_EUR', 5.0)))
+        current = 0
+        if isinstance(open_trades, dict):
+            for _m, _t in open_trades.items():
+                if not isinstance(_t, dict):
+                    continue
+                _price = ctx.get_current_price(_m)
+                _amt = float(_t.get('amount', 0) or 0)
+                if _price and _amt > 0 and (float(_price) * _amt) >= dust_thr:
+                    current += 1
         max_trades = int(cfg.get("MAX_OPEN_TRADES", 3))
         if current < max_trades:
             return
