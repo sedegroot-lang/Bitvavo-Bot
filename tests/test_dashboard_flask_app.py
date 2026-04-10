@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+pytest.importorskip("flask", reason="flask not installed")
 import tools.dashboard_flask.app as app
 
 

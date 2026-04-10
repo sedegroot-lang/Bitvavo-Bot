@@ -11,14 +11,16 @@ Stress tests for Flask dashboard including:
 """
 
 import time
-import requests
 import threading
 import statistics
 from datetime import datetime
 from typing import List, Dict, Any
 from collections import defaultdict
-import psutil
 import os
+import pytest
+
+requests = pytest.importorskip("requests", reason="requests not installed")
+psutil = pytest.importorskip("psutil", reason="psutil not installed")
 
 # Test configuration
 BASE_URL = "http://localhost:5001"
