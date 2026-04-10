@@ -840,6 +840,40 @@ How we prevent recurrence.
 
 ---
 
+## #026 — Dust trades never closed: wrong threshold + no auto-removal (2026-04-10)
+
+### Symptom
+TAO-EUR (€2.10) and ALGO-EUR (€0.05) remained as open trades indefinitely after partial sells.
+They could not be sold (below Bitvavo €5 minimum) but still counted as open trades, blocking
+new entries. Bot log showed `HARD STOP: already at max trades (5+0+0/5)` even though only 4
+real trades existed. The `[DUST_SKIP]` log showed `drempel €0` — threshold was ~0 instead of 5.
+
+### Root Cause
+Two issues:
+1. **Config `DUST_TRADE_THRESHOLD_EUR=0.5`** in `config/bot_config.json`. With 0.5, TAO (€2.10)
+   was above threshold and NOT filtered as dust. Only ALGO (€0.05) was skipped. The `:.0f` format
+   rounded 0.5 to "€0" in logs, making it look like zero.
+2. **No auto-cleanup of dust trades**. Even when dust was correctly identified (ALGO), it was only
+   skipped in the trailing management loop — the trade record remained in `open_trades` forever.
+   `_cleanup_market_dust` skips markets that ARE in open_trades (`if market in S.open_trades: return`),
+   so it couldn't help either.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `%LOCALAPPDATA%/BotConfig/bot_config_local.json` | Set `DUST_TRADE_THRESHOLD_EUR=5.0` and `DUST_THRESHOLD_EUR=5.0` in local config (overrides base config's 0.5) |
+| `bot/shared.py` | Changed default `DUST_TRADE_THRESHOLD_EUR` from 1.0 to 5.0 |
+| `trailing_bot.py` | Added auto-cleanup: before per-trade loop, scan all open trades, close any with value < threshold via `_finalize_close_trade()` with `reason='dust_cleanup'` |
+| `tests/test_dust_cleanup.py` | New test file: 7 tests for count_active_open_trades filtering, count_dust_trades, shared state default |
+
+### Prevention
+- Dust positions are now automatically closed (archived) each main loop cycle — they don't accumulate.
+- Config threshold is 5.0 (matching Bitvavo minimum), set in local config that OneDrive can't revert.
+- Shared state default is 5.0 so even without config, dust filtering uses the Bitvavo minimum.
+
+---
+
 ## #025 — Dust positions counted as open trades, blocking new entries (2026-04-10)
 
 ### Symptom

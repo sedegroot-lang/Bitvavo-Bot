@@ -2245,6 +2245,43 @@ async def bot_loop():
         if '_corr_block_entries' not in dir() or not isinstance(_corr_block_entries, bool):
             _corr_block_entries = False
 
+        # ── Auto-close dust positions that are unsellable ──
+        # Positions below DUST_TRADE_THRESHOLD_EUR can't be sold (Bitvavo min order).
+        # Remove them from open_trades to free up slots and stop wasteful processing.
+        _dust_markets_to_close = []
+        for _dm, _dt in list(open_trades.items()):
+            if not isinstance(_dt, dict):
+                continue
+            if _dm.upper() in hodl_markets_set:
+                continue
+            _dval, _dprice = _compute_trade_value_eur(_dm, _dt)
+            if _dval is not None and _dval < DUST_TRADE_THRESHOLD_EUR:
+                _dust_markets_to_close.append((_dm, _dt, _dval, _dprice))
+        for _dm, _dt, _dval, _dprice in _dust_markets_to_close:
+            try:
+                _sell_price = _dprice if _dprice and _dprice > 0 else float(_dt.get('buy_price', 0) or 0)
+                _inv = float(_dt.get('invested_eur', 0) or 0)
+                _profit = _dval - _inv if _dval is not None else -_inv
+                _amt = float(_dt.get('amount', 0) or 0)
+                closed_entry = {
+                    'market': _dm,
+                    'buy_price': float(_dt.get('buy_price', 0) or 0),
+                    'sell_price': _sell_price,
+                    'amount': _amt,
+                    'invested_eur': _inv,
+                    'profit': round(_profit, 4),
+                    'profit_pct': round((_profit / _inv * 100) if _inv > 0 else 0.0, 2),
+                    'reason': 'dust_cleanup',
+                    'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'opened_ts': _dt.get('opened_ts', 0),
+                    'closed_ts': time.time(),
+                    'note': f'Unsellable dust (EUR {_dval:.2f} < min EUR {DUST_TRADE_THRESHOLD_EUR:.0f})',
+                }
+                log(f"[DUST_CLEANUP] {_dm}: waarde EUR {_dval:.2f} < drempel EUR {DUST_TRADE_THRESHOLD_EUR:.0f} — trade gesloten (verlies EUR {_profit:.2f})", level='info')
+                _finalize_close_trade(_dm, _dt, closed_entry, update_market_profits=True, profit_for_market=_profit)
+            except Exception as _dce:
+                log(f"[DUST_CLEANUP] Fout bij sluiten {_dm}: {_dce}", level='error')
+
         for m in list(open_trades.keys()):
             # Skip HODL assets entirely - they should not be managed by trailing bot
             if m.upper() in hodl_markets_set:

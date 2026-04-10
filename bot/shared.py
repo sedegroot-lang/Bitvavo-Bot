@@ -54,7 +54,7 @@ class _SharedState:
     # ── Constants (populated from CONFIG at init) ───────────
     MAX_CLOSED: int = 500
     MIN_ORDER_EUR: float = 5.0
-    DUST_TRADE_THRESHOLD_EUR: float = 1.0
+    DUST_TRADE_THRESHOLD_EUR: float = 5.0
     FEE_MAKER: float = 0.0015
     FEE_TAKER: float = 0.0025
     SLIPPAGE_PCT: float = 0.001
