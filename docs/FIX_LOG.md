@@ -820,6 +820,57 @@ Three bugs combined:
 
 ---
 
+## #027 — Incomplete sells leaving dust: get_amount_step used minOrder instead of quantityDecimals (2026-04-10)
+
+### Symptom
+After every sell, residual balances ("dust") remained on Bitvavo. Examples:
+- TAO-EUR: `normalize_amount(0.00913)` → **0.0** (sell NOTHING, entire balance becomes dust)
+- UNI-EUR: `normalize_amount(62.95)` → **62.70** (0.25 UNI / ~€3.50 lost as dust)
+- XRP-EUR: `normalize_amount(46.69)` → **43.12** (3.56 XRP / ~€8.70 lost as dust)
+- XLM-EUR: `normalize_amount(224.31)` → **197.27** (27.04 XLM / ~€4.80 lost as dust)
+
+This was the ROOT CAUSE behind all dust-related issues (#022–#026). Previous fixes only cleaned up
+dust after the fact; this fix prevents dust from being created.
+
+### Root Cause
+`get_amount_step()` in `bot/api.py` returned `minOrderInBaseAsset` (Bitvavo's minimum order SIZE)
+and used it as the amount STEP for normalization. `normalize_amount()` computed:
+`floor(amount / step) * step` — treating the minimum order size as a divisor.
+
+Example: TAO-EUR has `minOrderInBaseAsset = 0.02144965` (min order = 0.0214 TAO).
+`floor(0.00913 / 0.02144965) = 0` → normalized to **0.0** → sell NOTHING.
+
+UNI-EUR has `minOrderInBaseAsset = 1.84417788`:
+`floor(62.95 / 1.84417788) = 34` → `34 × 1.844 = 62.70` → **0.25 UNI lost as dust**.
+
+The correct step is `10^(-quantityDecimals)` — e.g., for TAO (8 decimals) the step is 0.00000001,
+not 0.02144965. Every single market was affected to varying degrees.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `bot/api.py` | `get_amount_step()`: Returns `10^(-quantityDecimals)` instead of `minOrderInBaseAsset`. Now uses the actual decimal precision as the step size. |
+| `bot/api.py` | `get_amount_precision()`: Checks `quantityDecimals` field first before falling back to counting decimals in `minOrderInBaseAsset`. |
+| `bot/orders_impl.py` | `place_sell()` sell_all path: Uses direct `Decimal.quantize()` to `quantityDecimals` precision with `ROUND_DOWN` instead of `normalize_amount()`. Ensures full balance is sold with only decimal truncation. |
+| `bot/orders_impl.py` | Post-sell sweep: After `sell_all` market sell, checks remaining balance and attempts to sell any remainder ≥ min order size. |
+| `tests/test_bot_api.py` | 4 new tests in `TestAmountStepPrecision`: verifies step uses quantityDecimals for 8-dec and 6-dec markets, full-balance normalization, precision lookup. |
+
+### Validation
+End-to-end test with real Bitvavo API market data for 7 positions:
+ALL markets normalize to exact balance with **ZERO DUST** (TAO, ALGO, UNI, XRP, XLM, LINK, LTC).
+
+### Prevention
+- `get_amount_step()` now uses `quantityDecimals` (the correct Bitvavo field for precision).
+- `sell_all=True` bypasses `normalize_amount()` entirely, using direct Decimal truncation.
+- Post-sell sweep catches any remaining balance after the primary sell.
+- 4 dedicated regression tests verify step size calculation and full-balance normalization.
+
+**CRITICAL RULE**: `minOrderInBaseAsset` is the MINIMUM ORDER SIZE, NOT an amount step/increment.
+The amount step is always `10^(-quantityDecimals)`. Never confuse these two API fields.
+
+---
+
 ## Template for new entries
 
 ```

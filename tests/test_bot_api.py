@@ -116,6 +116,55 @@ class TestNormalize:
             assert result == 50000.0
 
 
+class TestAmountStepPrecision:
+    """Verify get_amount_step returns precision-based step, NOT minOrderInBaseAsset."""
+
+    def test_step_uses_quantity_decimals_8(self):
+        """TAO-EUR: quantityDecimals=8, minOrderInBaseAsset=0.02144965."""
+        market_info = {
+            'market': 'TAO-EUR', 'quantityDecimals': 8,
+            'minOrderInBaseAsset': '0.02144965',
+        }
+        with patch.object(_api, 'get_market_info', return_value=market_info):
+            step = _api.get_amount_step('TAO-EUR')
+            assert step == pytest.approx(1e-8)
+            # Normalize should NOT use minOrder as step
+            norm = _api.normalize_amount('TAO-EUR', 0.00913216)
+            assert norm == pytest.approx(0.00913216)  # zero dust
+
+    def test_step_uses_quantity_decimals_6(self):
+        """XRP-EUR: quantityDecimals=6, minOrderInBaseAsset=4.312334."""
+        market_info = {
+            'market': 'XRP-EUR', 'quantityDecimals': 6,
+            'minOrderInBaseAsset': '4.312334',
+        }
+        with patch.object(_api, 'get_market_info', return_value=market_info):
+            step = _api.get_amount_step('XRP-EUR')
+            assert step == pytest.approx(1e-6)
+            norm = _api.normalize_amount('XRP-EUR', 46.68742)
+            assert norm == pytest.approx(46.68742)  # zero dust
+
+    def test_normalize_full_balance_no_dust(self):
+        """UNI-EUR: With old step=1.844, would lose 0.24 UNI. With fix: zero dust."""
+        market_info = {
+            'market': 'UNI-EUR', 'quantityDecimals': 8,
+            'minOrderInBaseAsset': '1.84417788',
+        }
+        with patch.object(_api, 'get_market_info', return_value=market_info):
+            norm = _api.normalize_amount('UNI-EUR', 62.94841004)
+            assert norm == pytest.approx(62.94841004)  # exact match
+
+    def test_precision_from_quantity_decimals(self):
+        """get_amount_precision should prefer quantityDecimals over minOrder decimal count."""
+        market_info = {
+            'market': 'ALGO-EUR', 'quantityDecimals': 6,
+            'minOrderInBaseAsset': '52.785611',  # has 6 decimals too, but value is wrong as step
+        }
+        with patch.object(_api, 'get_market_info', return_value=market_info):
+            prec = _api.get_amount_precision('ALGO-EUR')
+            assert prec == 6
+
+
 # ---------------------------------------------------------------------------
 # safe_call
 # ---------------------------------------------------------------------------

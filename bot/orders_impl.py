@@ -442,7 +442,15 @@ def place_sell(market, amount_base, *, skip_dust: bool = False, sell_all: bool =
         log(f"Waarschuwing: verkoophoeveelheid ({sell_amount:.8f}) veel lager dan gevraagd ({amount_base:.8f}) voor {symbol}")
     if sell_all and available > amount_base * 1.001:
         log(f"[sell_all] {symbol}: verkoop volledig saldo {available:.8f} (trade amount was {amount_base:.8f})", level='info')
-    norm_amount = S.normalize_amount(market, sell_amount)
+
+    # For full exits (sell_all), truncate to quantityDecimals only — never step-based.
+    # This ensures we sell the ENTIRE balance with no dust leftover.
+    if sell_all:
+        prec = S.get_amount_precision(market)
+        norm_amount = float(Decimal(str(sell_amount)).quantize(
+            Decimal('1.' + '0' * max(0, prec)), rounding=ROUND_DOWN))
+    else:
+        norm_amount = S.normalize_amount(market, sell_amount)
     if norm_amount <= 0:
         log(f"Sell amount voor {market} normaliseerde naar 0, verkoop overgeslagen.", level='warning')
         return {"error": "normalized_to_zero"}
@@ -534,6 +542,33 @@ def place_sell(market, amount_base, *, skip_dust: bool = False, sell_all: bool =
 
     resp = _place_sell_order(norm_amount)
     log(f"SELL resp={resp}")
+
+    # Post-sell sweep: if sell_all, check remaining balance and try to sell it
+    if sell_all and isinstance(resp, dict) and not resp.get('error') and not resp.get('errorCode'):
+        try:
+            time.sleep(0.3)  # brief pause for balance to settle
+            _post_bals = S.sanitize_balance_payload(safe_call(bitvavo.balance, {}), source='sell_sweep')
+            _post_avail = 0.0
+            for _pb in (_post_bals or []):
+                if _pb.get('symbol') == symbol:
+                    _post_avail = float(_pb.get('available', 0) or 0)
+                    break
+            if _post_avail > 0:
+                _post_price = S.get_current_price(market)
+                _post_val = _post_avail * float(_post_price or 0)
+                _post_min = S.get_min_order_size(market)
+                prec = S.get_amount_precision(market)
+                _post_norm = float(Decimal(str(_post_avail)).quantize(
+                    Decimal('1.' + '0' * max(0, prec)), rounding=ROUND_DOWN))
+                if _post_norm >= _post_min and _post_norm > 0:
+                    log(f"[sell_sweep] {symbol}: {_post_avail:.8f} remaining after sell (EUR {_post_val:.2f}), selling remainder", level='info')
+                    _sweep_resp = _place_sell_order(_post_norm)
+                    log(f"[sell_sweep] {symbol}: sweep resp={_sweep_resp}", level='info')
+                elif _post_avail > 0:
+                    log(f"[sell_sweep] {symbol}: {_post_avail:.8f} remaining (EUR {_post_val:.2f}) below min order — unsellable dust", level='debug')
+        except Exception as _sweep_err:
+            log(f"[sell_sweep] {symbol}: sweep check failed: {_sweep_err}", level='debug')
+
     if not skip_dust:
         try:
             _cleanup_market_dust(market)

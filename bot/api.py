@@ -681,6 +681,13 @@ def get_amount_precision(market: str) -> int:
                 return int(prec)
             except Exception as e:
                 log(f"return int(prec) failed: {e}", level='debug')
+        # Bitvavo uses quantityDecimals for the actual decimal precision
+        qd = info.get('quantityDecimals')
+        if qd is not None:
+            try:
+                return max(0, min(8, int(qd)))
+            except Exception:
+                pass
         d = _decimals_from_str_num(info.get('minOrderInBaseAsset') or info.get('minOrderAmount'))
         if d is not None:
             return max(0, min(8, d))
@@ -703,14 +710,13 @@ def get_price_precision(market: str) -> int:
 
 
 def get_amount_step(market: str) -> float:
-    info = get_market_info(market)
-    if info:
-        step = info.get('minOrderInBaseAsset') or info.get('minOrderAmount')
-        if step is not None:
-            try:
-                return float(step)
-            except Exception as e:
-                log(f"return float(step) failed: {e}", level='debug')
+    """Return the smallest amount increment for *market*.
+
+    Bitvavo's ``minOrderInBaseAsset`` is the **minimum order size**, NOT an
+    increment step.  The real step is ``10^(-quantityDecimals)``.
+    Using minOrder as step caused normalize_amount to truncate sell amounts
+    far below the actual balance, leaving unsellable dust (FIX #027).
+    """
     prec = get_amount_precision(market)
     return float(10 ** (-prec))
 
