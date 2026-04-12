@@ -219,11 +219,14 @@ def sync_derived_fields(trade: Trade, dca_max: int) -> Tuple[DCAState, List[str]
             trade["last_dca_price"] = state.last_dca_price
 
     # Sync dca_max: only SET if trade has no dca_max yet (new trade).
-    # Per-trade dca_max is preserved once set — global config is the default,
-    # not a forced override. (FIX #008: prevents resetting user overrides)
+    # Always sync dca_max to global config so config changes take effect
+    # on existing trades. (FIX #030b: old trades kept stale dca_max)
     stored_max = int(trade.get("dca_max", 0) or 0)
-    if stored_max <= 0:
-        repairs.append(f"dca_max {stored_max} → {dca_max} (initialized from config)")
+    if stored_max != dca_max:
+        if stored_max > 0:
+            repairs.append(f"dca_max {stored_max} → {dca_max} (synced to global config)")
+        else:
+            repairs.append(f"dca_max {stored_max} → {dca_max} (initialized from config)")
         trade["dca_max"] = dca_max
 
     return state, repairs
