@@ -470,6 +470,7 @@ class GridManager:
                     'error_count': state.error_count,
                     'trailing_tp_peak': state.trailing_tp_peak,
                     'trailing_tp_active': state.trailing_tp_active,
+                    'last_buy_fill_price': state.last_buy_fill_price,
                 }
 
             os.makedirs(os.path.dirname(self.GRID_STATE_FILE) or '.', exist_ok=True)
@@ -1074,6 +1075,7 @@ class GridManager:
         # Check each placed order for fills
         # CRITICAL: snapshot the list to avoid infinite loop when counter-orders
         # are appended to state.levels during iteration
+        fills_occurred = False
         levels_snapshot = list(state.levels)
         for level in levels_snapshot:
             if level.status != 'placed' or not level.order_id:
@@ -1095,6 +1097,7 @@ class GridManager:
                 level.filled_at = now
                 level.filled_price = fill_price
                 state.total_trades += 1
+                fills_occurred = True
 
                 # Calculate fee
                 fee_eur = actual_amount * fill_price * MAKER_FEE_PCT
@@ -1136,7 +1139,7 @@ class GridManager:
 
                 elif level.side == 'sell':
                     # Sell filled -> track profit + balance
-                    state.base_balance -= actual_amount
+                    state.base_balance = max(0.0, state.base_balance - actual_amount)
                     state.quote_balance += actual_amount * fill_price - fee_eur
 
                     # Calculate profit (difference from corresponding buy)
@@ -1196,7 +1199,7 @@ class GridManager:
         # Check if grid is out of range -> rebalance
         # Auto-rebalance when price is >0.5% outside grid range
         # (lowered from 2% to catch drifts earlier and keep grids productive)
-        if config.auto_rebalance:
+        if config.auto_rebalance and not fills_occurred:
             _rebal_margin = 1.005  # 0.5%
             if current_price < config.lower_price / _rebal_margin or current_price > config.upper_price * _rebal_margin:
                 log(f"[Grid] {market} price {current_price:.2f} outside range "
@@ -1222,16 +1225,20 @@ class GridManager:
         return {'status': state.status, 'actions': actions}
 
     def _find_next_higher_price(self, state: GridState, current_level_price: float) -> Optional[float]:
-        """Find the next grid price level above the given price."""
-        prices = sorted(set(l.price for l in state.levels))
+        """Find the next grid price level above the given price.
+        Only considers active (placed/pending) levels to avoid stale prices from old rebalances."""
+        prices = sorted(set(l.price for l in state.levels
+                            if l.status in ('placed', 'pending') and l.price > 0))
         for p in prices:
             if p > current_level_price * 1.001:  # Small tolerance
                 return p
         return None
 
     def _find_next_lower_price(self, state: GridState, current_level_price: float) -> Optional[float]:
-        """Find the next grid price level below the given price."""
-        prices = sorted(set(l.price for l in state.levels), reverse=True)
+        """Find the next grid price level below the given price.
+        Only considers active (placed/pending) levels to avoid stale prices from old rebalances."""
+        prices = sorted(set(l.price for l in state.levels
+                            if l.status in ('placed', 'pending') and l.price > 0), reverse=True)
         for p in prices:
             if p < current_level_price * 0.999:
                 return p
@@ -1243,8 +1250,14 @@ class GridManager:
         Uses actual last buy fill price when available (accurate after rebalance),
         otherwise falls back to grid level spacing estimate.
         """
-        # Prefer actual buy fill price if we have it — grid level prices can be
-        # stale after a rebalance and don't reflect real cost basis
+        # Prefer paired buy level's actual fill price for accurate per-trade cost basis
+        if sell_level.pair_level_id is not None:
+            for lvl in state.levels:
+                if lvl.level_id == sell_level.pair_level_id and lvl.filled_price and lvl.filled_price > 0:
+                    fee = sell_level.amount * lvl.filled_price * MAKER_FEE_PCT
+                    return sell_level.amount * lvl.filled_price + fee
+
+        # Fallback: use last buy fill price if available
         if state.last_buy_fill_price > 0:
             fee = sell_level.amount * state.last_buy_fill_price * MAKER_FEE_PCT
             return sell_level.amount * state.last_buy_fill_price + fee

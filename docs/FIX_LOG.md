@@ -44,6 +44,40 @@ not grid level estimates.
 
 ---
 
+## #031b — Grid deep analysis: 5 structural bugs (2026-04-12)
+
+### Symptom
+Ultra-deep simulation (`_grid_deep_sim.py`, 10 test scenarios) uncovered 5 bugs in
+`modules/grid_trading.py` — confirmed by automated test failures.
+
+### Bugs Found & Fixed
+
+| # | Bug | Severity | Root Cause | Fix |
+|---|-----|----------|-----------|-----|
+| 1 | `_save_states()` doesn't persist `last_buy_fill_price` | CRITICAL | Field added to `GridState` and `_load_states()` but missing from `_save_states()` explicit dict | Added `'last_buy_fill_price': state.last_buy_fill_price` to save dict |
+| 2 | `update_grid()` rebalance fires after fill in same call | CRITICAL | `update_grid()` has its own auto-rebalance check at end (separate from `auto_manage()`). After processing fills, it checked if price was out of range and rebalanced — same class of bug as #031 | Added `fills_occurred` flag; rebalance block guarded with `if config.auto_rebalance and not fills_occurred:` |
+| 3 | `_find_next_higher/lower_price` returns stale level prices | MODERATE | After rebalances, old filled/cancelled levels remained in `state.levels`. Price search returned their prices (e.g. 57000 from cancelled level) instead of None | Filter to `l.status in ('placed', 'pending')` only |
+| 4 | `base_balance` can go negative on sell fill | MODERATE | `state.base_balance -= actual_amount` without floor when sell amount exceeds balance (rounding/partial fills) | Changed to `state.base_balance = max(0.0, state.base_balance - actual_amount)` |
+| 5 | `_estimate_buy_cost` uses wrong cost basis for paired trades | MODERATE | With multiple buy/sell pairs, `last_buy_fill_price` is the LAST buy price, not the specific paired buy. Sell at level paired with buy@59200 used cost from last buy@60500 — €1.30 error | Now looks up `sell_level.pair_level_id` → finds paired buy level's `filled_price`. Falls back to `last_buy_fill_price` only if no pair found |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `modules/grid_trading.py` | `_save_states()`: added `last_buy_fill_price` to serialization dict |
+| `modules/grid_trading.py` | `update_grid()`: added `fills_occurred` flag, defers rebalance when fills processed |
+| `modules/grid_trading.py` | `_find_next_higher/lower_price()`: filter by `status in ('placed', 'pending')` |
+| `modules/grid_trading.py` | Sell fill handler: `base_balance = max(0.0, base_balance - actual_amount)` |
+| `modules/grid_trading.py` | `_estimate_buy_cost()`: paired buy level lookup via `pair_level_id` before fallback |
+| `tests/test_grid_trading.py` | Added `load_freshest` patch for test isolation from LocalAppData |
+
+### Key Rule
+**`update_grid()` has its OWN rebalance check** — separate from `auto_manage()`.
+Both paths must defer rebalance when fills occurred. Always check `pair_level_id`
+for accurate per-trade cost basis.
+
+---
+
 ## #001 — invested_eur desync after external buys (2026-03-25)
 
 ### Symptom
