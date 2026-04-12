@@ -70,6 +70,27 @@ class TradingSynchronizer:
     # ------------------------------------------------------------------
     # Primary trade_log synchronisation
     # ------------------------------------------------------------------
+    def _get_grid_markets(self) -> set:
+        """Return set of active grid markets to exclude from trailing sync."""
+        grid_markets: set = set()
+        try:
+            grid_cfg = self.ctx.config.get('GRID_TRADING') or {}
+            if grid_cfg.get('enabled'):
+                import json as _json
+                _grid_states_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    'data', 'grid_states.json',
+                )
+                if os.path.exists(_grid_states_path):
+                    with open(_grid_states_path, 'r', encoding='utf-8') as _gf:
+                        _gs = _json.load(_gf)
+                    for _gm, _gv in _gs.items():
+                        if isinstance(_gv, dict) and _gv.get('status') in ('running', 'paused', 'initialized'):
+                            grid_markets.add(_gm.upper())
+        except Exception as exc:
+            self.ctx.log(f"Sync: failed to load grid markets: {exc}", level='warning')
+        return grid_markets
+
     def sync_open_trades(
         self,
         open_trades: Dict[str, Dict[str, Any]],
@@ -132,6 +153,11 @@ class TradingSynchronizer:
                     return item
             return None
 
+        # Exclude grid-managed markets from trailing sync
+        grid_markets = self._get_grid_markets()
+        if grid_markets:
+            log(f"Sync: excluding grid markets from trailing sync: {grid_markets}", level='info')
+
         open_markets: Dict[str, float] = {}
         for balance_entry in balances:
             symbol = balance_entry.get("symbol")
@@ -139,10 +165,16 @@ class TradingSynchronizer:
             if not symbol or available <= 0:
                 continue
             if "-" in symbol and symbol in markets_set:
+                if symbol.upper() in grid_markets:
+                    log(f"Sync: skipping grid asset {symbol} (managed by grid module)", level='info')
+                    continue
                 open_markets[symbol] = available
                 continue
             best = find_best_market(symbol)
             if best:
+                if best.upper() in grid_markets:
+                    log(f"Sync: skipping grid asset {best} (managed by grid module)", level='info')
+                    continue
                 open_markets[best] = open_markets.get(best, 0.0) + available
                 continue
             alt = (
@@ -151,6 +183,9 @@ class TradingSynchronizer:
                 else None
             )
             if alt:
+                if alt.upper() in grid_markets:
+                    log(f"Sync: skipping grid asset {alt} (managed by grid module)", level='info')
+                    continue
                 open_markets[alt] = open_markets.get(alt, 0.0) + available
 
         trade_log_path = ctx.trade_log_path
@@ -495,6 +530,11 @@ class TradingSynchronizer:
             level="info",
         )
 
+        # Exclude grid-managed markets from reconcile
+        grid_markets = self._get_grid_markets()
+        if grid_markets:
+            log(f"Sync: excluding grid markets from reconcile: {grid_markets}", level='info')
+
         positive_balances: List[Dict[str, Any]] = []
         live_open: Dict[str, Dict[str, Any]] = {}
         for balance_entry in balances:
@@ -502,6 +542,9 @@ class TradingSynchronizer:
             if not symbol:
                 continue
             market = f"{symbol}-EUR"
+            if market.upper() in grid_markets:
+                log(f"Sync: skipping grid asset {market} (managed by grid module)", level='info')
+                continue
             try:
                 amount = float(
                     balance_entry.get("available", 0)

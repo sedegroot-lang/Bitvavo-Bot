@@ -993,3 +993,29 @@ Multiple places used `len(open_trades)` to count trades without filtering out du
 
 ### Prevention
 All capacity/counting checks now use value-based filtering against `DUST_TRADE_THRESHOLD_EUR` (default €5). Entry checks already used `count_active_open_trades()` which was correct — now all other paths are consistent.
+
+---
+
+## #030 — Grid market BTC-EUR adopted as trailing trade by trading_sync.py (2026-04-12)
+
+### Symptom
+BTC-EUR (a grid-managed market) appeared in `open_trades` in `data/trade_log.json` and was shown on the dashboard as a regular trailing trade. The trailing bot could potentially apply trailing stops, DCA, or dust cleanup on grid-managed assets, causing conflicts with the grid module.
+
+### Root Cause
+Two missing grid filters:
+1. **`modules/trading_sync.py`**: Both `sync_open_trades()` and `reconcile_balances()` had zero grid market filtering. When these methods fetched Bitvavo balances, BTC (held by the grid module) was treated as a regular position and added to `open_trades`.
+2. **`trailing_bot.py` main loop**: The per-trade management loop (trailing stops, DCA, dust cleanup) only skipped HODL markets but not grid markets. If a grid market was in `open_trades` (via the sync bug above), the trailing bot would actively manage it.
+
+Note: `bot/sync_engine.py` already had grid filtering (FIX #014), but `modules/trading_sync.py` (the older parallel sync system) did not.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/trading_sync.py` | Added `_get_grid_markets()` helper. Both `sync_open_trades()` and `reconcile_balances()` now skip grid-managed markets when building the balance map. |
+| `trailing_bot.py` | Added `grid_markets_set` alongside `hodl_markets_set`. The per-trade loop and dust cleanup loop now skip grid markets. |
+| `data/trade_log.json` | Removed BTC-EUR from `open` trades (it was incorrectly added by the unfixed sync). |
+
+### Prevention
+- Grid markets are now excluded at ALL sync entry points: `bot/sync_engine.py`, `modules/trading_sync.py`, and `modules/sync_validator.py`.
+- The trailing bot's management loop explicitly skips grid markets even if they somehow end up in `open_trades`.

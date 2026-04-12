@@ -2238,6 +2238,11 @@ async def bot_loop():
         except Exception as e:
             log(f"[ERROR] HODL markets config parse failed: {e}", level='error')
 
+        # Build set of grid markets to skip in trailing/stoploss (FIX #017)
+        grid_markets_set = get_active_grid_markets()
+        if grid_markets_set:
+            log(f"[GRID] Excluding grid markets from trailing management: {sorted(grid_markets_set)}", level='info')
+
         # Initialize correlation shield flags before per-trade loop
         # (full evaluation happens later, but flags are referenced in stop-loss checks)
         if '_corr_tighten_stops' not in dir() or not isinstance(_corr_tighten_stops, bool):
@@ -2253,6 +2258,9 @@ async def bot_loop():
             if not isinstance(_dt, dict):
                 continue
             if _dm.upper() in hodl_markets_set:
+                continue
+            # Skip grid trading assets — managed by grid module (FIX #017)
+            if _dm in grid_markets_set or _dm.upper() in {g.upper() for g in grid_markets_set}:
                 continue
             _dval, _dprice = _compute_trade_value_eur(_dm, _dt)
             if _dval is not None and _dval < DUST_TRADE_THRESHOLD_EUR:
@@ -2285,6 +2293,9 @@ async def bot_loop():
         for m in list(open_trades.keys()):
             # Skip HODL assets entirely - they should not be managed by trailing bot
             if m.upper() in hodl_markets_set:
+                continue
+            # Skip grid trading assets — managed by grid module, not trailing bot (FIX #017)
+            if m in grid_markets_set or m.upper() in {g.upper() for g in grid_markets_set}:
                 continue
             
             t = open_trades.get(m)
