@@ -116,6 +116,7 @@ class GridManager:
     """
 
     GRID_STATE_FILE = 'data/grid_states.json'
+    GRID_FILLS_LOG = 'data/grid_fills_log.json'
     ORDER_CHECK_INTERVAL = 30  # seconds between order status checks
 
     def __init__(self, bitvavo_client=None, config: dict = None):
@@ -479,6 +480,50 @@ class GridManager:
                 pass
         except Exception as e:
             log(f"[Grid] Failed to save states: {e}", level='error')
+
+    def _log_fill(self, market: str, side: str, price: float, amount: float,
+                  fee: float, profit: float = 0.0, level_id: int = 0) -> None:
+        """Append a filled grid order to the persistent fills log.
+
+        This survives rebalances (which replace levels in grid_states.json).
+        """
+        entry = {
+            'market': market,
+            'side': side,
+            'price': price,
+            'amount': amount,
+            'value_eur': round(amount * price, 4),
+            'fee': round(fee, 4),
+            'profit': round(profit, 4),
+            'level_id': level_id,
+            'timestamp': time.time(),
+        }
+        try:
+            fills = []
+            if os.path.exists(self.GRID_FILLS_LOG):
+                with open(self.GRID_FILLS_LOG, 'r', encoding='utf-8') as f:
+                    fills = json.load(f)
+                if not isinstance(fills, list):
+                    fills = []
+            fills.append(entry)
+            # Keep last 500 fills max
+            if len(fills) > 500:
+                fills = fills[-500:]
+            write_json_compat(self.GRID_FILLS_LOG, fills, indent=2)
+        except Exception as e:
+            log(f"[Grid] Failed to log fill: {e}", level='warning')
+
+    def get_fills_history(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Return the last N grid fills from the persistent log, newest first."""
+        try:
+            if os.path.exists(self.GRID_FILLS_LOG):
+                with open(self.GRID_FILLS_LOG, 'r', encoding='utf-8') as f:
+                    fills = json.load(f)
+                if isinstance(fills, list):
+                    return list(reversed(fills[-limit:]))
+        except Exception as e:
+            log(f"[Grid] Failed to read fills log: {e}", level='warning')
+        return []
 
     # ==================== ORDER EXECUTION ====================
 
@@ -1084,6 +1129,7 @@ class GridManager:
                         'amount': actual_amount,
                         'fee': round(fee_eur, 4),
                     })
+                    self._log_fill(market, 'buy', fill_price, actual_amount, fee_eur, level_id=level.level_id)
 
                 elif level.side == 'sell':
                     # Sell filled -> track profit + balance
@@ -1135,6 +1181,7 @@ class GridManager:
                         'fee': round(fee_eur, 4),
                         'profit': round(profit, 4),
                     })
+                    self._log_fill(market, 'sell', fill_price, actual_amount, fee_eur, profit=profit, level_id=level.level_id)
 
                 log(f"[Grid] {market} {level.side.upper()} filled @ {fill_price:.2f} "
                     f"(amount={actual_amount:.6f}, fee={fee_eur:.4f} EUR)", level='info')

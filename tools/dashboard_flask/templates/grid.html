@@ -214,6 +214,60 @@
     </div>
 </section>
 
+<!-- Grid Filled Orders / Closed Trades -->
+<section class="glass-panel">
+    <div class="section-header">
+        <h2>📕 Laatste Grid Trades</h2>
+    </div>
+    {% if grid_fills and grid_fills|length > 0 %}
+    <div class="table-responsive">
+        <table class="closed-trades-table">
+            <thead>
+                <tr>
+                    <th>Markt</th>
+                    <th>Type</th>
+                    <th>Prijs</th>
+                    <th>Aantal</th>
+                    <th>Waarde</th>
+                    <th>Fee</th>
+                    <th>Winst</th>
+                    <th>Datum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fill in grid_fills %}
+                <tr class="{% if fill.side == 'sell' %}row-positive{% else %}row-neutral{% endif %}">
+                    <td><strong>{{ fill.market }}</strong></td>
+                    <td>
+                        <span class="reason-badge {% if fill.side == 'sell' %}reason-trailing-tp{% else %}reason-dca{% endif %}">
+                            {% if fill.side == 'sell' %}📤 Sell{% else %}📥 Buy{% endif %}
+                        </span>
+                    </td>
+                    <td>€{{ "%.2f"|format(fill.price) }}</td>
+                    <td>{{ "%.8f"|format(fill.amount) if fill.amount < 0.01 else ("%.6f"|format(fill.amount) if fill.amount < 1 else "%.4f"|format(fill.amount)) }}</td>
+                    <td>€{{ "%.2f"|format(fill.value_eur) }}</td>
+                    <td style="color: var(--text-muted);">€{{ "%.4f"|format(fill.fee) }}</td>
+                    <td class="{% if fill.profit > 0 %}text-success{% elif fill.profit < 0 %}text-danger{% endif %}">
+                        {% if fill.side == 'sell' and fill.profit != 0 %}
+                            {% if fill.profit > 0 %}+{% endif %}€{{ "%.4f"|format(fill.profit) }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>{{ fill.date_str }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="padding: 20px; text-align: center; color: #94a3b8;">
+        <p>📭 Nog geen grid trades uitgevoerd</p>
+        <p style="font-size: 0.85rem;">Wanneer grid orders worden gevuld verschijnen ze hier.</p>
+    </div>
+    {% endif %}
+</section>
+
 <!-- Create Grid -->
 <section class="glass-panel">
     <div class="section-header">

@@ -2076,6 +2076,10 @@ input:focus, select:focus, textarea:focus {
     background: rgba(248, 113, 113, 0.05);
 }
 
+.closed-trades-table .row-neutral {
+    background: rgba(148, 163, 184, 0.04);
+}
+
 .closed-trades-table small {
     color: #94a3b8;
     font-size: 0.75rem;
@@ -2119,6 +2123,11 @@ input:focus, select:focus, textarea:focus {
 .reason-manual {
     background: rgba(148, 163, 184, 0.2);
     color: #94a3b8;
+}
+
+.reason-dca {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
 }
 
 .table-responsive {

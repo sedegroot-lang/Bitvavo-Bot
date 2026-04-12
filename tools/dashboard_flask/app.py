@@ -2395,6 +2395,25 @@ def grid():
     # DEBUG: Verify available_markets is populated
     logger.info(f"Grid route: available_markets has {len(available_markets)} markets")
     
+    # Load grid fills history for closed trades table
+    grid_fills = []
+    try:
+        grid_fills = grid_manager.get_fills_history(limit=50)
+        # Format timestamps for display
+        from datetime import datetime
+        for fill in grid_fills:
+            ts = fill.get('timestamp')
+            if ts:
+                try:
+                    fill['date_str'] = datetime.fromtimestamp(float(ts)).strftime('%d-%m-%Y %H:%M')
+                except Exception:
+                    fill['date_str'] = '-'
+            else:
+                fill['date_str'] = '-'
+        logger.info(f"[GRID] Loaded {len(grid_fills)} grid fills for history table")
+    except Exception as e:
+        logger.warning(f"Failed to load grid fills: {e}")
+
     total_grid_net_profit = total_grid_profit - total_grid_fees
     logger.info(f"[GRID PROFIT DEBUG] gross={total_grid_profit!r} fees={total_grid_fees!r} net={total_grid_net_profit!r} active_grids_count={len(active_grids)}")
     return render_template('grid.html',
@@ -2405,6 +2424,7 @@ def grid():
         active_grids=active_grids,
         grid_count=grid_count,
         grid_history=grid_history,
+        grid_fills=grid_fills,
         filled_orders=filled_orders,
         avg_grid_levels=int(avg_grid_levels),
         available_markets=available_markets,
