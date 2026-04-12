@@ -5,6 +5,45 @@
 
 ---
 
+## #031 — Grid rebalance creates sells below buy cost basis (2026-04-12)
+
+### Symptom
+Grid bot bought BTC at €61,594 (07:30), then vol-adaptive rebalance triggered in the same cycle,
+placing a sell at €61,196 — below the buy price. Sell filled at 07:49 for a loss of €0.43 but
+the grid reported +€1.24 profit (€1.67 discrepancy).
+
+### Root Cause (3 bugs)
+
+1. **Vol-adaptive rebalance in same cycle as fill**: `auto_manage()` Step 3 processes fills, then
+   Step 3b checks vol-adaptive and can trigger a `_rebalance_grid()` in the same call. The new
+   grid levels are centered on current price, ignoring the cost basis of just-bought inventory.
+   
+2. **`_estimate_buy_cost()` uses grid level prices**: After rebalance, the function estimates
+   cost from `_find_next_lower_price()` which returns new grid levels, not the actual buy price.
+   For the sell at €61,196, it estimated cost at €59,360 (the new lower buy level), yielding
+   fake +€1.24 profit when real cost was €61,594 = loss.
+
+3. **No cost basis protection in `_rebalance_grid()`**: Rebalance blindly sets sell levels from
+   grid math without checking if they're below the actual buy cost of held inventory.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/grid_trading.py` | Added `last_buy_fill_price` to `GridState` — tracks actual buy fill price for cost basis. |
+| `modules/grid_trading.py` | Buy fill handler now sets `state.last_buy_fill_price = fill_price`. |
+| `modules/grid_trading.py` | `auto_manage()` Step 3 tracks `fills_this_cycle`; Step 3b skips rebalance if fills occurred. |
+| `modules/grid_trading.py` | `_rebalance_grid()` raises sell levels above cost basis (+ 2× maker fee) when inventory held. |
+| `modules/grid_trading.py` | `_estimate_buy_cost()` uses `last_buy_fill_price` when available instead of grid level estimate. |
+| `data/grid_states.json` | Corrected `total_profit` from +€1.24 to -€0.43, added `last_buy_fill_price`. |
+
+### Key Rule
+**NEVER rebalance in the same cycle as a fill.** After a buy fill, the grid must protect
+sell levels above the actual buy cost basis. Grid profit must use actual fill prices,
+not grid level estimates.
+
+---
+
 ## #001 — invested_eur desync after external buys (2026-03-25)
 
 ### Symptom

@@ -99,6 +99,7 @@ class GridState:
     error_count: int = 0
     trailing_tp_peak: float = 0.0        # Highest profit seen (for trailing TP)
     trailing_tp_active: bool = False     # Whether trailing TP has been activated
+    last_buy_fill_price: float = 0.0     # Actual fill price of last buy (for cost basis)
 
 
 # ================= GRID MANAGER =================
@@ -424,6 +425,7 @@ class GridManager:
                         error_count=state_data.get('error_count', 0),
                         trailing_tp_peak=state_data.get('trailing_tp_peak', 0),
                         trailing_tp_active=state_data.get('trailing_tp_active', False),
+                        last_buy_fill_price=state_data.get('last_buy_fill_price', 0.0),
                     )
                 if self.grids:
                     log(f"[Grid] Loaded {len(self.grids)} grid states")
@@ -1099,9 +1101,10 @@ class GridManager:
                 state.total_fees += fee_eur
 
                 if level.side == 'buy':
-                    # Buy filled -> track balance
+                    # Buy filled -> track balance and actual cost basis
                     state.base_balance += actual_amount
                     state.quote_balance -= actual_amount * fill_price + fee_eur
+                    state.last_buy_fill_price = fill_price  # Track real buy price for cost basis
 
                     # Place counter sell at next higher grid level
                     sell_price = self._find_next_higher_price(state, level.price)
@@ -1235,7 +1238,17 @@ class GridManager:
         return None
 
     def _estimate_buy_cost(self, state: GridState, sell_level: GridLevel) -> float:
-        """Estimate the buy cost for a sell level (approximate from grid spacing)."""
+        """Estimate the buy cost for a sell level.
+
+        Uses actual last buy fill price when available (accurate after rebalance),
+        otherwise falls back to grid level spacing estimate.
+        """
+        # Prefer actual buy fill price if we have it — grid level prices can be
+        # stale after a rebalance and don't reflect real cost basis
+        if state.last_buy_fill_price > 0:
+            fee = sell_level.amount * state.last_buy_fill_price * MAKER_FEE_PCT
+            return sell_level.amount * state.last_buy_fill_price + fee
+
         buy_price = self._find_next_lower_price(state, sell_level.price)
         if buy_price:
             fee = sell_level.amount * buy_price * MAKER_FEE_PCT
@@ -1308,6 +1321,25 @@ class GridManager:
 
         # Recalculate and place new levels
         new_levels = self._calculate_grid_levels(config, current_price)
+
+        # === COST BASIS PROTECTION ===
+        # If we hold inventory from a recent buy, ensure no sell level is placed
+        # below our actual cost basis (otherwise we guarantee a loss on the sell)
+        if state.last_buy_fill_price > 0 and state.base_balance > 0:
+            min_sell_price = state.last_buy_fill_price * (1 + 2 * MAKER_FEE_PCT)  # Above cost+fees
+            raised = 0
+            for lvl in new_levels:
+                if lvl.side == 'sell' and lvl.price < min_sell_price:
+                    old_p = lvl.price
+                    lvl.price = self._normalize_price(market, min_sell_price)
+                    raised += 1
+                    log(f"[Grid] Rebalance {market}: raised sell L{lvl.level_id} "
+                        f"€{old_p:.2f}→€{lvl.price:.2f} (above cost basis "
+                        f"€{state.last_buy_fill_price:.2f})", level='info')
+            if raised:
+                log(f"[Grid] {market}: raised {raised} sell(s) above cost basis to prevent loss",
+                    level='info')
+
         state.levels = new_levels
         state.rebalance_count += 1
         state.last_rebalance = time.time()
@@ -1686,11 +1718,16 @@ class GridManager:
                         results[f'retry_{market}'] = retried
 
         # Step 3: Update all running grids
+        fills_this_cycle = set()  # Markets that had fills — skip rebalance for these
         for market, state in list(self.grids.items()):
             if state.status == 'running':
                 update_result = self.update_grid(market)
                 if update_result.get('actions'):
                     results[f'update_{market}'] = update_result
+                    # Track markets with fills to avoid rebalancing on same cycle
+                    for act in update_result.get('actions', []):
+                        if act.get('type') in ('buy_filled', 'sell_filled'):
+                            fills_this_cycle.add(market)
 
         # Step 3b: Volatility-adaptive grid density
         # Auto-adjust num_grids if real-time volatility deviates >30% from grid creation
@@ -1703,6 +1740,12 @@ class GridManager:
                 continue
             config = state.config
             if not config.volatility_adaptive:
+                continue
+            # Skip rebalance if this market just had fills this cycle
+            # (rebalancing right after a fill can create sells below cost basis)
+            if market in fills_this_cycle:
+                log(f"[Grid] Skipping vol-adaptive for {market}: fills processed this cycle",
+                    level='debug')
                 continue
             # Cooldown check: skip if rebalanced recently
             if state.last_rebalance and (time.time() - state.last_rebalance) < vol_adapt_cooldown:
