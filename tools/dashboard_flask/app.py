@@ -3750,7 +3750,7 @@ def notifications():
 
 @app.route('/roadmap')
 def roadmap():
-    """Portfolio Roadmap page — growth plan from €465 to €5,000."""
+    """Portfolio Roadmap V2 — data-driven growth plan from €1.240 to €6.000."""
     config = load_config()
     heartbeat = load_heartbeat()
 
@@ -3769,27 +3769,23 @@ def roadmap():
 
     total_deposited = get_total_deposited()
 
-    # Milestones from PORTFOLIO_ROADMAP.md (hardcoded for fast rendering)
+    # Milestones from PORTFOLIO_ROADMAP_V2.md (hardcoded for fast rendering)
+    # V1 history milestones (completed) + V2 milestones
     milestones = [
-        {'value': 465, 'label': '€465', 'action': 'Huidige config — stabiel draaien', 'icon': '🟢', 'star': False},
-        {'value': 500, 'label': '€500', 'action': 'Geen wijzigingen — stabiel houden', 'icon': '📍', 'star': False},
-        {'value': 600, 'label': '€600', 'action': 'BASE → 42', 'icon': '📍', 'star': False},
-        {'value': 700, 'label': '€700', 'action': 'BASE → 48, DCA → 32', 'icon': '📍', 'star': False},
-        {'value': 800, 'label': '€800', 'action': '4 trades, BASE → 52', 'icon': '📍', 'star': False},
-        {'value': 900, 'label': '€900', 'action': 'BASE → 56, DCA → 34, trailing → 2,4%', 'icon': '📍', 'star': False},
-        {'value': 1000, 'label': '€1.000', 'action': 'Grid BTC aan (€150)', 'icon': '⭐', 'star': True},
-        {'value': 1100, 'label': '€1.100', 'action': 'BASE → 62', 'icon': '📍', 'star': False},
-        {'value': 1200, 'label': '€1.200', 'action': '5 trades, MIN_SCORE → 6,5', 'icon': '📍', 'star': False},
-        {'value': 1300, 'label': '€1.300', 'action': 'BASE → 68', 'icon': '📍', 'star': False},
-        {'value': 1400, 'label': '€1.400', 'action': 'Grid ETH erbij (€250)', 'icon': '📍', 'star': False},
-        {'value': 1500, 'label': '€1.500', 'action': 'BASE → 75, DCA → 40', 'icon': '📍', 'star': False},
-        {'value': 1600, 'label': '€1.600', 'action': '6 trades', 'icon': '📍', 'star': False},
-        {'value': 1800, 'label': '€1.800', 'action': 'Grid SOL erbij (€400)', 'icon': '📍', 'star': False},
-        {'value': 2000, 'label': '€2.000', 'action': '7 trades, DCA 10 levels', 'icon': '⭐', 'star': True},
-        {'value': 2500, 'label': '€2.500', 'action': 'Grid 4 markten (€600)', 'icon': '📍', 'star': False},
-        {'value': 3000, 'label': '€3.000', 'action': '8 trades, Grid 5 mktn (€800)', 'icon': '⭐', 'star': True},
-        {'value': 4000, 'label': '€4.000', 'action': '9 trades, Grid 6 mktn (€1.400)', 'icon': '📍', 'star': False},
-        {'value': 5000, 'label': '€5.000', 'action': '10 trades, Grid €2.000 — Passief Inkomen', 'icon': '🏆', 'star': True},
+        {'value': 465, 'label': '€465', 'action': 'V1 Start (11 mrt 2026)', 'icon': '✅', 'star': False},
+        {'value': 500, 'label': '€500', 'action': 'V1: Stabiel draaien (18 mrt)', 'icon': '✅', 'star': False},
+        {'value': 700, 'label': '€700', 'action': 'V1: DCA Hybrid F_CONSERVATIEF (26 mrt)', 'icon': '✅', 'star': False},
+        {'value': 800, 'label': '€800', 'action': 'V1: 4 trades, BASE 52 (3 apr)', 'icon': '✅', 'star': False},
+        {'value': 1000, 'label': '€1.000', 'action': 'V1: Grid BTC aan, €150 (7 apr)', 'icon': '✅', 'star': True},
+        {'value': 1200, 'label': '€1.200', 'action': 'V1: 5 trades, BASE 62 (9 apr)', 'icon': '✅', 'star': False},
+        {'value': 1240, 'label': '€1.240', 'action': 'V2 START: BASE 150, 4 trades, DCA max 6 (10 apr)', 'icon': '⭐', 'star': True},
+        {'value': 1500, 'label': '€1.500', 'action': 'Grid +ETH (€250), A-S weer aan', 'icon': '📍', 'star': False},
+        {'value': 1800, 'label': '€1.800', 'action': '5 trades, BASE 160, DCA 35', 'icon': '⭐', 'star': True},
+        {'value': 2200, 'label': '€2.200', 'action': 'BASE 180, DCA 40, Grid +LINK (€400)', 'icon': '📍', 'star': False},
+        {'value': 2700, 'label': '€2.700', 'action': '6 trades, BASE 200, DCA 45, DCA_MAX 8', 'icon': '⭐', 'star': True},
+        {'value': 3500, 'label': '€3.500', 'action': '7 trades, BASE 220, Grid +XRP (€700)', 'icon': '⭐', 'star': True},
+        {'value': 4500, 'label': '€4.500', 'action': '8 trades, BASE 250, Grid +DOT (€1.000)', 'icon': '📍', 'star': False},
+        {'value': 6000, 'label': '€6.000', 'action': 'BASE 300, Grid 6 mktn (€1.500) — Passief Inkomen', 'icon': '🏆', 'star': True},
     ]
 
     # Determine current milestone index
@@ -3798,41 +3794,279 @@ def roadmap():
         if current_value >= m['value']:
             current_idx = i
 
-    progress_pct = min(100, max(0, (current_value / 5000) * 100))
+    progress_pct = min(100, max(0, (current_value / 6000) * 100))
 
-    # Golden rules
+    # ── Dynamic data: balance sparkline (last 30 days, 1 point per day) ──
+    balance_sparkline = []
+    try:
+        import time as _time
+        from datetime import datetime as _dt
+        cutoff = _time.time() - 30 * 86400
+        daily_vals = {}
+        bh_path = PROJECT_ROOT / 'data' / 'balance_history.jsonl'
+        if bh_path.exists():
+            with bh_path.open('r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except Exception:
+                        continue
+                    ts = entry.get('ts', 0)
+                    if ts < cutoff:
+                        continue
+                    day = _dt.fromtimestamp(ts).strftime('%Y-%m-%d')
+                    daily_vals[day] = float(entry.get('total_eur', 0))
+            for day in sorted(daily_vals.keys()):
+                balance_sparkline.append({'date': day, 'value': round(daily_vals[day], 2)})
+    except Exception:
+        pass
+
+    # ── Dynamic data: weekly profit table (last 8 weeks) ──
+    weekly_profits = []
+    try:
+        from collections import defaultdict as _ddict
+        from datetime import datetime as _dt
+        weekly_raw = _ddict(lambda: {'profit': 0.0, 'trades': 0, 'wins': 0})
+        pnl_path = PROJECT_ROOT / 'data' / 'trade_pnl_history.jsonl'
+        if pnl_path.exists():
+            with pnl_path.open('r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except Exception:
+                        continue
+                    ts = entry.get('ts') or entry.get('closed_ts') or 0
+                    if ts == 0:
+                        continue
+                    dt = _dt.fromtimestamp(ts)
+                    week_key = dt.strftime('%Y-W%W')
+                    weekly_raw[week_key]['profit'] += float(entry.get('profit_eur', 0))
+                    weekly_raw[week_key]['trades'] += 1
+                    if float(entry.get('profit_eur', 0)) > 0:
+                        weekly_raw[week_key]['wins'] += 1
+            for wk in sorted(weekly_raw.keys())[-8:]:
+                w = weekly_raw[wk]
+                wr = round(w['wins'] / w['trades'] * 100) if w['trades'] > 0 else 0
+                weekly_profits.append({
+                    'week': wk,
+                    'profit': round(w['profit'], 2),
+                    'trades': w['trades'],
+                    'wins': w['wins'],
+                    'winrate': wr,
+                })
+    except Exception:
+        pass
+
+    # ── Dynamic data: performance stats ──
+    perf_stats = {'total_profit': 0, 'total_trades': 0, 'win_rate': 0, 'avg_profit': 0,
+                  'avg_hold_hrs': 0, 'best_market': '-', 'best_market_profit': 0,
+                  'worst_market': '-', 'worst_market_profit': 0, 'recent_win_rate': 0}
+    try:
+        # From expectancy
+        exp_path = PROJECT_ROOT / 'data' / 'expectancy_history.jsonl'
+        if exp_path.exists():
+            last_line = ''
+            with exp_path.open('r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        last_line = line
+            if last_line:
+                exp = json.loads(last_line)
+                perf_stats['total_trades'] = int(exp.get('sample_size', 0))
+                perf_stats['win_rate'] = round(float(exp.get('win_rate', 0)) * 100, 1)
+                perf_stats['total_profit'] = round(float(exp.get('net_profit', 0)), 2)
+                avg_win = float(exp.get('avg_win', 0))
+                avg_loss = float(exp.get('avg_loss', 0))
+                wr = float(exp.get('win_rate', 0))
+                perf_stats['avg_profit'] = round(avg_win * wr + avg_loss * (1 - wr), 2)
+
+        # From market metrics
+        mm_path = PROJECT_ROOT / 'data' / 'market_metrics.json'
+        if mm_path.exists():
+            with mm_path.open('r', encoding='utf-8') as f:
+                mm = json.load(f)
+            if mm:
+                best = max(mm.items(), key=lambda x: x[1].get('total_profit', 0))
+                worst = min(mm.items(), key=lambda x: x[1].get('total_profit', 0))
+                perf_stats['best_market'] = best[0].replace('-EUR', '')
+                perf_stats['best_market_profit'] = round(best[1].get('total_profit', 0), 2)
+                perf_stats['worst_market'] = worst[0].replace('-EUR', '')
+                perf_stats['worst_market_profit'] = round(worst[1].get('total_profit', 0), 2)
+                # Average hold time
+                total_hold = sum(v.get('avg_hold_seconds', 0) * v.get('trades', 0) for v in mm.values())
+                total_t = sum(v.get('trades', 0) for v in mm.values())
+                if total_t > 0:
+                    perf_stats['avg_hold_hrs'] = round(total_hold / total_t / 3600, 1)
+
+        # Recent win rate (last 2 weeks from weekly_profits)
+        if len(weekly_profits) >= 2:
+            recent = weekly_profits[-2:]
+            r_wins = sum(w['wins'] for w in recent)
+            r_trades = sum(w['trades'] for w in recent)
+            perf_stats['recent_win_rate'] = round(r_wins / r_trades * 100) if r_trades > 0 else 0
+        elif weekly_profits:
+            perf_stats['recent_win_rate'] = weekly_profits[-1]['winrate']
+    except Exception:
+        pass
+
+    # ── Dynamic data: ETA per milestone + growth rate ──
+    growth_per_week = 0.0
+    deposit_per_week = 100 / 4.33  # ~€23/week avg for active deposit months
+    try:
+        if len(balance_sparkline) >= 7:
+            # Growth over last 14 days (or available)
+            span_days = min(14, len(balance_sparkline))
+            recent = balance_sparkline[-span_days:]
+            val_start = recent[0]['value']
+            val_end = recent[-1]['value']
+            if val_start > 0:
+                growth_per_week = (val_end - val_start) / span_days * 7
+    except Exception:
+        pass
+
+    # Compute ETA for each upcoming milestone
+    import math
+    for m in milestones:
+        if current_value >= m['value']:
+            m['eta'] = ''
+            m['eta_weeks'] = 0
+        else:
+            gap = m['value'] - current_value
+            weekly_rate = growth_per_week + deposit_per_week
+            if weekly_rate > 0:
+                weeks = gap / weekly_rate
+                m['eta_weeks'] = round(weeks, 1)
+                from datetime import datetime as _dt, timedelta as _td
+                eta_date = _dt.now() + _td(weeks=weeks)
+                m['eta'] = eta_date.strftime('%d %b %Y')
+            else:
+                m['eta'] = '?'
+                m['eta_weeks'] = 0
+
+    # ── Next milestone detail card ──
+    next_milestone = None
+    if current_idx + 1 < len(milestones):
+        nm = milestones[current_idx + 1]
+        gap = nm['value'] - current_value
+        # Checklist items
+        checklist = []
+        wr_ok = perf_stats.get('recent_win_rate', 0) >= 60
+        checklist.append({'label': 'Winrate ≥ 60% (laatste 2 weken)', 'ok': wr_ok,
+                          'detail': '%d%%' % perf_stats.get('recent_win_rate', 0)})
+        eur_free = current_value - float(heartbeat.get('total_exposure_eur', 0) or 0)
+        buffer_pct = (eur_free / current_value * 100) if current_value > 0 else 0
+        buffer_ok = buffer_pct >= 20
+        checklist.append({'label': 'Buffer ≥ 20%', 'ok': buffer_ok,
+                          'detail': '%.0f%% (€%.0f vrij)' % (buffer_pct, eur_free)})
+        # Config stable for 2 weeks check (V2 start was 10 apr 2026)
+        import time as _time
+        v2_start = 1744243200  # 2026-04-10 00:00:00 UTC approx
+        days_since_change = (_time.time() - v2_start) / 86400
+        stable_ok = days_since_change >= 14
+        checklist.append({'label': 'Config stabiel ≥ 2 weken', 'ok': stable_ok,
+                          'detail': '%.0f dagen' % days_since_change})
+        next_milestone = {
+            'label': nm['label'],
+            'action': nm['action'],
+            'gap': round(gap, 0),
+            'eta': nm.get('eta', '?'),
+            'eta_weeks': nm.get('eta_weeks', 0),
+            'checklist': checklist,
+        }
+
+    # ── Smart advice ──
+    advice_items = []
+    try:
+        # Winrate advice
+        rwr = perf_stats.get('recent_win_rate', 0)
+        if rwr >= 60:
+            advice_items.append({'type': 'success', 'icon': '✅',
+                                 'text': 'Winrate %d%% — boven 60%% drempel' % rwr})
+        elif rwr > 0:
+            advice_items.append({'type': 'danger', 'icon': '⚠️',
+                                 'text': 'Winrate %d%% — onder 60%% drempel! Overweeg voorzichtiger config' % rwr})
+
+        # Buffer
+        eur_avail = float(heartbeat.get('eur_balance', 0) or 0)
+        if current_value > 0:
+            buf = eur_avail / current_value * 100
+            if buf >= 20:
+                advice_items.append({'type': 'success', 'icon': '✅',
+                                     'text': 'Buffer %.0f%% — boven 20%% minimum' % buf})
+            else:
+                advice_items.append({'type': 'danger', 'icon': '🔴',
+                                     'text': 'Buffer %.0f%% — ONDER 20%%! Verlaag exposure' % buf})
+
+        # Growth rate
+        if growth_per_week > 0:
+            advice_items.append({'type': 'info', 'icon': '📈',
+                                 'text': 'Groeisnelheid: €%.0f/week (trading) + €%.0f/week (stortingen)' % (
+                                     growth_per_week, deposit_per_week)})
+        elif growth_per_week < -10:
+            advice_items.append({'type': 'danger', 'icon': '📉',
+                                 'text': 'Portfolio krimpt: €%.0f/week — check bear market protocol' % growth_per_week})
+
+        # Trades
+        wp = weekly_profits[-1] if weekly_profits else None
+        if wp and wp['trades'] > 0:
+            advice_items.append({'type': 'info', 'icon': '📊',
+                                 'text': 'Deze week: %d trades, €%.2f winst, %d%% winrate' % (
+                                     wp['trades'], wp['profit'], wp['winrate'])})
+
+        # Next milestone
+        if next_milestone:
+            advice_items.append({'type': 'info', 'icon': '🎯',
+                                 'text': 'Volgende mijlpaal (%s): nog €%.0f nodig — geschat %s' % (
+                                     next_milestone['label'], next_milestone['gap'], next_milestone['eta'])})
+    except Exception:
+        pass
+
+    # Golden rules (V2)
     golden_rules = [
-        'Nooit een stap overslaan — elke verhoging bouwt voort op bewezen stabiliteit',
-        'Minimaal 2 weken wachten na elke config-wijziging',
-        'Winrate check: moet ≥ 50% zijn over laatste 2 weken',
-        'EUR buffer: houd ALTIJD minimaal 15% van portfoliowaarde vrij',
-        'Grid pas bij €1.000+ met minimaal €40/level',
-        'Bij 15% drawdown: ga terug naar vorige mijlpaal-config',
-        'Eén ding tegelijk wijzigen — nooit alles tegelijk verhogen',
+        'Minimaal 2 weken evalueren na elke config-wijziging',
+        'Winrate check: moet ≥ 60% zijn over laatste 2 weken',
+        'EUR buffer: houd ALTIJD minimaal 20% van portfoliowaarde vrij',
+        'Bij 15% drawdown: verlaag BASE met 30% en ga naar vorige fase',
+        'DCA_MAX_BUYS nooit boven 8 — meer DCA = geld vastzetten',
+        'Grid pas uitbreiden bij bewezen positieve PnL op bestaande grids',
+        'MAX_TRADES verhogen = BASE verlagen — nooit beide tegelijk omhoog',
     ]
 
-    # Deposit plan
+    # Deposit plan (V2 — versneld)
     deposit_plan = [
         {'month': 'Mrt 2026', 'deposit': 100, 'cum': 870, 'est': 465, 'done': True},
-        {'month': 'Apr 2026', 'deposit': 100, 'cum': 970, 'est': 521, 'done': False},
-        {'month': 'Mei 2026', 'deposit': 100, 'cum': 1070, 'est': 581, 'done': False},
-        {'month': 'Jun 2026', 'deposit': 100, 'cum': 1170, 'est': 645, 'done': False},
-        {'month': 'Jul 2026', 'deposit': 100, 'cum': 1270, 'est': 713, 'done': False},
-        {'month': 'Aug 2026', 'deposit': 100, 'cum': 1370, 'est': 785, 'done': False},
-        {'month': 'Sep 2026', 'deposit': 100, 'cum': 1470, 'est': 861, 'done': False},
-        {'month': 'Okt 2026', 'deposit': 100, 'cum': 1570, 'est': 945, 'done': False},
-        {'month': 'Nov 2026', 'deposit': 100, 'cum': 1670, 'est': 1035, 'done': False},
-        {'month': 'Dec 2026', 'deposit': 100, 'cum': 1770, 'est': 1135, 'done': False},
+        {'month': 'Apr 2026', 'deposit': 100, 'cum': 970, 'est': 1300, 'done': True},
+        {'month': 'Mei 2026', 'deposit': 100, 'cum': 1070, 'est': 1460, 'done': False},
+        {'month': 'Jun 2026', 'deposit': 100, 'cum': 1170, 'est': 1630, 'done': False},
+        {'month': 'Jul 2026', 'deposit': 100, 'cum': 1270, 'est': 1810, 'done': False},
+        {'month': 'Aug 2026', 'deposit': 100, 'cum': 1370, 'est': 2000, 'done': False},
+        {'month': 'Sep 2026', 'deposit': 50, 'cum': 1420, 'est': 2150, 'done': False},
+        {'month': 'Okt 2026', 'deposit': 50, 'cum': 1470, 'est': 2310, 'done': False},
+        {'month': 'Nov 2026', 'deposit': 0, 'cum': 1470, 'est': 2430, 'done': False},
+        {'month': 'Dec 2026', 'deposit': 0, 'cum': 1470, 'est': 2560, 'done': False},
     ]
 
-    # Expected earnings at target
+    # Expected earnings at €6.000 target (V2)
     earnings_at_5k = {
-        'trailing_day': 9.0,
-        'grid_day': 1.6,
-        'total_day': 10.5,
-        'total_week': 73,
-        'total_month': 315,
+        'trailing_day': 10.0,
+        'grid_day': 1.2,
+        'total_day': 11.2,
+        'total_week': 78,
+        'total_month': 340,
     }
+
+    # Bear market protocol (V2 — strengere triggers bij hogere BASE)
+    bear_protocol = [
+        {'trigger': 'Trigger 1: Portfolio −8% in 1 week', 'action': 'BASE −30%, MIN_SCORE +0,5'},
+        {'trigger': 'Trigger 2: Portfolio −15% in 2 weken', 'action': 'Terug naar 2 mijlpalen eerder + halveer grid budget'},
+        {'trigger': 'Trigger 3: Portfolio −25%+ (crash)', 'action': 'Noodconfig: 3 trades, €50 BASE, Grid uit. Wacht op stabilisatie.'},
+    ]
 
     return render_template('roadmap.html',
         milestones=milestones,
@@ -3843,6 +4077,13 @@ def roadmap():
         golden_rules=golden_rules,
         deposit_plan=deposit_plan,
         earnings_at_5k=earnings_at_5k,
+        bear_protocol=bear_protocol,
+        balance_sparkline=balance_sparkline,
+        weekly_profits=weekly_profits,
+        perf_stats=perf_stats,
+        next_milestone=next_milestone,
+        advice_items=advice_items,
+        growth_per_week=round(growth_per_week, 2),
         config=config,
         heartbeat=heartbeat,
         bot_running=is_bot_online(heartbeat, config),

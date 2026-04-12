@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Roadmap - Bitvavo Trading Bot{% endblock %}
+{% block title %}Roadmap V2 - Bitvavo Trading Bot{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -25,7 +25,7 @@
 .roadmap-hero .subtitle {
     color: var(--text-tertiary, #6e7681);
     font-size: 0.85rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
 }
 .roadmap-hero .current-value {
     font-size: 2.5rem;
@@ -38,6 +38,20 @@
     font-size: 0.8rem;
     color: var(--text-tertiary, #6e7681);
 }
+.roadmap-hero .growth-rate {
+    font-size: 0.8rem;
+    color: #10b981;
+    margin-top: 0.3rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+.roadmap-hero .growth-rate.negative { color: #ef4444; }
+
+/* Sparkline container */
+.sparkline-container {
+    max-width: 600px;
+    height: 80px;
+    margin: 1rem auto 0.5rem;
+}
 
 /* Progress bar */
 .progress-track {
@@ -46,7 +60,7 @@
     height: 12px;
     background: rgba(255,255,255,0.06);
     border-radius: 6px;
-    margin: 1.25rem auto 0.5rem;
+    margin: 1rem auto 0.5rem;
     overflow: hidden;
     position: relative;
 }
@@ -60,10 +74,8 @@
 .progress-fill::after {
     content: '';
     position: absolute;
-    right: 0;
-    top: 0;
-    width: 20px;
-    height: 100%;
+    right: 0; top: 0;
+    width: 20px; height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3));
     border-radius: 0 6px 6px 0;
     animation: shimmer 2s infinite;
@@ -82,81 +94,129 @@
 }
 
 /* Section panels */
-.roadmap-section {
-    margin-bottom: 1.5rem;
-}
+.roadmap-section { margin-bottom: 1.5rem; }
 .roadmap-section h3 {
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: 1rem; font-weight: 600;
     color: var(--text-primary, #e6edf3);
     margin: 0 0 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    display: flex; align-items: center; gap: 0.5rem;
 }
 
-/* Timeline */
-.timeline {
-    position: relative;
-    padding-left: 2rem;
+/* ── Smart Advice ── */
+.advice-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.advice-item {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    line-height: 1.4;
 }
-.timeline::before {
-    content: '';
-    position: absolute;
-    left: 11px;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: rgba(255,255,255,0.08);
+.advice-item .advice-icon { font-size: 1.1rem; flex-shrink: 0; }
+.advice-item.success { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2); color: #10b981; }
+.advice-item.danger { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.2); color: #ef4444; }
+.advice-item.info { background: rgba(56,97,251,0.06); border: 1px solid rgba(56,97,251,0.2); color: #58a6ff; }
+
+/* ── Next Milestone Card ── */
+.next-milestone-card {
+    background: linear-gradient(135deg, rgba(56,97,251,0.06), rgba(245,158,11,0.06));
+    border: 2px solid rgba(56,97,251,0.25);
+    border-radius: 14px;
+    padding: 1.5rem;
 }
-.timeline-item {
-    position: relative;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.5rem;
-    background: var(--bg-card, rgba(22,27,34,0.6));
+.next-milestone-card .nm-header {
+    display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;
+}
+.next-milestone-card .nm-label {
+    font-size: 1.8rem; font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    color: #58a6ff;
+}
+.next-milestone-card .nm-action {
+    font-size: 0.85rem; color: var(--text-secondary, #8b949e);
+}
+.nm-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
+.nm-stat {
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px; padding: 0.75rem; text-align: center;
+}
+.nm-stat .nm-stat-label { font-size: 0.68rem; color: var(--text-tertiary, #6e7681); text-transform: uppercase; letter-spacing: 0.5px; }
+.nm-stat .nm-stat-value { font-size: 1.2rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--text-primary, #e6edf3); margin-top: 0.2rem; }
+.checklist { list-style: none; padding: 0; margin: 0; }
+.checklist li {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 0; font-size: 0.82rem;
+    color: var(--text-secondary, #8b949e);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.checklist li:last-child { border-bottom: none; }
+.check-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; flex-shrink: 0; }
+.check-ok { background: rgba(16,185,129,0.15); color: #10b981; }
+.check-fail { background: rgba(239,68,68,0.15); color: #ef4444; }
+.check-detail { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-tertiary, #6e7681); }
+
+/* ── Performance Stats ── */
+.perf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.6rem;
+}
+.perf-card {
+    background: rgba(255,255,255,0.03);
     border: 1px solid var(--border-primary, rgba(240,246,252,0.1));
     border-radius: 10px;
-    transition: all 0.2s ease;
+    padding: 0.75rem;
+    text-align: center;
 }
-.timeline-item:hover {
-    border-color: rgba(56,97,251,0.3);
-    transform: translateX(4px);
+.perf-card .perf-label { font-size: 0.68rem; color: var(--text-tertiary, #6e7681); text-transform: uppercase; letter-spacing: 0.5px; }
+.perf-card .perf-value { font-size: 1.1rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--text-primary, #e6edf3); margin-top: 0.2rem; }
+.perf-card .perf-value.positive { color: #10b981; }
+.perf-card .perf-value.negative { color: #ef4444; }
+.perf-card .perf-sub { font-size: 0.68rem; color: var(--text-tertiary, #6e7681); margin-top: 0.1rem; }
+
+/* ── Weekly Profit Table ── */
+.weekly-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.8rem; }
+.weekly-table th {
+    text-align: left; padding: 0.5rem 0.75rem;
+    color: var(--text-tertiary, #6e7681); font-weight: 500;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;
 }
-.timeline-item.completed {
-    border-color: rgba(16,185,129,0.3);
-    background: rgba(16,185,129,0.04);
+.weekly-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: var(--text-secondary, #8b949e);
 }
-.timeline-item.current {
-    border-color: rgba(56,97,251,0.5);
-    background: rgba(56,97,251,0.06);
-    box-shadow: 0 0 20px rgba(56,97,251,0.1);
+.weekly-table .mono { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+.weekly-table .profit-positive { color: #10b981; }
+.weekly-table .profit-negative { color: #ef4444; }
+.wr-bar { display: inline-block; height: 6px; border-radius: 3px; background: #10b981; min-width: 4px; vertical-align: middle; margin-left: 4px; }
+
+/* Timeline */
+.timeline { position: relative; padding-left: 2rem; }
+.timeline::before {
+    content: ''; position: absolute; left: 11px; top: 0; bottom: 0;
+    width: 2px; background: rgba(255,255,255,0.08);
 }
-.timeline-item.star {
-    border-color: rgba(245,158,11,0.3);
+.timeline-item {
+    position: relative; padding: 0.75rem 1rem; margin-bottom: 0.5rem;
+    background: var(--bg-card, rgba(22,27,34,0.6));
+    border: 1px solid var(--border-primary, rgba(240,246,252,0.1));
+    border-radius: 10px; transition: all 0.2s ease;
 }
-.timeline-item.star.current {
-    border-color: rgba(245,158,11,0.5);
-    background: rgba(245,158,11,0.06);
-}
+.timeline-item:hover { border-color: rgba(56,97,251,0.3); transform: translateX(4px); }
+.timeline-item.completed { border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.04); }
+.timeline-item.current { border-color: rgba(56,97,251,0.5); background: rgba(56,97,251,0.06); box-shadow: 0 0 20px rgba(56,97,251,0.1); }
+.timeline-item.star { border-color: rgba(245,158,11,0.3); }
+.timeline-item.star.current { border-color: rgba(245,158,11,0.5); background: rgba(245,158,11,0.06); }
 .timeline-dot {
-    position: absolute;
-    left: -25px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
+    position: absolute; left: -25px; top: 50%; transform: translateY(-50%);
+    width: 12px; height: 12px; border-radius: 50%;
     border: 2px solid rgba(255,255,255,0.15);
-    background: var(--bg-primary, #0d1117);
-    z-index: 1;
+    background: var(--bg-primary, #0d1117); z-index: 1;
 }
-.timeline-item.completed .timeline-dot {
-    background: #10b981;
-    border-color: #10b981;
-}
+.timeline-item.completed .timeline-dot { background: #10b981; border-color: #10b981; }
 .timeline-item.current .timeline-dot {
-    background: #3861fb;
-    border-color: #3861fb;
+    background: #3861fb; border-color: #3861fb;
     box-shadow: 0 0 8px rgba(56,97,251,0.5);
     animation: pulse-dot 2s ease infinite;
 }
@@ -164,194 +224,101 @@
     0%, 100% { box-shadow: 0 0 4px rgba(56,97,251,0.4); }
     50% { box-shadow: 0 0 12px rgba(56,97,251,0.7); }
 }
-.timeline-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.timeline-value {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: var(--text-primary, #e6edf3);
-}
-.timeline-item.completed .timeline-value {
-    color: #10b981;
-}
-.timeline-item.current .timeline-value {
-    color: #58a6ff;
-}
-.timeline-icon {
-    font-size: 1rem;
-}
-.timeline-action {
-    font-size: 0.78rem;
-    color: var(--text-secondary, #8b949e);
-    margin-top: 0.2rem;
-}
+.timeline-header { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.timeline-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.9rem; color: var(--text-primary, #e6edf3); }
+.timeline-item.completed .timeline-value { color: #10b981; }
+.timeline-item.current .timeline-value { color: #58a6ff; }
+.timeline-icon { font-size: 1rem; }
+.timeline-action { font-size: 0.78rem; color: var(--text-secondary, #8b949e); }
+.timeline-eta { font-size: 0.68rem; color: var(--text-tertiary, #6e7681); font-family: 'JetBrains Mono', monospace; }
 .timeline-badge {
-    margin-left: auto;
-    font-size: 0.65rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 10px;
-    white-space: nowrap;
+    margin-left: auto; font-size: 0.65rem; font-weight: 600;
+    padding: 2px 8px; border-radius: 10px; white-space: nowrap;
 }
-.badge-done {
-    background: rgba(16,185,129,0.15);
-    color: #10b981;
-}
-.badge-current {
-    background: rgba(56,97,251,0.15);
-    color: #58a6ff;
-}
-.badge-upcoming {
-    background: rgba(255,255,255,0.05);
-    color: var(--text-tertiary, #6e7681);
-}
+.badge-done { background: rgba(16,185,129,0.15); color: #10b981; }
+.badge-current { background: rgba(56,97,251,0.15); color: #58a6ff; }
+.badge-upcoming { background: rgba(255,255,255,0.05); color: var(--text-tertiary, #6e7681); }
 
 /* Golden rules */
-.rules-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
+.rules-list { list-style: none; padding: 0; margin: 0; }
 .rules-list li {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.6rem;
-    padding: 0.6rem 0.8rem;
-    margin-bottom: 0.4rem;
-    background: rgba(245,158,11,0.04);
-    border: 1px solid rgba(245,158,11,0.12);
-    border-radius: 8px;
-    font-size: 0.82rem;
-    color: var(--text-secondary, #8b949e);
-    line-height: 1.4;
+    display: flex; align-items: flex-start; gap: 0.6rem;
+    padding: 0.6rem 0.8rem; margin-bottom: 0.4rem;
+    background: rgba(245,158,11,0.04); border: 1px solid rgba(245,158,11,0.12);
+    border-radius: 8px; font-size: 0.82rem;
+    color: var(--text-secondary, #8b949e); line-height: 1.4;
 }
 .rules-list li .rule-num {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 22px;
-    height: 22px;
-    background: rgba(245,158,11,0.15);
-    color: #f59e0b;
-    font-weight: 700;
-    font-size: 0.7rem;
-    border-radius: 6px;
-    flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 22px; height: 22px; background: rgba(245,158,11,0.15);
+    color: #f59e0b; font-weight: 700; font-size: 0.7rem;
+    border-radius: 6px; flex-shrink: 0;
 }
 
 /* Deposit plan table */
-.deposit-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    font-size: 0.8rem;
-}
+.deposit-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.8rem; }
 .deposit-table th {
-    text-align: left;
-    padding: 0.5rem 0.75rem;
-    color: var(--text-tertiary, #6e7681);
-    font-weight: 500;
+    text-align: left; padding: 0.5rem 0.75rem;
+    color: var(--text-tertiary, #6e7681); font-weight: 500;
     border-bottom: 1px solid rgba(255,255,255,0.08);
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;
 }
-.deposit-table td {
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    color: var(--text-secondary, #8b949e);
-}
-.deposit-table tr.done td {
-    color: #10b981;
-}
-.deposit-table .mono {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 500;
-}
+.deposit-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text-secondary, #8b949e); }
+.deposit-table tr.done td { color: #10b981; }
+.deposit-table .mono { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
 
 /* Earnings projection */
-.earnings-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.75rem;
-}
+.earnings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; }
 .earning-card {
-    background: rgba(16,185,129,0.05);
-    border: 1px solid rgba(16,185,129,0.15);
-    border-radius: 10px;
-    padding: 1rem;
-    text-align: center;
+    background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.15);
+    border-radius: 10px; padding: 1rem; text-align: center;
 }
-.earning-card .earning-label {
-    font-size: 0.7rem;
-    color: var(--text-tertiary, #6e7681);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 0.3rem;
-}
-.earning-card .earning-value {
-    font-size: 1.3rem;
-    font-weight: 700;
-    font-family: 'JetBrains Mono', monospace;
-    color: #10b981;
-}
-.earning-card .earning-sub {
-    font-size: 0.7rem;
-    color: var(--text-tertiary, #6e7681);
-    margin-top: 0.15rem;
-}
+.earning-card .earning-label { font-size: 0.7rem; color: var(--text-tertiary, #6e7681); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.3rem; }
+.earning-card .earning-value { font-size: 1.3rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: #10b981; }
+.earning-card .earning-sub { font-size: 0.7rem; color: var(--text-tertiary, #6e7681); margin-top: 0.15rem; }
 
 /* Bear market protocol */
 .bear-card {
-    background: rgba(239,68,68,0.04);
-    border: 1px solid rgba(239,68,68,0.15);
-    border-radius: 10px;
-    padding: 0.8rem 1rem;
-    margin-bottom: 0.5rem;
+    background: rgba(239,68,68,0.04); border: 1px solid rgba(239,68,68,0.15);
+    border-radius: 10px; padding: 0.8rem 1rem; margin-bottom: 0.5rem;
 }
-.bear-card .trigger {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #ef4444;
-    margin-bottom: 0.25rem;
-}
-.bear-card .bear-action {
-    font-size: 0.78rem;
-    color: var(--text-secondary, #8b949e);
-}
+.bear-card .trigger { font-size: 0.8rem; font-weight: 600; color: #ef4444; margin-bottom: 0.25rem; }
+.bear-card .bear-action { font-size: 0.78rem; color: var(--text-secondary, #8b949e); }
 
-/* Two-column layout for rules + deposit */
-.roadmap-columns {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-}
-@media (max-width: 900px) {
-    .roadmap-columns {
-        grid-template-columns: 1fr;
-    }
-}
+/* Layout */
+.roadmap-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.roadmap-three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
+@media (max-width: 1100px) { .roadmap-three-col { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .roadmap-columns { grid-template-columns: 1fr; } }
 
 .glass-panel {
     background: var(--bg-card, rgba(22,27,34,0.8));
     border: 1px solid var(--border-primary, rgba(240,246,252,0.1));
-    border-radius: 12px;
-    padding: 1.2rem;
+    border-radius: 12px; padding: 1.2rem;
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Roadmap Hero -->
+<!-- Roadmap Hero with Sparkline -->
 <div class="roadmap-hero">
-    <h2>Portfolio Roadmap</h2>
-    <div class="subtitle">Groeiplan van €465 naar €5.000 — stap voor stap opschalen</div>
+    <h2>Portfolio Roadmap V2</h2>
+    <div class="subtitle">Data-driven groeiplan — hogere BASE, minder slots, bewezen DCA-limieten</div>
     <div class="current-value">€{{ "%.0f"|format(current_value) }}</div>
-    <div class="target-label">van €5.000 doel · €{{ "%.0f"|format(total_deposited) }} gestort</div>
+    <div class="target-label">van €6.000 doel · €{{ "%.0f"|format(total_deposited) }} gestort</div>
+    {% if growth_per_week %}
+    <div class="growth-rate {% if growth_per_week < 0 %}negative{% endif %}">
+        {% if growth_per_week >= 0 %}▲{% else %}▼{% endif %} €{{ "%.0f"|format(growth_per_week|abs) }}/week groei
+    </div>
+    {% endif %}
+
+    <!-- Mini Sparkline Chart (30 days) -->
+    {% if balance_sparkline|length > 2 %}
+    <div class="sparkline-container">
+        <canvas id="sparklineChart"></canvas>
+    </div>
+    {% endif %}
+
     <div class="progress-track">
         <div class="progress-fill" id="roadmap-progress" data-pct="{{ "%.1f"|format(progress_pct) }}"></div>
     </div>
@@ -363,11 +330,169 @@
         <span>€3.000</span>
         <span>€4.000</span>
         <span>€5.000</span>
+        <span>€6.000</span>
     </div>
 </div>
 
-<!-- Two-column: Golden Rules + Deposit Plan -->
+<!-- Smart Advice + Next Milestone -->
 <div class="roadmap-columns">
+    <!-- Smart Advice -->
+    <div class="roadmap-section">
+        <div class="glass-panel">
+            <h3>🧠 Smart Advies</h3>
+            <div class="advice-list">
+                {% for item in advice_items %}
+                <div class="advice-item {{ item.type }}">
+                    <span class="advice-icon">{{ item.icon }}</span>
+                    <span>{{ item.text }}</span>
+                </div>
+                {% endfor %}
+                {% if not advice_items %}
+                <div class="advice-item info">
+                    <span class="advice-icon">ℹ️</span>
+                    <span>Onvoldoende data voor advies — wacht op meer trades</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Next Milestone Detail Card -->
+    <div class="roadmap-section">
+        <div class="next-milestone-card">
+            {% if next_milestone %}
+            <h3>🎯 Volgende Mijlpaal</h3>
+            <div class="nm-header">
+                <span class="nm-label">{{ next_milestone.label }}</span>
+                <span class="nm-action">{{ next_milestone.action }}</span>
+            </div>
+            <div class="nm-stats">
+                <div class="nm-stat">
+                    <div class="nm-stat-label">Nog nodig</div>
+                    <div class="nm-stat-value">€{{ "%.0f"|format(next_milestone.gap) }}</div>
+                </div>
+                <div class="nm-stat">
+                    <div class="nm-stat-label">Geschatte datum</div>
+                    <div class="nm-stat-value" style="font-size: 0.9rem;">{{ next_milestone.eta }}</div>
+                </div>
+                <div class="nm-stat">
+                    <div class="nm-stat-label">Weken</div>
+                    <div class="nm-stat-value">~{{ next_milestone.eta_weeks }}</div>
+                </div>
+            </div>
+            <h3 style="font-size: 0.85rem;">📋 Checklist</h3>
+            <ul class="checklist">
+                {% for c in next_milestone.checklist %}
+                <li>
+                    <span class="check-icon {% if c.ok %}check-ok{% else %}check-fail{% endif %}">
+                        {% if c.ok %}✓{% else %}✗{% endif %}
+                    </span>
+                    <span>{{ c.label }}</span>
+                    <span class="check-detail">{{ c.detail }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <h3>🏆 Alle mijlpalen bereikt!</h3>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Performance Stats -->
+<div class="roadmap-section">
+    <div class="glass-panel">
+        <h3>📊 Prestatie Samenvatting</h3>
+        <div class="perf-grid">
+            <div class="perf-card">
+                <div class="perf-label">Totale Winst</div>
+                <div class="perf-value {% if perf_stats.total_profit >= 0 %}positive{% else %}negative{% endif %}">€{{ "%.2f"|format(perf_stats.total_profit) }}</div>
+                <div class="perf-sub">{{ perf_stats.total_trades }} trades</div>
+            </div>
+            <div class="perf-card">
+                <div class="perf-label">Winrate (all-time)</div>
+                <div class="perf-value">{{ "%.1f"|format(perf_stats.win_rate) }}%</div>
+                <div class="perf-sub">van alle trades</div>
+            </div>
+            <div class="perf-card">
+                <div class="perf-label">Winrate (recent)</div>
+                <div class="perf-value {% if perf_stats.recent_win_rate >= 60 %}positive{% else %}negative{% endif %}">{{ perf_stats.recent_win_rate }}%</div>
+                <div class="perf-sub">laatste 2 weken</div>
+            </div>
+            <div class="perf-card">
+                <div class="perf-label">Gem. Profit/Trade</div>
+                <div class="perf-value {% if perf_stats.avg_profit >= 0 %}positive{% else %}negative{% endif %}">€{{ "%.2f"|format(perf_stats.avg_profit) }}</div>
+                <div class="perf-sub">per trade</div>
+            </div>
+            <div class="perf-card">
+                <div class="perf-label">Gem. Hold Tijd</div>
+                <div class="perf-value">{{ "%.1f"|format(perf_stats.avg_hold_hrs) }}u</div>
+                <div class="perf-sub">uren</div>
+            </div>
+            <div class="perf-card">
+                <div class="perf-label">Beste Markt</div>
+                <div class="perf-value positive">{{ perf_stats.best_market }}</div>
+                <div class="perf-sub">€{{ "%.2f"|format(perf_stats.best_market_profit) }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Weekly Profit Table + Milestone Timeline -->
+<div class="roadmap-columns">
+    <!-- Weekly Profit -->
+    <div class="roadmap-section">
+        <div class="glass-panel">
+            <h3>📅 Wekelijkse Winst</h3>
+            <table class="weekly-table">
+                <thead>
+                    <tr><th>Week</th><th>Winst</th><th>Trades</th><th>Winrate</th></tr>
+                </thead>
+                <tbody>
+                    {% for w in weekly_profits|reverse %}
+                    <tr>
+                        <td>{{ w.week }}</td>
+                        <td class="mono {% if w.profit >= 0 %}profit-positive{% else %}profit-negative{% endif %}">€{{ "%.2f"|format(w.profit) }}</td>
+                        <td class="mono">{{ w.trades }}</td>
+                        <td class="mono">{{ w.winrate }}% <span class="wr-bar" style="width: {{ w.winrate * 0.4 }}px;"></span></td>
+                    </tr>
+                    {% endfor %}
+                    {% if not weekly_profits %}
+                    <tr><td colspan="4" style="text-align:center; color: var(--text-tertiary);">Geen data beschikbaar</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Milestone Timeline -->
+    <div class="roadmap-section">
+        <div class="glass-panel">
+            <h3>🗺️ Mijlpalen Timeline</h3>
+            <div class="timeline">
+                {% for m in milestones %}
+                <div class="timeline-item {% if loop.index0 < current_idx %}completed{% elif loop.index0 == current_idx %}current{% endif %}{% if m.star %} star{% endif %}">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-header">
+                        <span class="timeline-icon">{{ m.icon }}</span>
+                        <span class="timeline-value">{{ m.label }}</span>
+                        <span class="timeline-action">{{ m.action }}</span>
+                        {% if m.eta and loop.index0 > current_idx %}
+                        <span class="timeline-eta">~{{ m.eta }}</span>
+                        {% endif %}
+                        <span class="timeline-badge {% if loop.index0 < current_idx %}badge-done{% elif loop.index0 == current_idx %}badge-current{% else %}badge-upcoming{% endif %}">
+                            {% if loop.index0 < current_idx %}Bereikt{% elif loop.index0 == current_idx %}Huidig{% else %}Komend{% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Three-column: Golden Rules + Deposit Plan + Earnings/Bear -->
+<div class="roadmap-three-col">
     <!-- Golden Rules -->
     <div class="roadmap-section">
         <div class="glass-panel">
@@ -389,14 +514,13 @@
             <h3>💰 Stortingsplan</h3>
             <table class="deposit-table">
                 <thead>
-                    <tr><th>Maand</th><th>Storting</th><th>Cum. gestort</th><th>Geschat</th><th></th></tr>
+                    <tr><th>Maand</th><th>Storting</th><th>Geschat</th><th></th></tr>
                 </thead>
                 <tbody>
                     {% for d in deposit_plan %}
                     <tr{% if d.done %} class="done"{% endif %}>
                         <td>{{ d.month }}</td>
                         <td class="mono">€{{ d.deposit }}</td>
-                        <td class="mono">€{{ d.cum }}</td>
                         <td class="mono">€{{ d.est }}</td>
                         <td>{% if d.done %}✅{% endif %}</td>
                     </tr>
@@ -405,73 +529,90 @@
             </table>
         </div>
     </div>
-</div>
 
-<!-- Milestone Timeline -->
-<div class="roadmap-section">
-    <div class="glass-panel">
-        <h3>🗺️ Mijlpalen Timeline</h3>
-        <div class="timeline">
-            {% for m in milestones %}
-            <div class="timeline-item {% if loop.index0 < current_idx %}completed{% elif loop.index0 == current_idx %}current{% endif %}{% if m.star %} star{% endif %}">
-                <div class="timeline-dot"></div>
-                <div class="timeline-header">
-                    <span class="timeline-icon">{{ m.icon }}</span>
-                    <span class="timeline-value">{{ m.label }}</span>
-                    <span class="timeline-action">{{ m.action }}</span>
-                    <span class="timeline-badge {% if loop.index0 < current_idx %}badge-done{% elif loop.index0 == current_idx %}badge-current{% else %}badge-upcoming{% endif %}">
-                        {% if loop.index0 < current_idx %}Bereikt{% elif loop.index0 == current_idx %}Huidig{% else %}Komend{% endif %}
-                    </span>
+    <!-- Earnings + Bear Market -->
+    <div class="roadmap-section">
+        <div class="glass-panel" style="margin-bottom: 1rem;">
+            <h3>📈 Opbrengst bij €6.000</h3>
+            <div class="earnings-grid">
+                <div class="earning-card">
+                    <div class="earning-label">Per dag</div>
+                    <div class="earning-value">€{{ "%.2f"|format(earnings_at_5k.total_day) }}</div>
                 </div>
+                <div class="earning-card">
+                    <div class="earning-label">Per week</div>
+                    <div class="earning-value">€{{ earnings_at_5k.total_week }}</div>
+                </div>
+                <div class="earning-card">
+                    <div class="earning-label">Per maand</div>
+                    <div class="earning-value">€{{ earnings_at_5k.total_month }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="glass-panel">
+            <h3>🔴 Bear Protocol</h3>
+            {% for bp in bear_protocol %}
+            <div class="bear-card">
+                <div class="trigger">{{ bp.trigger }}</div>
+                <div class="bear-action">{{ bp.action }}</div>
             </div>
             {% endfor %}
         </div>
     </div>
 </div>
 
-<!-- Two-column: Earnings Projection + Bear Market Protocol -->
-<div class="roadmap-columns">
-    <!-- Earnings at €5.000 -->
-    <div class="roadmap-section">
-        <div class="glass-panel">
-            <h3>📈 Verwachte Opbrengst bij €5.000</h3>
-            <div class="earnings-grid">
-                <div class="earning-card">
-                    <div class="earning-label">Per dag</div>
-                    <div class="earning-value">€{{ "%.2f"|format(earnings_at_5k.total_day) }}</div>
-                    <div class="earning-sub">trailing + grid</div>
-                </div>
-                <div class="earning-card">
-                    <div class="earning-label">Per week</div>
-                    <div class="earning-value">€{{ earnings_at_5k.total_week }}</div>
-                    <div class="earning-sub">passief inkomen</div>
-                </div>
-                <div class="earning-card">
-                    <div class="earning-label">Per maand</div>
-                    <div class="earning-value">€{{ earnings_at_5k.total_month }}</div>
-                    <div class="earning-sub">zonder stortingen</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bear Market Protocol -->
-    <div class="roadmap-section">
-        <div class="glass-panel">
-            <h3>🔴 Bear Market Protocol</h3>
-            <div class="bear-card">
-                <div class="trigger">Trigger 1: Portfolio −10% in 1 week</div>
-                <div class="bear-action">MAX_OPEN_TRADES −1, MIN_SCORE +0,5</div>
-            </div>
-            <div class="bear-card">
-                <div class="trigger">Trigger 2: Portfolio −20% in 2 weken</div>
-                <div class="bear-action">Ga terug naar config van 2 mijlpalen eerder</div>
-            </div>
-            <div class="bear-card">
-                <div class="trigger">Trigger 3: Portfolio −30%+ (crash)</div>
-                <div class="bear-action">Noodconfig: 2 trades, €30 BASE, Grid uit. Wacht op stabilisatie.</div>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Sparkline Chart Script -->
+{% if balance_sparkline|length > 2 %}
+<script>
+(function() {
+    var ctx = document.getElementById('sparklineChart');
+    if (!ctx || typeof Chart === 'undefined') return;
+    var data = {{ balance_sparkline | tojson }};
+    var labels = data.map(function(d) { return d.date.slice(5); }); // MM-DD
+    var values = data.map(function(d) { return d.value; });
+    var minV = Math.min.apply(null, values) * 0.98;
+    var maxV = Math.max.apply(null, values) * 1.02;
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                borderColor: '#58a6ff',
+                backgroundColor: function(context) {
+                    var chart = context.chart;
+                    var ctx2 = chart.ctx;
+                    var gradient = ctx2.createLinearGradient(0, 0, 0, chart.height);
+                    gradient.addColorStop(0, 'rgba(88,166,255,0.3)');
+                    gradient.addColorStop(1, 'rgba(88,166,255,0.0)');
+                    return gradient;
+                },
+                fill: true,
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                pointHoverBackgroundColor: '#58a6ff',
+                tension: 0.3,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: {
+                backgroundColor: 'rgba(13,17,23,0.9)',
+                titleColor: '#8b949e',
+                bodyColor: '#e6edf3',
+                bodyFont: { family: 'JetBrains Mono', size: 12 },
+                callbacks: { label: function(ctx) { return '€' + ctx.parsed.y.toFixed(2); } }
+            }},
+            scales: {
+                x: { display: true, grid: { display: false }, ticks: { font: { size: 9 }, color: '#6e7681', maxTicksLimit: 7 } },
+                y: { display: false, min: minV, max: maxV }
+            },
+            interaction: { intersect: false, mode: 'index' }
+        }
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}
