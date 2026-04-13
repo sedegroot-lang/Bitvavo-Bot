@@ -5,6 +5,65 @@
 
 ---
 
+## #033 — Grid counter-orders all at same price + no sell levels (2026-04-13)
+
+### Symptom
+Grid BTC-EUR had 6 open orders, ALL buys, NO sells. Three counter-buy orders were all
+placed at the exact same price (60105), and three original buy levels at different prices.
+Grid was using full €184 budget but was effectively a one-sided buy wall with no ability
+to profit from price movements. Total open order value spread:
+- 3 original buys: €56/each at 58891, 59498, 60105
+- 3 counter-buys: €5/each all at 60105 (duplicate price!)
+
+### Root Cause (3 bugs)
+
+1. **`_find_next_lower_price` scanned placed/pending levels, not the grid ladder**:
+   When sells at 61778 and 61927 filled, the counter-buy price was found by scanning
+   `state.levels` for the nearest placed/pending level below. The only placed buy levels
+   were at 58891, 59498, 60105 — so ALL three counter-buys got price 60105 (the highest
+   placed buy). The function had no concept of the grid's actual price spacing.
+
+2. **No sell-side price ladder stored**: The grid started with no BTC, so only buy levels
+   were created (`buy_only` mode). The sell-side grid prices were never stored. When a buy
+   filled and needed to place a counter-sell, `_find_next_higher_price` searched for
+   placed/pending levels above — finding none (all sells were filled or cancelled).
+
+3. **Budget imbalance**: With no BTC balance, `_calculate_grid_levels` allocated 100% of
+   budget to buy side. The sell orders got only whatever tiny BTC dust existed (~€5 each).
+   After those tiny sells filled, the counter-buys were equally tiny (~€5 each), creating
+   a massive imbalance where most of the budget sat in buy orders that would never fill.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/grid_trading.py` | NEW: `price_ladder: List[float]` field on `GridState` — stores full grid price ladder |
+| `modules/grid_trading.py` | NEW: `_compute_full_ladder()` — derives complete grid prices from config (both buy AND sell side) |
+| `modules/grid_trading.py` | NEW: `_get_price_ladder()` — returns stored ladder with config fallback |
+| `modules/grid_trading.py` | FIXED: `_find_next_higher_price()` uses price_ladder instead of scanning level statuses |
+| `modules/grid_trading.py` | FIXED: `_find_next_lower_price()` uses price_ladder instead of scanning level statuses |
+| `modules/grid_trading.py` | Both find functions have fallback: calculate one grid step beyond ladder bounds |
+| `modules/grid_trading.py` | `create_grid()` stores full ladder via `_compute_full_ladder()` |
+| `modules/grid_trading.py` | `_rebalance_grid()` updates ladder on rebalance |
+| `modules/grid_trading.py` | `_save_states()` / `_load_states()` persist/restore `price_ladder` |
+| `bot_config_local.json` | `GRID_TRADING.num_grids`: 5→10 for better trade frequency with €184 budget |
+| `data/grid_states.json` | Reset: old broken grid deleted, new grid created with proper ladder |
+
+### Grid Config Applied
+- Market: BTC-EUR, Range: ±4% (8% total), 10 price levels, €184 budget
+- 5 buy levels placed at different prices (€36.88/level)
+- Full 10-price ladder stored (5 buy + 5 sell prices) for counter-order placement
+- When a buy fills, counter-sell placed at correct next-higher ladder price (not arbitrary)
+
+### Key Rules
+1. **`price_ladder` must always contain ALL grid prices** (both buy and sell side), even when
+   only buy orders are placed. This ensures counter-orders go to the correct price.
+2. **Never scan `state.levels` status for counter-order pricing** — use the price ladder.
+3. **Counter-sell price = next ladder price above the filled buy price** (not the nearest
+   placed/pending level).
+
+---
+
 ## #032 — Grid sells below cost: lost cost basis + phantom fills (2026-04-13)
 
 ### Symptom

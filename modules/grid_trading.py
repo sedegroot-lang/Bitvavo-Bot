@@ -100,6 +100,7 @@ class GridState:
     trailing_tp_peak: float = 0.0        # Highest profit seen (for trailing TP)
     trailing_tp_active: bool = False     # Whether trailing TP has been activated
     last_buy_fill_price: float = 0.0     # Actual fill price of last buy (for cost basis)
+    price_ladder: List[float] = field(default_factory=list)  # Sorted grid price levels for counter-order placement
 
 
 # ================= GRID MANAGER =================
@@ -426,7 +427,12 @@ class GridManager:
                         trailing_tp_peak=state_data.get('trailing_tp_peak', 0),
                         trailing_tp_active=state_data.get('trailing_tp_active', False),
                         last_buy_fill_price=state_data.get('last_buy_fill_price', 0.0),
+                        price_ladder=state_data.get('price_ladder', []),
                     )
+                    # Ensure price_ladder is populated (backfill from config if missing)
+                    gs = self.grids[market]
+                    if not gs.price_ladder:
+                        gs.price_ladder = self._compute_full_ladder(gs.config, market)
                 if self.grids:
                     log(f"[Grid] Loaded {len(self.grids)} grid states")
 
@@ -483,6 +489,7 @@ class GridManager:
                     'trailing_tp_peak': state.trailing_tp_peak,
                     'trailing_tp_active': state.trailing_tp_active,
                     'last_buy_fill_price': state.last_buy_fill_price,
+                    'price_ladder': state.price_ladder,
                 }
 
             os.makedirs(os.path.dirname(self.GRID_STATE_FILE) or '.', exist_ok=True)
@@ -739,6 +746,7 @@ class GridManager:
             current_price=current_price,
             status='initialized',
             quote_balance=total_investment,
+            price_ladder=self._compute_full_ladder(config, market),
         )
 
         self.grids[market] = state
@@ -1282,24 +1290,68 @@ class GridManager:
         self._save_states()
         return {'status': state.status, 'actions': actions}
 
+    def _compute_full_ladder(self, config: GridConfig, market: str) -> List[float]:
+        """Compute the full grid price ladder from config (all levels, not just placed ones)."""
+        n = max(3, config.num_grids)
+        if config.grid_mode == 'geometric' and config.upper_price > config.lower_price > 0 and n > 1:
+            ratio = (config.upper_price / config.lower_price) ** (1 / (n - 1))
+            prices = [config.lower_price * (ratio ** i) for i in range(n)]
+        else:
+            step = (config.upper_price - config.lower_price) / max(1, n - 1)
+            prices = [config.lower_price + step * i for i in range(n)]
+        return sorted(self._normalize_price(market, p) for p in prices if p > 0)
+
+    def _get_price_ladder(self, state: GridState) -> List[float]:
+        """Get the grid's price ladder. Uses stored ladder, falls back to config-derived."""
+        if state.price_ladder:
+            return sorted(state.price_ladder)
+        # Derive from config
+        config = state.config
+        n = max(3, config.num_grids)
+        if config.grid_mode == 'geometric' and config.upper_price > config.lower_price > 0 and n > 1:
+            ratio = (config.upper_price / config.lower_price) ** (1 / (n - 1))
+            prices = [self._normalize_price(config.market, config.lower_price * (ratio ** i)) for i in range(n)]
+        else:
+            step = (config.upper_price - config.lower_price) / max(1, n - 1)
+            prices = [self._normalize_price(config.market, config.lower_price + step * i) for i in range(n)]
+        return sorted(p for p in prices if p > 0)
+
     def _find_next_higher_price(self, state: GridState, current_level_price: float) -> Optional[float]:
-        """Find the next grid price level above the given price.
-        Only considers active (placed/pending) levels to avoid stale prices from old rebalances."""
-        prices = sorted(set(l.price for l in state.levels
-                            if l.status in ('placed', 'pending') and l.price > 0))
-        for p in prices:
-            if p > current_level_price * 1.001:  # Small tolerance
+        """Find the next grid price level above the given price using the price ladder."""
+        ladder = self._get_price_ladder(state)
+        for p in ladder:
+            if p > current_level_price * 1.001:
                 return p
+        # Ladder exhausted: calculate one step above using grid spacing
+        config = state.config
+        if len(ladder) >= 2:
+            avg_step = (ladder[-1] - ladder[0]) / (len(ladder) - 1)
+        elif config.num_grids > 1:
+            avg_step = (config.upper_price - config.lower_price) / (config.num_grids - 1)
+        else:
+            avg_step = current_level_price * 0.01  # 1% fallback
+        next_p = current_level_price + avg_step
+        if next_p > 0 and next_p <= config.upper_price * 1.05:
+            return self._normalize_price(config.market, next_p)
         return None
 
     def _find_next_lower_price(self, state: GridState, current_level_price: float) -> Optional[float]:
-        """Find the next grid price level below the given price.
-        Only considers active (placed/pending) levels to avoid stale prices from old rebalances."""
-        prices = sorted(set(l.price for l in state.levels
-                            if l.status in ('placed', 'pending') and l.price > 0), reverse=True)
-        for p in prices:
+        """Find the next grid price level below the given price using the price ladder."""
+        ladder = self._get_price_ladder(state)
+        for p in sorted(ladder, reverse=True):
             if p < current_level_price * 0.999:
                 return p
+        # Ladder exhausted: calculate one step below using grid spacing
+        config = state.config
+        if len(ladder) >= 2:
+            avg_step = (ladder[-1] - ladder[0]) / (len(ladder) - 1)
+        elif config.num_grids > 1:
+            avg_step = (config.upper_price - config.lower_price) / (config.num_grids - 1)
+        else:
+            avg_step = current_level_price * 0.01  # 1% fallback
+        next_p = current_level_price - avg_step
+        if next_p > 0 and next_p >= config.lower_price * 0.95:
+            return self._normalize_price(config.market, next_p)
         return None
 
     def _estimate_buy_cost(self, state: GridState, sell_level: GridLevel) -> float:
@@ -1434,6 +1486,7 @@ class GridManager:
                     level='info')
 
         state.levels = new_levels
+        state.price_ladder = self._compute_full_ladder(config, market)
         state.rebalance_count += 1
         state.last_rebalance = time.time()
 
