@@ -5,6 +5,56 @@
 
 ---
 
+## #032 — Grid sells below cost: lost cost basis + phantom fills (2026-04-13)
+
+### Symptom
+ALL grid sells since the initial buy at €61,594 were below cost:
+- Sell @ 61,196 → loss -€0.43
+- Sell @ 60,648 → loss -€0.21
+- Sell @ 61,254 → loss -€0.10
+- Sell @ 60,956 → loss -€0.10
+
+Grid reported `total_profit: +€1.57` when real P&L was **-€0.90** (€2.47 discrepancy).
+Also: 72 phantom fills from simulation script contaminated `grid_fills_log.json`.
+
+### Root Cause
+
+1. **`last_buy_fill_price` was 0.0**: The buy at 61,594 occurred BEFORE FIX #031b added
+   persistence of `last_buy_fill_price` to `_save_states()`. After bot restart, the field
+   loaded as 0.0 (default) because it was never saved to disk. All subsequent rebalances
+   had NO cost protection (`if state.last_buy_fill_price > 0` → always false).
+
+2. **No fallback for unknown cost basis**: When `last_buy_fill_price` was 0 and inventory
+   existed, the grid had no mechanism to recover the cost. It placed sell orders below
+   the actual buy price, guaranteeing losses on every sell.
+
+3. **Phantom fills from simulation**: The `_grid_deep_sim.py` script (FIX #031b) wrote to
+   the real `data/grid_fills_log.json` because `_log_fill` wasn't mocked in all test paths.
+   72 phantom fills at impossible prices (81,450 and 91,125) contaminated the log.
+
+4. **Profit calculation fallback showed fake profits**: `_estimate_buy_cost` fell through to
+   `sell_price * 0.99` estimate when no cost basis was known, showing positive profit on
+   what were actually losses.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `modules/grid_trading.py` | NEW: `_derive_cost_from_exchange()` queries Bitvavo trades API for last buy price |
+| `modules/grid_trading.py` | `_load_states()`: derives cost from exchange when `last_buy_fill_price==0` + inventory |
+| `modules/grid_trading.py` | `_rebalance_grid()`: derives cost before protection check; uses current price as last resort |
+| `modules/grid_trading.py` | `start_grid()`: derives cost + blocks sell orders below cost basis |
+| `modules/grid_trading.py` | `_estimate_buy_cost()`: exchange fallback instead of fake 0.99 estimate |
+| `data/grid_states.json` | Corrected `last_buy_fill_price` to 61594, `total_profit` to -0.90 |
+| `data/grid_fills_log.json` | Removed 72 phantom fills, corrected profit values on remaining 4 sells |
+
+### Key Rules
+1. **`last_buy_fill_price` must NEVER be 0 when inventory exists.** If it is, derive from Bitvavo.
+2. **Simulations must use isolated file paths** (`GRID_FILLS_LOG`, `GRID_STATE_FILE`).
+3. **ALL sell placements must check cost basis** — in `_rebalance_grid`, `start_grid`, AND counter-orders.
+
+---
+
 ## #031 — Grid rebalance creates sells below buy cost basis (2026-04-12)
 
 ### Symptom

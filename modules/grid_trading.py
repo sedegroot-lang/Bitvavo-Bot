@@ -445,6 +445,18 @@ class GridManager:
                             cfg.inventory_skew = bool(gcfg.get('inventory_skew', cfg.inventory_skew))
                         self._save_states()
                         log(f"[Grid] Synced runtime config to {len(self.grids)} grids")
+
+                # Safety net: derive cost basis from exchange when it's missing
+                # but the grid holds inventory (e.g. after restart with old state file)
+                if self.bitvavo:
+                    for market, state in self.grids.items():
+                        if state.last_buy_fill_price <= 0 and state.base_balance > 0:
+                            derived = self._derive_cost_from_exchange(market)
+                            if derived > 0:
+                                state.last_buy_fill_price = derived
+                                log(f"[Grid] {market}: recovered cost basis {derived:.2f} "
+                                    f"from exchange (was lost)", level='warning')
+                                self._save_states()
         except Exception as e:
             log(f"[Grid] Failed to load states: {e}", level='warning')
 
@@ -483,6 +495,29 @@ class GridManager:
                 pass
         except Exception as e:
             log(f"[Grid] Failed to save states: {e}", level='error')
+
+    def _derive_cost_from_exchange(self, market: str) -> float:
+        """Query Bitvavo for the most recent buy fill price on this market.
+
+        Used as safety net when last_buy_fill_price is 0 but the grid holds
+        inventory (e.g. after restart with missing persistence). Returns 0.0 if
+        no buy found or API fails.
+        """
+        try:
+            trades = self._safe_call(self.bitvavo.trades, market, {'limit': 20})
+            if not trades or not isinstance(trades, list):
+                return 0.0
+            for t in trades:
+                if isinstance(t, dict) and t.get('side') == 'buy':
+                    price = float(t.get('price', 0) or 0)
+                    if price > 0:
+                        log(f"[Grid] {market}: derived cost basis from exchange: "
+                            f"last buy @ {price:.2f}", level='info')
+                        return price
+        except Exception as e:
+            log(f"[Grid] {market}: failed to derive cost from exchange: {e}",
+                level='warning')
+        return 0.0
 
     def _log_fill(self, market: str, side: str, price: float, amount: float,
                   fee: float, profit: float = 0.0, level_id: int = 0) -> None:
@@ -923,6 +958,19 @@ class GridManager:
         error_count = 0
         skipped_sells = 0
 
+        # Derive cost basis if missing but we hold inventory
+        if state.last_buy_fill_price <= 0 and base_balance > 0:
+            derived = self._derive_cost_from_exchange(market)
+            if derived > 0:
+                state.last_buy_fill_price = derived
+                log(f"[Grid] start_grid {market}: recovered cost basis {derived:.2f} "
+                    f"from exchange", level='warning')
+
+        # Cost floor for sell orders — never sell below cost basis
+        min_sell_price = 0.0
+        if state.last_buy_fill_price > 0:
+            min_sell_price = state.last_buy_fill_price * (1 + 2 * MAKER_FEE_PCT)
+
         for level in state.levels:
             if level.status in ('pending', 'error'):
                 # Skip sell orders if we don't hold enough base asset
@@ -930,6 +978,16 @@ class GridManager:
                     level.status = 'cancelled'
                     level.error_msg = f'No {base_asset} balance at startup; will be placed via counter-order'
                     skipped_sells += 1
+                    continue
+
+                # Skip sell orders below cost basis
+                if level.side == 'sell' and min_sell_price > 0 and level.price < min_sell_price:
+                    level.status = 'cancelled'
+                    level.error_msg = (f'Below cost basis {state.last_buy_fill_price:.2f}; '
+                                       f'will be placed via counter-order')
+                    skipped_sells += 1
+                    log(f"[Grid] start_grid {market}: skipping sell @ {level.price:.2f} "
+                        f"(below cost {state.last_buy_fill_price:.2f})", level='warning')
                     continue
 
                 resp = self._place_limit_order(
@@ -1266,7 +1324,16 @@ class GridManager:
         if buy_price:
             fee = sell_level.amount * buy_price * MAKER_FEE_PCT
             return sell_level.amount * buy_price + fee
-        return sell_level.amount * sell_level.price * 0.99  # Rough estimate
+
+        # Last resort: try to derive from exchange history
+        derived = self._derive_cost_from_exchange(state.config.market)
+        if derived > 0:
+            state.last_buy_fill_price = derived  # Cache for next time
+            fee = sell_level.amount * derived * MAKER_FEE_PCT
+            return sell_level.amount * derived + fee
+
+        # Use sell price as cost (assumes break-even minus fees)
+        return sell_level.amount * sell_level.price
 
     def _place_counter_order(self, state: GridState, market: str, side: str,
                               amount: float, price: float, source_level_id: int) -> bool:
@@ -1338,6 +1405,19 @@ class GridManager:
         # === COST BASIS PROTECTION ===
         # If we hold inventory from a recent buy, ensure no sell level is placed
         # below our actual cost basis (otherwise we guarantee a loss on the sell)
+        # Safety net: derive from Bitvavo if cost basis is unknown
+        if state.last_buy_fill_price <= 0 and state.base_balance > 0:
+            derived = self._derive_cost_from_exchange(market)
+            if derived > 0:
+                state.last_buy_fill_price = derived
+                log(f"[Grid] Rebalance {market}: recovered cost basis {derived:.2f} "
+                    f"from exchange", level='warning')
+            else:
+                # Last resort: use current price as floor to avoid certain losses
+                state.last_buy_fill_price = current_price
+                log(f"[Grid] Rebalance {market}: using current price {current_price:.2f} "
+                    f"as cost basis (no exchange data)", level='warning')
+
         if state.last_buy_fill_price > 0 and state.base_balance > 0:
             min_sell_price = state.last_buy_fill_price * (1 + 2 * MAKER_FEE_PCT)  # Above cost+fees
             raised = 0
