@@ -3376,6 +3376,24 @@ async def bot_loop():
                 
                 # Apply funding rate modifier to final score
                 score += _funding_score_mod
+
+                # ── Shadow Mode: evaluate with timing + velocity filters ──
+                if CONFIG.get('SHADOW_MODE_ENABLED', True):
+                    try:
+                        from core.shadow_tracker import get_shadow_tracker as _get_shadow
+                        _shadow = _get_shadow()
+                        if price_now and price_now > 0:
+                            _shadow.evaluate_entry(
+                                market=m,
+                                score=score,
+                                price=price_now,
+                                min_score_threshold=min_score_threshold,
+                                closed_trades=closed_trades,
+                                bot_would_buy=(score >= min_score_threshold),
+                            )
+                    except Exception:
+                        pass
+
                 if score >= min_score_threshold:
                     scored.append((score, m, price_now, s_short, ml_info))
             except Exception as scan_err:
@@ -3402,6 +3420,47 @@ async def bot_loop():
             f"elapsed {scan_elapsed:.1f}s ({markets_per_second:.2f} markets/s)",
             level='info'
         )
+
+        # ── Shadow Mode: DMS scan + phantom trade price updates ──
+        if CONFIG.get('SHADOW_MODE_ENABLED', True):
+            try:
+                from core.shadow_tracker import get_shadow_tracker as _get_shadow
+                _shadow = _get_shadow()
+                # Refresh DMS watchlist (every 4 hours)
+                _shadow.refresh_dms_watchlist(bitvavo, CONFIG.get('WHITELIST_MARKETS', []))
+                # Evaluate 3 DMS opportunity markets per cycle (rotating)
+                for _dms_entry in _shadow.get_dms_markets_to_evaluate(3):
+                    try:
+                        _dms_m = _dms_entry["market"]
+                        if _dms_m in open_trades:
+                            continue
+                        _dms_result = signal_strength(_dms_m)
+                        if isinstance(_dms_result, (list, tuple)) and len(_dms_result) >= 2:
+                            _dms_score = float(_dms_result[0] or 0)
+                            _dms_price = float(_dms_result[1] or 0)
+                            if _dms_price > 0:
+                                _shadow.evaluate_entry(
+                                    market=_dms_m,
+                                    score=_dms_score,
+                                    price=_dms_price,
+                                    min_score_threshold=min_score_threshold,
+                                    closed_trades=closed_trades,
+                                    bot_would_buy=False,
+                                    is_dms=True,
+                                )
+                    except Exception:
+                        pass
+                # Update phantom trade prices
+                _shadow.update_phantom_prices(get_current_price)
+                # Periodic stats (every ~50 cycles ≈ 20 min)
+                if not hasattr(bot_loop, '_shadow_log_counter'):
+                    bot_loop._shadow_log_counter = 0
+                bot_loop._shadow_log_counter += 1
+                if bot_loop._shadow_log_counter % 50 == 0:
+                    _stats = _shadow.get_stats()
+                    log(f"[SHADOW] Stats: {_stats}", level='info')
+            except Exception as _shadow_err:
+                log(f"[SHADOW] Error: {_shadow_err}", level='debug')
 
 
         # Trades openen via async
