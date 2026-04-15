@@ -109,7 +109,7 @@ class ShadowTracker:
         cutoff = now - 30 * 86400
         pnl: Dict[str, float] = {}
         for t in closed_trades:
-            ts = float(t.get("timestamp") or t.get("opened_ts") or 0)
+            ts = _parse_ts(t.get("timestamp") or t.get("opened_ts") or 0)
             if ts < cutoff:
                 continue
             m = t.get("market", "")
@@ -492,6 +492,26 @@ def _append_jsonl(entry: dict, path: Path):
             f.write(json.dumps(entry, default=str) + "\n")
     except Exception:
         pass
+
+
+def _parse_ts(val) -> float:
+    """Parse a timestamp that may be a float, int, or ISO date string."""
+    if isinstance(val, (int, float)):
+        return float(val)
+    if isinstance(val, str):
+        try:
+            return float(val)
+        except ValueError:
+            pass
+        # Try common datetime formats
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+            try:
+                import datetime
+                dt = datetime.datetime.strptime(val, fmt)
+                return dt.timestamp()
+            except ValueError:
+                continue
+    return 0.0
 
 
 # ═══════════════════════════════════════════════════════════════════

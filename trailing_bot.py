@@ -3391,8 +3391,8 @@ async def bot_loop():
                                 closed_trades=closed_trades,
                                 bot_would_buy=(score >= min_score_threshold),
                             )
-                    except Exception:
-                        pass
+                    except Exception as _shadow_eval_err:
+                        log(f"[SHADOW] Eval error {m}: {_shadow_eval_err}", level='debug')
 
                 if score >= min_score_threshold:
                     scored.append((score, m, price_now, s_short, ml_info))
