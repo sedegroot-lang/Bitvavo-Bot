@@ -5,6 +5,26 @@
 
 ---
 
+## #034 — Shadow tracker crash on string timestamps in closed_trades (2026-04-15)
+
+### Symptom
+Shadow mode hook in bot_loop silently failed — no entries written to `data/shadow_log.jsonl` despite scan completing successfully. Debug logging revealed: `could not convert string to float: '2026-04-10 20:12:20'`
+
+### Root Cause
+`closed_trades` list contains entries where `timestamp` field is an ISO date string (e.g. `'2026-04-10 20:12:20'`) rather than a unix float. The velocity filter's `float(t.get("timestamp"))` crashed on these entries. The `except Exception: pass` silently swallowed the error.
+
+### Fix Applied
+| File | Change |
+|------|--------|
+| `core/shadow_tracker.py` | Added `_parse_ts(val)` helper that handles float, int, and ISO date string timestamps |
+| `core/shadow_tracker.py` | Velocity filter now uses `_parse_ts()` instead of bare `float()` |
+| `trailing_bot.py` | Changed shadow hook `except Exception: pass` to `except Exception as e: log(...)` for debug visibility |
+
+### Lesson
+Never use bare `float()` on trade timestamps — the archive and closed_trades list contain mixed format timestamps (unix floats AND ISO strings). Always use a defensive parser.
+
+---
+
 ## #033 — Grid counter-orders all at same price + no sell levels (2026-04-13)
 
 ### Symptom
