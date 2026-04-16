@@ -167,9 +167,13 @@ Analyse van alle 584 echte trades + 68 trades uit de laatste 6 weken onthulde:
   "BASE_AMOUNT_EUR": 150,
   "MAX_OPEN_TRADES": 4,
   "DCA_MAX_BUYS": 6,
-  "DCA_MAX_ORDERS": 6
+  "DCA_MAX_ORDERS": 6,
+  "AVELLANEDA_STOIKOV_GRID": false
 }
 ```
+
+> **A-S grid uit**: Bij €184 budget en 5 levels berekent A-S een 5% spread → levels te ver van prijs.
+> Arithmetic spacing geeft strakke, voorspelbare levels (1,5% stap). Weer aan bij €1.500 (meer budget).
 
 **Budget check (realiteit: 97% geen DCA):**
 - Alle slots vol, puur base: 4 × 150 = **€600**
@@ -186,14 +190,15 @@ Analyse van alle 584 echte trades + 68 trades uit de laatste 6 weken onthulde:
 
 ---
 
-### 📍 €1.500 — Grid Uitbreiden naar ETH
+### 📍 €1.500 — Grid Uitbreiden naar ETH + A-S Weer Aan
 
 > **Trigger**: Portfolio ≥ €1.500 stabiel, V2 draait ≥ 3 weken, winrate ≥ 60%.
 
-**Wijziging**: Grid budget omhoog naar €250, ETH erbij
+**Wijziging**: Grid budget omhoog naar €250, ETH erbij, **Avellaneda-Stoikov weer aan** (€250 budget + 2 grids = genoeg levels voor dynamische spacing)
 
 ```json
 {
+  "AVELLANEDA_STOIKOV_GRID": true,
   "GRID_TRADING": {
     "preferred_markets": ["BTC-EUR", "ETH-EUR"],
     "investment_per_grid": 125,

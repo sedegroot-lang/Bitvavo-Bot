@@ -1,0 +1,313 @@
+{
+  "timestamp": 1776272324.9886055,
+  "total_eur_markets": 429,
+  "markets_with_volume": 396,
+  "cascade_state": {
+    "density": 0.25020408163265306,
+    "active": "False",
+    "leaders": [
+      "RED-EUR",
+      "HBAR-EUR",
+      "LINK-EUR",
+      "USDC-EUR",
+      "TRIA-EUR",
+      "WLFI-EUR",
+      "TRUMP-EUR",
+      "GALA-EUR",
+      "PENGU-EUR",
+      "MON-EUR"
+    ],
+    "amplifiers": [
+      "XPL-EUR",
+      "ALGO-EUR",
+      "HYPE-EUR",
+      "MERL-EUR",
+      "RENDER-EUR",
+      "KITE-EUR",
+      "PEPE-EUR",
+      "ENA-EUR",
+      "STO-EUR",
+      "NEAR-EUR",
+      "PENGU-EUR",
+      "AAVE-EUR",
+      "WLD-EUR",
+      "PTB-EUR",
+      "FARTCOIN-EUR",
+      "ARB-EUR",
+      "ENJ-EUR",
+      "WIF-EUR",
+      "RED-EUR",
+      "DOGE-EUR"
+    ]
+  },
+  "top_25_combined": [
+    {
+      "market": "ENJ-EUR",
+      "combined_score": 1362.0102214650767,
+      "opp_score": 908.0068143100511,
+      "cascade": true,
+      "leader": false,
+      "volume_eur": 8551146.516194751,
+      "volatility": 90.80068143100512,
+      "in_bot": false
+    },
+    {
+      "market": "RED-EUR",
+      "combined_score": 576.4330917378222,
+      "opp_score": 295.6067137117037,
+      "cascade": true,
+      "leader": true,
+      "volume_eur": 536369.5200671365,
+      "volatility": 40.36288942143103,
+      "in_bot": false
+    },
+    {
+      "market": "BIO-EUR",
+      "combined_score": 574.3405335534364,
+      "opp_score": 574.3405335534364,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 950258.0835933961,
+      "volatility": 58.91809290953547,
+      "in_bot": false
+    },
+    {
+      "market": "D-EUR",
+      "combined_score": 440.66248553857395,
+      "opp_score": 440.66248553857395,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 1261896.8636480803,
+      "volatility": 44.0662485538574,
+      "in_bot": false
+    },
+    {
+      "market": "XAN-EUR",
+      "combined_score": 426.52431253716975,
+      "opp_score": 426.52431253716975,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 2299676.441194565,
+      "volatility": 42.652431253716976,
+      "in_bot": false
+    },
+    {
+      "market": "TRUST-EUR",
+      "combined_score": 339.9216127332636,
+      "opp_score": 339.9216127332636,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 559183.9266271697,
+      "volatility": 45.45706996199037,
+      "in_bot": false
+    },
+    {
+      "market": "PTB-EUR",
+      "combined_score": 282.03478650033196,
+      "opp_score": 188.02319100022132,
+      "cascade": true,
+      "leader": false,
+      "volume_eur": 869116.551741552,
+      "volatility": 20.16844469399214,
+      "in_bot": false
+    },
+    {
+      "market": "TRIA-EUR",
+      "combined_score": 248.97921075702635,
+      "opp_score": 191.5224698130972,
+      "cascade": false,
+      "leader": true,
+      "volume_eur": 562685.6946713157,
+      "volatility": 25.532115275946506,
+      "in_bot": false
+    },
+    {
+      "market": "MERL-EUR",
+      "combined_score": 218.80489791818314,
+      "opp_score": 145.86993194545542,
+      "cascade": true,
+      "leader": false,
+      "volume_eur": 513787.98233459576,
+      "volatility": 20.350440273948237,
+      "in_bot": false
+    },
+    {
+      "market": "AAVE-EUR",
+      "combined_score": 177.47605770396424,
+      "opp_score": 118.31737180264282,
+      "cascade": true,
+      "leader": false,
+      "volume_eur": 1617636.3691718369,
+      "volatility": 11.831737180264282,
+      "in_bot": false
+    },
+    {
+      "market": "XMN-EUR",
+      "combined_score": 171.0662570730253,
+      "opp_score": 171.0662570730253,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 146498.31739506562,
+      "volatility": 44.69387755102042,
+      "in_bot": false
+    },
+    {
+      "market": "STO-EUR",
+      "combined_score": 165.73284159760095,
+      "opp_score": 110.4885610650673,
+      "cascade": true,
+      "leader": false,
+      "volume_eur": 1002730.5040718194,
+      "volatility": 11.04885610650673,
+      "in_bot": false
+    },
+    {
+      "market": "XION-EUR",
+      "combined_score": 155.05208289777454,
+      "opp_score": 155.05208289777454,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 147012.9836855463,
+      "volatility": 40.43893959148198,
+      "in_bot": false
+    },
+    {
+      "market": "ICNT-EUR",
+      "combined_score": 145.21482329651195,
+      "opp_score": 145.21482329651195,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 419526.3841152792,
+      "volatility": 22.419778172889668,
+      "in_bot": false
+    },
+    {
+      "market": "CHILLGUY-EUR",
+      "combined_score": 136.09341209297503,
+      "opp_score": 136.09341209297503,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 264482.9656451878,
+      "volatility": 26.462949603215506,
+      "in_bot": false
+    },
+    {
+      "market": "NEIRO-EUR",
+      "combined_score": 130.31839742708587,
+      "opp_score": 130.31839742708587,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 540514.9125946838,
+      "volatility": 17.725638599810804,
+      "in_bot": false
+    },
+    {
+      "market": "CTSI-EUR",
+      "combined_score": 128.6175271715938,
+      "opp_score": 128.6175271715938,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 136557.71006129985,
+      "volatility": 34.80503242947566,
+      "in_bot": false
+    },
+    {
+      "market": "ZAMA-EUR",
+      "combined_score": 120.09562655973191,
+      "opp_score": 120.09562655973191,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 336109.54454207985,
+      "volatility": 20.715087381754042,
+      "in_bot": false
+    },
+    {
+      "market": "FARTCOIN-EUR",
+      "combined_score": 119.55868098667091,
+      "opp_score": 79.70578732444727,
+      "cascade": true,
+      "leader": false,
+      "volume_eur": 876517.0109752021,
+      "volatility": 8.513530211293702,
+      "in_bot": false
+    },
+    {
+      "market": "INX-EUR",
+      "combined_score": 115.4357634294974,
+      "opp_score": 115.4357634294974,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 618215.9790986752,
+      "volatility": 14.681494488342612,
+      "in_bot": false
+    },
+    {
+      "market": "PENGU-EUR",
+      "combined_score": 115.16350506413478,
+      "opp_score": 59.05820772519732,
+      "cascade": true,
+      "leader": true,
+      "volume_eur": 633261.3868614887,
+      "volatility": 7.421449885904864,
+      "in_bot": false
+    },
+    {
+      "market": "VVV-EUR",
+      "combined_score": 112.74337558706358,
+      "opp_score": 112.74337558706358,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 271897.70474015997,
+      "volatility": 21.621621621621614,
+      "in_bot": false
+    },
+    {
+      "market": "MBOX-EUR",
+      "combined_score": 110.1096390770944,
+      "opp_score": 110.1096390770944,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 145886.380971868,
+      "volatility": 28.82822902796273,
+      "in_bot": false
+    },
+    {
+      "market": "WLFI-EUR",
+      "combined_score": 100.48120300751863,
+      "opp_score": 77.29323308270664,
+      "cascade": false,
+      "leader": true,
+      "volume_eur": 1145934.279879429,
+      "volatility": 7.729323308270663,
+      "in_bot": false
+    },
+    {
+      "market": "ZBT-EUR",
+      "combined_score": 99.03829574209634,
+      "opp_score": 99.03829574209634,
+      "cascade": false,
+      "leader": false,
+      "volume_eur": 571970.2831055729,
+      "volatility": 13.095329354432472,
+      "in_bot": false
+    }
+  ],
+  "missed_opportunities": [
+    "ENJ-EUR",
+    "RED-EUR",
+    "BIO-EUR",
+    "D-EUR",
+    "XAN-EUR",
+    "TRUST-EUR",
+    "PTB-EUR",
+    "TRIA-EUR",
+    "MERL-EUR",
+    "AAVE-EUR",
+    "XMN-EUR",
+    "STO-EUR",
+    "XION-EUR",
+    "ICNT-EUR",
+    "CHILLGUY-EUR"
+  ],
+  "current_markets": []
+}

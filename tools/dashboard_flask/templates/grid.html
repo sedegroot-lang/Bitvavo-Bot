@@ -35,55 +35,6 @@
         <span class="badge">{{ active_grids|length }} actief</span>
     </div>
     
-    <!-- ETH-EUR Strategy Card (if available and not yet activated) -->
-    {% if eth_strategy %}
-    <!-- DEBUG: eth_strategy IS loaded -->
-    {% if 'ETH-EUR' not in (active_grids | map(attribute='market') | list) %}
-    <div class="recommended-strategy glass-panel" style="background: linear-gradient(135deg, rgba(52, 152, 219, 0.1), rgba(46, 204, 113, 0.1)); border: 2px solid var(--accent-primary); margin-bottom: var(--spacing-lg);">
-        <div class="strategy-badge">🎯 AANBEVOLEN STRATEGIE</div>
-        <div class="strategy-header">
-            <h3>{{ eth_strategy.market }} Grid Bot</h3>
-            <span class="strategy-mode">{{ eth_strategy.mode|upper|replace('_', ' ') }}</span>
-        </div>
-        <div class="strategy-description">
-            {{ eth_strategy.strategy_rationale.market_selection }}
-        </div>
-        <div class="strategy-stats-grid">
-            <div class="strategy-stat">
-                <div class="stat-label">💰 Investering</div>
-                <div class="stat-value">€{{ "%.2f"|format(eth_strategy.investment.total_eur) }}</div>
-                <div class="stat-hint">{{ eth_strategy.investment.reason[:50] }}...</div>
-            </div>
-            <div class="strategy-stat">
-                <div class="stat-label">📊 Grid Niveaus</div>
-                <div class="stat-value">{{ eth_strategy.grid_settings.num_grids }}</div>
-                <div class="stat-hint">{{ eth_strategy.grid_settings.grid_mode|title }} spacing</div>
-            </div>
-            <div class="strategy-stat">
-                <div class="stat-label">📈 Prijsbereik</div>
-                <div class="stat-value">±{{ eth_strategy.grid_settings.range_pct }}%</div>
-                <div class="stat-hint">€{{ "%.2f"|format(eth_strategy.grid_settings.lower_price) }} - €{{ "%.2f"|format(eth_strategy.grid_settings.upper_price) }}</div>
-            </div>
-            <div class="strategy-stat">
-                <div class="stat-label">🎯 Gesch. Maandelijks ROI</div>
-                <div class="stat-value text-success">+{{ "%.0f"|format(eth_strategy.expected_performance.monthly_roi_pct) }}%</div>
-                <div class="stat-hint">€{{ "%.2f"|format(eth_strategy.expected_performance.estimated_monthly_profit) }}/month</div>
-            </div>
-        </div>
-        <div class="strategy-actions" style="display: flex; gap: var(--spacing-md); margin-top: var(--spacing-md);">
-            <button class="btn btn-primary" onclick="activateETHGrid()" style="flex: 1;">
-                ⚡ Activeer ETH-EUR Grid
-            </button>
-            <button class="btn btn-secondary" onclick="viewETHStrategy()">
-                📋 Bekijk Details
-            </button>
-        </div>
-    </div>
-    {% endif %}
-    {% else %}
-    <!-- ETH Strategy not available - no debug visible in production -->
-    {% endif %}
-    
     <div class="grid-cards">
         {% if active_grids %}
             {% for grid in active_grids %}

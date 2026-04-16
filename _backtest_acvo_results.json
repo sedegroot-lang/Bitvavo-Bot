@@ -1,0 +1,610 @@
+{
+  "n_trades": 788,
+  "period_days": 189,
+  "oos_days": 55,
+  "full": {
+    "A) Current: BASE=150, 5 slots, DCA reserve/trade": {
+      "name": "A) Current: BASE=150, 5 slots, DCA reserve/trade",
+      "total_profit": -955.08,
+      "trades_opened": 138,
+      "trades_skipped": 650,
+      "total_trades": 788,
+      "hit_rate": 17.512690355329948,
+      "max_concurrent": 4,
+      "final_eur": 272.92,
+      "min_eur": 152.92,
+      "max_drawdown": 955.08,
+      "profit_per_day": -5.05,
+      "profit_per_week": -35.37,
+      "profit_per_month": -151.6
+    },
+    "A2) Realistic current: BASE=150, 5 slots, no DCA res": {
+      "name": "A2) Realistic current: BASE=150, 5 slots, no DCA res",
+      "total_profit": -1083.36,
+      "trades_opened": 150,
+      "trades_skipped": 638,
+      "total_trades": 788,
+      "hit_rate": 19.035532994923855,
+      "max_concurrent": 5,
+      "final_eur": 144.64,
+      "min_eur": 24.64,
+      "max_drawdown": 1083.36,
+      "profit_per_day": -5.73,
+      "profit_per_week": -40.12,
+      "profit_per_month": -171.96
+    },
+    "B) ACVO: velocity-sized, 7 slots, pooled DCA": {
+      "name": "B) ACVO: velocity-sized, 7 slots, pooled DCA",
+      "total_profit": 3405.83,
+      "trades_opened": 696,
+      "trades_skipped": 92,
+      "total_trades": 788,
+      "hit_rate": 88.3248730964467,
+      "max_concurrent": 7,
+      "final_eur": 4633.83,
+      "min_eur": 256.48,
+      "max_drawdown": 1382.39,
+      "profit_per_day": 18.02,
+      "profit_per_week": 126.14,
+      "profit_per_month": 540.61
+    },
+    "C) ACVO Aggressive: vel+WR sized, 6 slots": {
+      "name": "C) ACVO Aggressive: vel+WR sized, 6 slots",
+      "total_profit": 5372.26,
+      "trades_opened": 695,
+      "trades_skipped": 93,
+      "total_trades": 788,
+      "hit_rate": 88.19796954314721,
+      "max_concurrent": 6,
+      "final_eur": 6600.26,
+      "min_eur": 250.19,
+      "max_drawdown": 1157.07,
+      "profit_per_day": 28.42,
+      "profit_per_week": 198.97,
+      "profit_per_month": 852.74
+    },
+    "D) Velocity Filter: skip negative-vel markets": {
+      "name": "D) Velocity Filter: skip negative-vel markets",
+      "total_profit": 3920.88,
+      "trades_opened": 325,
+      "trades_skipped": 463,
+      "total_trades": 788,
+      "hit_rate": 41.243654822335024,
+      "max_concurrent": 5,
+      "final_eur": 5148.88,
+      "min_eur": 478.0,
+      "max_drawdown": 109.91,
+      "profit_per_day": 20.75,
+      "profit_per_week": 145.22,
+      "profit_per_month": 622.36
+    },
+    "E) More slots: BASE=120, 8 slots, 15% reserve": {
+      "name": "E) More slots: BASE=120, 8 slots, 15% reserve",
+      "total_profit": -945.09,
+      "trades_opened": 157,
+      "trades_skipped": 631,
+      "total_trades": 788,
+      "hit_rate": 19.923857868020303,
+      "max_concurrent": 8,
+      "final_eur": 282.91,
+      "min_eur": 186.91,
+      "max_drawdown": 945.09,
+      "profit_per_day": -5.0,
+      "profit_per_week": -35.0,
+      "profit_per_month": -150.01
+    },
+    "F) HYBRID: vel-filter + ACVO + adaptive pool": {
+      "name": "F) HYBRID: vel-filter + ACVO + adaptive pool",
+      "total_profit": 7157.6,
+      "trades_opened": 326,
+      "trades_skipped": 462,
+      "total_trades": 788,
+      "hit_rate": 41.370558375634516,
+      "max_concurrent": 6,
+      "final_eur": 8385.6,
+      "min_eur": 496.18,
+      "max_drawdown": 105.48,
+      "profit_per_day": 37.87,
+      "profit_per_week": 265.1,
+      "profit_per_month": 1136.13
+    }
+  },
+  "oos": {
+    "A) Current: BASE=150, 5 slots, DCA reserve/trade": {
+      "name": "A) Current: BASE=150, 5 slots, DCA reserve/trade",
+      "total_profit": -953.24,
+      "trades_opened": 62,
+      "trades_skipped": 175,
+      "total_trades": 237,
+      "hit_rate": 26.160337552742618,
+      "max_concurrent": 0,
+      "final_eur": 274.76,
+      "min_eur": 154.76,
+      "max_drawdown": 1541.13,
+      "profit_per_day": -17.33,
+      "profit_per_week": -121.32,
+      "profit_per_month": -519.95
+    },
+    "A2) Realistic current: BASE=150, 5 slots, no DCA res": {
+      "name": "A2) Realistic current: BASE=150, 5 slots, no DCA res",
+      "total_profit": -1103.24,
+      "trades_opened": 67,
+      "trades_skipped": 170,
+      "total_trades": 237,
+      "hit_rate": 28.270042194092827,
+      "max_concurrent": 0,
+      "final_eur": 124.76,
+      "min_eur": 4.76,
+      "max_drawdown": 1691.13,
+      "profit_per_day": -20.06,
+      "profit_per_week": -140.41,
+      "profit_per_month": -601.77
+    },
+    "B) ACVO: velocity-sized, 7 slots, pooled DCA": {
+      "name": "B) ACVO: velocity-sized, 7 slots, pooled DCA",
+      "total_profit": -184.36,
+      "trades_opened": 237,
+      "trades_skipped": 0,
+      "total_trades": 237,
+      "hit_rate": 100.0,
+      "max_concurrent": 0,
+      "final_eur": 1043.64,
+      "min_eur": 823.88,
+      "max_drawdown": 1383.13,
+      "profit_per_day": -3.35,
+      "profit_per_week": -23.46,
+      "profit_per_month": -100.56
+    },
+    "C) ACVO Aggressive: vel+WR sized, 6 slots": {
+      "name": "C) ACVO Aggressive: vel+WR sized, 6 slots",
+      "total_profit": 340.78,
+      "trades_opened": 237,
+      "trades_skipped": 0,
+      "total_trades": 237,
+      "hit_rate": 100.0,
+      "max_concurrent": 0,
+      "final_eur": 1568.78,
+      "min_eur": 928.0,
+      "max_drawdown": 1153.02,
+      "profit_per_day": 6.2,
+      "profit_per_week": 43.37,
+      "profit_per_month": 185.88
+    },
+    "D) Velocity Filter: skip negative-vel markets": {
+      "name": "D) Velocity Filter: skip negative-vel markets",
+      "total_profit": 787.82,
+      "trades_opened": 31,
+      "trades_skipped": 206,
+      "total_trades": 237,
+      "hit_rate": 13.080168776371309,
+      "max_concurrent": 0,
+      "final_eur": 2015.82,
+      "min_eur": 1078.0,
+      "max_drawdown": 33.81,
+      "profit_per_day": 14.32,
+      "profit_per_week": 100.27,
+      "profit_per_month": 429.72
+    },
+    "E) More slots: BASE=120, 8 slots, 15% reserve": {
+      "name": "E) More slots: BASE=120, 8 slots, 15% reserve",
+      "total_profit": -930.59,
+      "trades_opened": 69,
+      "trades_skipped": 168,
+      "total_trades": 237,
+      "hit_rate": 29.11392405063291,
+      "max_concurrent": 0,
+      "final_eur": 297.41,
+      "min_eur": 201.41,
+      "max_drawdown": 1400.9,
+      "profit_per_day": -16.92,
+      "profit_per_week": -118.44,
+      "profit_per_month": -507.6
+    },
+    "F) HYBRID: vel-filter + ACVO + adaptive pool": {
+      "name": "F) HYBRID: vel-filter + ACVO + adaptive pool",
+      "total_profit": 1390.65,
+      "trades_opened": 31,
+      "trades_skipped": 206,
+      "total_trades": 237,
+      "hit_rate": 13.080168776371309,
+      "max_concurrent": 0,
+      "final_eur": 2618.65,
+      "min_eur": 948.0,
+      "max_drawdown": 26.51,
+      "profit_per_day": 25.28,
+      "profit_per_week": 176.99,
+      "profit_per_month": 758.54
+    }
+  },
+  "best_full": "F) HYBRID: vel-filter + ACVO + adaptive pool",
+  "best_oos": "F) HYBRID: vel-filter + ACVO + adaptive pool",
+  "velocities": {
+    "IMX-EUR": {
+      "velocity": -0.001,
+      "profit_per_trade": -5.7095,
+      "avg_invested": 19.9167,
+      "avg_hold_h": 573.6693,
+      "winrate": 0.0,
+      "n": 4,
+      "total_profit": -22.838
+    },
+    "MIRA-EUR": {
+      "velocity": -0.0009,
+      "profit_per_trade": -7.5387,
+      "avg_invested": 7.5387,
+      "avg_hold_h": 1130.1662,
+      "winrate": 0.0,
+      "n": 3,
+      "total_profit": -22.6161
+    },
+    "NOM-EUR": {
+      "velocity": 0.0,
+      "profit_per_trade": 0.0864,
+      "avg_invested": 8.7157,
+      "avg_hold_h": 1146.4751,
+      "winrate": 0.6667,
+      "n": 3,
+      "total_profit": 0.2593
+    },
+    "SAND-EUR": {
+      "velocity": -0.0004,
+      "profit_per_trade": -3.4631,
+      "avg_invested": 8.9503,
+      "avg_hold_h": 1050.3201,
+      "winrate": 0.3333,
+      "n": 3,
+      "total_profit": -10.3892
+    },
+    "CROSS-EUR": {
+      "velocity": -0.0006,
+      "profit_per_trade": -6.0333,
+      "avg_invested": 8.7093,
+      "avg_hold_h": 1130.6034,
+      "winrate": 0.0,
+      "n": 3,
+      "total_profit": -18.0998
+    },
+    "ATOM-EUR": {
+      "velocity": -0.0016,
+      "profit_per_trade": -2.0068,
+      "avg_invested": 15.4444,
+      "avg_hold_h": 122.8057,
+      "winrate": 0.0909,
+      "n": 11,
+      "total_profit": -22.0743
+    },
+    "ARB-EUR": {
+      "velocity": -0.0007,
+      "profit_per_trade": -1.831,
+      "avg_invested": 19.3063,
+      "avg_hold_h": 249.0525,
+      "winrate": 0.4,
+      "n": 5,
+      "total_profit": -9.1549
+    },
+    "SNX-EUR": {
+      "velocity": -0.0004,
+      "profit_per_trade": -0.4744,
+      "avg_invested": 16.1349,
+      "avg_hold_h": 132.2616,
+      "winrate": 0.5714,
+      "n": 7,
+      "total_profit": -3.3206
+    },
+    "ADA-EUR": {
+      "velocity": -0.0021,
+      "profit_per_trade": -1.3059,
+      "avg_invested": 17.4378,
+      "avg_hold_h": 67.8563,
+      "winrate": 0.3846,
+      "n": 13,
+      "total_profit": -16.9772
+    },
+    "OP-EUR": {
+      "velocity": -0.0006,
+      "profit_per_trade": -0.4718,
+      "avg_invested": 23.1005,
+      "avg_hold_h": 23.0385,
+      "winrate": 0.4286,
+      "n": 7,
+      "total_profit": -3.3024
+    },
+    "DOT-EUR": {
+      "velocity": -0.0002,
+      "profit_per_trade": -0.0584,
+      "avg_invested": 16.5943,
+      "avg_hold_h": 19.8257,
+      "winrate": 0.6,
+      "n": 15,
+      "total_profit": -0.8754
+    },
+    "LINK-EUR": {
+      "velocity": -0.0039,
+      "profit_per_trade": -0.3006,
+      "avg_invested": 18.5078,
+      "avg_hold_h": 3.7638,
+      "winrate": 0.7692,
+      "n": 52,
+      "total_profit": -15.6307
+    },
+    "SOL-EUR": {
+      "velocity": -0.0233,
+      "profit_per_trade": -1.954,
+      "avg_invested": 21.3977,
+      "avg_hold_h": 6.3769,
+      "winrate": 0.44,
+      "n": 25,
+      "total_profit": -48.8495
+    },
+    "UNI-EUR": {
+      "velocity": 0.0004,
+      "profit_per_trade": 0.0889,
+      "avg_invested": 24.5815,
+      "avg_hold_h": 19.2124,
+      "winrate": 0.7778,
+      "n": 18,
+      "total_profit": 1.6002
+    },
+    "AVAX-EUR": {
+      "velocity": -0.0193,
+      "profit_per_trade": -0.7738,
+      "avg_invested": 36.7769,
+      "avg_hold_h": 4.084,
+      "winrate": 0.5294,
+      "n": 17,
+      "total_profit": -13.1554
+    },
+    "INJ-EUR": {
+      "velocity": -0.003,
+      "profit_per_trade": -0.766,
+      "avg_invested": 19.7149,
+      "avg_hold_h": 6.6899,
+      "winrate": 0.3529,
+      "n": 17,
+      "total_profit": -13.0214
+    },
+    "XRP-EUR": {
+      "velocity": 0.0072,
+      "profit_per_trade": 0.1491,
+      "avg_invested": 33.7356,
+      "avg_hold_h": 1.9633,
+      "winrate": 0.6429,
+      "n": 28,
+      "total_profit": 4.1751
+    },
+    "NEAR-EUR": {
+      "velocity": 308.7064,
+      "profit_per_trade": 0.0552,
+      "avg_invested": 52.9145,
+      "avg_hold_h": 0.0,
+      "winrate": 0.6429,
+      "n": 14,
+      "total_profit": 0.7727
+    },
+    "ALGO-EUR": {
+      "velocity": -62.6332,
+      "profit_per_trade": -0.0175,
+      "avg_invested": 65.421,
+      "avg_hold_h": 0.0,
+      "winrate": 0.6429,
+      "n": 14,
+      "total_profit": -0.245
+    },
+    "BTC-EUR": {
+      "velocity": -20314.0146,
+      "profit_per_trade": -9.1293,
+      "avg_invested": 48.9969,
+      "avg_hold_h": 0.0,
+      "winrate": 0.013,
+      "n": 77,
+      "total_profit": -702.9584
+    },
+    "ETH-EUR": {
+      "velocity": -44347.1297,
+      "profit_per_trade": -9.2448,
+      "avg_invested": 49.5064,
+      "avg_hold_h": 0.0,
+      "winrate": 0.0132,
+      "n": 76,
+      "total_profit": -702.606
+    },
+    "FET-EUR": {
+      "velocity": -418.2962,
+      "profit_per_trade": -0.0105,
+      "avg_invested": 15.2774,
+      "avg_hold_h": 0.0,
+      "winrate": 0.8571,
+      "n": 7,
+      "total_profit": -0.0735
+    },
+    "ENA-EUR": {
+      "velocity": -186128.3556,
+      "profit_per_trade": -6.6309,
+      "avg_invested": 21.3499,
+      "avg_hold_h": 0.0,
+      "winrate": 0.4,
+      "n": 5,
+      "total_profit": -33.1544
+    },
+    "TIA-EUR": {
+      "velocity": -38410.0126,
+      "profit_per_trade": -2.7642,
+      "avg_invested": 22.4774,
+      "avg_hold_h": 0.0,
+      "winrate": 0.3333,
+      "n": 3,
+      "total_profit": -8.2927
+    },
+    "PEPE-EUR": {
+      "velocity": -18203.2015,
+      "profit_per_trade": -0.6232,
+      "avg_invested": 16.6569,
+      "avg_hold_h": 0.0,
+      "winrate": 0.4,
+      "n": 5,
+      "total_profit": -3.1158
+    },
+    "POL-EUR": {
+      "velocity": -9411.8077,
+      "profit_per_trade": -0.4402,
+      "avg_invested": 14.515,
+      "avg_hold_h": 0.0,
+      "winrate": 0.5,
+      "n": 8,
+      "total_profit": -3.5213
+    },
+    "APT-EUR": {
+      "velocity": 511.2075,
+      "profit_per_trade": 0.0428,
+      "avg_invested": 27.1162,
+      "avg_hold_h": 0.0,
+      "winrate": 0.8333,
+      "n": 6,
+      "total_profit": 0.2565
+    },
+    "RENDER-EUR": {
+      "velocity": -904.4461,
+      "profit_per_trade": -0.068,
+      "avg_invested": 15.6392,
+      "avg_hold_h": 0.0,
+      "winrate": 0.6667,
+      "n": 9,
+      "total_profit": -0.6122
+    },
+    "MOODENG-EUR": {
+      "velocity": 4583.9627,
+      "profit_per_trade": 1.6368,
+      "avg_invested": 155.9063,
+      "avg_hold_h": 0.0,
+      "winrate": 0.9565,
+      "n": 23,
+      "total_profit": 37.6458
+    },
+    "S-EUR": {
+      "velocity": 36020.0984,
+      "profit_per_trade": 0.328,
+      "avg_invested": 8.833,
+      "avg_hold_h": 0.0,
+      "winrate": 0.75,
+      "n": 4,
+      "total_profit": 1.312
+    },
+    "KAVA-EUR": {
+      "velocity": -14969.5567,
+      "profit_per_trade": -0.6626,
+      "avg_invested": 28.01,
+      "avg_hold_h": 0.0,
+      "winrate": 0.25,
+      "n": 4,
+      "total_profit": -2.6505
+    },
+    "THQ-EUR": {
+      "velocity": 9331.0438,
+      "profit_per_trade": 1.8105,
+      "avg_invested": 84.174,
+      "avg_hold_h": 0.0,
+      "winrate": 1.0,
+      "n": 3,
+      "total_profit": 5.4314
+    },
+    "PTB-EUR": {
+      "velocity": 11839.6771,
+      "profit_per_trade": 3.2556,
+      "avg_invested": 142.7381,
+      "avg_hold_h": 0.0,
+      "winrate": 1.0,
+      "n": 21,
+      "total_profit": 68.3668
+    },
+    "WIF-EUR": {
+      "velocity": 80631.1263,
+      "profit_per_trade": 5.8535,
+      "avg_invested": 31.6262,
+      "avg_hold_h": 0.0,
+      "winrate": 1.0,
+      "n": 94,
+      "total_profit": 550.2307
+    },
+    "ACT-EUR": {
+      "velocity": 4194.0831,
+      "profit_per_trade": 0.9048,
+      "avg_invested": 98.1201,
+      "avg_hold_h": 0.0,
+      "winrate": 1.0,
+      "n": 31,
+      "total_profit": 28.0488
+    },
+    "CELR-EUR": {
+      "velocity": 45262.4693,
+      "profit_per_trade": 1.7817,
+      "avg_invested": 29.5877,
+      "avg_hold_h": 0.0,
+      "winrate": 1.0,
+      "n": 3,
+      "total_profit": 5.345
+    },
+    "JASMY-EUR": {
+      "velocity": 180343.2729,
+      "profit_per_trade": 8.9061,
+      "avg_invested": 27.8397,
+      "avg_hold_h": 0.0,
+      "winrate": 0.5,
+      "n": 4,
+      "total_profit": 35.6244
+    },
+    "AAVE-EUR": {
+      "velocity": -12595.0582,
+      "profit_per_trade": -1.3614,
+      "avg_invested": 43.015,
+      "avg_hold_h": 0.0,
+      "winrate": 0.4,
+      "n": 5,
+      "total_profit": -6.8069
+    },
+    "LTC-EUR": {
+      "velocity": 33977.3019,
+      "profit_per_trade": 3.4834,
+      "avg_invested": 36.5028,
+      "avg_hold_h": 0.0,
+      "winrate": 0.875,
+      "n": 8,
+      "total_profit": 27.8673
+    },
+    "ZEUS-EUR": {
+      "velocity": 228614.0053,
+      "profit_per_trade": 60.0632,
+      "avg_invested": 75.8698,
+      "avg_hold_h": 0.0,
+      "winrate": 1.0,
+      "n": 8,
+      "total_profit": 480.5059
+    },
+    "TAO-EUR": {
+      "velocity": 3005.0225,
+      "profit_per_trade": 0.9174,
+      "avg_invested": 169.1807,
+      "avg_hold_h": 0.0,
+      "winrate": 0.6667,
+      "n": 3,
+      "total_profit": 2.7522
+    },
+    "BCH-EUR": {
+      "velocity": -4623.9507,
+      "profit_per_trade": -0.2495,
+      "avg_invested": 25.0933,
+      "avg_hold_h": 0.0,
+      "winrate": 0.75,
+      "n": 4,
+      "total_profit": -0.9981
+    },
+    "DOGE-EUR": {
+      "velocity": -479.6872,
+      "profit_per_trade": -0.0888,
+      "avg_invested": 85.9572,
+      "avg_hold_h": 0.0,
+      "winrate": 0.8,
+      "n": 5,
+      "total_profit": -0.4442
+    }
+  }
+}
