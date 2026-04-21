@@ -5,6 +5,29 @@
 
 ---
 
+## #036 — /set Telegram commando schrijft naar verkeerde config-laag (2026-04-21)
+
+### Symptom
+`/set BASE_AMOUNT_EUR 1000` (of andere keys) via Telegram had geen effect: de bot startte trades met het oude bedrag. Ookzag `/config` afwijkende waarden t.o.v. wat de bot echt gebruikte.
+
+### Root Cause
+`_load_config()` in `telegram_handler.py` las alleen layer 1 (`config/bot_config.json`, OneDrive). `_save_config()` schreef ook alleen naar layer 1. Maar de bot's runtime config is de 3-laags merged result waarbij **layer 3 (`LOCAL_OVERRIDE_PATH`) altijd wint**. Als layer 3 `BASE_AMOUNT_EUR = 127` had, overschreef die layer 3 elke write naar layer 1 bij de volgende `load_config()`.
+
+### Fix Applied
+| File | Change |
+|------|--------|
+| `modules/telegram_handler.py` | `_load_config()` roept nu `modules.config.load_config()` aan (volledige 3-laags merge) zodat alle Telegram-commando's de echte bot-waarden tonen |
+| `modules/telegram_handler.py` | `_save_config()` verwijderd; vervangen door `_save_local_override(key, value)` die alleen de gewijzigde key naar `LOCAL_OVERRIDE_PATH` (layer 3) schrijft — wint over alles, nooit teruggedraaid door OneDrive |
+| `modules/telegram_handler.py` | `_apply_set_command()` gebruikt nu `_save_local_override()` i.p.v. read-modify-write op layer 1 |
+| `modules/telegram_handler.py` | `_save_chat_id()` gebruikt nu ook `_save_local_override()` |
+| `modules/telegram_handler.py` | `BUDGET_RESERVATION.*` keys toegevoegd aan `ALLOWED_KEYS` (trailing_pct, grid_pct, reserve_pct, min_reserve_eur, mode) |
+| `modules/telegram_handler.py` | Success message bijgewerkt: "Actief na volgende bot-loop (~25s)" i.p.v. "Herstart bot" |
+
+### Lesson
+`/set` moet altijd schrijven naar `LOCAL_OVERRIDE_PATH` (layer 3). Lees-modify-write op layer 1 werkt nooit betrouwbaar omdat layer 3 alles overschrijft. Gebruik altijd `_save_local_override()` voor config-aanpassingen via Telegram.
+
+---
+
 ## #035 — Nieuw: /update Telegram commando (git pull + herstart) (2026-04-21)
 
 ### Symptom

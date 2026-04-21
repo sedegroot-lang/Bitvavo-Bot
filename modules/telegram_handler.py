@@ -47,25 +47,47 @@ _watch_initialized = False
 # Config helpers
 # ──────────────────────────────────────────
 def _load_config() -> dict:
+    """Laad de volledige (3-laags) merged config zoals de bot die zelf gebruikt."""
     try:
-        with open(CONFIG_PATH, encoding="utf-8") as f:
-            return json.load(f)
+        from modules.config import load_config as _real_load
+        return _real_load()
     except Exception as e:
         logger.error(f"[Telegram] Config laden mislukt: {e}")
-        return {}
+        try:
+            with open(CONFIG_PATH, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
 
 
-def _save_config(cfg: dict) -> None:
+def _save_local_override(key_upper: str, parsed_value) -> None:
+    """Schrijf één config-key direct naar LOCAL_OVERRIDE_PATH (layer 3).
+
+    Layer 3 wint over alle andere lagen en wordt nooit door OneDrive teruggedraaid.
+    Dot-notatie (bijv. GRID_TRADING.enabled) wordt vertaald naar een geneste dict.
+    """
+    from modules.config import LOCAL_OVERRIDE_PATH
+    local_path = Path(LOCAL_OVERRIDE_PATH)
     try:
-        from modules.config import save_config as _real_save
-        _real_save(cfg)
-    except Exception as e:
-        logger.warning(f"[Telegram] Fallback to direct write: {e}")
-        import tempfile
-        tmp = str(CONFIG_PATH) + '.tmp'
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2, ensure_ascii=False)
-        os.replace(tmp, str(CONFIG_PATH))
+        local_overrides = json.loads(local_path.read_text(encoding="utf-8-sig")) if local_path.exists() else {}
+        if not isinstance(local_overrides, dict):
+            local_overrides = {}
+    except Exception:
+        local_overrides = {}
+
+    if "." in key_upper:
+        parent, child = key_upper.split(".", 1)
+        if parent not in local_overrides or not isinstance(local_overrides[parent], dict):
+            local_overrides[parent] = {}
+        local_overrides[parent][child] = parsed_value
+    else:
+        local_overrides[key_upper] = parsed_value
+
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = str(local_path) + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(local_overrides, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, str(local_path))
 
 
 def _reload_credentials() -> None:
@@ -77,9 +99,7 @@ def _reload_credentials() -> None:
 
 def _save_chat_id(chat_id: str) -> None:
     global _chat_id
-    cfg = _load_config()
-    cfg["TELEGRAM_CHAT_ID"] = chat_id
-    _save_config(cfg)
+    _save_local_override("TELEGRAM_CHAT_ID", chat_id)
     _chat_id = chat_id
     logger.info(f"[Telegram] Chat ID opgeslagen: {chat_id}")
 
@@ -314,6 +334,11 @@ ALLOWED_KEYS = {
     "DEFAULT_TRAILING": float,
     "TRAILING_ACTIVATION_PCT": float,
     "ALERT_DEDUPE_SECONDS": int,
+    "BUDGET_RESERVATION.trailing_pct": float,
+    "BUDGET_RESERVATION.grid_pct": float,
+    "BUDGET_RESERVATION.reserve_pct": float,
+    "BUDGET_RESERVATION.min_reserve_eur": float,
+    "BUDGET_RESERVATION.mode": str,
 }
 
 
@@ -327,15 +352,14 @@ def _apply_set_command(key: str, value: str) -> str:
         )
     try:
         typ = ALLOWED_KEYS[key_upper]
-        parsed = value.lower() in ("true", "1", "yes", "ja", "aan", "on") if typ == bool else typ(value)
-        cfg = _load_config()
-        if "." in key_upper:
-            parent, child = key_upper.split(".", 1)
-            cfg.setdefault(parent, {})[child] = parsed
+        if typ == bool:
+            parsed = value.lower() in ("true", "1", "yes", "ja", "aan", "on")
+        elif typ == str:
+            parsed = value
         else:
-            cfg[key_upper] = parsed
-        _save_config(cfg)
-        return f"✅ <code>{key_upper}</code> = <code>{parsed}</code>\n⚠️ Herstart bot voor sommige parameters."
+            parsed = typ(value)
+        _save_local_override(key_upper, parsed)
+        return f"✅ <code>{key_upper}</code> = <code>{parsed}</code>\n⏱️ Actief na volgende bot-loop (~25s)."
     except Exception as e:
         return f"❌ Fout bij instellen: {e}"
 
@@ -1015,7 +1039,7 @@ def _handle_command(text: str):
             "<b>Voorbeelden:</b>\n"
             "  <code>/set BASE_AMOUNT_EUR 15</code>\n"
             "  <code>/set DCA_ENABLED true</code>\n"
-            "  <code>/set HARD_SL_ALT_PCT 0.05</code>\n"
+            "  <code>/set BUDGET_RESERVATION.trailing_pct 80</code>\n"
             "  <code>/market SOL</code>"
         )
     elif cmd == "/status":
