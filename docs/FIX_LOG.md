@@ -5,6 +5,23 @@
 
 ---
 
+## #035 — Nieuw: /update Telegram commando (git pull + herstart) (2026-04-21)
+
+### Symptom
+Geen manier om code-updates op de crypto laptop te deployen zonder fysieke toegang (geen `git pull` mogelijk op afstand).
+
+### Fix Applied
+| File | Change |
+|------|--------|
+| `modules/telegram_handler.py` | Nieuwe functie `_git_pull_and_restart()`: voert `git pull` uit in `BASE_DIR`, stuurt uitvoer als Telegram-bericht, en roept `_restart_bot()` aan bij succes |
+| `modules/telegram_handler.py` | `/update` commando toegevoegd aan command handler en `/help` tekst |
+| `modules/telegram_handler.py` | Module docstring bijgewerkt met `/update` |
+
+### Lesson
+Bij een `git pull` fout (exit code ≠ 0) wordt de bot NIET herstart — de foutmelding wordt via Telegram gestuurd zodat de gebruiker het kan oplossen.
+
+---
+
 ## #034 — Shadow tracker crash on string timestamps in closed_trades (2026-04-15)
 
 ### Symptom

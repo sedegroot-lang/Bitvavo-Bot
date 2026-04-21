@@ -3,7 +3,7 @@ Telegram Handler voor Bitvavo Bot
 - Notificaties via Bot API
 - Polling voor commands (geen extra library nodig)
 - Auto-alerts: buy, sell, stop-loss, errors
-- Commands: /start /help /status /log /trades /profit /stop /restart /set
+- Commands: /start /help /status /log /trades /profit /stop /restart /update /set
             /trailing /dca /grid /balance /config /orders /performance
 """
 
@@ -404,6 +404,43 @@ def _restart_bot() -> None:
             )
         except Exception as e:
             logger.error(f"[Telegram] Herstart mislukt: {e}")
+    t = threading.Thread(target=_do, daemon=False)
+    t.start()
+
+
+def _git_pull_and_restart() -> None:
+    """Voer git pull uit in BASE_DIR en herstart daarna de bot.
+
+    Stuurt een Telegram-bericht met de uitvoer van git pull.
+    Bij een fout wordt een foutmelding gestuurd en wordt NIET herstart.
+    """
+    def _do():
+        time.sleep(1)
+        try:
+            result = subprocess.run(
+                ["git", "pull"],
+                cwd=str(BASE_DIR),
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            output = (result.stdout or "").strip() or (result.stderr or "").strip() or "(geen uitvoer)"
+            if result.returncode != 0:
+                send_message(
+                    f"❌ <b>git pull mislukt (code {result.returncode}):</b>\n<pre>{output[:500]}</pre>\n"
+                    "Bot wordt <b>niet</b> herstart."
+                )
+                return
+            send_message(
+                f"✅ <b>git pull geslaagd:</b>\n<pre>{output[:500]}</pre>\n"
+                "🔄 Bot wordt nu herstart…"
+            )
+            time.sleep(2)
+            _restart_bot()
+        except Exception as e:
+            send_message(f"❌ <b>Update mislukt:</b> {e}")
+            logger.error(f"[Telegram] /update mislukt: {e}")
+
     t = threading.Thread(target=_do, daemon=False)
     t.start()
 
@@ -973,7 +1010,8 @@ def _handle_command(text: str):
             "/set KEY VALUE — Parameter aanpassen\n"
             "/log [n] — Laatste n log regels (max 50)\n"
             "/stop — Bot stoppen\n"
-            "/restart — Bot herstarten\n\n"
+            "/restart — Bot herstarten\n"
+            "/update — git pull + herstart\n\n"
             "<b>Voorbeelden:</b>\n"
             "  <code>/set BASE_AMOUNT_EUR 15</code>\n"
             "  <code>/set DCA_ENABLED true</code>\n"
@@ -1020,6 +1058,10 @@ def _handle_command(text: str):
     elif cmd == "/restart":
         send_message("🔄 <b>Bot wordt herstart...</b>\nNa ~10 seconden is hij weer actief.")
         _restart_bot()
+        return
+    elif cmd == "/update":
+        send_message("⬇️ <b>Update ophalen via git pull…</b>")
+        _git_pull_and_restart()
         return
     elif cmd == "/set":
         if len(parts) < 3:
