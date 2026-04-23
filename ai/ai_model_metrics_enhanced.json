@@ -1,74 +1,74 @@
 {
-  "trained_at": 1776361886,
-  "samples_total": 194,
-  "samples_train": 155,
-  "samples_test": 39,
-  "positive_ratio": 0.5103092783505154,
-  "cv_auc_mean": 0.917590027700831,
-  "cv_auc_std": 0.03732166590133838,
-  "test_accuracy": 0.7948717948717948,
-  "test_auc": 0.8763157894736842,
-  "test_precision_0": 0.7037037037037037,
-  "test_precision_1": 1.0,
-  "test_recall_1": 0.6,
-  "test_f1_1": 0.75,
+  "trained_at": 1776925294,
+  "samples_total": 500,
+  "samples_train": 400,
+  "samples_test": 100,
+  "positive_ratio": 0.64,
+  "cv_auc_mean": 0.4800347222222222,
+  "cv_auc_std": 0.025210999533780615,
+  "test_accuracy": 0.63,
+  "test_auc": 0.5859374999999999,
+  "test_precision_0": 0.4864864864864865,
+  "test_precision_1": 0.7142857142857143,
+  "test_recall_1": 0.703125,
+  "test_f1_1": 0.7086614173228346,
   "classification_report": {
     "0": {
-      "precision": 0.7037037037037037,
-      "recall": 1.0,
-      "f1-score": 0.8260869565217391,
-      "support": 19.0
+      "precision": 0.4864864864864865,
+      "recall": 0.5,
+      "f1-score": 0.4931506849315068,
+      "support": 36.0
     },
     "1": {
-      "precision": 1.0,
-      "recall": 0.6,
-      "f1-score": 0.75,
-      "support": 20.0
+      "precision": 0.7142857142857143,
+      "recall": 0.703125,
+      "f1-score": 0.7086614173228346,
+      "support": 64.0
     },
-    "accuracy": 0.7948717948717948,
+    "accuracy": 0.63,
     "macro avg": {
-      "precision": 0.8518518518518519,
-      "recall": 0.8,
-      "f1-score": 0.7880434782608696,
-      "support": 39.0
+      "precision": 0.6003861003861004,
+      "recall": 0.6015625,
+      "f1-score": 0.6009060511271707,
+      "support": 100.0
     },
     "weighted avg": {
-      "precision": 0.8556505223171889,
-      "recall": 0.7948717948717948,
-      "f1-score": 0.7870680044593088,
-      "support": 39.0
+      "precision": 0.6322779922779923,
+      "recall": 0.63,
+      "f1-score": 0.6310775536619566,
+      "support": 100.0
     }
   },
   "confusion_matrix": [
     [
-      19,
-      0
+      18,
+      18
     ],
     [
-      8,
-      12
+      19,
+      45
     ]
   ],
   "feature_importance": {
-    "feature_0": 0.31933602690696716,
-    "feature_1": 0.0,
-    "feature_2": 0.0,
-    "feature_3": 0.5632487535476685,
-    "feature_4": 0.1174151822924614
+    "feature_0": 0.24783673882484436,
+    "feature_1": 0.2561150789260864,
+    "feature_2": 0.25039586424827576,
+    "feature_3": 0.24565236270427704,
+    "feature_4": 0.0
   },
   "scaler_mean": [
-    2.5751057452771096,
-    0.0,
-    50.0,
-    0.7525773195876289,
-    939.2586847563985
+    6.58588987950489,
+    0.4931875132309433,
+    50.59860767002063,
+    1.512,
+    0.0
   ],
   "scaler_scale": [
-    5.555029214674649,
-    1.0,
-    1.0,
-    3.793730389028751,
-    416.29009929868005
+    2.0849456880563846,
+    0.9055060508138636,
+    14.10239345320879,
+    1.1531938258592958,
+    1.0
   ],
   "feature_names": [
     "score",
@@ -77,5 +77,5 @@
     "dca_buys",
     "hold_duration_hours"
   ],
-  "quality_threshold_met": true
+  "quality_threshold_met": false
 }

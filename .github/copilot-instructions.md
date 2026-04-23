@@ -330,7 +330,7 @@ This runs 7 automated checks: config, open trades, performance, budget, processe
 
 ### Before ANY Config Change
 1. Read current local config (`%LOCALAPPDATA%/BotConfig/bot_config_local.json`)
-2. Verify change matches the active roadmap phase in `docs/PORTFOLIO_ROADMAP.md`
+2. Verify change matches the active roadmap phase in `docs/PORTFOLIO_ROADMAP_V2.md`
 3. Calculate budget impact: `(BASE + DCA + DCA×0.9) × MAX_TRADES + GRID_INVESTMENT`
 4. Verify 15% EUR reserve is maintained
 5. After applying: verify with readback, update roadmap, commit+push

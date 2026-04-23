@@ -273,16 +273,17 @@ def check_roadmap_alignment() -> dict:
     except Exception:
         return {"status": "error", "issues": ["Cannot load config"]}
 
-    # Current expected values from €1.200 phase
+    # Current expected values from PORTFOLIO_ROADMAP_V2.md (€1.450 phase)
     # This gets updated when roadmap phase changes
     expected = {
-        "phase": "€1.200",
-        "MAX_OPEN_TRADES": 5,
-        "BASE_AMOUNT_EUR": 62,
-        "DCA_AMOUNT_EUR": 30,
-        "DCA_DROP_PCT": 0.025,
-        "MIN_SCORE_TO_BUY": 7.0,
-        "DEFAULT_TRAILING": 0.024,
+        "phase": "€1.450 (V2)",
+        "MAX_OPEN_TRADES": 4,
+        "BASE_AMOUNT_EUR": 320,
+        "DCA_AMOUNT_EUR": 20,
+        "DCA_MAX_BUYS": 2,
+        "MIN_SCORE_TO_BUY": 8.0,
+        "DEFAULT_TRAILING": 0.022,
+        "TRAILING_ACTIVATION_PCT": 0.025,
     }
     result["expected_phase"] = expected["phase"]
 
