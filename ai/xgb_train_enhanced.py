@@ -53,6 +53,7 @@ except ImportError:
 
 # Constants
 TRADE_LOG_PATH = PROJECT_ROOT / 'data' / 'trade_log.json'
+TRADE_ARCHIVE_PATH = PROJECT_ROOT / 'data' / 'trade_archive.json'
 CONFIG_PATH = PROJECT_ROOT / 'config' / 'bot_config.json'
 MODEL_OUTPUT_PATH = PROJECT_ROOT / 'ai' / 'ai_xgb_model_enhanced.json'
 METRICS_OUTPUT_PATH = PROJECT_ROOT / 'ai' / 'ai_model_metrics_enhanced.json'
@@ -66,17 +67,54 @@ TARGET_PRECISION_CLASS1 = 0.60
 
 
 def load_closed_trades() -> List[Dict[str, Any]]:
-    """Load closed trades from trade_log.json."""
-    if not TRADE_LOG_PATH.exists():
+    """Load closed trades from trade_log.json AND trade_archive.json (FIX #043).
+
+    Older trades are moved to trade_archive.json by the lifecycle manager,
+    leaving trade_log.json with only the most recent ~5 closed trades.
+    Both sources must be merged for training to have a meaningful sample.
+    """
+    all_closed: List[Dict[str, Any]] = []
+
+    # 1) Recent closed trades
+    if TRADE_LOG_PATH.exists():
+        try:
+            with open(TRADE_LOG_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            recent = data.get('closed', []) or []
+            all_closed.extend(recent)
+            print(f"Loaded {len(recent)} closed trades from trade_log.json")
+        except Exception as e:
+            print(f"Failed to read {TRADE_LOG_PATH}: {e}")
+    else:
         print(f"Trade log not found: {TRADE_LOG_PATH}")
-        return []
-    
-    with open(TRADE_LOG_PATH, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    
-    closed = data.get('closed', [])
-    print(f"Loaded {len(closed)} closed trades")
-    return closed
+
+    # 2) Archived trades (the bulk of history)
+    if TRADE_ARCHIVE_PATH.exists():
+        try:
+            with open(TRADE_ARCHIVE_PATH, 'r', encoding='utf-8') as f:
+                arc = json.load(f)
+            archived = arc.get('trades', []) if isinstance(arc, dict) else (arc or [])
+            all_closed.extend(archived)
+            print(f"Loaded {len(archived)} archived trades from trade_archive.json")
+        except Exception as e:
+            print(f"Failed to read {TRADE_ARCHIVE_PATH}: {e}")
+
+    # Deduplicate by (market, opened_ts/timestamp, sell_order_id) — archive may overlap log
+    seen = set()
+    deduped: List[Dict[str, Any]] = []
+    for t in all_closed:
+        key = (
+            t.get('market'),
+            t.get('opened_ts') or t.get('timestamp'),
+            t.get('sell_order_id') or (tuple(t.get('sell_order_ids') or []) or None),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(t)
+
+    print(f"Total unique closed trades: {len(deduped)}")
+    return deduped
 
 
 def extract_features_from_trades(trades: List[Dict]) -> pd.DataFrame:
@@ -101,10 +139,12 @@ def extract_features_from_trades(trades: List[Dict]) -> pd.DataFrame:
                 'buy_price': float(trade.get('buy_price', 0) or 0),
                 'sell_price': float(trade.get('sell_price', 0) or 0),
                 
-                # Signal features (if available)
+                # Signal features (if available) — accept both new (`*_at_entry`) and legacy (`*_at_buy`) field names (FIX #043)
                 'score': float(trade.get('score', 0) or 0),
                 'ml_score': float(trade.get('ml_score', 0) or 0),
-                'rsi_at_buy': float(trade.get('rsi_at_buy', 50) or 50),
+                'rsi_at_buy': float(trade.get('rsi_at_entry', trade.get('rsi_at_buy', 50)) or 50),
+                'macd_at_buy': float(trade.get('macd_at_entry', trade.get('macd_at_buy', 0)) or 0),
+                'volatility_at_buy': float(trade.get('volatility_at_entry', 0) or 0),
                 
                 # Position sizing
                 'amount': float(trade.get('amount', 0) or 0),
@@ -146,7 +186,7 @@ def prepare_training_data(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, Lis
     """Prepare X and y arrays for training."""
     
     feature_cols = [
-        'score', 'ml_score', 'rsi_at_buy', 
+        'score', 'ml_score', 'rsi_at_buy', 'macd_at_buy', 'volatility_at_buy',
         'dca_buys', 'hold_duration_hours'
     ]
     

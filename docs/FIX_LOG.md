@@ -5,6 +5,38 @@
 
 ---
 
+## #043 — Slechts 7 closed trades zichtbaar voor enhanced trainer + grid-exclusion blokkeert BTC/ETH terwijl GRID_TRADING uit staat (2026-04-23)
+
+### Symptom / Aanleiding
+1. `xgb_train_enhanced.py` rapporteerde "Loaded 7 closed trades" terwijl er **861** trades in `data/trade_archive.json` staan → MIN_SAMPLES (100) nooit gehaald → enhanced trainer kon nooit draaien.
+2. Bot-log toonde herhaald `[GRID] Excluding grid markets from trailing management: ['BTC-EUR']` en `Excluding grid trading markets from trailing bot: ['BTC-EUR']` — terwijl `GRID_TRADING.enabled=False` in config en `[Grid] DISABLED in config` óók al gelogd werd. BTC-EUR (en bij implicatie ETH-EUR uit andere whitelist-checks) bleven uitgesloten van trailing terwijl ze in de whitelist staan.
+
+### Root Cause
+1. `ai/xgb_train_enhanced.py.load_closed_trades()` las alléén `data/trade_log.json`. De lifecycle manager archiveert oudere trades naar `data/trade_archive.json` (861 entries), waardoor `trade_log.json` slechts ~7 recente closed trades bevat. Het archief werd genegeerd.
+2. `trailing_bot.get_active_grid_markets()` riep onvoorwaardelijk `get_grid_manager().get_all_grids_summary()` aan. Die returnt actieve grids op basis van **on-disk `data/grid_states.json`** — een stale BTC-EUR grid uit een eerdere sessie bleef staan. Geen check op `CONFIG['GRID_TRADING']['enabled']` → wanneer grid module is uitgezet via config, blijft de stale state alsnog markets uitsluiten.
+
+### Fix
+- `ai/xgb_train_enhanced.py`:
+  - `load_closed_trades()` leest nu zowel `data/trade_log.json` als `data/trade_archive.json` en deduplicate op `(market, opened_ts/timestamp, sell_order_id)`. Resultaat: **837 unique closed trades** (was 7) → MIN_SAMPLES ruim gehaald, positive ratio 57.95%.
+  - `extract_features_from_trades()` accepteert nu zowel nieuwe (`*_at_entry`) als legacy (`*_at_buy`) field names voor RSI/MACD/volatility.
+  - Feature-cols uitgebreid met `macd_at_buy` en `volatility_at_buy`.
+- `trailing_bot.get_active_grid_markets()`: early return `set()` als `CONFIG['GRID_TRADING'].get('enabled', False)` False is. Stale `grid_states.json` kan zo nooit meer markets uitsluiten van trailing.
+
+### Files
+- MOD: `ai/xgb_train_enhanced.py` (load_closed_trades, extract_features_from_trades, prepare_training_data)
+- MOD: `trailing_bot.py` (`get_active_grid_markets`)
+
+### Validation
+- Standalone: `load_closed_trades()` → "Loaded 7 closed trades from trade_log.json / Loaded 861 archived trades / Total unique 837 / Extracted 837 feature records / Positive ratio 57.95%".
+- Bot herstart na fix: nieuwe scan toont **"Nieuwe scan gestart: 20 markten (totaal 20)"** (was 19) — BTC-EUR is nu opgenomen. Geen `Excluding grid` log lines meer na restart.
+- 16 procs running, heartbeat fresh.
+
+### Notes
+- Andere modules met `xxx_archive.json` skip-patroon (sync, performance) controleren of ze óók archief negeren — toekomstige refactor.
+- Stale `data/grid_states.json` blijft op disk staan; harmless nu de guard er is, maar ooit handmatig opruimen als grid trading definitief af.
+
+---
+
 ## #042 — auto_retrain overwrote 7-feature XGB met 5-feature enhanced + LSTM script ontbrak + TF niet geïnstalleerd (2026-04-23)
 
 ### Symptom / Aanleiding

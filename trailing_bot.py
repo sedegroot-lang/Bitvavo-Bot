@@ -1432,9 +1432,17 @@ def get_active_grid_markets() -> set:
     """Get set of markets that are currently active in grid trading.
     
     These markets should be excluded from trailing bot and HODL trading
-    to prevent conflicts.
+    to prevent conflicts. Returns empty set when GRID_TRADING is disabled
+    in config (FIX #043) — stale grid_states.json on disk must not block
+    the trailing bot from trading those markets.
     """
-    grid_markets = set()
+    grid_markets: set = set()
+    try:
+        grid_cfg = CONFIG.get('GRID_TRADING') or {}
+        if not bool(grid_cfg.get('enabled', False)):
+            return grid_markets
+    except Exception:
+        return grid_markets
     try:
         from modules.grid_trading import get_grid_manager
         grid_manager = get_grid_manager()
