@@ -3779,7 +3779,7 @@ def roadmap():
         {'value': 1000, 'label': '€1.000', 'action': 'V1: Grid BTC aan, €150 (7 apr)', 'icon': '✅', 'star': True},
         {'value': 1200, 'label': '€1.200', 'action': 'V1: 5 trades, BASE 62 (9 apr)', 'icon': '✅', 'star': False},
         {'value': 1240, 'label': '€1.240', 'action': 'V2 START: BASE 150, 4 trades, DCA max 6 (10 apr)', 'icon': '⭐', 'star': True},
-        {'value': 1450, 'label': '€1.450', 'action': 'V2.1: size-floor + per-market EV-sizing + tighter trailing (23 apr)', 'icon': '⭐', 'star': True},
+        {'value': 1450, 'label': '€1.450', 'action': 'V2.1 NO-RESERVE: BASE 200, 4 trades, DCA 40x2 + size-floor + EV-sizing (23 apr)', 'icon': '⭐', 'star': True},
         {'value': 1500, 'label': '€1.500', 'action': 'Grid +ETH (€250), A-S weer aan', 'icon': '📍', 'star': False},
         {'value': 1800, 'label': '€1.800', 'action': '5 trades, BASE 160, DCA 35', 'icon': '⭐', 'star': True},
         {'value': 2200, 'label': '€2.200', 'action': 'BASE 180, DCA 40, Grid +LINK (€400)', 'icon': '📍', 'star': False},

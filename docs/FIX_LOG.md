@@ -5,6 +5,27 @@
 
 ---
 
+## #038 — €1.450 sizing upgrade naar NO-RESERVE profiel (2026-04-23)
+
+### Symptom
+Initiële V2.1 config (#037) was te conservatief voor de daadwerkelijke risk-appetite van de gebruiker — BASE=120 op €1.450 portfolio liet €610 (42%) ongebruikt.
+
+### Fix
+Lokale config opgeschaald naar de "no-reserve" variant van de €1.450 backtest:
+- `BASE_AMOUNT_EUR`: 120 → **200**
+- `DCA_AMOUNT_EUR`: 30 → **40**
+- `DCA_MAX_BUYS`/`DCA_MAX_ORDERS`: 3 → **2**
+- `MIN_BALANCE_EUR`: 0 (expliciet — geen harde reserve)
+- `MAX_OPEN_TRADES`: 4 (ongewijzigd, behoudt diversificatie)
+
+Worst-case exposure: 4 × (200 + 40×2) = **€1.120 = 77%** van €1.450.
+Sim PnL backtest: **+€431,63** op 123 clean trades (vs +€273 voor BASE=120 = **+58%**, vs +€117 realized = **+270%**).
+
+### Lesson
+Bij "geen reserve" houd je nog steeds 4 slots om concentratierisico te beperken. De échte rem op grotere posities is **slippage en spread-impact** boven ~€200/trade op kleinere alts (FET, ENJ, GALA), niet de capital-efficiency. Backtest schaalt PnL lineair maar live verlies door slippage kan 5-10% afsnijden van de geprojecteerde +270%.
+
+---
+
 ## #036 — /set Telegram commando schrijft naar verkeerde config-laag (2026-04-21)
 
 ### Symptom
