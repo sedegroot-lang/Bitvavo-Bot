@@ -42,6 +42,62 @@ Geen manier om code-updates op de crypto laptop te deployen zonder fysieke toega
 
 ### Lesson
 Bij een `git pull` fout (exit code ≠ 0) wordt de bot NIET herstart — de foutmelding wordt via Telegram gestuurd zodat de gebruiker het kan oplossen.
+---
+
+## #037 — Position size floor + per-market EV-sizing for €1.450 portfolio (2026-04-23)
+
+### Symptom
+Bot at €1.450 portfolio was running with V2-start config (BASE=1000, MAX=6, DCA=61x5) — **6× over-leveraged** for the actual portfolio. Many trades fired at <€25 invested (negative EV bucket: −€0,12/trade), while the proven sweet-spot (€75-€150) sat at +€3,34/trade. No data feedback loop to under-weight historically losing markets.
+
+### Root cause
+1. Single global BASE_AMOUNT_EUR was applied uniformly regardless of per-market expectancy.
+2. No floor on tiny positions: dust-sized buys diluted the portfolio with negative-EV trades.
+3. Config had not been right-sized after portfolio shrunk from €4k → €1.450.
+
+### Fix (3 new components)
+1. **`bot/sizing_floor.py`** — `enforce_size_floor(market, proposed_eur, score, eur_balance, is_dca, cfg, log)`:
+   - <SOFT_MIN (€50): abort
+   - SOFT_MIN..ABS_MIN (€50-€75): bump up if balance allows OR allow if score ≥ 14 (high-conviction bypass) OR abort
+   - ≥ ABS_MIN: pass-through
+   - DCA buys exempt
+2. **`core/market_expectancy.py`** — `MarketExpectancy` with empirical-Bayes shrinkage:
+   - `shrunk_ev = (n × ev_market + K_PRIOR × ev_global) / (n + K_PRIOR)` with K_PRIOR=10, ALPHA=0.7
+   - `size_multiplier(market) → 0.0` if shrunk_ev ≤ −0.50 (blacklist), else clamped 0.30..1.80
+   - Persists to `data/market_expectancy.json`, atomic writes every 5 trades
+3. **Score-stamping** in `trailing_bot.py:open_trade_async` so the size-floor's high-conviction bypass actually has the entry score available.
+4. Wired both into `bot/orders_impl.py:place_buy()` (after EUR balance safeguard, gated by `MARKET_EV_SIZING_ENABLED` and `POSITION_SIZE_FLOOR_ENABLED`).
+5. Wired `market_ev.record_trade()` into `trailing_bot._finalize_close_trade` so the model self-improves on every closed trade (operational error reasons excluded).
+6. **Bootstrap** script `scripts/helpers/bootstrap_market_ev.py` seeds 159 trades from the clean archive (March-April 2026, no saldo_error/sync_removed/manual/reconstructed/dust).
+7. Local config right-sized for €1.450:
+   ```
+   BASE_AMOUNT_EUR: 1000 → 120
+   MAX_OPEN_TRADES: 6 → 4
+   DCA_AMOUNT_EUR: 61 → 30
+   DCA_MAX_BUYS: 5 → 3
+   DEFAULT_TRAILING: 0.024 → 0.022
+   TRAILING_ACTIVATION_PCT: 0.020 → 0.025
+   POSITION_SIZE_FLOOR_ENABLED: true (new)
+   POSITION_SIZE_ABS_MIN_EUR: 75 (new)
+   POSITION_SIZE_SOFT_MIN_EUR: 50 (new)
+   POSITION_SIZE_HIGH_CONVICTION_SCORE: 14 (new)
+   MARKET_EV_SIZING_ENABLED: true (new)
+   ```
+   Worst-case exposure: 4 × (120 + 30×3) = €840 = 58% of €1.450 ✅
+
+### Validation
+- 17/17 new unit tests pass (`tests/test_sizing_floor.py`, `tests/test_market_expectancy.py`).
+- Bootstrap seeded 159 trades, global EV +€0,73/trade, all whitelisted markets profitable, no blacklists triggered.
+- Backtest on 123 clean trades since 2026-03-01: simulated PnL **+€273,24** vs realized +€116,59 = **+134% projected improvement**.
+
+### Files touched
+- NEW: `bot/sizing_floor.py`, `core/market_expectancy.py`, `scripts/helpers/bootstrap_market_ev.py`
+- NEW: `tests/test_sizing_floor.py`, `tests/test_market_expectancy.py`
+- MOD: `bot/orders_impl.py` (place_buy gates), `trailing_bot.py` (open_trade_async score stamp + _finalize_close_trade record), `bot/shared.py` (last_signal_score field)
+- MOD: `docs/PORTFOLIO_ROADMAP_V2.md` (€1.450 milestone), `tools/dashboard_flask/app.py` (milestone array)
+- LOCAL config: `%LOCALAPPDATA%/BotConfig/bot_config_local.json`
+
+### Lesson
+When portfolio shrinks significantly, BASE_AMOUNT must shrink with it — running €1000 BASE on a €1450 portfolio leaves no room for diversification or DCA. Always size BASE so that `MAX_TRADES × (BASE + DCA_MAX × DCA_AMOUNT) ≤ 60% × portfolio` to preserve the 15% EUR reserve plus a safety buffer.
 
 ---
 

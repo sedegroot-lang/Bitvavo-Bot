@@ -84,6 +84,11 @@ class _SharedState:
     MAX_CLUSTER_EXPOSURE_EUR: float = 100.0
     MARKET_PERFORMANCE_FILE: str = 'data/market_metrics.json'
 
+    # Last computed signal score for the next entry attempt; used by
+    # bot.sizing_floor for the high-conviction bypass. Updated by the
+    # entry scanner just before calling place_buy.
+    last_signal_score: float = 0.0
+
     # ── Function references ─────────────────────────────────
     log: Callable = staticmethod(print)
     safe_call: Callable = staticmethod(lambda fn, *a, **kw: fn(*a, **kw))

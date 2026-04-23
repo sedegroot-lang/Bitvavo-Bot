@@ -3,6 +3,10 @@
 > **Doel**: Agressiever opschaalplan gebaseerd op **data-driven analyse** van 938 historische trades.
 > V1 was te conservatief — 97% van trades kreeg geen DCA, 60% van kapitaal zat ongebruikt in cash.
 > V2 maximaliseer kapitaalefficiëntie: hogere BASE orders, minder slots, bewezen DCA-limieten.
+>
+> **Update 23 april 2026 (V2.1)** — Portfolio €1.450 milestone toegevoegd met drie nieuwe edge-componenten:
+> position size floor + per-market EV-sizing (empirical-Bayes) + tighter trailing.
+> Backtest op 159 trades sinds 1 maart 2026: **+134% projected PnL improvement**.
 
 ---
 
@@ -120,7 +124,8 @@ Analyse van alle 584 echte trades + 68 trades uit de laatste 6 weken onthulde:
 |-----------|-------|------------|------|---------|---------|----------|------|
 | **≤€1.000** ✅ | *V1 bereikt — Grid BTC aan* | 4 | 56 | 28 | 17 | 2,4% | €150 BTC |
 | **€1.200** ✅ | *V1: 5 trades, BASE 62* | 5 | 62 | 30 | 17 | 2,4% | €150 BTC |
-| **€1.240** ← nu | **V2 START: BASE 150, 4 trades** | **4** | **150** | **30** | **6** | 2,4% | €150 BTC |
+| **€1.240** ✅ | *V2 START: BASE 150, 4 trades* | 4 | 150 | 30 | 6 | 2,4% | €150 BTC |
+| **€1.450** ← nu | **V2.1: Size-floor + EV-sizing + tighter trailing** | **4** | **120** | **30** | **3** | **2,2% / act 2,5%** | UIT |
 | **€1.500** | ↑ Grid +ETH (€250 totaal) | 4 | 150 | 30 | 6 | 2,4% | **€250 BTC+ETH** |
 | **€1.800** | ↑ 5 trades, BASE 160, DCA 35 | **5** | **160** | **35** | **6** | 2,3% | €250 |
 | **€2.200** | ↑ BASE 180, DCA 40, Grid +LINK | 5 | **180** | **40** | **6** | 2,3% | **€400 3 mktn** |
@@ -187,6 +192,67 @@ Analyse van alle 584 echte trades + 68 trades uit de laatste 6 weken onthulde:
 - [ ] Geen enkele trade > €50 verlies?
 - [ ] Portfolio ≥ €1.300?
 - [ ] Gemiddelde profit per trade ≥ €1,50?
+
+---
+
+### ⭐ €1.450 — V2.1: Size-Floor + Per-Market EV-Sizing + Strakker Trailing (GEACTIVEERD)
+
+> **Geactiveerd**: 23 april 2026. Datadriven herijking na 159 trades sinds 1 maart 2026.
+> Drie nieuwe edge-componenten gewired in `bot/orders_impl.py:place_buy()`:
+> 1. **Position size floor** ([bot/sizing_floor.py](bot/sizing_floor.py)) — bumpt tiny posities (<€75) naar de bewezen 75-150 EV-sweet-spot of breekt af bij <€50.
+> 2. **Per-market EV-sizing met empirical-Bayes shrinkage** ([core/market_expectancy.py](core/market_expectancy.py)) — schaalt elke koop met 0.3x..1.8x op basis van per-markt expectancy, geseed met 159 historische trades.
+> 3. **Score-stamping** in `open_trade_async` zodat het size-floor een high-conviction bypass kan uitvoeren bij score ≥ 14.
+
+**Reden voor de switch (data sinds 1 maart 2026):**
+- 159 nettrades, +€116,59 totaal, WR 74,2%, profit factor 7,4, expectancy +€0,73/trade.
+- Size-bucket analyse: trades **<€25 verloren −€0,12/trade**, **€25-75 +€0,41**, **€75-150 +€3,34/trade (+2,95% ROI)** — duidelijke sweet-spot.
+- Backtest replay: EV-weighted sizing **+55%** (van +€72,31 naar +€111,92 op test-set).
+- Profit-lock ratchet replay (33 trades): **+18%** door bestaande `STEPPED_TRAILING_LEVELS` strakker te trekken (config-only, geen nieuwe module nodig).
+- Portfolio: €1.450 (was €1.240 bij V2-start). Oude config (BASE=1000, MAX=6, DCA=61x5) was **6× over-leveraged** voor deze portefeuille.
+
+**Wijzigingen (lokale config):**
+
+```json
+{
+  "BASE_AMOUNT_EUR": 120,
+  "MAX_OPEN_TRADES": 4,
+  "DCA_AMOUNT_EUR": 30,
+  "DCA_MAX_BUYS": 3,
+  "DCA_MAX_ORDERS": 3,
+  "DEFAULT_TRAILING": 0.022,
+  "TRAILING_ACTIVATION_PCT": 0.025,
+  "POSITION_SIZE_FLOOR_ENABLED": true,
+  "POSITION_SIZE_ABS_MIN_EUR": 75,
+  "POSITION_SIZE_SOFT_MIN_EUR": 50,
+  "POSITION_SIZE_HIGH_CONVICTION_SCORE": 14,
+  "MARKET_EV_SIZING_ENABLED": true
+}
+```
+
+**Budget check (worst case, alle slots vol + alle DCAs gevuld):**
+- Per trade max (zonder EV-boost): 120 + 30×3 = €210
+- Alle 4 slots vol: 4 × 210 = **€840 (58%)** ✅ binnen 60%-target
+- Met EV-boost (avg 1,3x op winners): ~€700-€900 typisch (48-62%)
+- Reserve EUR: ≥ €217 (15%) gegarandeerd via `MIN_BALANCE_EUR` + `MAX_OPEN_TRADES` cap
+- Grid: UIT — focus 100% op trailing-bot voor maximale capital-efficiency op deze schaal
+
+**Verwachte opbrengst (geprojecteerd uit backtest):**
+- Sim PnL op 123 trades sinds 1 maart 2026: **+€273,24** (vs realiteit +€116,59 = **+134% verbetering**)
+- Per week: ~€38-€45 (vs huidige €14,57/week)
+- Per maand: ~€160-€190
+
+**Bootstrap stap (eenmalig, al uitgevoerd 23 april):**
+```powershell
+python scripts/helpers/bootstrap_market_ev.py
+```
+Schrijft `data/market_expectancy.json` met 159 historische trades. Vanaf dat moment past de bot per koop automatisch een EV-multiplier toe.
+
+**Evaluatie na 2 weken (7 mei 2026):**
+- [ ] Geen size-floor reject-rate > 25% (anders SOFT_MIN te hoog)?
+- [ ] Avg trade size landt in €75-€150 band?
+- [ ] Per-market blacklist activeert correct (geen DOT/LINK forced trades)?
+- [ ] WR ≥ 70% en expectancy ≥ €1,00/trade?
+- [ ] Portfolio ≥ €1.550?
 
 ---
 
@@ -517,7 +583,8 @@ Analyse van alle 584 echte trades + 68 trades uit de laatste 6 weken onthulde:
 - [x] €1.200 — 5 trades, V1 einde (9 april 2026)
 
 ### V2 Roadmap
-- [x] €1.240 ← nu — **V2 START**: BASE 150, 4 trades, DCA max 6 (10 april 2026)
+- [x] €1.240 — **V2 START**: BASE 150, 4 trades, DCA max 6 (10 april 2026)
+- [x] €1.450 ← nu — **V2.1**: size-floor + per-market EV-sizing + tighter trailing (23 april 2026)
 - [ ] €1.500 — Grid +ETH (€250)
 - [ ] €1.800 ⭐ — 5 trades, BASE 160, DCA 35
 - [ ] €2.200 — BASE 180, DCA 40, Grid +LINK (€400)

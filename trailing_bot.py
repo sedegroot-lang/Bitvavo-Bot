@@ -190,6 +190,18 @@ def _finalize_close_trade(
         p = profit_for_market if profit_for_market is not None else closed_entry.get('profit', 0.0)
         market_profits[market] = market_profits.get(market, 0.0) + p
 
+    # Per-market empirical-Bayes expectancy update (sizing feedback loop).
+    # Skip operational error closes — they are not a signal of market quality.
+    try:
+        _reason = (closed_entry.get('reason') or '').lower()
+        _operational_errors = {'saldo_error', 'sync_removed', 'manual_close',
+                               'reconstructed', 'dust_cleanup'}
+        if _reason not in _operational_errors and closed_entry.get('profit') is not None:
+            from core.market_expectancy import market_ev as _mev
+            _mev.record_trade(market, float(closed_entry.get('profit', 0) or 0))
+    except Exception:
+        pass
+
     # Bayesian Signal Fusion: update signal weights from trade outcome
     try:
         if CONFIG.get('BAYESIAN_FUSION_ENABLED', True):
@@ -4084,6 +4096,12 @@ async def open_trade_async(score, m, price_now, s_short, eur_balance, ml_info=No
         return {'buy_executed': False}
 
     # Live koop met safety buy via async helper
+    # Stamp last_signal_score on shared state for size-floor high-conviction bypass
+    try:
+        from bot.shared import state as _shared_state
+        _shared_state.last_signal_score = float(score or 0.0)
+    except Exception:
+        pass
     buy_result, entry_price = await safety_buy(m, amt_eur, entry_price)
     if not is_order_success(buy_result):
         _release_market(m)

@@ -196,6 +196,44 @@ def place_buy(market, eur_amount, entry_price, order_type=None, *, is_dca: bool 
             return {"error": "eur_balance_too_low"}
     except Exception as e:
         log(f"Kon EUR-saldo niet ophalen voor safeguard: {e}", level='warning')
+        eur_bal = 0.0  # ensure defined for size-floor gate below
+
+    # 2b. Per-market EV-weighted size adjustment (Bayesian shrinkage).
+    # Up-scales markets with proven positive EV, down-scales chronic losers,
+    # and skips entirely if the shrunk EV is below the blacklist threshold.
+    # DCA buys keep their original size — they extend an existing position.
+    if not is_dca:
+        try:
+            if bool(CONFIG.get('MARKET_EV_SIZING_ENABLED', True)):
+                from core.market_expectancy import market_ev as _mev
+                _mult = _mev.size_multiplier(market)
+                if _mult <= 0:
+                    log(f"[EV-SKIP] {market} shrunk EV below blacklist threshold — skip entry", level='info')
+                    return {"error": "market_ev_blacklist"}
+                if abs(_mult - 1.0) > 0.02:
+                    new_eur = round(float(eur_amount) * _mult, 2)
+                    log(f"[EV-SIZE] {market} mult={_mult:.2f} → {eur_amount:.2f} → {new_eur:.2f} EUR", level='info')
+                    eur_amount = new_eur
+        except Exception as _ev_e:
+            log(f"market_ev sizing failed (non-fatal): {_ev_e}", level='warning')
+
+    # 2c. Position size floor — reject micro-trades that lose to fees.
+    try:
+        from bot.sizing_floor import enforce_size_floor
+        _last_score = float(getattr(S, 'last_signal_score', 0.0) or 0.0)
+        adjusted = enforce_size_floor(
+            market, float(eur_amount),
+            score=_last_score,
+            eur_balance=float(eur_bal or 0.0),
+            is_dca=is_dca,
+            cfg=CONFIG,
+            log=log,
+        )
+        if adjusted is None:
+            return {"error": "size_floor_rejected"}
+        eur_amount = adjusted
+    except Exception as _sf_e:
+        log(f"size_floor check failed (non-fatal): {_sf_e}", level='warning')
 
     # Determine order type
     ot = str(order_type or S.ORDER_TYPE or 'auto').lower()
