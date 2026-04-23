@@ -137,12 +137,57 @@ def portfolio():
         regime_score_adj = float(last_scan.get('regime_score_adj', 0) or 0)
         regime_blocking = regime == 'bearish' or regime_score_adj > 50
 
+        # ── New gate states (post-loss cooldown, BTC drawdown shield, adaptive score) ──
+        cooldown_active_count = 0
+        cooldown_markets_preview = []
+        try:
+            from bot.post_loss_cooldown import get_instance as _get_cd
+            _cd = _get_cd()
+            _now = __import__('time').time()
+            for _m, _entry in list(getattr(_cd, '_state', {}).items())[:50]:
+                _until = _entry.get('cooldown_until', 0)
+                if _until and _until > _now:
+                    cooldown_active_count += 1
+                    if len(cooldown_markets_preview) < 3:
+                        _mins = int((_until - _now) / 60)
+                        cooldown_markets_preview.append(f"{_m} ({_mins}m)")
+        except Exception:
+            pass
+
+        adaptive_bump = 0.0
+        adaptive_reason = ''
+        try:
+            from bot.adaptive_score import get_instance as _get_as
+            adaptive_bump, adaptive_reason = _get_as().adjustment(cfg=config)
+        except Exception:
+            pass
+
+        btc_shield_blocked = False
+        btc_shield_reason = ''
+        try:
+            from bot.shared import state as _bot_state
+            _btc_candles = None
+            try:
+                _btc_candles = _bot_state.get_candles('BTC-EUR', '5m', 30) if hasattr(_bot_state, 'get_candles') else None
+            except Exception:
+                _btc_candles = None
+            if _btc_candles:
+                from bot.btc_drawdown_shield import evaluate as _btc_eval
+                _res = _btc_eval(_btc_candles, cfg=config, market='ANY-EUR')
+                btc_shield_blocked = bool(getattr(_res, 'blocked', False))
+                btc_shield_reason = str(getattr(_res, 'reason', '') or '')
+        except Exception:
+            pass
+
         blocks = []
         warnings = []
 
         if regime_blocking:
             regime_label = (regime or 'bearish').upper().replace('_', ' ')
             blocks.append(f"Regime {regime_label}: alle nieuwe entries geblokkeerd (threshold +{regime_score_adj:.0f})")
+
+        if btc_shield_blocked:
+            blocks.append(f"🛡️ BTC drawdown shield actief: {btc_shield_reason or 'BTC daalt te snel'}")
 
         if open_count >= max_trades:
             blocks.append(f"Max trades bereikt: {open_count}/{max_trades}")
@@ -151,35 +196,54 @@ def portfolio():
         
         available_for_trades = eur_balance - min_balance
         if available_for_trades < base_amount:
-            blocks.append(f"Onvoldoende saldo: €{eur_balance:.2f}")
+            blocks.append(f"Onvoldoende saldo: €{eur_balance:.2f} (nodig: €{base_amount:.0f} + €{min_balance:.0f} reserve)")
         elif available_for_trades < base_amount * 2:
-            warnings.append(f"Laag saldo: €{eur_balance:.2f}")
-        
+            warnings.append(f"Laag saldo: €{eur_balance:.2f} — slechts 1 trade-slot betaalbaar")
+
+        # Compute the actual MIN_SCORE the bot is using right now
+        effective_min_score = float(min_score_threshold or 0) + float(adaptive_bump or 0)
+
+        # ── Helper to surface "waarom geen trade" in BOTH yellow and green-wait states ──
+        def _build_reason_lines() -> list:
+            """Return informative lines explaining why no new trade is starting."""
+            lines = []
+            if total_markets > 0:
+                if passed_min_score == 0:
+                    lines.append(f'⚠️ {evaluated}/{total_markets} markets gescand — niemand scoort ≥{effective_min_score:.1f}')
+                else:
+                    lines.append(f'✅ {passed_min_score} market(s) voldoen aan min score ({effective_min_score:.1f})')
+            else:
+                lines.append('⏳ Eerste market-scan loopt nog (heartbeat heeft nog geen scan-stats)')
+            if adaptive_bump and abs(adaptive_bump) >= 0.01:
+                arrow = '↑' if adaptive_bump > 0 else '↓'
+                lines.append(f'🎯 Adaptive MIN_SCORE {arrow} {adaptive_bump:+.1f} — {adaptive_reason or "WR-aanpassing"}')
+            if cooldown_active_count > 0:
+                preview = ', '.join(cooldown_markets_preview)
+                extra = f' (+{cooldown_active_count - len(cooldown_markets_preview)} meer)' if cooldown_active_count > len(cooldown_markets_preview) else ''
+                lines.append(f'⏸️ {cooldown_active_count} market(s) in post-loss cooldown: {preview}{extra}')
+            return lines
+
         if blocks:
             trade_readiness = {
                 'status': 'red', 'color': '#ef4444', 'icon': '🔴',
-                'label': 'GEBLOKKEERD', 'message': blocks[0], 'details': blocks + warnings
+                'label': 'GEBLOKKEERD', 'message': blocks[0], 'details': blocks[1:] + warnings + _build_reason_lines()
             }
         elif warnings:
-            # Build informative details including scan stats
-            details = list(warnings)
+            # Build informative details — start with non-warning context (no duplicate of message)
+            details = []
             remaining_slots = max_trades - open_count
-            available_for_trades = eur_balance - min_balance
             if pending_reservations > 0:
                 details.append(f'🔒 {pending_reservations} market(s) gereserveerd (wordt verwerkt)')
             if remaining_slots > 0:
                 details.append(f'{remaining_slots} slot(s) beschikbaar')
             if available_for_trades >= base_amount:
                 details.append(f'€{available_for_trades:.2f} beschikbaar voor trades')
-            # Show scan results to explain why no trade is opening
-            if total_markets > 0:
-                if passed_min_score == 0:
-                    details.append(f'⚠️ {evaluated}/{total_markets} markets gescand, geen voldoet aan min score ({min_score_threshold})')
-                else:
-                    details.append(f'✅ {passed_min_score} market(s) voldoen aan min score ({min_score_threshold})')
-            # Determine a more descriptive message
+            details.extend(_build_reason_lines())
+            # Determine a more descriptive headline message (don't repeat the warning)
             if passed_min_score == 0 and total_markets > 0:
-                msg = f'Wacht op signaal — geen market scoort ≥{min_score_threshold}'
+                msg = f'Wacht op signaal — geen market scoort ≥{effective_min_score:.1f}'
+            elif total_markets == 0:
+                msg = 'Wacht op eerste market-scan'
             else:
                 msg = warnings[0]
             trade_readiness = {
@@ -188,30 +252,27 @@ def portfolio():
             }
         else:
             remaining_slots = max_trades - open_count
-            possible_trades = int(available_for_trades / base_amount)
+            possible_trades = int(available_for_trades / base_amount) if base_amount > 0 else 0
             
             # Build details with scan info
             details = [
                 f'{remaining_slots} open trade slots beschikbaar',
                 f'€{available_for_trades:.2f} beschikbaar voor trades'
             ]
+            details.extend(_build_reason_lines())
             
-            # Add scan results info
             if passed_min_score == 0 and total_markets > 0:
-                # No markets passing score - explain why no trades
-                details.append(f'⚠️ {evaluated}/{total_markets} markets gescand, geen voldoet aan min score ({min_score_threshold})')
                 trade_readiness = {
                     'status': 'green', 'color': '#10b981', 'icon': '🟢',
                     'label': 'GEREED (wacht)',
-                    'message': f'Wacht op signaal - geen market scoort ≥{min_score_threshold}',
+                    'message': f'Wacht op signaal — geen market scoort ≥{effective_min_score:.1f}',
                     'details': details
                 }
-            elif passed_min_score > 0:
-                details.append(f'✅ {passed_min_score} market(s) voldoen aan min score')
+            elif total_markets == 0:
                 trade_readiness = {
                     'status': 'green', 'color': '#10b981', 'icon': '🟢',
                     'label': 'GEREED',
-                    'message': f'{remaining_slots} slots vrij, {possible_trades} trades mogelijk',
+                    'message': 'Wacht op eerste market-scan',
                     'details': details
                 }
             else:
