@@ -5,6 +5,44 @@
 
 ---
 
+## #046 — Telegram /set met dot-key faalde stil + Portfolio toonde slechts 5 closed trades (i.p.v. 800+) + Roadmap stortingsscenario's miste compounding-uitleg en hogere stappen + Stortingsplan-component overbodig (2026-04-23)
+
+### Symptom / Aanleiding
+Gebruiker meldde:
+1. "Als ik parameters aanpas in telegram, dan doet die dat niet naar local config" → `/set BUDGET_RESERVATION.trailing_pct 80` had geen effect.
+2. "Bij portfolio zie ik nog maar 5 trades staan, terwijl ik 100 heb aangevinkt. het lijkt wel of al die trades weg zijn" → trade_log had 7 closed; archive had 861 maar werd niet gemerged.
+3. Vraag of de Mijlpaal-ETA tabel winst-herinvestering meeneemt + verzoek om dynamische stappen 500/1000.
+4. Verzoek om Stortingsplan-tabel te verwijderen.
+
+### Root cause
+1. `_apply_set_command()` in `modules/telegram_handler.py` deed `key.upper()` op de **hele** key incl. dot. `BUDGET_RESERVATION.trailing_pct` werd `BUDGET_RESERVATION.TRAILING_PCT` (child geupperd) → niet in `ALLOWED_KEYS` → user kreeg "Onbekende parameter". Bot config gebruikt **lowercase** children dus de uppercase write zou bovendien een nieuwe key naast de bestaande hebben gezet.
+2. Het portfolio-template wordt geserveerd door **`tools/dashboard_flask/blueprints/main/routes.py`** (Flask blueprint), NIET door `app.py::portfolio`. De blueprint las alleen `trades.get('closed', [])` (≈5 trades) en raakte de archive nooit. Bovendien gebruikt `data/trade_archive.json` de top-level key `'trades'` (NIET `'closed'`) — 861 trades waren onzichtbaar.
+3. Bestaande tekst zei alleen "compounding" zonder duidelijk te maken dat dat trading-winst herbelegt; deposits stonden vast op 0/100/200/300; geen stappen voor €500/€1000.
+4. `deposit_plan` was hardcoded V2-fasering die niet meer matchte met huidige roadmap.
+
+### Fix
+- **MOD** `modules/telegram_handler.py::_apply_set_command`: dot-keys worden nu opgesplitst — parent UPPERCASE, child case-preserve. Lookup in `ALLOWED_KEYS` is case-insensitive zodat `/set budget_reservation.trailing_pct 80` of `/set BUDGET_RESERVATION.TRAILING_PCT 80` beide werken. Reply toont nu expliciet het opgeslagen pad: `%LOCALAPPDATA%/BotConfig/bot_config_local.json`.
+- **MOD** `modules/telegram_handler.py::_save_local_override`: dot-keys worden geschreven met UPPERCASE parent + originele-case child (matched bot config schema). Single-level keys nog steeds `key.upper()`.
+- **MOD** `tools/dashboard_flask/blueprints/main/routes.py::portfolio`: merget nu `data/trade_archive.json` (zowel `trades` als `closed` keys) in `closed_trades_raw`, dedupliceert op `(market, timestamp, sell_price)`, en logt `[PORTFOLIO] Closed trades after archive merge: N` voor diagnose. Resultaat: 837 trades beschikbaar i.p.v. 5 → met `?trades_count=100` toont nu 97 (3 partial-TP filtered).
+- **MOD** `tools/dashboard_flask/app.py::portfolio` (monolith fallback): zelfde merge toegevoegd voor consistentie.
+- **MOD** `tools/dashboard_flask/app.py::roadmap`: `SCENARIO_DEPOSITS = [0, 100, 200, 300, 500, 1000]` en `SCENARIO_TARGETS = [2000, 5000, 10000, 25000, 50000]` — tabel is nu 6×5 i.p.v. 4×3. `deposit_scenarios[].etas` lijst-vorm voor template-loop. Stortingsplan-blok verwijderd. Comment toegevoegd dat groei% × kapitaal = winst-herinvestering.
+- **MOD** `tools/dashboard_flask/templates/roadmap.html`: drie-kolom layout vervangen door 2-kolom (Stortingsplan-paneel weg). Deposit-toggle uitgebreid met €500/€1000. Scenario-tabel rendert nu via `{% for t in scenario_targets %}` + `{% for eta in s.etas %}`. Onderschrift expliciet: "✅ Trading-winst wordt automatisch herbelegd in de simulatie".
+
+### Verification
+- `/set BUDGET_RESERVATION.trailing_pct 80` → schreef `BUDGET_RESERVATION.trailing_pct = 80.0` naar local override; readback bevestigd; daarna teruggezet naar 100.
+- `/set GRID_TRADING.enabled true` → schreef correct in geneste dict.
+- `/portfolio?trades_count=100` → log: `Closed trades after archive merge: 837`, `Closed trades count: 97`. Response 241kB (was ~177kB).
+- `/roadmap?deposit=500` → 200, deposit-toggle bevat €500 en €1000, scenario-tabel toont kolommen €25.000 en €50.000, onderschrift bevat "automatisch herbelegd".
+- Stortingsplan-paneel niet meer in HTML (alleen orphan CSS in `.deposit-table` die ongebruikt is).
+- 16 python-procs draaien na 2× herstart.
+
+### Lesson (CRITICAL)
+- **Dashboard heeft TWEE portfolio-routes** (monolith `app.py::portfolio` én `blueprints/main/routes.py::portfolio`) — bij wijzigingen aan portfolio-data ALTIJD beide controleren. De blueprint wint omdat hij eerst geregistreerd wordt in Flask app-init.
+- **`data/trade_archive.json` gebruikt key `'trades'`, niet `'closed'`** — alle dashboard-aggregaties die archive merging doen moeten beide keys lezen (`get('trades', []) + get('closed', [])`).
+- **Telegram dot-keys: parent UPPERCASE, child case-preserve.** `key.upper()` op de hele key breekt de lookup omdat bot config schema lowercase children gebruikt (`enabled`, `trailing_pct`, etc.).
+
+---
+
 ## #045 — Dashboard Parameters tab schreef wijzigingen naar OneDrive base config + RSI Max DCA validatie blokkeerde 100 + Roadmap miste deposit-scenario's en multi-level passief inkomen (2026-04-23)
 
 ### Symptom / Aanleiding

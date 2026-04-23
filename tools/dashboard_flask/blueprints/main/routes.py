@@ -301,8 +301,39 @@ def portfolio():
         trades_count = 10
     trades_count = max(1, min(trades_count, 500))  # clamp to 1-500
 
-    closed_trades_raw = trades.get('closed', [])
+    closed_trades_raw = list(trades.get('closed', []) or [])
     open_markets = set(trades.get('open', {}).keys())  # Markets that are still open
+
+    # Merge in archived closed trades — oudere trades worden naar trade_archive.json
+    # verplaatst door de bot. Zonder deze merge zie je alleen de paar trades die nog
+    # in trade_log.json staan (typisch 5-10) i.p.v. de volledige historie.
+    try:
+        import json as _json
+        from pathlib import Path as _Path
+        _project_root = _Path(__file__).resolve().parent.parent.parent.parent.parent
+        _archive_path = _project_root / 'data' / 'trade_archive.json'
+        if _archive_path.exists():
+            with _archive_path.open('r', encoding='utf-8') as _af:
+                _archive = _json.load(_af)
+            if isinstance(_archive, list):
+                closed_trades_raw.extend(_archive)
+            elif isinstance(_archive, dict):
+                # Archive uses 'trades' key (canonical), but also support 'closed' for backwards compat
+                closed_trades_raw.extend(_archive.get('trades', []) or [])
+                closed_trades_raw.extend(_archive.get('closed', []) or [])
+        # De-duplicate op (market, timestamp, sell_price)
+        _seen = set()
+        _deduped = []
+        for _t in closed_trades_raw:
+            _key = (_t.get('market'), _ts_to_float(_t.get('timestamp', 0)), float(_t.get('sell_price', 0) or 0))
+            if _key in _seen:
+                continue
+            _seen.add(_key)
+            _deduped.append(_t)
+        closed_trades_raw = _deduped
+        logger.info(f"[PORTFOLIO] Closed trades after archive merge: {len(closed_trades_raw)}")
+    except Exception as _e:
+        logger.warning(f"[PORTFOLIO] Archive merge failed: {_e}")
 
     # Filter out partial TP entries for trades that are still open
     # These have reason='trailing_tp' but the trade is still active

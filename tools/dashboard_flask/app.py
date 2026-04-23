@@ -1996,7 +1996,31 @@ def portfolio():
     # Get last N closed trades for the closed trades table (configurable)
     trades_count = request.args.get('trades_count', 10, type=int)
     trades_count = max(1, min(trades_count, 500))  # clamp 1-500
-    closed_trades_raw = trades.get('closed', [])
+    closed_trades_raw = list(trades.get('closed', []) or [])
+    # Merge in archived closed trades (oudere trades worden naar trade_archive.json verplaatst)
+    try:
+        archive_path = PROJECT_ROOT / 'data' / 'trade_archive.json'
+        if archive_path.exists():
+            with archive_path.open('r', encoding='utf-8') as _af:
+                _archive = json.load(_af)
+            if isinstance(_archive, list):
+                closed_trades_raw.extend(_archive)
+            elif isinstance(_archive, dict):
+                closed_trades_raw.extend(_archive.get('trades', []) or [])
+                closed_trades_raw.extend(_archive.get('closed', []) or [])
+        # De-duplicate op (market, timestamp, sell_price)
+        _seen = set()
+        _deduped = []
+        for t in closed_trades_raw:
+            key = (t.get('market'), _ts_to_float(t.get('timestamp', 0)), float(t.get('sell_price', 0) or 0))
+            if key in _seen:
+                continue
+            _seen.add(key)
+            _deduped.append(t)
+        closed_trades_raw = _deduped
+        logger.info(f"[PORTFOLIO] Closed trades after archive merge: {len(closed_trades_raw)}")
+    except Exception as _e:
+        logger.warning(f"[PORTFOLIO] Archive merge failed: {_e}")
     # Sort by timestamp descending and take last N
     closed_trades_sorted = sorted(closed_trades_raw, key=lambda x: _ts_to_float(x.get('timestamp', 0)), reverse=True)[:trades_count]
     
@@ -4114,20 +4138,6 @@ def roadmap():
         'MAX_TRADES verhogen = BASE verlagen — nooit beide tegelijk omhoog',
     ]
 
-    # Deposit plan (V2 — versneld)
-    deposit_plan = [
-        {'month': 'Mrt 2026', 'deposit': 100, 'cum': 870, 'est': 465, 'done': True},
-        {'month': 'Apr 2026', 'deposit': 100, 'cum': 970, 'est': 1300, 'done': True},
-        {'month': 'Mei 2026', 'deposit': 100, 'cum': 1070, 'est': 1460, 'done': False},
-        {'month': 'Jun 2026', 'deposit': 100, 'cum': 1170, 'est': 1630, 'done': False},
-        {'month': 'Jul 2026', 'deposit': 100, 'cum': 1270, 'est': 1810, 'done': False},
-        {'month': 'Aug 2026', 'deposit': 100, 'cum': 1370, 'est': 2000, 'done': False},
-        {'month': 'Sep 2026', 'deposit': 50, 'cum': 1420, 'est': 2150, 'done': False},
-        {'month': 'Okt 2026', 'deposit': 50, 'cum': 1470, 'est': 2310, 'done': False},
-        {'month': 'Nov 2026', 'deposit': 0, 'cum': 1470, 'est': 2430, 'done': False},
-        {'month': 'Dec 2026', 'deposit': 0, 'cum': 1470, 'est': 2560, 'done': False},
-    ]
-
     # Expected earnings at €6.000 target (V2)
     earnings_at_5k = {
         'trailing_day': 10.0,
@@ -4174,14 +4184,17 @@ def roadmap():
             'is_current': cap <= current_value < (cap * 1.5) if cap < 50000 else current_value >= cap,
         })
 
-    # ── Deposit scenarios for ETA comparison (€0/€100/€200/€300 per maand) ──
+    # ── Deposit scenarios for ETA comparison ──
+    # Compounding model: simv = simv * (1 + groei%) + storting/week
+    # ¨ Groei% omvat trading-rendement OP HET GROEIENDE KAPITAAL →
+    # winst wordt automatisch herbelegd in de simulatie.
+    SCENARIO_DEPOSITS = [0, 100, 200, 300, 500, 1000]
+    SCENARIO_TARGETS = [2000, 5000, 10000, 25000, 50000]
     deposit_scenarios = []
-    for scenario_dep in [0, 100, 200, 300]:
+    for scenario_dep in SCENARIO_DEPOSITS:
         weekly_dep = scenario_dep / 4.33
-        # Find time to €2k, €5k, €10k under this scenario
-        targets = [2000, 5000, 10000]
         target_etas = {}
-        for t in targets:
+        for t in SCENARIO_TARGETS:
             if current_value >= t:
                 target_etas[t] = '✅'
                 continue
@@ -4191,11 +4204,11 @@ def roadmap():
             if growth_per_week_pct <= 0 and weekly_dep <= 0:
                 target_etas[t] = '∞'
                 continue
-            while simv < t and weeks < 520:
+            while simv < t and weeks < 1040:  # max 20 jaar
                 simv = simv * growth_factor + weekly_dep
                 weeks += 1
-            if weeks >= 520:
-                target_etas[t] = '> 10j'
+            if weeks >= 1040:
+                target_etas[t] = '> 20j'
             else:
                 from datetime import datetime as _dt, timedelta as _td
                 eta_date = _dt.now() + _td(weeks=weeks)
@@ -4203,10 +4216,13 @@ def roadmap():
         deposit_scenarios.append({
             'monthly': scenario_dep,
             'is_current': scenario_dep == int(monthly_deposit),
+            'etas': [target_etas.get(t, '?') for t in SCENARIO_TARGETS],
+            # Backwards compat keys
             'eta_2k': target_etas.get(2000, '?'),
             'eta_5k': target_etas.get(5000, '?'),
             'eta_10k': target_etas.get(10000, '?'),
         })
+    scenario_targets_meta = SCENARIO_TARGETS
 
     # ── Future / advanced roadmap ideas ──
     future_ideas = [
@@ -4261,8 +4277,8 @@ def roadmap():
         progress_pct=progress_pct,
         total_deposited=total_deposited,
         golden_rules=golden_rules,
-        deposit_plan=deposit_plan,
         earnings_at_5k=earnings_at_5k,
+        scenario_targets=scenario_targets_meta,
         bear_protocol=bear_protocol,
         balance_sparkline=balance_sparkline,
         weekly_profits=weekly_profits,

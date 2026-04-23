@@ -60,11 +60,13 @@ def _load_config() -> dict:
             return {}
 
 
-def _save_local_override(key_upper: str, parsed_value) -> None:
+def _save_local_override(key: str, parsed_value) -> None:
     """Schrijf één config-key direct naar LOCAL_OVERRIDE_PATH (layer 3).
 
     Layer 3 wint over alle andere lagen en wordt nooit door OneDrive teruggedraaid.
-    Dot-notatie (bijv. GRID_TRADING.enabled) wordt vertaald naar een geneste dict.
+    Dot-notatie (bijv. GRID_TRADING.enabled) wordt vertaald naar een geneste dict
+    waarbij de parent UPPERCASE is maar de child de originele case behoudt
+    (bot config gebruikt lowercase children zoals 'enabled', 'trailing_pct').
     """
     from modules.config import LOCAL_OVERRIDE_PATH
     local_path = Path(LOCAL_OVERRIDE_PATH)
@@ -75,13 +77,15 @@ def _save_local_override(key_upper: str, parsed_value) -> None:
     except Exception:
         local_overrides = {}
 
-    if "." in key_upper:
-        parent, child = key_upper.split(".", 1)
+    if "." in key:
+        parent_raw, child_raw = key.split(".", 1)
+        parent = parent_raw.upper()  # parent altijd UPPERCASE
+        child = child_raw  # child case behouden (bot config = lowercase)
         if parent not in local_overrides or not isinstance(local_overrides[parent], dict):
             local_overrides[parent] = {}
         local_overrides[parent][child] = parsed_value
     else:
-        local_overrides[key_upper] = parsed_value
+        local_overrides[key.upper()] = parsed_value
 
     local_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = str(local_path) + ".tmp"
@@ -343,25 +347,47 @@ ALLOWED_KEYS = {
 
 
 def _apply_set_command(key: str, value: str) -> str:
-    key_upper = key.upper()
-    if key_upper not in ALLOWED_KEYS:
+    # Voor dot-keys: parent UPPERCASE, child case-preserve voor lookup
+    if "." in key:
+        parent_raw, child_raw = key.split(".", 1)
+        canonical_key = f"{parent_raw.upper()}.{child_raw}"
+    else:
+        canonical_key = key.upper()
+
+    # Case-insensitive lookup zodat /set BUDGET_RESERVATION.TRAILING_PCT en
+    # /set budget_reservation.trailing_pct beide werken
+    matched_key = None
+    matched_typ = None
+    for allowed_key, allowed_typ in ALLOWED_KEYS.items():
+        if allowed_key.lower() == canonical_key.lower():
+            matched_key = allowed_key  # gebruik exacte casing uit ALLOWED_KEYS (lowercase children!)
+            matched_typ = allowed_typ
+            break
+
+    if matched_key is None:
         return (
             f"❌ Onbekende parameter: <code>{key}</code>\n\n"
             "Toegestane parameters:\n"
             + "\n".join(f"• <code>{k}</code>" for k in sorted(ALLOWED_KEYS))
         )
     try:
-        typ = ALLOWED_KEYS[key_upper]
+        typ = matched_typ
         if typ == bool:
             parsed = value.lower() in ("true", "1", "yes", "ja", "aan", "on")
         elif typ == str:
             parsed = value
         else:
             parsed = typ(value)
-        _save_local_override(key_upper, parsed)
-        return f"✅ <code>{key_upper}</code> = <code>{parsed}</code>\n⏱️ Actief na volgende bot-loop (~25s)."
+        _save_local_override(matched_key, parsed)
+        from modules.config import LOCAL_OVERRIDE_PATH
+        return (
+            f"✅ <code>{matched_key}</code> = <code>{parsed}</code>\n"
+            f"📁 Opgeslagen in: <code>%LOCALAPPDATA%/BotConfig/bot_config_local.json</code>\n"
+            f"⏱️ Actief na volgende bot-loop (~25s)."
+        )
     except Exception as e:
         return f"❌ Fout bij instellen: {e}"
+
 
 
 # ──────────────────────────────────────────

@@ -289,6 +289,8 @@
 .roadmap-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 .roadmap-three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
 @media (max-width: 1100px) { .roadmap-three-col { grid-template-columns: 1fr; } }
+.roadmap-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media (max-width: 1100px) { .roadmap-two-col { grid-template-columns: 1fr; } }
 @media (max-width: 900px) { .roadmap-columns { grid-template-columns: 1fr; } }
 
 .glass-panel {
@@ -537,8 +539,8 @@
     </div>
 </div>
 
-<!-- Three-column: Golden Rules + Deposit Plan + Earnings/Bear -->
-<div class="roadmap-three-col">
+<!-- Two-column: Golden Rules + Earnings/Bear (Stortingsplan removed) -->
+<div class="roadmap-two-col">
     <!-- Golden Rules -->
     <div class="roadmap-section">
         <div class="glass-panel">
@@ -551,28 +553,6 @@
                 </li>
                 {% endfor %}
             </ol>
-        </div>
-    </div>
-
-    <!-- Deposit Plan -->
-    <div class="roadmap-section">
-        <div class="glass-panel">
-            <h3>💰 Stortingsplan</h3>
-            <table class="deposit-table">
-                <thead>
-                    <tr><th>Maand</th><th>Storting</th><th>Geschat</th><th></th></tr>
-                </thead>
-                <tbody>
-                    {% for d in deposit_plan %}
-                    <tr{% if d.done %} class="done"{% endif %}>
-                        <td>{{ d.month }}</td>
-                        <td class="mono">€{{ d.deposit }}</td>
-                        <td class="mono">€{{ d.est }}</td>
-                        <td>{% if d.done %}✅{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
         </div>
     </div>
 
@@ -626,24 +606,34 @@
                 <a href="?deposit=100" class="{% if monthly_deposit == 100 %}active{% endif %}">€100/m</a>
                 <a href="?deposit=200" class="{% if monthly_deposit == 200 %}active{% endif %}">€200/m</a>
                 <a href="?deposit=300" class="{% if monthly_deposit == 300 %}active{% endif %}">€300/m</a>
+                <a href="?deposit=500" class="{% if monthly_deposit == 500 %}active{% endif %}">€500/m</a>
+                <a href="?deposit=1000" class="{% if monthly_deposit == 1000 %}active{% endif %}">€1000/m</a>
             </div>
             <table class="scenario-table">
                 <thead>
-                    <tr><th>Storting/maand</th><th>→ €2.000</th><th>→ €5.000</th><th>→ €10.000</th></tr>
+                    <tr>
+                        <th>Storting/maand</th>
+                        {% for t in scenario_targets %}
+                        <th>→ €{{ "{:,.0f}".format(t).replace(",",".") }}</th>
+                        {% endfor %}
+                    </tr>
                 </thead>
                 <tbody>
                     {% for s in deposit_scenarios %}
                     <tr class="{% if s.is_current %}is-current{% endif %}">
                         <td>€{{ s.monthly }}</td>
-                        <td>{{ s.eta_2k }}</td>
-                        <td>{{ s.eta_5k }}</td>
-                        <td>{{ s.eta_10k }}</td>
+                        {% for eta in s.etas %}
+                        <td>{{ eta }}</td>
+                        {% endfor %}
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
             <div style="font-size: 0.72rem; color: var(--text-tertiary,#6e7681); margin-top: 0.6rem; line-height: 1.4;">
-                ETA berekend met compounding: <code>kapitaal × (1+groei%) + storting/week</code> per week tot doel bereikt.
+                ✅ <strong>Trading-winst wordt automatisch herbelegd</strong> in de simulatie:
+                <code>kapitaal × (1+groei%) + storting/week</code> per week tot doel bereikt.
+                De groei% wordt elke week toegepast op het reeds-gegroeide kapitaal
+                — dus zowel rente-op-rente (compounding) als rente-op-stortingen.<br/>
                 Huidige groei: <strong>{{ "%.2f"|format(growth_per_week_pct) }}%/week</strong>.
             </div>
         </div>
