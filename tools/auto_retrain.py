@@ -110,6 +110,16 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_config() -> Dict:
+    # Use the project's 3-layer config loader (base + overrides + LOCAL),
+    # so settings in %LOCALAPPDATA%/BotConfig/bot_config_local.json are honored.
+    # Falls back to reading the base file if the loader is unavailable.
+    try:
+        from modules.config import load_config as _load_config
+        cfg = _load_config() or {}
+        if cfg:
+            return cfg
+    except Exception as exc:  # pragma: no cover - defensive
+        log(f'auto_retrain: kon modules.config.load_config niet gebruiken ({exc}); val terug op base config.', level='warning')
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(f'Config file not found at {CONFIG_PATH}')
     with CONFIG_PATH.open('r', encoding='utf-8') as fh:
