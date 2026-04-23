@@ -125,7 +125,7 @@ Analyse van alle 584 echte trades + 68 trades uit de laatste 6 weken onthulde:
 | **≤€1.000** ✅ | *V1 bereikt — Grid BTC aan* | 4 | 56 | 28 | 17 | 2,4% | €150 BTC |
 | **€1.200** ✅ | *V1: 5 trades, BASE 62* | 5 | 62 | 30 | 17 | 2,4% | €150 BTC |
 | **€1.240** ✅ | *V2 START: BASE 150, 4 trades* | 4 | 150 | 30 | 6 | 2,4% | €150 BTC |
-| **€1.450** ← nu | **V2.1: NO-RESERVE — Size-floor + EV-sizing + tighter trailing** | **4** | **200** | **40** | **2** | **2,2% / act 2,5%** | UIT |
+| **€1.450** ← nu | **V2.1: FULL-DEPLOY — size-floor + EV-sizing + tighter trailing** | **4** | **320** | **20** | **2** | **2,2% / act 2,5%** | UIT |
 | **€1.500** | ↑ Grid +ETH (€250 totaal) | 4 | 150 | 30 | 6 | 2,4% | **€250 BTC+ETH** |
 | **€1.800** | ↑ 5 trades, BASE 160, DCA 35 | **5** | **160** | **35** | **6** | 2,3% | €250 |
 | **€2.200** | ↑ BASE 180, DCA 40, Grid +LINK | 5 | **180** | **40** | **6** | 2,3% | **€400 3 mktn** |
@@ -210,13 +210,13 @@ Analyse van alle 584 echte trades + 68 trades uit de laatste 6 weken onthulde:
 - Profit-lock ratchet replay (33 trades): **+18%** door bestaande `STEPPED_TRAILING_LEVELS` strakker te trekken (config-only, geen nieuwe module nodig).
 - Portfolio: €1.450 (was €1.240 bij V2-start). Oude config (BASE=1000, MAX=6, DCA=61x5) was **6× over-leveraged** voor deze portefeuille.
 
-**Wijzigingen (lokale config) — NO-RESERVE variant (gekozen 23 apr):**
+**Wijzigingen (lokale config) — FULL-DEPLOY variant (gekozen 23 apr):**
 
 ```json
 {
-  "BASE_AMOUNT_EUR": 200,
+  "BASE_AMOUNT_EUR": 320,
   "MAX_OPEN_TRADES": 4,
-  "DCA_AMOUNT_EUR": 40,
+  "DCA_AMOUNT_EUR": 20,
   "DCA_MAX_BUYS": 2,
   "DCA_MAX_ORDERS": 2,
   "MIN_BALANCE_EUR": 0,
@@ -230,18 +230,20 @@ Analyse van alle 584 echte trades + 68 trades uit de laatste 6 weken onthulde:
 }
 ```
 
-**Budget check (worst case, alle slots vol + alle DCAs gevuld):**
-- Per trade max (zonder EV-boost): 200 + 40×2 = €280
-- Alle 4 slots vol: 4 × 280 = **€1.120 (77%)** — bewust geen reserve afgedwongen
-- Met EV-boost (avg 1,3x op winners): ~€900-€1.200 typisch (62-83%)
-- Reserve: niet hard afgedwongen (`MIN_BALANCE_EUR=0`) — kapitaal werkt voor je
-- Grid: UIT — focus 100% op trailing-bot voor maximale capital-efficiency op deze schaal
+**Budget check (kapitaal echt aan het werk):**
+- Per trade typical: 320 EUR (geen DCA, geldt voor 70% van trades)
+- Per trade worst: 320 + 20×2 = **€360**
+- Alle 4 slots typical: 4 × 320 = **€1.280 (88%)** — €170 cash buffer voor fees+slippage
+- Alle 4 slots worst: 4 × 360 = **€1.440 (99%)** — binnen portfolio
+- Met EV-boost: winners 320×1,8 = €576, losers 320×0,5 = €160 (auto-allocatie naar SOL/XRP/UNI)
+- DCA bewust klein (20×2): 97% van historische trades trigger nooit DCA
+- Grid: UIT — 100% trailing-bot focus
 
 **Verwachte opbrengst (geprojecteerd uit backtest):**
-- Sim PnL op 123 trades sinds 1 maart 2026: **+€431,63** (vs realiteit +€116,59 = **+270% verbetering**)
-- Per week: ~€55-€65 (vs huidige €14,57/week)
-- Per maand: ~€220-€260
-- Caveat: backtest schaalt PnL lineair; bij €200+/trade op kleinere alts kan slippage 5-10% afsnijden
+- Sim PnL op 123 trades sinds 1 maart 2026: **+€673** (vs realiteit +€117 = **+477% verbetering**)
+- Per week: ~€85-€100 (vs huidige €14,57/week)
+- Per maand: ~€340-€400
+- Caveat: backtest schaalt PnL lineair; bij €300+/trade op kleinere alts (FET, ENJ, GALA) kan slippage 5-15% afsnijden → reele projectie ~€570-€640
 
 **Bootstrap stap (eenmalig, al uitgevoerd 23 april):**
 ```powershell

@@ -5,6 +5,29 @@
 
 ---
 
+## #039 — €1.450 sizing FINAL: full-deployment 88% typical, 99% worst (2026-04-23)
+
+### Symptom
+Vorige iteratie #038 (BASE=200, MAX=4) liet typical 4×200 = €800 = 55% van portfolio idle. Gebruiker terecht op gewezen: "200×4 = 800, 600 idle".
+
+### Fix
+Echte volledige deployment via wijdere grid-search (BASE 200-350, MAX 3-5, DCA 20-50 × 1-3):
+- `BASE_AMOUNT_EUR`: 200 → **320**
+- `DCA_AMOUNT_EUR`: 40 → **20** (klein want 97% trades trigger nooit DCA)
+- `DCA_MAX_BUYS`/`ORDERS`: 2 → **2** (ongewijzigd)
+- `MAX_OPEN_TRADES`: 4 (ongewijzigd, behoudt diversificatie boven 3-slots winners)
+
+Numeriek:
+- Typical (geen DCA): 4 × 320 = **€1.280 = 88%** van €1.450
+- Worst (alle DCAs gevuld): 4 × 360 = **€1.440 = 99%**
+- Cash buffer: ~€170 voor fees+slippage
+- Sim PnL: **+€673** op 123 trades = **+477% vs realized** = ~+€95/week
+
+### Lesson
+Bij "all capital deployed" moet de typical-case (no-DCA) zelf al ~85-90% zijn. Anders zit het meeste idle want 97% van trades doet geen DCA. DCA klein houden + BASE groot maken = correct. 3-slots config (BASE=350, MAX=3) gaf marginaal hogere PnL maar concentratierisico op single market crash is te hoog.
+
+---
+
 ## #038 — €1.450 sizing upgrade naar NO-RESERVE profiel (2026-04-23)
 
 ### Symptom
