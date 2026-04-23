@@ -3553,14 +3553,64 @@ def save_strategy_parameters():
             except (ValueError, TypeError) as e:
                 logger.warning(f"Failed to convert grid_pct: {e}")
 
-        # Write updated config
-        write_json_compat(str(config_path), config, indent=2)
-        load_config(force=True)  # Reload cached config
-        
+        # CRITICAL: write ONLY the changed/relevant keys to the LOCAL override
+        # file (%LOCALAPPDATA%/BotConfig/bot_config_local.json). The OneDrive-
+        # synced base config is read-only from the dashboard's perspective —
+        # OneDrive will revert anything we write there. The local override file
+        # loads LAST in modules/config.py and wins over everything.
+        try:
+            from modules.config import LOCAL_OVERRIDE_PATH as _LOCAL_PATH
+        except Exception:
+            _LOCAL_PATH = os.path.join(
+                os.environ.get('LOCALAPPDATA', os.path.expanduser('~')),
+                'BotConfig', 'bot_config_local.json'
+            )
+
+        # Build a delta of just the keys we actually mapped from the form.
+        touched_keys = set()
+        for form_field, (config_key, _conv) in field_mapping.items():
+            if form_field in data:
+                touched_keys.add(config_key)
+        if 'grid_pct' in data:
+            touched_keys.add('BUDGET_RESERVATION')
+
+        # Load existing local overrides (if any) and merge our touched keys.
+        local_cfg = {}
+        try:
+            if os.path.exists(_LOCAL_PATH):
+                with open(_LOCAL_PATH, 'r', encoding='utf-8-sig') as _lf:
+                    local_cfg = json.load(_lf) or {}
+        except Exception as _exc:
+            logger.warning(f"Could not read existing local override file ({_exc}); starting fresh.")
+            local_cfg = {}
+
+        for k in touched_keys:
+            if k in config:
+                local_cfg[k] = config[k]
+
+        # Atomic write to the LOCAL override file
+        try:
+            os.makedirs(os.path.dirname(_LOCAL_PATH), exist_ok=True)
+            tmp_path = _LOCAL_PATH + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as _lf:
+                json.dump(local_cfg, _lf, indent=2, ensure_ascii=False)
+            os.replace(tmp_path, _LOCAL_PATH)
+        except Exception as _exc:
+            logger.error(f"Failed to write local override file {_LOCAL_PATH}: {_exc}", exc_info=True)
+            return jsonify({'error': f'Could not save to local override file: {_exc}'}), 500
+
+        # Reload cached config so the dashboard immediately reflects the change.
+        try:
+            load_config(force=True)
+        except Exception:
+            pass
+
         return jsonify({
             'status': 'ok',
-            'message': f'Parameters saved successfully ({updated_count} fields updated)',
-            'updated_count': updated_count
+            'message': f'Parameters saved ({updated_count} fields) to local override — wins over OneDrive base config.',
+            'updated_count': updated_count,
+            'saved_to': _LOCAL_PATH,
+            'saved_keys': sorted(touched_keys),
         })
         
     except Exception as e:
@@ -3915,38 +3965,65 @@ def roadmap():
         pass
 
     # ── Dynamic data: ETA per milestone + growth rate ──
+    # User-selectable deposit scenario via ?deposit=100|200|0
+    try:
+        monthly_deposit = float(request.args.get('deposit', 100))
+    except Exception:
+        monthly_deposit = 100.0
+    monthly_deposit = max(0.0, min(2000.0, monthly_deposit))
+    deposit_per_week = monthly_deposit / 4.33
+
     growth_per_week = 0.0
-    deposit_per_week = 100 / 4.33  # ~€23/week avg for active deposit months
+    growth_per_week_pct = 0.0  # % of portfolio per week
     try:
         if len(balance_sparkline) >= 7:
-            # Growth over last 14 days (or available)
+            # Growth over last 14 days (or available), strip out deposits
             span_days = min(14, len(balance_sparkline))
             recent = balance_sparkline[-span_days:]
             val_start = recent[0]['value']
             val_end = recent[-1]['value']
             if val_start > 0:
-                growth_per_week = (val_end - val_start) / span_days * 7
+                # Subtract pro-rated deposits to isolate trading growth
+                deposits_in_span = (monthly_deposit / 30.0) * span_days
+                pure_growth = (val_end - val_start) - deposits_in_span
+                growth_per_week = pure_growth / span_days * 7
+                growth_per_week_pct = (growth_per_week / val_start) * 100 if val_start else 0
     except Exception:
         pass
 
-    # Compute ETA for each upcoming milestone
+    # Compute ETA for each upcoming milestone (compounding model:
+    # value_next = value * (1 + growth_pct) + deposit_per_week)
     import math
     for m in milestones:
         if current_value >= m['value']:
             m['eta'] = ''
             m['eta_weeks'] = 0
         else:
-            gap = m['value'] - current_value
-            weekly_rate = growth_per_week + deposit_per_week
-            if weekly_rate > 0:
-                weeks = gap / weekly_rate
-                m['eta_weeks'] = round(weeks, 1)
-                from datetime import datetime as _dt, timedelta as _td
-                eta_date = _dt.now() + _td(weeks=weeks)
-                m['eta'] = eta_date.strftime('%d %b %Y')
-            else:
+            # Simulate week-by-week up to a hard cap of 520 weeks (10y)
+            weeks = 0
+            simv = current_value
+            growth_factor = 1 + (growth_per_week_pct / 100.0)
+            target = m['value']
+            # Guard against pathological negative growth + zero deposit
+            if growth_per_week_pct <= 0 and deposit_per_week <= 0:
                 m['eta'] = '?'
                 m['eta_weeks'] = 0
+                continue
+            while simv < target and weeks < 520:
+                simv = simv * growth_factor + deposit_per_week
+                weeks += 1
+            if weeks >= 520:
+                m['eta'] = '> 10 jaar'
+                m['eta_weeks'] = 520
+            else:
+                m['eta_weeks'] = weeks
+                from datetime import datetime as _dt, timedelta as _td
+                eta_date = _dt.now() + _td(weeks=weeks)
+                # Show month + year for milestones > 12 weeks away, else date
+                if weeks > 12:
+                    m['eta'] = eta_date.strftime('%b %Y')
+                else:
+                    m['eta'] = eta_date.strftime('%d %b %Y')
 
     # ── Next milestone detail card ──
     next_milestone = None
@@ -4067,6 +4144,116 @@ def roadmap():
         {'trigger': 'Trigger 3: Portfolio −25%+ (crash)', 'action': 'Noodconfig: 3 trades, €50 BASE, Grid uit. Wacht op stabilisatie.'},
     ]
 
+    # ── Passive Income Estimator at multiple capital levels ──
+    # Use real recent winrate and average profit per trade to estimate
+    # daily yield in %. Falls back to a conservative 0.18%/day if no data.
+    daily_yield_pct = 0.18
+    try:
+        if perf_stats.get('total_trades', 0) >= 30 and perf_stats.get('total_profit', 0) > 0:
+            # Approximate: weekly_profit / current_value gives weekly yield
+            if growth_per_week_pct > 0:
+                # Cap at 5%/day to stay realistic
+                daily_yield_pct = min(5.0, growth_per_week_pct / 7.0)
+        # Recent weekly profit fallback
+        if growth_per_week_pct == 0 and weekly_profits:
+            recent_avg = sum(w['profit'] for w in weekly_profits[-4:]) / max(1, len(weekly_profits[-4:]))
+            if current_value > 0 and recent_avg > 0:
+                daily_yield_pct = min(5.0, (recent_avg / current_value) * 100 / 7.0)
+    except Exception:
+        pass
+
+    passive_income_table = []
+    for cap in [1500, 2000, 3000, 5000, 7500, 10000, 15000, 25000, 50000]:
+        day_eur = cap * (daily_yield_pct / 100.0)
+        passive_income_table.append({
+            'capital': cap,
+            'day': round(day_eur, 2),
+            'week': round(day_eur * 7, 2),
+            'month': round(day_eur * 30, 2),
+            'year': round(day_eur * 365, 2),
+            'is_current': cap <= current_value < (cap * 1.5) if cap < 50000 else current_value >= cap,
+        })
+
+    # ── Deposit scenarios for ETA comparison (€0/€100/€200/€300 per maand) ──
+    deposit_scenarios = []
+    for scenario_dep in [0, 100, 200, 300]:
+        weekly_dep = scenario_dep / 4.33
+        # Find time to €2k, €5k, €10k under this scenario
+        targets = [2000, 5000, 10000]
+        target_etas = {}
+        for t in targets:
+            if current_value >= t:
+                target_etas[t] = '✅'
+                continue
+            simv = current_value
+            weeks = 0
+            growth_factor = 1 + (growth_per_week_pct / 100.0)
+            if growth_per_week_pct <= 0 and weekly_dep <= 0:
+                target_etas[t] = '∞'
+                continue
+            while simv < t and weeks < 520:
+                simv = simv * growth_factor + weekly_dep
+                weeks += 1
+            if weeks >= 520:
+                target_etas[t] = '> 10j'
+            else:
+                from datetime import datetime as _dt, timedelta as _td
+                eta_date = _dt.now() + _td(weeks=weeks)
+                target_etas[t] = eta_date.strftime('%b %Y') if weeks > 12 else eta_date.strftime('%d %b')
+        deposit_scenarios.append({
+            'monthly': scenario_dep,
+            'is_current': scenario_dep == int(monthly_deposit),
+            'eta_2k': target_etas.get(2000, '?'),
+            'eta_5k': target_etas.get(5000, '?'),
+            'eta_10k': target_etas.get(10000, '?'),
+        })
+
+    # ── Future / advanced roadmap ideas ──
+    future_ideas = [
+        {'icon': '🤖', 'title': 'Multi-strategy A/B testing',
+         'desc': 'Draai 2 config-varianten parallel met €100 sandbox-budget en kies wekelijks de beste.'},
+        {'icon': '🔁', 'title': 'Dynamische grid-uitbreiding',
+         'desc': 'Open automatisch nieuwe grid op tweede coin (ETH) zodra BTC-grid 30 dagen +PnL toont.'},
+        {'icon': '🧠', 'title': 'Sentiment overlay (Fear & Greed + funding rates)',
+         'desc': 'Verlaag MAX_OPEN_TRADES bij Greed >75, verhoog bij Fear <25. Reduceer drawdown rond pieken.'},
+        {'icon': '📊', 'title': 'Per-coin Kelly-sizing',
+         'desc': 'Kelly fractie per coin in plaats van globaal — meer kapitaal naar bewezen winners (SOL, NEAR).'},
+        {'icon': '⏱️', 'title': 'Time-of-day filter',
+         'desc': 'Statistiek toont winst-verdeling per uur. Skip slechtste 4 uur = +5% winrate.'},
+        {'icon': '💸', 'title': 'Auto-withdraw bij doel',
+         'desc': 'Bij elke €1k milestone: stuur automatisch 30% naar spaarrekening (lock-in winst).'},
+        {'icon': '🛡️', 'title': 'Hedge tab uitbreiden met perpetuals',
+         'desc': 'Korte BTC-perp short bij portfolio +10% in week — beschermt tegen mean-reversion crash.'},
+        {'icon': '🪙', 'title': 'Staking-integratie tijdens HODL',
+         'desc': 'HODL-tab coins automatisch staken (ETH, SOL, ADA) — passief 3-7%/jaar bovenop trading.'},
+        {'icon': '🌐', 'title': 'Multi-exchange arbitrage',
+         'desc': 'Vergelijk Bitvavo prijzen met Kraken/Binance — alleen handelen wanneer Bitvavo +0,4% spread.'},
+        {'icon': '🎯', 'title': 'Capital plan optimizer',
+         'desc': 'AI berekent optimale BASE/MAX_TRADES/DCA per nieuwe milestone i.p.v. handmatige fasering.'},
+        {'icon': '📱', 'title': 'Push-notificaties bij milestone-bereik',
+         'desc': 'Telegram/discord bericht "🎉 €2.000 bereikt!" + voorgestelde nieuwe config.'},
+        {'icon': '🔍', 'title': 'Backtest-knop op dashboard',
+         'desc': 'Selecteer config + datumrange → run backtest in 30s → toon equity-curve vóór live deploy.'},
+    ]
+
+    # ── Auto-retrain status (read from ai/ai_model_metrics.json) ──
+    autoretrain_status = {'enabled': False, 'last_trained': None, 'next_due': None, 'interval_days': 7}
+    try:
+        autoretrain_status['enabled'] = bool(config.get('AI_AUTO_RETRAIN_ENABLED', False))
+        autoretrain_status['interval_days'] = int(config.get('AI_RETRAIN_INTERVAL_DAYS', 7) or 7)
+        metrics_path = PROJECT_ROOT / 'ai' / 'ai_model_metrics.json'
+        if metrics_path.exists():
+            with metrics_path.open('r', encoding='utf-8') as _mf:
+                _m = json.load(_mf)
+            ts = int(_m.get('trained_at', 0) or 0)
+            if ts:
+                from datetime import datetime as _dt2, timedelta as _td2
+                autoretrain_status['last_trained'] = _dt2.fromtimestamp(ts).strftime('%d %b %Y %H:%M')
+                next_dt = _dt2.fromtimestamp(ts) + _td2(days=autoretrain_status['interval_days'])
+                autoretrain_status['next_due'] = next_dt.strftime('%d %b %Y %H:%M')
+    except Exception:
+        pass
+
     return render_template('roadmap.html',
         milestones=milestones,
         current_value=current_value,
@@ -4088,6 +4275,13 @@ def roadmap():
         bot_running=is_bot_online(heartbeat, config),
         ai_running=heartbeat.get('ai_active', False),
         active_tab='roadmap',
+        passive_income_table=passive_income_table,
+        daily_yield_pct=round(daily_yield_pct, 3),
+        deposit_scenarios=deposit_scenarios,
+        future_ideas=future_ideas,
+        monthly_deposit=int(monthly_deposit),
+        autoretrain_status=autoretrain_status,
+        growth_per_week_pct=round(growth_per_week_pct, 3),
     )
 
 

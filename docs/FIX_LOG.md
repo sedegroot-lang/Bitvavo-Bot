@@ -5,6 +5,51 @@
 
 ---
 
+## #045 — Dashboard Parameters tab schreef wijzigingen naar OneDrive base config + RSI Max DCA validatie blokkeerde 100 + Roadmap miste deposit-scenario's en multi-level passief inkomen (2026-04-23)
+
+### Symptom / Aanleiding
+Gebruiker meldde dat:
+1. "Als ik wat aanpas of het ook echt veranderd" → **wijzigingen werden NIET persistent**: `/api/strategy/save` schreef naar `config/bot_config.json` (OneDrive!) → werd elke sync gereverteerd.
+2. RSI Max DCA veld toonde HTML5 popup "minimaal 70" terwijl waarde 100 → input had `min="30" max="70"`, browser zei "Value must be ≤ 70" → user las dat als minimum.
+3. Roadmap-tab toonde alleen "Opbrengst bij €6.000", geen scenarios voor andere kapitaalniveaus, geen ETA per stortingsbedrag.
+4. Algemene "rommelige" layout van Parameters-tab — vrijwel geen CSS voor `.param-field`/`.params-grid`/`.input-row`/`.ai-switch`.
+5. Vraag: "doet auto_retrain zelf de retrain? blijft timer staan na restart?"
+
+### Root cause
+1. `tools/dashboard_flask/app.py::save_strategy_parameters()` deed `write_json_compat(str(config_path), config)` waar `config_path = PROJECT_ROOT/config/bot_config.json` — strijdig met de project-regel "ALL config changes MUST go to `%LOCALAPPDATA%/BotConfig/bot_config_local.json`".
+2. Templates `parameters.html` had hardcoded `min/max` op RSI-velden (`30-40`, `60-90`, `30-70`) terwijl RSI gewoon 0-100 is.
+3. Roadmap had één hardcoded `earnings_at_5k` dict en één globale ETA met vaste deposit_per_week.
+4. CSS-classes (`.params-grid`, `.param-field`, `.ctrl-btn`, `.ai-switch`, `.params-save-bar`) waren nergens gedefinieerd in `dashboard.css` → browser fallback layout.
+5. Auto_retrain DOES self-run (`auto_retrain.py --loop` via `start_automated.ps1`) en IS restart-safe (`trained_at` opgeslagen in `ai/ai_model_metrics.json`, `compute_due_time` rekent vanaf laatste training). Geen bug, alleen onduidelijkheid.
+
+### Fix
+- **MOD** `tools/dashboard_flask/app.py::save_strategy_parameters`: schrijft nu **alleen** geraakte keys naar `LOCAL_OVERRIDE_PATH` (`%LOCALAPPDATA%/BotConfig/bot_config_local.json`), gemerged met bestaande lokale overrides. Atomic write (`.tmp` + `os.replace`). Response geeft `saved_to` + `saved_keys` terug.
+- **MOD** `templates/parameters.html`: RSI-velden naar `min="0" max="100"` met tooltips. Sticky save bar met live-status ("Onopgeslagen wijzigingen" / "Opgeslagen naar local override"). Param-fields markeren met `.dirty` class bij wijziging.
+- **MOD** `templates/roadmap.html` + `app.py::roadmap`:
+  - `?deposit=0|100|200|300` selector → herberekent ETA's met compounding model `simv = simv*(1+groei) + deposit/week` per week tot doel.
+  - Nieuwe **Passief Inkomen tabel** voor 9 kapitaalniveaus (€1.5k → €50k) met /dag, /maand, /jaar op basis van werkelijke recente daily yield% uit performance-stats.
+  - Nieuwe **Stortingsscenario tabel**: ETA naar €2k/€5k/€10k voor 4 deposit-niveaus naast elkaar.
+  - Nieuwe **Auto-Retrain Status panel**: leest `ai/ai_model_metrics.json` → toont last/next + uitleg dat timer restart-safe is.
+  - Nieuwe **Geavanceerde Roadmap-ideeën** sectie: 12 advanced ideas (multi-strategy A/B, sentiment overlay, per-coin Kelly, time-of-day filter, auto-withdraw, hedge perpetuals, staking, multi-exchange arbitrage, capital plan optimizer, push-notif, backtest button).
+- **MOD** `static/css/dashboard.css`: 200 regels nieuwe styling voor params-form (clean grid, hover, dirty marker, AI toggle switch, sticky save bar, slide-in toast).
+
+### Files
+- MOD: `tools/dashboard_flask/app.py` (save endpoint + roadmap route met scenarios/passive income/future ideas/autoretrain)
+- MOD: `tools/dashboard_flask/templates/parameters.html` (RSI bounds + sticky save bar + dirty markers + saved-to feedback)
+- MOD: `tools/dashboard_flask/templates/roadmap.html` (4 nieuwe panels + CSS)
+- MOD: `tools/dashboard_flask/static/css/dashboard.css` (~200 regels params-form V2 styling)
+
+### Validatie
+- `Invoke-WebRequest /roadmap?deposit=200` → 200 OK, alle 4 nieuwe sections aanwezig (Passief Inkomen, Stortingsscenario, Auto-Retrain, Geavanceerde Roadmap-ideeën).
+- `Invoke-WebRequest /parameters` → 200 OK, sticky save bar + local override hint + RSI 0-100 aanwezig.
+- POST `/api/strategy/save` met `{"max_open_trades":4}` → response `saved_to: %LOCALAPPDATA%/BotConfig/bot_config_local.json`, `saved_keys: [MAX_OPEN_TRADES]`. Verified met PowerShell read-back: `MAX_OPEN_TRADES = 4` in local override file.
+- Bot restart: 16 procs running.
+
+### Lesson Learned
+**Dashboard write-paths moeten ALTIJD naar LOCAL_OVERRIDE_PATH gaan.** Elke `/api/.../save` route die `config/bot_config.json` direct schrijft is een bug waiting to happen — OneDrive reverteert. Check ook andere endpoints (whitelist/blacklist/reset/etc.) — die staan nog steeds op `bot_config.json` en moeten apart geaudit worden bij volgende sessie.
+
+---
+
 ## #044 — Regular XGB nooit (her)getraind: trade_features.csv ontbrak + bb_position/stochastic_k werden niet gelogd (2026-04-23)
 
 ### Symptom / Aanleiding

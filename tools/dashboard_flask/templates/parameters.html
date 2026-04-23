@@ -220,7 +220,7 @@
                     </div>
                 </div>
                 <div class="input-row">
-                    <input type="number" class="form-input" name="rsi_oversold" value="{{ params.rsi_oversold|default(30, true) }}" min="10" max="40">
+                    <input type="number" class="form-input" name="rsi_oversold" value="{{ params.rsi_oversold|default(30, true) }}" min="0" max="100" title="RSI-waarde 0-100 (typisch 20-40 voor oversold)">
                     <div class="input-controls">
                         <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_oversold', -1)">−</button>
                         <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_oversold', 1)">+</button>
@@ -238,7 +238,7 @@
                     </div>
                 </div>
                 <div class="input-row">
-                    <input type="number" class="form-input" name="rsi_overbought" value="{{ params.rsi_overbought|default(65, true) }}" min="60" max="90">
+                    <input type="number" class="form-input" name="rsi_overbought" value="{{ params.rsi_overbought|default(65, true) }}" min="0" max="100" title="RSI-waarde 0-100 (typisch 60-80 voor overbought)">
                     <div class="input-controls">
                         <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_overbought', -1)">−</button>
                         <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_overbought', 1)">+</button>
@@ -256,7 +256,7 @@
                     </div>
                 </div>
                 <div class="input-row">
-                    <input type="number" class="form-input" name="rsi_max_dca" value="{{ params.rsi_max_dca|default(55, true) }}" min="30" max="70">
+                    <input type="number" class="form-input" name="rsi_max_dca" value="{{ params.rsi_max_dca|default(55, true) }}" min="0" max="100" title="Max RSI waarop DCA-buy nog mag (0-100, 100 = altijd toegestaan)">
                     <div class="input-controls">
                         <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_max_dca', -1)">−</button>
                         <button type="button" class="ctrl-btn" onclick="adjustValue('rsi_max_dca', 1)">+</button>
@@ -1227,13 +1227,14 @@
 </section>
 
 <!-- Save Actions -->
-<div class="form-actions-sticky">
-    <button type="submit" class="btn btn-primary btn-lg">💾 Save Parameters</button>
-    <button type="button" class="btn btn-ai" onclick="getAIOptimization()">
-        <span class="btn-icon">🤖</span> AI Optimize All
-    </button>
-    <button type="button" class="btn btn-secondary" onclick="resetDefaults()">🔄 Reset to Defaults</button>
-    <button type="button" class="btn btn-secondary" onclick="exportParams()">📥 Export</button>
+<div class="params-save-bar">
+    <div class="save-status" id="save-status">
+        💾 Wijzigingen worden opgeslagen in <code>%LOCALAPPDATA%\BotConfig\bot_config_local.json</code>
+    </div>
+    <button type="submit" class="save-btn primary">💾 Save Parameters</button>
+    <button type="button" class="save-btn secondary" onclick="getAIOptimization()">🤖 AI Optimize All</button>
+    <button type="button" class="save-btn secondary" onclick="resetDefaults()">🔄 Reset to Defaults</button>
+    <button type="button" class="save-btn secondary" onclick="exportParams()">📥 Export</button>
 </div>
 </form>
 
@@ -1876,7 +1877,17 @@ document.getElementById('strategy-form').addEventListener('submit', async functi
         const result = await response.json();
         
         if (response.ok) {
-            showNotification(`✅ ${result.message || 'Parameters saved successfully!'}`, 'success');
+            const savedTo = result.saved_to ? ('<br><small style="opacity:.7;">→ ' + result.saved_to + '</small>') : '';
+            const savedKeys = (result.saved_keys && result.saved_keys.length)
+                ? ('<br><small style="opacity:.7;">Keys: ' + result.saved_keys.join(', ') + '</small>')
+                : '';
+            showNotification(`✅ ${result.message || 'Parameters saved!'}${savedTo}${savedKeys}`, 'success');
+            const status = document.getElementById('save-status');
+            if (status) {
+                status.classList.remove('dirty');
+                status.classList.add('saved');
+                status.innerHTML = `✅ Opgeslagen naar local override (${result.updated_count || 0} velden) — wint over OneDrive base config.`;
+            }
             clearDirtyState();
             console.log('Save success:', result);
         } else {
@@ -1984,18 +1995,28 @@ document.addEventListener('DOMContentLoaded', function() {
     // Track form dirty state
     const form = document.getElementById('strategy-form');
     if (form) {
-        form.addEventListener('input', function() {
+        const _markDirty = function(ev) {
             if (!formDirty) {
                 formDirty = true;
                 showDirtySaveBar();
+                const status = document.getElementById('save-status');
+                if (status) {
+                    status.classList.remove('saved');
+                    status.classList.add('dirty');
+                    status.innerHTML = '⚠️ Onopgeslagen wijzigingen — klik <strong>Save Parameters</strong> om naar local override te schrijven.';
+                }
             }
-        });
-        form.addEventListener('change', function() {
-            if (!formDirty) {
-                formDirty = true;
-                showDirtySaveBar();
-            }
-        });
+            // Mark the specific .param-field with .dirty so user sees what changed
+            try {
+                const tgt = ev && ev.target;
+                if (tgt) {
+                    const field = tgt.closest('.param-field');
+                    if (field) field.classList.add('dirty');
+                }
+            } catch (e) { /* ignore */ }
+        };
+        form.addEventListener('input', _markDirty);
+        form.addEventListener('change', _markDirty);
     }
     
     // Warn on navigate away with unsaved changes
@@ -2025,6 +2046,7 @@ function clearDirtyState() {
     formDirty = false;
     const bar = document.getElementById('dirty-save-bar');
     if (bar) bar.remove();
+    document.querySelectorAll('.param-field.dirty').forEach(f => f.classList.remove('dirty'));
 }
 </script>
 {% endblock %}
