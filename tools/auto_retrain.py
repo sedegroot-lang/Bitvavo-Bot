@@ -90,7 +90,12 @@ _PROJECT_ROOT = _TOOLS_DIR.parent
 
 CONFIG_PATH = _PROJECT_ROOT / 'config' / 'bot_config.json'
 METRICS_PATH = _PROJECT_ROOT / 'ai' / 'ai_model_metrics.json'
-TRAIN_SCRIPT = _PROJECT_ROOT / 'ai' / 'xgb_train_enhanced.py'
+# Regular 7-feature trainer that writes to ai/ai_xgb_model.json (the model the bot loads).
+# xgb_train_enhanced.py is intentionally NOT used here - it produces a 5-feature
+# post-trade model and would break entry-signal predictions.
+TRAIN_SCRIPT = _PROJECT_ROOT / 'ai' / 'xgb_walk_forward.py'
+TRAIN_DATA_PATH = _PROJECT_ROOT / 'trade_features.csv'
+MIN_TRAIN_SAMPLES = 100
 DEFAULT_LOOP_SECONDS = 900  # 15 minutes
 
 
@@ -173,8 +178,38 @@ def compute_due_time(last_ts: int, interval_days: int, target_time: dt_time) -> 
 
 
 def build_train_command(cfg_args: Dict) -> list:
-    # xgb_train_enhanced.py uses no CLI args — it reads config and trade_log directly
-    return [sys.executable, str(TRAIN_SCRIPT)]
+    # xgb_walk_forward.py supports --window/--step; defaults are sensible.
+    cmd = [sys.executable, str(TRAIN_SCRIPT)]
+    try:
+        if isinstance(cfg_args, dict):
+            window = cfg_args.get('window')
+            step = cfg_args.get('step')
+            if window:
+                cmd += ['--window', str(int(window))]
+            if step:
+                cmd += ['--step', str(int(step))]
+    except Exception:
+        pass
+    return cmd
+
+
+def _training_data_ready() -> Tuple[bool, str]:
+    """Check whether enough labelled feature data exists to safely (re)train.
+
+    Returns (ready, reason). When not ready, the caller should SKIP training
+    rather than break the running bot's model.
+    """
+    if not TRAIN_DATA_PATH.exists():
+        return False, f'no training data at {TRAIN_DATA_PATH.name}'
+    try:
+        with TRAIN_DATA_PATH.open('r', encoding='utf-8') as fh:
+            # subtract 1 for header
+            rows = sum(1 for _ in fh) - 1
+        if rows < MIN_TRAIN_SAMPLES:
+            return False, f'only {rows} rows in {TRAIN_DATA_PATH.name} (need >= {MIN_TRAIN_SAMPLES})'
+    except Exception as exc:
+        return False, f'cannot read {TRAIN_DATA_PATH.name}: {exc}'
+    return True, ''
 
 
 def maybe_retrain(args: argparse.Namespace) -> Dict[str, object]:
@@ -203,26 +238,39 @@ def maybe_retrain(args: argparse.Namespace) -> Dict[str, object]:
         return {'ran': False, 'next_due': due_dt, 'last_trained': last_ts}
 
     train_args = cfg.get('AI_RETRAIN_ARGS', {}) if isinstance(cfg.get('AI_RETRAIN_ARGS'), dict) else {}
-    cmd = build_train_command(train_args)
-    log(f'auto_retrain: running XGBoost training pipeline (cmd: {cmd}).')
-    try:
-        subprocess.run(cmd, check=True)
-        trained = True
-    except subprocess.CalledProcessError as exc:
-        log(f'auto_retrain: XGBoost training failed with exit code {exc.returncode}', level='error')
-        raise
-    
-    # Also train LSTM if enabled
+
+    # Safety: only train when there is enough labelled data. This protects the
+    # currently-loaded production model from being overwritten by a model that
+    # was trained on dummy/insufficient data (which would break entry signals).
+    ready, reason = _training_data_ready()
+    if not ready:
+        log(f'auto_retrain: SKIPPING XGBoost training: {reason}. '
+            f'Existing model {cfg.get("XGB_MODEL_PATH", "ai/ai_xgb_model.json")} kept.', level='warning')
+    else:
+        cmd = build_train_command(train_args)
+        log(f'auto_retrain: running XGBoost training pipeline (cmd: {cmd}).')
+        try:
+            subprocess.run(cmd, check=True)
+            trained = True
+        except subprocess.CalledProcessError as exc:
+            log(f'auto_retrain: XGBoost training failed with exit code {exc.returncode}', level='error')
+            raise
+
+    # Also train LSTM if enabled (only when training script exists)
     if cfg.get('USE_LSTM', False):
         lstm_script = _PROJECT_ROOT / 'scripts' / 'train_lstm_model.py'
-        lstm_cmd = [sys.executable, str(lstm_script)]
-        log(f'auto_retrain: running LSTM training pipeline (cmd: {lstm_cmd}).')
-        try:
-            subprocess.run(lstm_cmd, check=True)
-            log('auto_retrain: LSTM training completed successfully.')
-        except subprocess.CalledProcessError as exc:
-            log(f'auto_retrain: LSTM training failed with exit code {exc.returncode}', level='warning')
-            # Don't raise - LSTM failure shouldn't block XGBoost success
+        if not lstm_script.exists():
+            log(f'auto_retrain: SKIPPING LSTM training: {lstm_script.name} not found. '
+                f'Existing model models/lstm_price_model.h5 kept.', level='warning')
+        else:
+            lstm_cmd = [sys.executable, str(lstm_script)]
+            log(f'auto_retrain: running LSTM training pipeline (cmd: {lstm_cmd}).')
+            try:
+                subprocess.run(lstm_cmd, check=True)
+                log('auto_retrain: LSTM training completed successfully.')
+            except subprocess.CalledProcessError as exc:
+                log(f'auto_retrain: LSTM training failed with exit code {exc.returncode}', level='warning')
+                # Don't raise - LSTM failure shouldn't block XGBoost success
 
     # Update metrics to mark this run; fallback to current time if file missing
     last_ts, metrics = load_metrics()

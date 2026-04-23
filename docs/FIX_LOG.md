@@ -5,6 +5,52 @@
 
 ---
 
+## #042 — auto_retrain overwrote 7-feature XGB met 5-feature enhanced + LSTM script ontbrak + TF niet geïnstalleerd (2026-04-23)
+
+### Symptom / Aanleiding
+Bot logde herhaaldelijk:
+```
+[Ensemble] ... XGB=0, LSTM=None(0.33), RL=None(0.00) → HOLD (conf=1.00)
+LSTM predictor laden mislukt: TensorFlow is vereist voor LSTM predictor
+```
+en eerder, bij retrain runs: `Feature shape mismatch, expected: 7, got: 5`. Resultaat: ensemble degradeerde naar XGB-only (of zelfs alleen score-based) en `auto_retrain.py --loop` riep een script aan dat niet bestond (`scripts/train_lstm_model.py`).
+
+### Root Cause
+1. `tools/auto_retrain.py` had `TRAIN_SCRIPT = ai/xgb_train_enhanced.py` — die schrijft een 5-feature model naar `ai/ai_xgb_model.json`, terwijl `modules/ml.py` een 7-feature model verwacht (rsi, macd, sma_short, sma_long, volume, bb_position, stochastic_k). Elke retrain-run brak de bot.
+2. Geen guard tegen ontbrekende `trade_features.csv` → trainer crashte; bestaand model werd overschreven of corrupt.
+3. `scripts/train_lstm_model.py` werd door auto_retrain aangeroepen maar bestond niet → subprocess-failure per cyclus.
+4. TensorFlow was niet geïnstalleerd in de venv (`Python 3.13.7`); LSTM-predictor in `modules/ml_lstm.py` raised → ensemble viel terug op XGB-only.
+
+### Fix
+- `tools/auto_retrain.py`:
+  - `TRAIN_SCRIPT` → `ai/xgb_walk_forward.py` (regular 7-feature trainer; enhanced is post-trade analyse only).
+  - Nieuwe helper `_training_data_ready() -> Tuple[bool, str]` checkt of `trade_features.csv` bestaat én ≥`MIN_TRAIN_SAMPLES` (100) rijen heeft. Bij `False` → log warning en SKIP de XGB-stap (bestaande model blijft staan).
+  - LSTM-blok krijgt `lstm_script.exists()` guard vooraf.
+  - `build_train_command` geeft `--window`/`--step` door uit `AI_RETRAIN_ARGS`.
+- `scripts/train_lstm_model.py` (NIEUW): walk-forward LSTM trainer die live Bitvavo candles ophaalt (10 markets × 1440×1m), sequences bouwt (lookback=60, horizon=5, up_threshold=0.003), model bouwt via `LSTMPricePredictor.build_model()` → `train()` → `save_model()`. Aborts safely zonder overschrijven als TF mist of <200 sequences.
+- `%LOCALAPPDATA%/BotConfig/bot_config_local.json`: `USE_LSTM=true` (helper script `_enable_lstm.py` met `encoding='utf-8-sig'` BOM-safe).
+- `pip install tensorflow` → TF 2.21.0 (Python 3.13 wheels werken; CPU-only op Windows, geen GPU).
+
+### Files
+- MOD: `tools/auto_retrain.py`
+- NEW: `scripts/train_lstm_model.py`
+- NEW (helper, niet committed): `_enable_lstm.py`, `_smoke_ml.py`
+- CONFIG: `%LOCALAPPDATA%/BotConfig/bot_config_local.json` (`USE_LSTM=true`)
+
+### Validation
+- `import tensorflow as tf; tf.__version__` → `2.21.0`.
+- `LSTMPricePredictor.load_model()` op `models/lstm_price_model.h5` → `True`; `predict(np.random.rand(60,5))` → `('NEUTRAL', 0.78)`.
+- Bot herstart: 16 procs running, heartbeat fresh, 3 trades managed, log toont `LSTM model gebouwd: 60 lookback, 5 features` en `LSTM model geladen van models\lstm_price_model.h5`. Geen `Feature shape mismatch` meer, geen `TensorFlow is vereist` warnings sinds restart.
+- Auto_retrain triggerde live `train_lstm_model.py` → 10771 train / 2693 val sequences over 10 markten × 10 epochs (training in progress).
+
+### Notes
+- **Twee XGB-modellen serveren verschillende doelen**: `ai_xgb_model.json` (7-feat regular) wordt door bot geladen voor live signalen. `ai_xgb_model_enhanced.json` (5-feat) is uitsluitend post-trade analyse — die mag nooit naar de regular path geschreven worden.
+- **`trade_features.csv` bestaat nog niet**: er zijn slechts 7 closed trades; auto_retrain skipt XGB veilig totdat data ready is.
+- **Python 3.13 + TF 2.21**: officieel ondersteund vanaf TF 2.17+. Wheels installeerden zonder problemen via `pip install tensorflow`.
+- **OneDrive-immune config**: `USE_LSTM` gezet in `%LOCALAPPDATA%/BotConfig/bot_config_local.json` zodat OneDrive het niet kan reverten.
+
+---
+
 ## #041 — trailing_bot.py crash-loop: KeyError op SMA_SHORT bij module-load (2026-04-23)
 
 ### Symptom / Aanleiding
