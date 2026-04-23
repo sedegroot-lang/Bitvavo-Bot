@@ -3773,20 +3773,18 @@ def roadmap():
     # V1 history milestones (completed) + V2 milestones
     milestones = [
         {'value': 465, 'label': '€465', 'action': 'V1 Start (11 mrt 2026)', 'icon': '✅', 'star': False},
-        {'value': 500, 'label': '€500', 'action': 'V1: Stabiel draaien (18 mrt)', 'icon': '✅', 'star': False},
         {'value': 700, 'label': '€700', 'action': 'V1: DCA Hybrid F_CONSERVATIEF (26 mrt)', 'icon': '✅', 'star': False},
-        {'value': 800, 'label': '€800', 'action': 'V1: 4 trades, BASE 52 (3 apr)', 'icon': '✅', 'star': False},
-        {'value': 1000, 'label': '€1.000', 'action': 'V1: Grid BTC aan, €150 (7 apr)', 'icon': '✅', 'star': True},
-        {'value': 1200, 'label': '€1.200', 'action': 'V1: 5 trades, BASE 62 (9 apr)', 'icon': '✅', 'star': False},
-        {'value': 1240, 'label': '€1.240', 'action': 'V2 START: BASE 150, 4 trades, DCA max 6 (10 apr)', 'icon': '⭐', 'star': True},
-        {'value': 1450, 'label': '€1.450', 'action': 'V2.1 FULL-DEPLOY: BASE 320, 4 trades, DCA 20x2 + size-floor + EV-sizing (typical 88%) (23 apr)', 'icon': '⭐', 'star': True},
-        {'value': 1500, 'label': '€1.500', 'action': 'Grid +ETH (€250), A-S weer aan', 'icon': '📍', 'star': False},
-        {'value': 1800, 'label': '€1.800', 'action': '5 trades, BASE 160, DCA 35', 'icon': '⭐', 'star': True},
-        {'value': 2200, 'label': '€2.200', 'action': 'BASE 180, DCA 40, Grid +LINK (€400)', 'icon': '📍', 'star': False},
-        {'value': 2700, 'label': '€2.700', 'action': '6 trades, BASE 200, DCA 45, DCA_MAX 8', 'icon': '⭐', 'star': True},
-        {'value': 3500, 'label': '€3.500', 'action': '7 trades, BASE 220, Grid +XRP (€700)', 'icon': '⭐', 'star': True},
-        {'value': 4500, 'label': '€4.500', 'action': '8 trades, BASE 250, Grid +DOT (€1.000)', 'icon': '📍', 'star': False},
-        {'value': 6000, 'label': '€6.000', 'action': 'BASE 300, Grid 6 mktn (€1.500) — Passief Inkomen', 'icon': '🏆', 'star': True},
+        {'value': 1000, 'label': '€1.000', 'action': 'V1: Grid BTC aan (7 apr)', 'icon': '✅', 'star': False},
+        {'value': 1240, 'label': '€1.240', 'action': 'V2 START: BASE 150, 4 trades, DCA max 6 (10 apr)', 'icon': '✅', 'star': False},
+        {'value': 1450, 'label': '€1.450', 'action': 'V3 NOW: BASE 320, MAX 4, DCA 20×2 — grid OFF, full edge stack (23 apr)', 'icon': '⭐', 'star': True},
+        {'value': 1700, 'label': '€1.700', 'action': 'BASE 380, MAX 4, DCA 25×2', 'icon': '📍', 'star': False},
+        {'value': 2000, 'label': '€2.000', 'action': 'BASE 400, MAX 5, DCA 25×2', 'icon': '⭐', 'star': True},
+        {'value': 2500, 'label': '€2.500', 'action': 'BASE 480, MAX 5, DCA 30×2', 'icon': '📍', 'star': False},
+        {'value': 3000, 'label': '€3.000', 'action': 'BASE 550, MAX 5, DCA 35×2', 'icon': '⭐', 'star': True},
+        {'value': 4000, 'label': '€4.000', 'action': 'BASE 700, MAX 5, DCA 50×2', 'icon': '📍', 'star': False},
+        {'value': 5000, 'label': '€5.000', 'action': 'BASE 850, MAX 5, DCA 70×2', 'icon': '⭐', 'star': True},
+        {'value': 7500, 'label': '€7.500', 'action': 'BASE 1.250, MAX 6, DCA 100×2', 'icon': '📍', 'star': False},
+        {'value': 10000, 'label': '€10.000', 'action': 'BASE 1.500, MAX 6, DCA 150×2 — Passief Inkomen', 'icon': '🏆', 'star': True},
     ]
 
     # Determine current milestone index
@@ -3795,7 +3793,7 @@ def roadmap():
         if current_value >= m['value']:
             current_idx = i
 
-    progress_pct = min(100, max(0, (current_value / 6000) * 100))
+    progress_pct = min(100, max(0, (current_value / 10000) * 100))
 
     # ── Dynamic data: balance sparkline (last 30 days, 1 point per day) ──
     balance_sparkline = []

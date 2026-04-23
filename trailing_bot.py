@@ -202,6 +202,30 @@ def _finalize_close_trade(
     except Exception:
         pass
 
+    # Post-loss per-market cooldown — record every non-operational close.
+    try:
+        _reason = (closed_entry.get('reason') or '').lower()
+        _operational_errors = {'saldo_error', 'sync_removed', 'manual_close',
+                               'reconstructed', 'dust_cleanup'}
+        if _reason not in _operational_errors and closed_entry.get('profit') is not None:
+            from pathlib import Path as _Path
+            from bot.post_loss_cooldown import get_instance as _get_pl
+            _pl = _get_pl(_Path(__file__).parent / 'data' / 'post_loss_cooldown.json')
+            _pl.record_close(market, float(closed_entry.get('profit', 0) or 0))
+    except Exception:
+        pass
+
+    # Adaptive MIN_SCORE — feed rolling 7-trade outcome buffer.
+    try:
+        _reason = (closed_entry.get('reason') or '').lower()
+        _operational_errors = {'saldo_error', 'sync_removed', 'manual_close',
+                               'reconstructed', 'dust_cleanup'}
+        if _reason not in _operational_errors and closed_entry.get('profit') is not None:
+            from bot.adaptive_score import get_instance as _get_adapt
+            _get_adapt().record_close(float(closed_entry.get('profit', 0) or 0))
+    except Exception:
+        pass
+
     # Bayesian Signal Fusion: update signal weights from trade outcome
     try:
         if CONFIG.get('BAYESIAN_FUSION_ENABLED', True):
@@ -3040,6 +3064,18 @@ async def bot_loop():
         # Always pull the latest threshold from CONFIG so dashboard/hot-reloads take effect
         min_score_threshold = float(CONFIG.get('MIN_SCORE_TO_BUY', MIN_SCORE_TO_BUY))
 
+        # ── Adaptive MIN_SCORE: bump threshold when rolling 7-trade WR is poor ──
+        try:
+            from bot.adaptive_score import get_instance as _get_adaptive
+            _adapt_delta, _adapt_reason = _get_adaptive().adjustment(cfg=CONFIG)
+            if _adapt_delta != 0.0:
+                _new_min = max(0.0, min_score_threshold + _adapt_delta)
+                if abs(_adapt_delta) >= 0.5:
+                    log(f"[ADAPTIVE_SCORE] MIN_SCORE {min_score_threshold:.1f} → {_new_min:.1f} ({_adapt_reason})", level='info')
+                min_score_threshold = _new_min
+        except Exception as _ad_err:
+            log(f"[ADAPTIVE_SCORE] Error: {_ad_err}", level='debug')
+
         # ── BOCPD Regime Engine: detect market regime from BTC multi-timeframe data ──
         _regime_result = None
         _regime_adj = {}
@@ -3182,6 +3218,30 @@ async def bot_loop():
                     log(f"[event_hooks] Markt {m} overgeslagen door pauze", level='debug')
                     markets_skipped += 1
                     continue
+
+                # ── Post-Loss Cooldown: skip markets that recently closed at a loss ──
+                try:
+                    from bot.post_loss_cooldown import get_instance as _get_pl
+                    _pl_blocked, _pl_reason = _get_pl().is_blocked(m, cfg=CONFIG)
+                    if _pl_blocked:
+                        log(f"[POST_LOSS_CD] {m}: skipped – {_pl_reason}", level='info')
+                        markets_skipped += 1
+                        continue
+                except Exception as _pl_err:
+                    log(f"[POST_LOSS_CD] {m}: Error: {_pl_err}", level='debug')
+
+                # ── BTC Drawdown Shield: skip alts when BTC is falling fast ──
+                if _btc_cascade_5m:
+                    try:
+                        from bot.btc_drawdown_shield import evaluate as _btc_shield
+                        _bs = _btc_shield(_btc_cascade_5m, cfg=CONFIG, market=m)
+                        if _bs.blocked:
+                            log(f"[BTC_SHIELD] {m}: skipped – {_bs.reason}", level='info')
+                            markets_skipped += 1
+                            continue
+                    except Exception as _bs_err:
+                        log(f"[BTC_SHIELD] {m}: Error: {_bs_err}", level='debug')
+
                 markets_evaluated += 1
                 
                 # ALWAYS log which market we're evaluating to track hangs

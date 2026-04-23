@@ -5,7 +5,44 @@
 
 ---
 
-## #039 — €1.450 sizing FINAL: full-deployment 88% typical, 99% worst (2026-04-23)
+## #040 — Nieuwe edge stack: post-loss cooldown + adaptive MIN_SCORE + BTC drawdown shield + dashboard refresh (2026-04-24)
+
+### Symptom / Aanleiding
+Volgende-generatie verbeteringen na #039 full-deployment. Doelen:
+1. Voorkom direct re-entry op een net verloren markt (revenge trading).
+2. Verhoog MIN_SCORE-drempel automatisch tijdens slechte periodes (lage rolling WR / loss-streak).
+3. Skip new entries (excl. BTC-EUR) als BTC zelf instort op 5m timeframe (crash hedge).
+4. Dashboard verouderd visueel — vol grid-trading milestones die niet meer relevant zijn.
+
+### Fix Applied
+**Drie nieuwe entry-gates** (bot/), elk geïsoleerd + thread-safe + unit-tested:
+- `bot/post_loss_cooldown.py` — `PostLossCooldown` singleton. Blokkeert market voor `POST_LOSS_COOLDOWN_SEC` (default 4h) na verlies; `POST_LOSS_BIG_COOLDOWN_SEC` (24h) na verlies > `POST_LOSS_BIG_LOSS_EUR` (€5). Persistent: `data/post_loss_cooldown.json`.
+- `bot/adaptive_score.py` — `AdaptiveScoreThreshold(lookback=7)` met deque rolling-WR. Loss-streak override (≥3 verliezen → +2.0 op MIN_SCORE) heeft voorrang. WR-ladder: <40% +1.5, <55% +0.5, >75% −0.5.
+- `bot/btc_drawdown_shield.py` — Stateless. Skip nieuwe entries als BTC 5m return over `BTC_DRAWDOWN_LOOKBACK_5M` (12 candles = ~1u) onder `BTC_DRAWDOWN_THRESHOLD_PCT` (default −1.5%). BTC-EUR market exempt.
+
+**Wiring** in `trailing_bot.py`:
+- Adaptive bump op `min_score_threshold` direct na config-load (~line 3041).
+- Post-loss + BTC shield gates direct na `_event_hooks_paused` continue (~line 3160).
+- Close-hooks naar beide singletons (`record_close`) in `_finalize_close_trade` na bestaande `market_expectancy.record_trade`.
+
+**Tests**: 24 nieuwe unit tests in `tests/test_post_loss_cooldown.py`, `test_adaptive_score.py`, `test_btc_drawdown_shield.py` — alle slagen.
+
+**Roadmap V2 herschreven**: `docs/PORTFOLIO_ROADMAP_V2.md` volledig zonder grid trading. 10 milestones €1.450→€25.000 met conservatief/base/optimistisch winstprojecties en ETAs t/m okt 2027.
+
+**Dashboard milestones array** in `tools/dashboard_flask/app.py` (line 3774) gesynchroniseerd met nieuwe roadmap (geen grid entries meer, denominator 6000 → 10000).
+
+**Dashboard visual refresh** (non-destructief):
+- Nieuwe `static/css/v3_modern.css` — dark glassmorphism design system, deep purple-blue accent, geladen LAATST in base.html zodat het alle legacy CSS overruled.
+- **Command Palette (Ctrl+K / Cmd+K)** toegevoegd in base.html — quick-jump naar alle 10 hoofdpagina's met zoekfunctie, keyboard nav (↑↓↵Esc).
+
+### Lesson
+Voorkomen van re-entry-on-loss is empirisch veel effectiever dan alleen een hogere MIN_SCORE — markets vertonen 1-4u "post-loss EV-dip" patronen waar zelfs goede signalen onderpresteren. BTC drives ~80% van alt-correlatie op 5m: een BTC −1.5% in 1u is een betrouwbaarder kill-switch dan losse alt-checks. Adaptive MIN_SCORE met loss-streak override = dynamische rem op cascading losses zonder handmatige interventie.
+
+Dashboard-tip: één LAATST-geladen CSS file (cascading override) is veiliger dan refactoren van 15 legacy files. Command Palette is ~50 regels JS en transformeert UX op alle 10 pagina's tegelijk.
+
+---
+
+
 
 ### Symptom
 Vorige iteratie #038 (BASE=200, MAX=4) liet typical 4×200 = €800 = 55% van portfolio idle. Gebruiker terecht op gewezen: "200×4 = 800, 600 idle".
