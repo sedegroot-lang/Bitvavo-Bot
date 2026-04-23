@@ -5,6 +5,38 @@
 
 ---
 
+## #041 — trailing_bot.py crash-loop: KeyError op SMA_SHORT bij module-load (2026-04-23)
+
+### Symptom / Aanleiding
+Bot maakte geen nieuwe trades meer. `monitor.py` startte `trailing_bot.py` continu opnieuw op (~elke 7-15s) — zichtbaar in `scripts/helpers/logs/monitor.log` en stderr toonde:
+```
+File "trailing_bot.py", line 720, in <module>
+    SMA_SHORT = CONFIG["SMA_SHORT"]
+KeyError: 'SMA_SHORT'
+```
+De keys `SMA_SHORT`, `SMA_LONG`, `MACD_FAST`, `MACD_SLOW`, `MACD_SIGNAL`, `BREAKOUT_LOOKBACK`, `MIN_SCORE_TO_BUY` ontbraken in zowel `config/bot_config.json` als `bot_config_local.json`. Module-level dict-subscript leverde direct een `KeyError` op import → crash voor `bot_loop()` ooit draaide.
+
+`heartbeat.json` werd hierdoor sinds 09:33 niet meer ververst, terwijl support-services (dashboard, AI supervisor, monitor zelf) wél bleven loggen — waardoor het leek alsof de bot draaide.
+
+### Root Cause
+1. `trailing_bot.py` regels 720-726 gebruikten `CONFIG["KEY"]` (raise op missing) i.p.v. `.get()` met default.
+2. `modules/config.py.load_config()` past schema-defaults uit `config_schema.py` NIET toe op de geladen dict — schema is alleen voor validatie.
+3. Combinatie = elke missende key crasht de bot bij module-import.
+
+### Fix
+Vervangen door `_as_int(CONFIG.get(...), <schema_default>)` met defaults uit `modules/config_schema.py`:
+- `SMA_SHORT=20`, `SMA_LONG=50`, `MACD_FAST=12`, `MACD_SLOW=26`, `MACD_SIGNAL=9`, `BREAKOUT_LOOKBACK=50`, `MIN_SCORE_TO_BUY=7.0` (laatste blijft float).
+
+### Files
+- MOD: `trailing_bot.py` (regels 720-726)
+
+### Notes
+- Dit is een terugkerend patroon: **module-level `CONFIG[...]` is fragiel**. Zoek alle resterende dict-subscripts in trailing_bot.py op import-niveau en migreer naar `.get()` met defaults — toekomstige config-drift mag de bot niet meer crashen.
+- Overweeg `load_config()` schema-defaults te laten inject — maar dat is een bredere refactor.
+- De kwaadaardige neveneffecten van deze crash-loop: `scripts/helpers/logs/trailing_stdout.log` is gegroeid tot **868 MB** en `bot_log.txt.rotation.log` tot **5.3 GB**. Schoonmaak nodig.
+
+---
+
 ## #040 — Nieuwe edge stack: post-loss cooldown + adaptive MIN_SCORE + BTC drawdown shield + dashboard refresh (2026-04-24)
 
 ### Symptom / Aanleiding
