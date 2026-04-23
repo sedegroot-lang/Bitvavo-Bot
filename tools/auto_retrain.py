@@ -95,6 +95,8 @@ METRICS_PATH = _PROJECT_ROOT / 'ai' / 'ai_model_metrics.json'
 # post-trade model and would break entry-signal predictions.
 TRAIN_SCRIPT = _PROJECT_ROOT / 'ai' / 'xgb_walk_forward.py'
 TRAIN_DATA_PATH = _PROJECT_ROOT / 'trade_features.csv'
+BUILD_FEATURES_SCRIPT = _PROJECT_ROOT / 'scripts' / 'build_trade_features.py'
+BACKFILL_SCRIPT = _PROJECT_ROOT / 'scripts' / 'backfill_trade_features.py'
 MIN_TRAIN_SAMPLES = 100
 DEFAULT_LOOP_SECONDS = 900  # 15 minutes
 
@@ -238,6 +240,23 @@ def maybe_retrain(args: argparse.Namespace) -> Dict[str, object]:
         return {'ran': False, 'next_due': due_dt, 'last_trained': last_ts}
 
     train_args = cfg.get('AI_RETRAIN_ARGS', {}) if isinstance(cfg.get('AI_RETRAIN_ARGS'), dict) else {}
+
+    # Always regenerate trade_features.csv from the latest trade_log + archive
+    # before evaluating data-readiness or training.
+    if BACKFILL_SCRIPT.exists():
+        try:
+            log(f'auto_retrain: backfilling missing entry snapshots via {BACKFILL_SCRIPT.name} (incremental).')
+            subprocess.run([sys.executable, str(BACKFILL_SCRIPT), '--sleep', '80'], check=False)
+        except Exception as exc:
+            log(f'auto_retrain: backfill_trade_features failed: {exc}', level='warning')
+    if BUILD_FEATURES_SCRIPT.exists():
+        try:
+            log(f'auto_retrain: rebuilding {TRAIN_DATA_PATH.name} from trade history.')
+            subprocess.run([sys.executable, str(BUILD_FEATURES_SCRIPT)], check=False)
+        except Exception as exc:
+            log(f'auto_retrain: build_trade_features failed: {exc}', level='warning')
+    else:
+        log(f'auto_retrain: {BUILD_FEATURES_SCRIPT.name} ontbreekt — sla feature-rebuild over.', level='warning')
 
     # Safety: only train when there is enough labelled data. This protects the
     # currently-loaded production model from being overwritten by a model that

@@ -4299,6 +4299,10 @@ async def open_trade_async(score, m, price_now, s_short, eur_balance, ml_info=No
                     new_trade['bb_upper_at_entry'] = ml_info['bb_upper']
                 if ml_info.get('bb_lower') is not None:
                     new_trade['bb_lower_at_entry'] = ml_info['bb_lower']
+                if ml_info.get('bb_position') is not None:
+                    new_trade['bb_position_at_entry'] = ml_info['bb_position']
+                if ml_info.get('stochastic_k') is not None:
+                    new_trade['stochastic_k_at_entry'] = ml_info['stochastic_k']
                 if ml_info.get('avg_volume') is not None:
                     new_trade['volume_avg_at_entry'] = ml_info['avg_volume']
                 log(f"[AI_META] {m}: RSI={ml_info.get('rsi')}, MACD={ml_info.get('macd_histogram')}, "

@@ -5,6 +5,42 @@
 
 ---
 
+## #044 — Regular XGB nooit (her)getraind: trade_features.csv ontbrak + bb_position/stochastic_k werden niet gelogd (2026-04-23)
+
+### Symptom / Aanleiding
+Het regular 7-feature XGB model (`ai/ai_xgb_model.json`) dat de bot **live** laadt in `modules.ml._get_xgb_model` werd nooit (her)getraind:
+1. `tools/auto_retrain.py` verwacht `trade_features.csv` in project-root → bestand bestond niet → `_training_data_ready()` skipte training elke cyclus.
+2. Naïef bouwen vanuit archief gaf 837 rijen, maar 785 hadden default `rsi=50` / `sma=0` (entry-snapshot werd vroeger niet gelogd) → bruikbaar = 52, label-balans 47/5 → onbruikbaar voor training.
+3. `bb_position` en `stochastic_k` werden bij entry **nergens** opgeslagen, ondanks dat `bot/signals.py` ze in `ml_info` plaatst.
+
+### Root Cause
+1. Geen pipeline-stap die `trade_features.csv` genereert uit het archief.
+2. `trailing_bot.py` entry-meta block sloeg wel `rsi/macd/sma_short/sma_long/bb_upper/bb_lower/...` op maar niet `bb_position` en `stochastic_k`.
+3. Voor historische trades was er geen backfill-mechanisme om de snapshot uit Bitvavo candles te reconstrueren.
+
+### Fix
+- **NEW** `scripts/build_trade_features.py`: bouwt `trade_features.csv` (rsi, macd, sma_short, sma_long, volume, bb_position, stochastic_k, label) uit `trade_log.json` + `trade_archive.json`. Filtert default-only rows en mergt optionele backfill-cache.
+- **NEW** `scripts/backfill_trade_features.py`: voor trades zonder echte snapshot fetcht 1m candles (3h venster) rond `opened_ts` via Bitvavo API en herberekent alle 7 features. Resultaat naar `data/trade_features_backfill.json` (resumable cache). Eerste run: **588/757 succes** → 652 bruikbare rijen voor training.
+- **MOD** `trailing_bot.py`: entry-meta block slaat nu ook `bb_position_at_entry` en `stochastic_k_at_entry` op uit `ml_info`. Vanaf nu zijn alle 7 features per nieuwe trade direct uit `trade_archive.json` afleidbaar.
+- **MOD** `tools/auto_retrain.py`: roept eerst `backfill_trade_features.py` (incrementeel via cache), dan `build_trade_features.py`, dan pas `_training_data_ready()` + `xgb_walk_forward.py`. Volledig automatische pipeline.
+
+### Files
+- NEW: `scripts/build_trade_features.py`
+- NEW: `scripts/backfill_trade_features.py`
+- MOD: `trailing_bot.py` (entry-meta save: `bb_position_at_entry`, `stochastic_k_at_entry`)
+- MOD: `tools/auto_retrain.py` (BACKFILL_SCRIPT/BUILD_FEATURES_SCRIPT chained vóór train)
+- NEW data: `data/trade_features_backfill.json` (757 entries cache), `trade_features.csv` (652 rows)
+
+### Validation
+- `python ai/xgb_walk_forward.py --window 400 --step 100` → "Samples: 652, Features: 7, Folds: 2, Avg Accuracy: 55.00%, Avg Precision: 62.98%, Buy rate: 61.04%". Feature importance evenwichtig verdeeld (rsi 0.15, sma_short 0.19, volume 0.19, bb_position 0.10, stochastic_k 0.09).
+- Model verified: `xgb.XGBClassifier().load_model('ai/ai_xgb_model.json').n_features_in_ == 7` ✓
+
+### Notes
+- Bitvavo's historische candle endpoint geeft beperkte data terug voor pairs > paar maanden oud (~25-35 candles ipv 60) → 169 oudere trades konden niet backfilled worden ("insufficient_candles"). Acceptabel: 588 echte + 64 originele snapshots = 652 trainset.
+- `data/trade_features_backfill.json` is incrementeel: volgende runs van de backfill skippen reeds-cached entries, dus `auto_retrain` mag deze veilig elke cyclus draaien.
+
+---
+
 ## #043 — Slechts 7 closed trades zichtbaar voor enhanced trainer + grid-exclusion blokkeert BTC/ETH terwijl GRID_TRADING uit staat (2026-04-23)
 
 ### Symptom / Aanleiding
