@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://rsms.me/" crossorigin>
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles-v2.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
 </head>
@@ -128,35 +129,78 @@
           </div>
         </div>
 
-        <!-- Open positions -->
+        <!-- Open positions (rich V1-style cards) -->
         <div class="card">
           <div class="card-head">
             <div class="card-title">Open posities · <span x-text="t.open_count ?? 0"></span></div>
             <div class="card-action faint" x-text="'totaal ' + fmtEur(p.asset_value_eur)"></div>
           </div>
-          <div style="overflow-x:auto">
-            <table class="tbl">
-              <thead><tr>
-                <th>Markt</th><th class="num">Buy</th><th class="num">Nu</th><th class="num">Geïnvesteerd</th>
-                <th class="num">Waarde</th><th class="num">PnL €</th><th class="num">PnL %</th><th class="num">DCA</th><th class="num">Leeftijd</th>
-              </tr></thead>
-              <tbody>
-                <template x-for="[m, tr] in Object.entries(t.open || {})" :key="m">
-                  <tr>
-                    <td><strong x-text="m.replace('-EUR','')"></strong></td>
-                    <td class="num muted" x-text="fmtNum(tr.buy_price, 6)"></td>
-                    <td class="num" x-text="fmtNum(tr.current_price, 6)"></td>
-                    <td class="num muted" x-text="fmtEur(tr.initial_invested_eur ?? tr.invested_eur)"></td>
-                    <td class="num" x-text="fmtEur(tr.current_value_eur)"></td>
-                    <td class="num" :class="(tr.unrealised_pnl_eur ?? 0) >= 0 ? 'pos' : 'neg'" x-text="fmtEur(tr.unrealised_pnl_eur)"></td>
-                    <td class="num" :class="(tr.unrealised_pnl_pct ?? 0) >= 0 ? 'pos' : 'neg'" x-text="(tr.unrealised_pnl_pct != null ? (tr.unrealised_pnl_pct >= 0 ? '+' : '') + tr.unrealised_pnl_pct + '%' : '—')"></td>
-                    <td class="num" x-text="(tr.dca_buys ?? 0) + '/' + (tr.dca_max ?? 0)"></td>
-                    <td class="num muted" x-text="ageHrs(tr.opened_ts)"></td>
-                  </tr>
-                </template>
-                <tr x-show="!Object.keys(t.open || {}).length"><td colspan="9" class="empty">Geen open trades</td></tr>
-              </tbody>
-            </table>
+          <div x-show="!Object.keys(t.open || {}).length" class="empty">Geen open trades</div>
+          <div class="trade-grid" x-show="Object.keys(t.open || {}).length">
+            <template x-for="[m, tr] in Object.entries(t.open || {})" :key="m">
+              <div class="trade-card" :class="(tr.unrealised_pnl_eur ?? 0) >= 0 ? 'profit' : 'loss'">
+                <div class="tc-head">
+                  <div class="tc-symbol" x-text="tr.symbol || m.replace('-EUR','')"></div>
+                  <div class="tc-status"
+                       :class="{trailing: tr.status_label==='TRAILING ACTIEF', warn: tr.status_label==='TRAILING WACHT', bad: tr.status_label==='HOOG VERLIES'}"
+                       x-text="tr.status_label || 'ACTIEF'"></div>
+                </div>
+
+                <div class="tc-pnl-hero">
+                  <span class="pnl-amount" :class="(tr.unrealised_pnl_eur ?? 0) >= 0 ? 'pos' : 'neg'"
+                        x-text="((tr.unrealised_pnl_eur ?? 0) >= 0 ? '+' : '') + fmtEur(tr.unrealised_pnl_eur)"></span>
+                  <span class="pnl-pct" :class="(tr.unrealised_pnl_pct ?? 0) >= 0 ? 'pos' : 'neg'"
+                        x-text="((tr.unrealised_pnl_pct ?? 0) >= 0 ? '+' : '') + (tr.unrealised_pnl_pct ?? 0).toFixed(2) + '%'"></span>
+                </div>
+
+                <div class="tc-grid-2">
+                  <div class="tc-cell"><div class="lbl">Geïnvesteerd</div><div class="val" x-text="fmtEur(tr.initial_invested_eur ?? tr.invested_eur)"></div></div>
+                  <div class="tc-cell"><div class="lbl">Huidige waarde</div><div class="val" x-text="fmtEur(tr.current_value_eur)"></div></div>
+                </div>
+
+                <div class="tc-prices">
+                  <div class="tc-price">
+                    <div class="lbl"><span class="dot entry"></span>Entry</div>
+                    <div class="val" x-text="fmtPrice(tr.buy_price)"></div>
+                  </div>
+                  <div class="tc-price">
+                    <div class="lbl"><span class="dot live"></span>Live</div>
+                    <div class="val" x-text="fmtPrice(tr.current_price)"></div>
+                  </div>
+                  <div class="tc-price">
+                    <div class="lbl"><span class="dot stop"></span>Trailing stop</div>
+                    <div class="val stop" x-text="tr.trailing_stop != null ? fmtPrice(tr.trailing_stop) : '—'"></div>
+                  </div>
+                </div>
+
+                <div class="tc-row">
+                  <span class="lbl" x-text="tr.trailing_activated ? 'Trailing actief' : 'Naar activatie'"></span>
+                  <div class="progress-bar">
+                    <div class="fill"
+                         :class="tr.trailing_activated ? 'active' : ((tr.trailing_progress_pct ?? 0) >= 70 ? 'near' : ((tr.trailing_progress_pct ?? 0) >= 30 ? 'mid' : 'early'))"
+                         :style="'width:' + Math.max(2, Math.min(100, tr.trailing_progress_pct ?? 0)) + '%'"></div>
+                  </div>
+                  <span class="val" x-text="(tr.trailing_progress_pct ?? 0).toFixed(0) + '%'"></span>
+                </div>
+
+                <div class="tc-row">
+                  <span class="lbl">DCA <span x-text="(tr.dca_level ?? 0) + '/' + (tr.dca_max_levels ?? 0)"></span></span>
+                  <div class="progress-bar">
+                    <div class="fill mid"
+                         :style="'width:' + (((tr.dca_level ?? 0) / Math.max(1, tr.dca_max_levels ?? 1)) * 100) + '%'"></div>
+                  </div>
+                  <span class="val muted"
+                        x-text="tr.dca_distance_pct != null ? '−' + Math.abs(tr.dca_distance_pct).toFixed(2) + '% → ' + fmtPrice(tr.dca_next_price) : '—'"></span>
+                </div>
+
+                <div class="tc-meta">
+                  <span>Top <b x-text="fmtPrice(tr.highest_price)"></b></span>
+                  <span>SL <b x-text="tr.stop_loss_distance_pct != null ? tr.stop_loss_distance_pct.toFixed(1) + '%' : '—'"></b></span>
+                  <span>Leeftijd <b x-text="tr.time_in_trade_h != null ? tr.time_in_trade_h.toFixed(1) + 'h' : ageHrs(tr.opened_ts)"></b></span>
+                  <span>Score <b x-text="tr.score != null ? tr.score.toFixed(1) : '—'"></b></span>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -387,22 +431,175 @@
 
       <!-- ============== ROADMAP ============== -->
       <section x-show="tab==='roadmap'" class="stack">
-        <div class="card">
-          <div class="card-head"><div class="card-title">Huidige fase</div></div>
-          <h2 style="margin:0 0 8px;font-size:18px" x-text="rd.current_phase || '—'"></h2>
-          <div class="muted" x-text="rd.next_phase ? 'Volgende: ' + rd.next_phase : ''"></div>
+
+        <!-- Hero -->
+        <div class="rm-hero">
+          <div class="label">Huidige portfoliowaarde</div>
+          <div class="value" x-text="fmtEur(rd.current_value)"></div>
+          <div class="target">Doel: <strong>€10.000</strong> · <span x-text="(rd.progress_pct ?? 0).toFixed(1) + '% bereikt'"></span></div>
+          <div class="rm-progress"><div class="fill" :style="'width:' + (rd.progress_pct ?? 0) + '%'"></div></div>
+          <div class="rm-progress-labels"><span>€0</span><span>€2.500</span><span>€5.000</span><span>€7.500</span><span>€10.000</span></div>
+          <div class="growth" :class="(rd.growth_per_week ?? 0) < 0 ? 'neg' : ''"
+               x-text="'Groei: ' + ((rd.growth_per_week ?? 0) >= 0 ? '+' : '') + fmtEur(rd.growth_per_week) + '/week (' + ((rd.growth_per_week_pct ?? 0) >= 0 ? '+' : '') + (rd.growth_per_week_pct ?? 0).toFixed(2) + '%) · €' + (rd.monthly_deposit ?? 0) + ' storting/maand'"></div>
         </div>
-        <div class="kpi-grid">
-          <div class="kpi"><div class="kpi-label">Max trades</div><div class="kpi-value" x-text="rd.max_open_trades ?? '—'"></div></div>
-          <div class="kpi"><div class="kpi-label">Base €/trade</div><div class="kpi-value" x-text="fmtEur(rd.base_amount_eur)"></div></div>
-          <div class="kpi"><div class="kpi-label">Min score</div><div class="kpi-value" x-text="rd.min_score_to_buy ?? '—'"></div></div>
-          <div class="kpi"><div class="kpi-label">DCA budget</div><div class="kpi-value" x-text="fmtEur(rd.dca_order_eur)"></div></div>
-          <div class="kpi"><div class="kpi-label">DCA max</div><div class="kpi-value" x-text="rd.dca_max_buys ?? '—'"></div></div>
-          <div class="kpi"><div class="kpi-label">Grid €</div><div class="kpi-value" x-text="fmtEur(rd.grid_investment)"></div></div>
+
+        <!-- Smart advice -->
+        <div class="card" x-show="(rd.advice_items || []).length">
+          <div class="card-head"><div class="card-title">📊 Smart advies</div></div>
+          <div class="advice-list">
+            <template x-for="(it, i) in (rd.advice_items || [])" :key="i">
+              <div class="advice-item" :class="it.type"><span x-text="it.icon"></span><span x-text="it.text"></span></div>
+            </template>
+          </div>
         </div>
+
+        <!-- Next milestone -->
+        <div class="next-milestone" x-show="rd.next_milestone">
+          <div class="nm-head">
+            <div class="nm-label" x-text="rd.next_milestone?.label"></div>
+            <div class="nm-action" x-text="rd.next_milestone?.action"></div>
+          </div>
+          <div class="nm-stats">
+            <div class="nm-stat"><div class="lbl">Te gaan</div><div class="val" x-text="'€' + (rd.next_milestone?.gap ?? 0).toLocaleString('nl-NL')"></div></div>
+            <div class="nm-stat"><div class="lbl">Geschat</div><div class="val" x-text="rd.next_milestone?.eta || '—'"></div></div>
+            <div class="nm-stat"><div class="lbl">Weken</div><div class="val" x-text="(rd.next_milestone?.eta_weeks ?? 0) > 0 ? rd.next_milestone.eta_weeks : '—'"></div></div>
+          </div>
+          <ul class="checklist">
+            <template x-for="(c, i) in (rd.next_milestone?.checklist || [])" :key="i">
+              <li>
+                <span class="check-icon" :class="c.ok ? 'ok' : 'fail'" x-text="c.ok ? '✓' : '✗'"></span>
+                <span x-text="c.label"></span>
+                <span class="check-detail" x-text="c.detail"></span>
+              </li>
+            </template>
+          </ul>
+        </div>
+
+        <!-- Two-column: timeline + active config + perf -->
+        <div class="row-2">
+          <div class="card">
+            <div class="card-head"><div class="card-title">🎯 Mijlpalen tijdlijn</div></div>
+            <div class="timeline">
+              <template x-for="(m, i) in (rd.milestones || [])" :key="i">
+                <div class="tl-item"
+                     :class="{completed: i < (rd.current_idx ?? 0), current: i === (rd.current_idx ?? 0), star: m.star}">
+                  <div class="tl-dot"></div>
+                  <div class="tl-head">
+                    <span class="tl-icon" x-text="m.icon"></span>
+                    <span class="tl-value" x-text="m.label"></span>
+                    <span class="tl-eta" x-text="m.eta || ''"></span>
+                  </div>
+                  <div class="tl-action" x-text="m.action"></div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="card">
+              <div class="card-head"><div class="card-title">⚙️ Actieve config</div></div>
+              <div class="kpi-grid" style="grid-template-columns:repeat(2,1fr)">
+                <div class="kpi"><div class="kpi-label">Max trades</div><div class="kpi-value" x-text="rd.active_config?.max_open_trades ?? '—'"></div></div>
+                <div class="kpi"><div class="kpi-label">Base €</div><div class="kpi-value" x-text="fmtEur(rd.active_config?.base_amount_eur)"></div></div>
+                <div class="kpi"><div class="kpi-label">Min score</div><div class="kpi-value" x-text="rd.active_config?.min_score_to_buy ?? '—'"></div></div>
+                <div class="kpi"><div class="kpi-label">DCA €</div><div class="kpi-value" x-text="fmtEur(rd.active_config?.dca_amount_eur)"></div></div>
+                <div class="kpi"><div class="kpi-label">DCA max</div><div class="kpi-value" x-text="rd.active_config?.dca_max_buys ?? '—'"></div></div>
+                <div class="kpi"><div class="kpi-label">Grid €</div><div class="kpi-value" x-text="fmtEur(rd.active_config?.grid_investment)"></div></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><div class="card-title">📈 Performance</div></div>
+              <table class="tbl">
+                <tbody>
+                  <tr><td>Win rate (totaal)</td><td class="num" x-text="(rd.perf_stats?.win_rate ?? 0) + '%'"></td></tr>
+                  <tr><td>Win rate (recent)</td><td class="num" :class="(rd.perf_stats?.recent_win_rate ?? 0) >= 60 ? 'pos' : 'neg'" x-text="(rd.perf_stats?.recent_win_rate ?? 0) + '%'"></td></tr>
+                  <tr><td>Beste markt</td><td class="num pos" x-text="(rd.perf_stats?.best_market || '—') + ' ' + fmtEur(rd.perf_stats?.best_market_profit)"></td></tr>
+                  <tr><td>Slechtste markt</td><td class="num neg" x-text="(rd.perf_stats?.worst_market || '—') + ' ' + fmtEur(rd.perf_stats?.worst_market_profit)"></td></tr>
+                  <tr><td>Gem. holdingtijd</td><td class="num muted" x-text="(rd.perf_stats?.avg_hold_hrs ?? 0) + 'h'"></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weekly profits -->
+        <div class="card" x-show="(rd.weekly_profits || []).length">
+          <div class="card-head"><div class="card-title">📅 Wekelijkse winst (laatste 8 weken)</div></div>
+          <table class="tbl">
+            <thead><tr><th>Week</th><th class="num">Winst</th><th class="num">Trades</th><th class="num">Wins</th><th class="num">Winrate</th></tr></thead>
+            <tbody>
+              <template x-for="(w, i) in (rd.weekly_profits || []).slice().reverse()" :key="i">
+                <tr>
+                  <td x-text="w.week"></td>
+                  <td class="num" :class="(w.profit ?? 0) >= 0 ? 'pos' : 'neg'" x-text="((w.profit ?? 0) >= 0 ? '+' : '') + fmtEur(w.profit)"></td>
+                  <td class="num muted" x-text="w.trades"></td>
+                  <td class="num pos" x-text="w.wins"></td>
+                  <td class="num" :class="w.winrate >= 60 ? 'pos' : (w.winrate >= 40 ? '' : 'neg')" x-text="w.winrate + '%'"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Deposit scenarios -->
         <div class="card">
-          <div class="card-head"><div class="card-title">Stortingen</div></div>
-          <div style="display:flex; gap:24px; align-items:baseline">
+          <div class="card-head"><div class="card-title">💰 Hoe lang met X €/maand storting?</div></div>
+          <p class="muted" style="font-size:12px;margin:0 0 10px">Geschatte tijd om elke target te bereiken bij huidige groei (<span x-text="((rd.growth_per_week_pct ?? 0)).toFixed(2) + '%/week'"></span>). Jouw rij gemarkeerd.</p>
+          <div style="overflow-x:auto">
+            <table class="scenario-table">
+              <thead>
+                <tr>
+                  <th>€/maand</th>
+                  <template x-for="(t, i) in (rd.scenario_targets || [])" :key="i">
+                    <th x-text="'€' + t.toLocaleString('nl-NL')"></th>
+                  </template>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(s, i) in (rd.deposit_scenarios || [])" :key="i">
+                  <tr :class="s.is_current ? 'is-current' : ''">
+                    <td x-text="'€' + s.monthly"></td>
+                    <template x-for="(eta, j) in s.etas" :key="j">
+                      <td x-text="eta"></td>
+                    </template>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Golden rules + Bear -->
+        <div class="row-2">
+          <div class="card">
+            <div class="card-head"><div class="card-title">🏛️ Gouden regels</div></div>
+            <ul class="rules-list">
+              <template x-for="(r, i) in (rd.golden_rules || [])" :key="i">
+                <li><span class="rule-num" x-text="i+1"></span><span x-text="r"></span></li>
+              </template>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">🐻 Bear protocol</div></div>
+            <table class="tbl">
+              <thead><tr><th>Trigger</th><th>Actie</th></tr></thead>
+              <tbody>
+                <template x-for="(b, i) in (rd.bear_protocol || [])" :key="i">
+                  <tr>
+                    <td style="font-size:12.5px" x-text="b.trigger"></td>
+                    <td class="muted" style="font-size:12px" x-text="b.action"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Stortingen -->
+        <div class="card">
+          <div class="card-head"><div class="card-title">💶 Stortingen historiek</div></div>
+          <div style="display:flex; gap:24px; align-items:baseline; flex-wrap:wrap">
             <div><div class="kpi-label">Totaal gestort</div><div class="kpi-value" x-text="fmtEur(d.total)"></div></div>
             <div><div class="kpi-label">Aantal</div><div class="kpi-value" x-text="d.count"></div></div>
             <div><div class="kpi-label">Account nu</div><div class="kpi-value" x-text="fmtEur(p.total_account_value_eur)"></div></div>

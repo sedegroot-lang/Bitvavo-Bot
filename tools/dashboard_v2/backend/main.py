@@ -213,23 +213,47 @@ def _portfolio() -> Dict[str, Any]:
     }
 
 
+def _compute_trailing_stop(buy_price: float, highest_price: float, trailing_activated: bool, cfg: Dict[str, Any]) -> Optional[float]:
+    """Mirror bot.trailing logic for dashboard display."""
+    if not (trailing_activated and highest_price and highest_price > buy_price > 0):
+        return None
+    try:
+        default_trail = float(cfg.get("DEFAULT_TRAILING", 0.04) or 0.04)
+        stepped_raw = cfg.get("STEPPED_TRAILING_LEVELS", []) or []
+        stepped = []
+        for s in stepped_raw:
+            if isinstance(s, (list, tuple)) and len(s) >= 2:
+                stepped.append({"profit_pct": float(s[0]), "trailing_pct": float(s[1])})
+            elif isinstance(s, dict):
+                stepped.append({"profit_pct": float(s.get("profit_pct", 0)), "trailing_pct": float(s.get("trailing_pct", default_trail))})
+        profit_pct = (highest_price - buy_price) / buy_price
+        trail_pct = default_trail
+        for lvl in reversed(sorted(stepped, key=lambda x: x["profit_pct"])):
+            if profit_pct >= lvl["profit_pct"]:
+                trail_pct = min(trail_pct, lvl["trailing_pct"])
+                break
+        return highest_price * (1 - trail_pct)
+    except Exception:
+        return None
+
+
 def _trades() -> Dict[str, Any]:
     log = _read_json(DATA / "trade_log.json", {"open": {}, "closed": []}) or {}
+    archive = _read_json(DATA / "trade_archive.json", []) or []
+    if isinstance(archive, dict):
+        archive = archive.get("closed") or archive.get("trades") or []
     open_trades = log.get("open") or {}
-    closed = log.get("closed") or []
-    if isinstance(closed, list):
-        closed_recent = sorted(
-            closed,
-            key=lambda t: t.get("closed_ts", 0) or t.get("timestamp", 0),
-            reverse=True,
-        )[:200]
-    else:
-        closed_recent = []
+    closed_live = log.get("closed") or []
+    closed_all = list(closed_live) + list(archive) if isinstance(closed_live, list) else list(archive)
+    closed_recent = sorted(
+        closed_all,
+        key=lambda t: t.get("closed_ts", 0) or t.get("timestamp", 0),
+        reverse=True,
+    )[:300]
 
-    # Live prices from price cache
     prices = _read_json(DATA / "price_cache.json", {}) or {}
+    cfg = _merged_config()
 
-    # Enrich open trades with current price + unrealised PnL
     enriched = {}
     for mkt, tr in (open_trades.items() if isinstance(open_trades, dict) else []):
         cur = None
@@ -241,28 +265,95 @@ def _trades() -> Dict[str, Any]:
                 cur = float(pinfo)
         except Exception:
             cur = None
+
         invested = float(tr.get("initial_invested_eur") or tr.get("invested_eur") or 0)
         amount = float(tr.get("amount") or 0)
         buy_p = float(tr.get("buy_price") or 0)
-        unrealised = None
-        unrealised_pct = None
-        if cur and amount > 0 and invested > 0:
-            cur_value = cur * amount
-            unrealised = round(cur_value - invested, 2)
-            unrealised_pct = round((cur / buy_p - 1) * 100, 2) if buy_p else None
+        # honour partial TPs: amount on log might be original; partial_tp_events.last.remaining_amount wins
+        ptp = tr.get("partial_tp_events") or []
+        if ptp and isinstance(ptp, list):
+            try:
+                rem = float(ptp[-1].get("remaining_amount") or 0)
+                if rem > 0:
+                    amount = rem
+            except Exception:
+                pass
+
+        cur_value = (cur * amount) if (cur and amount) else None
+        unrealised = round(cur_value - invested, 2) if (cur_value is not None and invested) else None
+        unrealised_pct = round((cur / buy_p - 1) * 100, 2) if (cur and buy_p) else None
+
+        # Trailing
+        trailing_activated = bool(tr.get("trailing_activated"))
+        activation_price = float(tr.get("activation_price") or 0) or None
+        if not activation_price and buy_p:
+            try:
+                activation_price = buy_p * (1 + float(tr.get("trailing_activation_pct") or cfg.get("TRAILING_ACTIVATION_PCT", 0.02)))
+            except Exception:
+                activation_price = None
+        highest_price = float(tr.get("highest_price") or tr.get("highest_since_activation") or 0) or None
+        trailing_stop = _compute_trailing_stop(buy_p, highest_price or buy_p, trailing_activated, cfg)
+        # progress (current → activation)
+        trailing_progress_pct = None
+        if cur and buy_p and activation_price and activation_price > buy_p:
+            trailing_progress_pct = max(0.0, min(100.0, (cur - buy_p) / (activation_price - buy_p) * 100))
+
+        # DCA
+        dca_max = int(tr.get("dca_max") or cfg.get("DCA_MAX_BUYS") or 0)
+        dca_buys = min(int(tr.get("dca_buys") or 0), dca_max if dca_max else 999)
+        dca_next_price = float(tr.get("dca_next_price") or 0) or None
+        if not dca_next_price and buy_p and dca_buys < dca_max:
+            try:
+                drop = float(tr.get("dca_drop_pct") or cfg.get("DCA_DROP_PCT") or 0.06)
+                dca_next_price = buy_p * (1 - drop * (dca_buys + 1))
+            except Exception:
+                pass
+        dca_distance_pct = None
+        if cur and dca_next_price:
+            dca_distance_pct = max(0.0, (cur - dca_next_price) / cur * 100)
+
+        # Status
+        if trailing_activated and (unrealised_pct or 0) >= 0:
+            status = "TRAILING ACTIEF"
+        elif trailing_activated:
+            status = "TRAILING WACHT"
+        elif (unrealised_pct or 0) <= -10:
+            status = "HOOG VERLIES"
+        elif (unrealised_pct or 0) >= 5:
+            status = "WINST"
+        else:
+            status = "ACTIEF"
+
+        opened_ts = float(tr.get("opened_ts") or tr.get("timestamp") or 0)
+        time_in_trade_h = (time.time() - opened_ts) / 3600 if opened_ts else None
+
         enriched[mkt] = {
             **tr,
+            "symbol": mkt.replace("-EUR", ""),
+            "amount_remaining": amount,
             "current_price": cur,
-            "current_value_eur": round(cur * amount, 2) if (cur and amount) else None,
+            "current_value_eur": round(cur_value, 2) if cur_value is not None else None,
             "unrealised_pnl_eur": unrealised,
             "unrealised_pnl_pct": unrealised_pct,
+            "activation_price": activation_price,
+            "trailing_stop": trailing_stop,
+            "trailing_progress_pct": round(trailing_progress_pct, 1) if trailing_progress_pct is not None else None,
+            "highest_price": highest_price,
+            "dca_level": dca_buys,
+            "dca_max_levels": dca_max,
+            "dca_next_price": dca_next_price,
+            "dca_distance_pct": round(dca_distance_pct, 2) if dca_distance_pct is not None else None,
+            "dca_buy_amount": float(tr.get("dca_amount_eur") or cfg.get("DCA_AMOUNT_EUR") or 5),
+            "status_label": status,
+            "time_in_trade_h": round(time_in_trade_h, 2) if time_in_trade_h else None,
+            "stop_loss_distance_pct": round((buy_p - trailing_stop) / buy_p * 100, 2) if (trailing_stop and buy_p) else None,
         }
 
     return {
         "open": enriched,
         "closed_recent": closed_recent,
         "open_count": len(enriched),
-        "closed_total": len(closed) if isinstance(closed, list) else 0,
+        "closed_total": len(closed_recent),
     }
 
 
@@ -507,36 +598,289 @@ def _markets() -> Dict[str, Any]:
 
 
 def _roadmap() -> Dict[str, Any]:
-    """Pull current phase from PORTFOLIO_ROADMAP_V2.md if present."""
-    md_path = PROJECT_ROOT / "docs" / "PORTFOLIO_ROADMAP_V2.md"
-    phase = None
-    next_phase = None
-    if md_path.exists():
-        try:
-            text = md_path.read_text(encoding="utf-8", errors="ignore")
-            # Heuristic: first heading "Phase ..." that isn't marked done
-            import re
-            for m in re.finditer(r"#+\s*(Phase[^\n]*)", text):
-                title = m.group(1).strip()
-                if "✅" in title or "DONE" in title.upper():
-                    continue
-                if phase is None:
-                    phase = title
-                else:
-                    next_phase = title
-                    break
-        except Exception:
-            pass
+    """Rich data-driven growth plan from current value to €10.000.
+
+    Mirrors the V1 Flask roadmap: milestones with ETA, weekly profits, performance,
+    smart advice, golden rules, deposit scenarios, passive income table.
+    """
     cfg = _merged_config()
-    return {
-        "current_phase": phase,
-        "next_phase": next_phase,
+    overview = _read_json(DATA / "account_overview.json", {}) or {}
+    hb = _heartbeat()
+
+    current_value = float(overview.get("total_account_value_eur") or 0)
+    if current_value <= 0:
+        current_value = float(hb.get("eur_balance") or 0)
+
+    deposits_data = _read_json(CONFIG_DIR / "deposits.json", {}) or {}
+    total_deposited = float(deposits_data.get("total_deposited_eur") or 0)
+
+    # Milestones (matches V1)
+    milestones = [
+        {"value": 465,   "label": "€465",    "action": "V1 Start (11 mrt 2026)", "icon": "✅", "star": False},
+        {"value": 700,   "label": "€700",    "action": "V1: DCA Hybrid F_CONSERVATIEF", "icon": "✅", "star": False},
+        {"value": 1000,  "label": "€1.000",  "action": "V1: Grid BTC aan", "icon": "✅", "star": False},
+        {"value": 1240,  "label": "€1.240",  "action": "V2 START: BASE 150, 4 trades, DCA max 6", "icon": "✅", "star": False},
+        {"value": 1450,  "label": "€1.450",  "action": "V3: BASE 320, MAX 4, DCA 20×2 — full edge stack", "icon": "⭐", "star": True},
+        {"value": 1700,  "label": "€1.700",  "action": "BASE 380, MAX 4, DCA 25×2", "icon": "📍", "star": False},
+        {"value": 2000,  "label": "€2.000",  "action": "BASE 400, MAX 5, DCA 25×2", "icon": "⭐", "star": True},
+        {"value": 2500,  "label": "€2.500",  "action": "BASE 480, MAX 5, DCA 30×2", "icon": "📍", "star": False},
+        {"value": 3000,  "label": "€3.000",  "action": "BASE 550, MAX 5, DCA 35×2", "icon": "⭐", "star": True},
+        {"value": 4000,  "label": "€4.000",  "action": "BASE 700, MAX 5, DCA 50×2", "icon": "📍", "star": False},
+        {"value": 5000,  "label": "€5.000",  "action": "BASE 850, MAX 5, DCA 70×2", "icon": "⭐", "star": True},
+        {"value": 7500,  "label": "€7.500",  "action": "BASE 1.250, MAX 6, DCA 100×2", "icon": "📍", "star": False},
+        {"value": 10000, "label": "€10.000", "action": "BASE 1.500, MAX 6, DCA 150×2 — Passief Inkomen", "icon": "🏆", "star": True},
+    ]
+    current_idx = 0
+    for i, m in enumerate(milestones):
+        if current_value >= m["value"]:
+            current_idx = i
+    progress_pct = min(100.0, max(0.0, (current_value / 10000.0) * 100))
+
+    # Sparkline (last 30 days)
+    sparkline: List[Dict[str, Any]] = []
+    try:
+        from datetime import datetime as _dt
+        cutoff = time.time() - 30 * 86400
+        daily_vals: Dict[str, float] = {}
+        bh_rows = _read_jsonl(DATA / "balance_history.jsonl", max_lines=20000)
+        for entry in bh_rows:
+            ts = float(entry.get("ts") or 0)
+            if ts < cutoff:
+                continue
+            day = _dt.fromtimestamp(ts).strftime("%Y-%m-%d")
+            daily_vals[day] = float(entry.get("total_eur") or 0)
+        for day in sorted(daily_vals.keys()):
+            sparkline.append({"date": day, "value": round(daily_vals[day], 2)})
+    except Exception:
+        pass
+
+    # Weekly profits (last 8 full weeks)
+    weekly_profits: List[Dict[str, Any]] = []
+    try:
+        from datetime import datetime as _dt
+        from collections import defaultdict as _dd
+        weekly_raw = _dd(lambda: {"profit": 0.0, "trades": 0, "wins": 0})
+        pnl_rows = _read_jsonl(DATA / "trade_pnl_history.jsonl", max_lines=5000)
+        for entry in pnl_rows:
+            ts = float(entry.get("ts") or entry.get("closed_ts") or 0)
+            if ts == 0:
+                continue
+            wk = _dt.fromtimestamp(ts).strftime("%Y-W%W")
+            p = float(entry.get("profit_eur") or entry.get("net_pnl_eur") or 0)
+            weekly_raw[wk]["profit"] += p
+            weekly_raw[wk]["trades"] += 1
+            if p > 0:
+                weekly_raw[wk]["wins"] += 1
+        for wk in sorted(weekly_raw.keys())[-8:]:
+            w = weekly_raw[wk]
+            wr = round(w["wins"] / w["trades"] * 100) if w["trades"] > 0 else 0
+            weekly_profits.append({"week": wk, "profit": round(w["profit"], 2),
+                                   "trades": w["trades"], "wins": w["wins"], "winrate": wr})
+    except Exception:
+        pass
+
+    # Perf stats
+    perf_stats = {
+        "total_profit": 0, "total_trades": 0, "win_rate": 0, "avg_profit": 0,
+        "avg_hold_hrs": 0, "best_market": "-", "best_market_profit": 0,
+        "worst_market": "-", "worst_market_profit": 0, "recent_win_rate": 0,
+    }
+    try:
+        exp_rows = _read_jsonl(DATA / "expectancy_history.jsonl", max_lines=200)
+        if exp_rows:
+            exp = exp_rows[-1]
+            perf_stats["total_trades"] = int(exp.get("sample_size") or 0)
+            perf_stats["win_rate"] = round(float(exp.get("win_rate") or 0) * 100, 1)
+            perf_stats["total_profit"] = round(float(exp.get("net_profit") or 0), 2)
+            avg_win = float(exp.get("avg_win") or 0)
+            avg_loss = float(exp.get("avg_loss") or 0)
+            wr = float(exp.get("win_rate") or 0)
+            perf_stats["avg_profit"] = round(avg_win * wr + avg_loss * (1 - wr), 2)
+        mm = _read_json(DATA / "market_metrics.json", {}) or {}
+        if isinstance(mm, dict) and mm:
+            best = max(mm.items(), key=lambda x: float((x[1] or {}).get("total_profit", 0) or 0))
+            worst = min(mm.items(), key=lambda x: float((x[1] or {}).get("total_profit", 0) or 0))
+            perf_stats["best_market"] = best[0].replace("-EUR", "")
+            perf_stats["best_market_profit"] = round(float(best[1].get("total_profit", 0) or 0), 2)
+            perf_stats["worst_market"] = worst[0].replace("-EUR", "")
+            perf_stats["worst_market_profit"] = round(float(worst[1].get("total_profit", 0) or 0), 2)
+            total_hold = sum(float(v.get("avg_hold_seconds", 0) or 0) * float(v.get("trades", 0) or 0) for v in mm.values() if isinstance(v, dict))
+            total_t = sum(float(v.get("trades", 0) or 0) for v in mm.values() if isinstance(v, dict))
+            if total_t > 0:
+                perf_stats["avg_hold_hrs"] = round(total_hold / total_t / 3600, 1)
+        if len(weekly_profits) >= 2:
+            recent = weekly_profits[-2:]
+            r_wins = sum(w["wins"] for w in recent)
+            r_trades = sum(w["trades"] for w in recent)
+            perf_stats["recent_win_rate"] = round(r_wins / r_trades * 100) if r_trades > 0 else 0
+        elif weekly_profits:
+            perf_stats["recent_win_rate"] = weekly_profits[-1]["winrate"]
+    except Exception:
+        pass
+
+    # Growth rate from sparkline (excl. deposits)
+    monthly_deposit = 100.0
+    deposit_per_week = monthly_deposit / 4.33
+    growth_per_week = 0.0
+    growth_per_week_pct = 0.0
+    try:
+        if len(sparkline) >= 7:
+            span_days = min(14, len(sparkline))
+            recent = sparkline[-span_days:]
+            v0 = recent[0]["value"]
+            v1 = recent[-1]["value"]
+            if v0 > 0:
+                deposits_in_span = (monthly_deposit / 30.0) * span_days
+                pure = (v1 - v0) - deposits_in_span
+                growth_per_week = pure / span_days * 7
+                growth_per_week_pct = (growth_per_week / v0) * 100
+    except Exception:
+        pass
+
+    # ETA per milestone
+    growth_factor = 1 + (growth_per_week_pct / 100.0)
+    for m in milestones:
+        if current_value >= m["value"]:
+            m["eta"] = ""
+            m["eta_weeks"] = 0
+            continue
+        if growth_per_week_pct <= 0 and deposit_per_week <= 0:
+            m["eta"] = "?"
+            m["eta_weeks"] = 0
+            continue
+        simv = current_value
+        weeks = 0
+        while simv < m["value"] and weeks < 520:
+            simv = simv * growth_factor + deposit_per_week
+            weeks += 1
+        m["eta_weeks"] = weeks
+        if weeks >= 520:
+            m["eta"] = "> 10 jaar"
+        else:
+            from datetime import datetime as _dt, timedelta as _td
+            eta_date = _dt.now() + _td(weeks=weeks)
+            m["eta"] = eta_date.strftime("%b %Y") if weeks > 12 else eta_date.strftime("%d %b %Y")
+
+    # Next milestone detail
+    next_milestone = None
+    if current_idx + 1 < len(milestones):
+        nm = milestones[current_idx + 1]
+        gap = nm["value"] - current_value
+        eur_free = current_value - float(hb.get("total_exposure_eur") or 0)
+        buffer_pct = (eur_free / current_value * 100) if current_value > 0 else 0
+        checklist = [
+            {"label": "Winrate ≥ 60% (laatste 2 weken)", "ok": perf_stats["recent_win_rate"] >= 60,
+             "detail": f"{perf_stats['recent_win_rate']}%"},
+            {"label": "Buffer ≥ 20%", "ok": buffer_pct >= 20,
+             "detail": f"{buffer_pct:.0f}% (€{eur_free:.0f} vrij)"},
+            {"label": "Config stabiel ≥ 2 weken", "ok": True, "detail": "auto"},
+        ]
+        next_milestone = {
+            "label": nm["label"], "action": nm["action"],
+            "gap": round(gap, 0), "eta": nm.get("eta", "?"),
+            "eta_weeks": nm.get("eta_weeks", 0), "checklist": checklist,
+        }
+
+    # Smart advice
+    advice_items: List[Dict[str, str]] = []
+    rwr = perf_stats["recent_win_rate"]
+    if rwr >= 60:
+        advice_items.append({"type": "success", "icon": "✅", "text": f"Winrate {rwr}% — boven 60% drempel"})
+    elif rwr > 0:
+        advice_items.append({"type": "danger", "icon": "⚠️", "text": f"Winrate {rwr}% — onder 60% drempel! Overweeg voorzichtiger config"})
+    eur_avail = float(hb.get("eur_balance") or 0)
+    if current_value > 0:
+        buf = eur_avail / current_value * 100
+        if buf >= 20:
+            advice_items.append({"type": "success", "icon": "✅", "text": f"Buffer {buf:.0f}% — boven 20% minimum"})
+        else:
+            advice_items.append({"type": "danger", "icon": "🔴", "text": f"Buffer {buf:.0f}% — ONDER 20%! Verlaag exposure"})
+    if growth_per_week > 0:
+        advice_items.append({"type": "info", "icon": "📈",
+                             "text": f"Groei: €{growth_per_week:.0f}/week trading + €{deposit_per_week:.0f}/week stortingen"})
+    elif growth_per_week < -10:
+        advice_items.append({"type": "danger", "icon": "📉",
+                             "text": f"Portfolio krimpt: €{growth_per_week:.0f}/week — check bear protocol"})
+    if weekly_profits:
+        wp = weekly_profits[-1]
+        if wp["trades"] > 0:
+            advice_items.append({"type": "info", "icon": "📊",
+                                 "text": f"Deze week: {wp['trades']} trades, €{wp['profit']:.2f} winst, {wp['winrate']}% winrate"})
+    if next_milestone:
+        advice_items.append({"type": "info", "icon": "🎯",
+                             "text": f"Volgende mijlpaal ({next_milestone['label']}): nog €{next_milestone['gap']:.0f} — geschat {next_milestone['eta']}"})
+
+    # Golden rules
+    golden_rules = [
+        "Minimaal 2 weken evalueren na elke config-wijziging",
+        "Winrate check: moet ≥ 60% zijn over laatste 2 weken",
+        "EUR buffer: houd ALTIJD minimaal 20% van portfoliowaarde vrij",
+        "Bij 15% drawdown: verlaag BASE met 30% en ga naar vorige fase",
+        "DCA_MAX_BUYS nooit boven 8 — meer DCA = geld vastzetten",
+        "Grid pas uitbreiden bij bewezen positieve PnL op bestaande grids",
+        "MAX_TRADES verhogen = BASE verlagen — nooit beide tegelijk omhoog",
+    ]
+
+    # Bear protocol
+    bear_protocol = [
+        {"trigger": "Trigger 1: Portfolio −8% in 1 week", "action": "BASE −30%, MIN_SCORE +0,5"},
+        {"trigger": "Trigger 2: Portfolio −15% in 2 weken", "action": "Terug naar 2 mijlpalen eerder + halveer grid budget"},
+        {"trigger": "Trigger 3: Portfolio −25%+ (crash)", "action": "Noodconfig: 3 trades, €50 BASE, Grid uit. Wacht op stabilisatie."},
+    ]
+
+    # Deposit scenarios
+    SCENARIOS = [0, 100, 200, 300, 500, 1000]
+    TARGETS = [2000, 5000, 10000, 25000, 50000]
+    deposit_scenarios = []
+    for dep in SCENARIOS:
+        weekly_dep = dep / 4.33
+        etas = []
+        for t in TARGETS:
+            if current_value >= t:
+                etas.append("✅"); continue
+            if growth_per_week_pct <= 0 and weekly_dep <= 0:
+                etas.append("∞"); continue
+            simv = current_value; w = 0
+            while simv < t and w < 1040:
+                simv = simv * growth_factor + weekly_dep
+                w += 1
+            if w >= 1040:
+                etas.append("> 20j")
+            else:
+                from datetime import datetime as _dt, timedelta as _td
+                d = _dt.now() + _td(weeks=w)
+                etas.append(d.strftime("%b %Y") if w > 12 else d.strftime("%d %b"))
+        deposit_scenarios.append({"monthly": dep, "etas": etas, "is_current": dep == int(monthly_deposit)})
+
+    # Active phase from current config
+    active_config = {
         "max_open_trades": cfg.get("MAX_OPEN_TRADES"),
         "base_amount_eur": cfg.get("BASE_AMOUNT_EUR"),
         "min_score_to_buy": cfg.get("MIN_SCORE_TO_BUY"),
-        "dca_order_eur": cfg.get("DCA_AMOUNT_EUR") or cfg.get("DCA_ORDER_EUR"),
+        "dca_amount_eur": cfg.get("DCA_AMOUNT_EUR") or cfg.get("DCA_ORDER_EUR"),
         "dca_max_buys": cfg.get("DCA_MAX_BUYS"),
         "grid_investment": (cfg.get("GRID_TRADING") or {}).get("investment_eur") if isinstance(cfg.get("GRID_TRADING"), dict) else cfg.get("GRID_INVESTMENT"),
+    }
+
+    return {
+        "current_value": round(current_value, 2),
+        "current_idx": current_idx,
+        "progress_pct": round(progress_pct, 2),
+        "milestones": milestones,
+        "total_deposited": round(total_deposited, 2),
+        "sparkline": sparkline,
+        "weekly_profits": weekly_profits,
+        "perf_stats": perf_stats,
+        "next_milestone": next_milestone,
+        "advice_items": advice_items,
+        "growth_per_week": round(growth_per_week, 2),
+        "growth_per_week_pct": round(growth_per_week_pct, 3),
+        "monthly_deposit": int(monthly_deposit),
+        "golden_rules": golden_rules,
+        "bear_protocol": bear_protocol,
+        "deposit_scenarios": deposit_scenarios,
+        "scenario_targets": TARGETS,
+        "active_config": active_config,
     }
 
 

@@ -49,6 +49,12 @@ function dash() {
     // ---------- formatters
     fmtEur(v) { if (v == null || isNaN(v)) return '—'; return eur.format(+v); },
     fmtNum(v, dp = 2) { if (v == null || isNaN(v)) return '—'; return (+v).toLocaleString('nl-NL', { minimumFractionDigits: dp, maximumFractionDigits: dp }); },
+    fmtPrice(v) {
+      if (v == null || isNaN(v)) return '—';
+      const n = +v;
+      const dp = n >= 1000 ? 2 : (n >= 10 ? 3 : (n >= 1 ? 4 : (n >= 0.01 ? 5 : 6)));
+      return '€' + n.toLocaleString('nl-NL', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+    },
     fmtDate(ts) { if (!ts) return '—'; const d = new Date(typeof ts === 'number' && ts < 1e12 ? ts * 1000 : ts); return d.toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }); },
     fmtAge(s) { if (s == null) return '—'; if (s < 60) return Math.round(s) + 's'; if (s < 3600) return Math.round(s / 60) + 'm'; if (s < 86400) return (s / 3600).toFixed(1) + 'h'; return (s / 86400).toFixed(1) + 'd'; },
     ageHrs(ts) { if (!ts) return '—'; const sec = Date.now() / 1000 - (typeof ts === 'number' && ts < 1e12 ? ts : ts / 1000); return this.fmtAge(sec); },

@@ -3,10 +3,10 @@
      - Static assets: cache-first
      - API calls: network-first with stale-fallback
 */
-const VERSION = 'bitvavo-dash-v2-2026.04.24.1';
+const VERSION = 'bitvavo-dash-v2-2026.04.24.3';
 const STATIC_CACHE = 'static-' + VERSION;
 const RUNTIME_CACHE = 'runtime-' + VERSION;
-const STATIC_ASSETS = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.webmanifest'];
+const STATIC_ASSETS = ['/', '/index.html', '/styles.css', '/styles-v2.css', '/app.js', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(STATIC_CACHE).then((c) => c.addAll(STATIC_ASSETS)).then(() => self.skipWaiting()));
