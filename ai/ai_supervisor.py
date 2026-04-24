@@ -102,6 +102,15 @@ except ImportError:
     log("[AI] Feedback loop module not available", level='debug')
 from modules.quarantine_manager import review_quarantine
 
+# Supervisor memory (light wrapper around modules.ai.bot_memory) — optional
+try:
+    from modules.ai import supervisor_memory as _sup_mem
+    SUP_MEM_AVAILABLE = True
+except Exception:
+    SUP_MEM_AVAILABLE = False
+    _sup_mem = None  # type: ignore
+    log("[AI] supervisor_memory not available", level='debug')
+
 # Market analysis functions (extracted to ai/market_analysis.py)
 from ai.market_analysis import (
     get_market_sector,
@@ -864,6 +873,22 @@ def _save_suggestions(out, insights, regime_meta, portfolio_advice, extras, clos
     if extras:
         for k, v in extras.items():
             doc[k] = v
+
+    # --- Memory hook: annotate suggestions with prior history + persist them ---
+    if SUP_MEM_AVAILABLE and _sup_mem is not None:
+        try:
+            snap = {
+                "regime": (regime_meta or {}).get("regime"),
+                "ts": doc.get("ts"),
+                "n_closed": len(closed_trades) if closed_trades else 0,
+            }
+            _sup_mem.annotate_suggestions(out)
+            for s in out:
+                if isinstance(s, dict):
+                    _sup_mem.log_suggestion(s, applied=False, snapshot=snap)
+        except Exception as _mem_e:
+            log(f"[AI] supervisor_memory hook failed: {_mem_e}", level='debug')
+
     write_json_compat(SUGGESTIONS_FILE, doc)
     
     # Summary logging
@@ -1040,7 +1065,17 @@ def _apply_critical_suggestions(critical_list: list, cfg: dict) -> list:
             })
         except Exception as e:
             _dbg(f"_append_ai_apply_event failed: {e}")
-    
+
+        if SUP_MEM_AVAILABLE and _sup_mem is not None:
+            try:
+                _sup_mem.log_suggestion(
+                    {'param': p, 'from': cur, 'to': to_v, 'reason': s.get('reason', ''), 'impact': 'CRITICAL'},
+                    applied=True,
+                    snapshot={'mode': 'auto_apply_critical', 'ts': now_ts},
+                )
+            except Exception as _mem_e:
+                _dbg(f"supervisor_memory log (critical) failed: {_mem_e}")
+
     if applied:
         # Atomic write
         write_json_compat(CONFIG_FILE, new_cfg)
@@ -1271,6 +1306,16 @@ def auto_apply_if_enabled(suggestions):
                 })
             except Exception as e:
                 _dbg(f"_append_ai_apply_event failed: {e}")
+
+            if SUP_MEM_AVAILABLE and _sup_mem is not None:
+                try:
+                    _sup_mem.log_suggestion(
+                        {'param': p, 'from': cur, 'to': to_v, 'reason': s.get('reason', ''), 'impact': s.get('impact') or 'AUTO'},
+                        applied=True,
+                        snapshot={'mode': 'auto_apply', 'ts': now_ts},
+                    )
+                except Exception as _mem_e:
+                    _dbg(f"supervisor_memory log (auto) failed: {_mem_e}")
             
             # Register change for feedback loop
             if FEEDBACK_AVAILABLE:
