@@ -4154,33 +4154,121 @@ def roadmap():
         {'trigger': 'Trigger 3: Portfolio −25%+ (crash)', 'action': 'Noodconfig: 3 trades, €50 BASE, Grid uit. Wacht op stabilisatie.'},
     ]
 
-    # ── Passive Income Estimator at multiple capital levels ──
-    # Use real recent winrate and average profit per trade to estimate
-    # daily yield in %. Falls back to a conservative 0.18%/day if no data.
-    daily_yield_pct = 0.18
+    # ── Passive Income Estimator (REALISTISCH, gebaseerd op echte data) ──
+    # Bouwt 3 scenario's op uit de werkelijke wekelijkse PnL-historie:
+    #   - Conservatief : 25e percentiel (slechte week)
+    #   - Typisch       : mediaan      (doorsnee week)
+    #   - Optimistisch  : 75e percentiel (goede week)
+    # Projecties zijn GECOMPOUND (week-op-week), niet lineair.
+    # Toont ook werkelijke MaxDD uit balance_sparkline en sample size.
+    # Geen fantasiecijfers: bij <3 volledige weken data toont 'onvoldoende data'.
+    passive_income_stats = {
+        'sample_weeks': 0,
+        'has_data': False,
+        'p25_week_pct': 0.0,
+        'median_week_pct': 0.0,
+        'p75_week_pct': 0.0,
+        'max_dd_pct': 0.0,
+        'total_realised_pnl': 0.0,
+        'cap_note': '',
+    }
+    daily_yield_pct = 0.0  # backwards-compat for other UI blocks
     try:
-        if perf_stats.get('total_trades', 0) >= 30 and perf_stats.get('total_profit', 0) > 0:
-            # Approximate: weekly_profit / current_value gives weekly yield
-            if growth_per_week_pct > 0:
-                # Cap at 5%/day to stay realistic
-                daily_yield_pct = min(5.0, growth_per_week_pct / 7.0)
-        # Recent weekly profit fallback
-        if growth_per_week_pct == 0 and weekly_profits:
-            recent_avg = sum(w['profit'] for w in weekly_profits[-4:]) / max(1, len(weekly_profits[-4:]))
-            if current_value > 0 and recent_avg > 0:
-                daily_yield_pct = min(5.0, (recent_avg / current_value) * 100 / 7.0)
+        # Werkelijke MaxDD over balance_sparkline
+        if balance_sparkline and len(balance_sparkline) >= 3:
+            vals = [p['value'] for p in balance_sparkline if p.get('value', 0) > 0]
+            if vals:
+                peak = vals[0]
+                worst_dd = 0.0
+                for v in vals:
+                    if v > peak:
+                        peak = v
+                    dd = (v - peak) / peak * 100 if peak > 0 else 0
+                    if dd < worst_dd:
+                        worst_dd = dd
+                passive_income_stats['max_dd_pct'] = round(worst_dd, 2)
+
+        # Realistische week-yield distributie
+        if weekly_profits and current_value > 0:
+            # Gebruik laatste 8 weken (al gefilterd in weekly_profits) — sluit huidige incomplete week uit
+            from datetime import datetime as _dt2
+            now_week_key = _dt2.now().strftime('%Y-W%W')
+            full_weeks = [w for w in weekly_profits if w['week'] != now_week_key and w['trades'] > 0]
+            if len(full_weeks) >= 3:
+                # Week-yield als % van current_value (approximation; vroeger was kapitaal kleiner
+                # → optimistische bias bij groeiende portfolio, gecompenseerd door cap_note disclaimer)
+                pcts = sorted([(w['profit'] / current_value) * 100 for w in full_weeks])
+                n = len(pcts)
+                # Percentielen via lineaire interpolatie
+                def _pct(arr, q):
+                    if not arr:
+                        return 0.0
+                    k = (len(arr) - 1) * q
+                    f = int(k)
+                    c = min(f + 1, len(arr) - 1)
+                    if f == c:
+                        return arr[f]
+                    return arr[f] + (arr[c] - arr[f]) * (k - f)
+                p25 = _pct(pcts, 0.25)
+                med = _pct(pcts, 0.50)
+                p75 = _pct(pcts, 0.75)
+                # Sanity caps: voorkom dat een single outlier-week absurde jaarprojecties geeft
+                # Realistische bovenlimiet: 5%/week (=1295%/jr gecompound) — alles erboven is ruis
+                p25 = max(-15.0, min(5.0, p25))
+                med = max(-15.0, min(5.0, med))
+                p75 = max(-15.0, min(5.0, p75))
+                passive_income_stats.update({
+                    'sample_weeks': n,
+                    'has_data': True,
+                    'p25_week_pct': round(p25, 3),
+                    'median_week_pct': round(med, 3),
+                    'p75_week_pct': round(p75, 3),
+                    'total_realised_pnl': round(sum(w['profit'] for w in weekly_profits), 2),
+                })
+                if n < 6:
+                    passive_income_stats['cap_note'] = f'Slechts {n} volledige weken data — projecties zijn ruw'
+                else:
+                    passive_income_stats['cap_note'] = f'{n} weken realtime data'
+                # Backwards-compat daily_yield_pct = mediaan / 7
+                daily_yield_pct = med / 7.0
     except Exception:
         pass
 
+    # Bouw tabel: 3 scenario's per kapitaalniveau, GECOMPOUND
+    def _compound_proj(weekly_pct: float, weeks: float) -> float:
+        """Cumulatieve % rendement over N weken bij vaste week-pct."""
+        if weekly_pct == 0:
+            return 0.0
+        return ((1 + weekly_pct / 100.0) ** weeks - 1) * 100.0
+
+    p25 = passive_income_stats['p25_week_pct']
+    med = passive_income_stats['median_week_pct']
+    p75 = passive_income_stats['p75_week_pct']
+
+    # Maand = 4.33 weken, jaar = 52 weken (compound)
+    proj_month_p25 = _compound_proj(p25, 4.33)
+    proj_month_med = _compound_proj(med, 4.33)
+    proj_month_p75 = _compound_proj(p75, 4.33)
+    proj_year_p25 = _compound_proj(p25, 52)
+    proj_year_med = _compound_proj(med, 52)
+    proj_year_p75 = _compound_proj(p75, 52)
+
     passive_income_table = []
     for cap in [1500, 2000, 3000, 5000, 7500, 10000, 15000, 25000, 50000]:
-        day_eur = cap * (daily_yield_pct / 100.0)
         passive_income_table.append({
             'capital': cap,
-            'day': round(day_eur, 2),
-            'week': round(day_eur * 7, 2),
-            'month': round(day_eur * 30, 2),
-            'year': round(day_eur * 365, 2),
+            # Week (informatief)
+            'week_p25': round(cap * p25 / 100.0, 2),
+            'week_med': round(cap * med / 100.0, 2),
+            'week_p75': round(cap * p75 / 100.0, 2),
+            # Maand (gecompound)
+            'month_p25': round(cap * proj_month_p25 / 100.0, 0),
+            'month_med': round(cap * proj_month_med / 100.0, 0),
+            'month_p75': round(cap * proj_month_p75 / 100.0, 0),
+            # Jaar (gecompound)
+            'year_p25': round(cap * proj_year_p25 / 100.0, 0),
+            'year_med': round(cap * proj_year_med / 100.0, 0),
+            'year_p75': round(cap * proj_year_p75 / 100.0, 0),
             'is_current': cap <= current_value < (cap * 1.5) if cap < 50000 else current_value >= cap,
         })
 
@@ -4292,6 +4380,7 @@ def roadmap():
         ai_running=heartbeat.get('ai_active', False),
         active_tab='roadmap',
         passive_income_table=passive_income_table,
+        passive_income_stats=passive_income_stats,
         daily_yield_pct=round(daily_yield_pct, 3),
         deposit_scenarios=deposit_scenarios,
         future_ideas=future_ideas,

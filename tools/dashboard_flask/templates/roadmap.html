@@ -559,29 +559,58 @@
     <!-- Earnings + Bear Market -->
     <div class="roadmap-section">
         <div class="glass-panel" style="margin-bottom: 1rem;">
-            <h3>� Passief Inkomen Schatting</h3>
-            <div style="font-size: 0.78rem; color: var(--text-tertiary,#6e7681); margin-bottom: 0.6rem;">
-                Op basis van huidige rendement: <strong style="color:#10b981;">{{ "%.2f"|format(daily_yield_pct) }}%/dag</strong>
-                {% if growth_per_week_pct %}<span style="opacity:.7;">(uit {{ "%.2f"|format(growth_per_week_pct) }}%/week)</span>{% endif %}
+            <h3>📊 Realistische Verwachting (eigen data)</h3>
+            {% if passive_income_stats and passive_income_stats.has_data %}
+            <div style="font-size: 0.78rem; color: var(--text-tertiary,#6e7681); margin-bottom: 0.6rem; line-height:1.5;">
+                Op basis van <strong style="color:#10b981;">{{ passive_income_stats.sample_weeks }}</strong> volledige weken eigen trade-historie:
+                slechte week <strong style="color:#ef4444;">{{ "%+.2f"|format(passive_income_stats.p25_week_pct) }}%</strong> ·
+                typische week <strong style="color:#10b981;">{{ "%+.2f"|format(passive_income_stats.median_week_pct) }}%</strong> ·
+                goede week <strong style="color:#3b82f6;">{{ "%+.2f"|format(passive_income_stats.p75_week_pct) }}%</strong>
+                {% if passive_income_stats.max_dd_pct < 0 %}
+                · MaxDD 30d <strong style="color:#ef4444;">{{ "%.1f"|format(passive_income_stats.max_dd_pct) }}%</strong>
+                {% endif %}
             </div>
             <table class="income-table">
                 <thead>
-                    <tr><th>Kapitaal</th><th>/dag</th><th>/maand</th><th>/jaar</th></tr>
+                    <tr>
+                        <th rowspan="2">Kapitaal</th>
+                        <th colspan="3" style="text-align:center;">€/maand (gecompound)</th>
+                        <th colspan="3" style="text-align:center;">€/jaar (gecompound)</th>
+                    </tr>
+                    <tr>
+                        <th style="color:#ef4444; font-size:0.7rem;">Slecht</th>
+                        <th style="color:#10b981; font-size:0.7rem;">Typisch</th>
+                        <th style="color:#3b82f6; font-size:0.7rem;">Goed</th>
+                        <th style="color:#ef4444; font-size:0.7rem;">Slecht</th>
+                        <th style="color:#10b981; font-size:0.7rem;">Typisch</th>
+                        <th style="color:#3b82f6; font-size:0.7rem;">Goed</th>
+                    </tr>
                 </thead>
                 <tbody>
                     {% for r in passive_income_table %}
                     <tr class="{% if r.is_current %}is-current{% endif %}">
                         <td>€{{ "{:,.0f}".format(r.capital).replace(",", ".") }}</td>
-                        <td>€{{ "%.2f"|format(r.day) }}</td>
-                        <td>€{{ "%.0f"|format(r.month) }}</td>
-                        <td>€{{ "%.0f"|format(r.year) }}</td>
+                        <td style="color:#ef4444;">{{ "%+.0f"|format(r.month_p25) }}</td>
+                        <td style="color:#10b981;">{{ "%+.0f"|format(r.month_med) }}</td>
+                        <td style="color:#3b82f6;">{{ "%+.0f"|format(r.month_p75) }}</td>
+                        <td style="color:#ef4444;">{{ "%+.0f"|format(r.year_p25) }}</td>
+                        <td style="color:#10b981;">{{ "%+.0f"|format(r.year_med) }}</td>
+                        <td style="color:#3b82f6;">{{ "%+.0f"|format(r.year_p75) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
             <div style="font-size: 0.72rem; color: var(--text-tertiary,#6e7681); margin-top: 0.6rem; line-height: 1.4;">
-                Aanname: zelfde dagrendement schaalt mee. Realiteit varieert per marktconditie en BASE/MAX_TRADES op die kapitaalniveau.
+                {{ passive_income_stats.cap_note }}.
+                Gecompounde projectie = (1 + week%)^N − 1. Realiteit varieert; bull/bear cycli, BASE/MAX_TRADES en draw-downs niet meegerekend.
+                Totaal gerealiseerd PnL (8w): <strong>€{{ "%+.2f"|format(passive_income_stats.total_realised_pnl) }}</strong>.
             </div>
+            {% else %}
+            <div style="font-size: 0.85rem; color: var(--text-tertiary,#6e7681); padding: 1rem 0; text-align:center;">
+                Onvoldoende trade-historie voor een eerlijke schatting.<br>
+                <span style="font-size:0.75rem;">Minimaal 3 volledige handelsweken nodig — kom later terug.</span>
+            </div>
+            {% endif %}
         </div>
         <div class="glass-panel">
             <h3>🔴 Bear Protocol</h3>
