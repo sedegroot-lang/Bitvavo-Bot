@@ -1,0 +1,51 @@
+{
+  "feature_cols": [
+    "ret_1",
+    "ret_6",
+    "ret_24",
+    "vol",
+    "pos_in_range",
+    "macd_diff",
+    "rsi",
+    "vol_ratio",
+    "vol_trend",
+    "slope"
+  ],
+  "fee_pct": 0.0025,
+  "tp_pct": 0.015,
+  "sl_pct": -0.02,
+  "horizon_bars": 24,
+  "lookback": 50,
+  "trained_samples": 22754,
+  "calib_samples": 4876,
+  "test_samples": 4877,
+  "alpha": 0.1,
+  "q_hat": 0.6266049742698669,
+  "empirical_coverage": 0.8812794750871438,
+  "results": {
+    "take_all": {
+      "trades": 4877,
+      "pnl_eur": -427.7875,
+      "win_rate": 0.5712528193561616,
+      "avg_pnl_eur": -0.08771529628870207
+    },
+    "xgb_only": {
+      "trades": 2871,
+      "pnl_eur": -326.6375,
+      "win_rate": 0.5499825844653431,
+      "avg_pnl_eur": -0.11377133402995472
+    },
+    "conformal_strict": {
+      "trades": 606,
+      "pnl_eur": -66.85,
+      "win_rate": 0.5528052805280528,
+      "avg_pnl_eur": -0.1103135313531353
+    },
+    "conformal_loose": {
+      "trades": 4405,
+      "pnl_eur": -433.38749999999993,
+      "win_rate": 0.5625425652667423,
+      "avg_pnl_eur": -0.09838535754824063
+    }
+  }
+}

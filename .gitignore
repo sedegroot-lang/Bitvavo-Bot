@@ -3,6 +3,10 @@
 # ==============================================
 .env
 *.env
+
+# Bulk historical candle CSVs (regenerable via scripts/fetch_historical_candles.py)
+data/historical_candles/
+_train_output.log
 .env.local
 .env.production
 secrets.json
