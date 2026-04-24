@@ -705,12 +705,15 @@
         <div class="card">
           <div class="card-head"><div class="card-title">Grid markten</div></div>
           <table class="tbl">
-            <thead><tr><th>Markt</th><th class="center">Status</th><th class="num">Lower</th><th class="num">Upper</th><th class="num">Levels</th><th class="num">Placed</th><th class="num">Filled</th><th class="num">Investment</th><th>Mode</th></tr></thead>
+            <thead><tr><th>Markt</th><th>Status</th><th class="num">Live orders</th><th class="num">Lower</th><th class="num">Upper</th><th class="num">Levels</th><th class="num">Placed</th><th class="num">Filled</th><th class="num">Invest</th><th>Mode</th></tr></thead>
             <tbody>
               <template x-for="(g, i) in (gr.markets || [])" :key="g.market">
                 <tr>
                   <td><strong x-text="g.market"></strong></td>
-                  <td class="center"><span class="dot-status" :class="g.enabled ? '' : 'bad'"></span></td>
+                  <td>
+                    <span class="tc-status" :class="g.is_active ? 'trailing' : (g.enabled ? 'warn' : 'bad')" x-text="g.status_label || (g.enabled ? 'AAN' : 'UIT')"></span>
+                  </td>
+                  <td class="num" :class="(g.live_open_orders ?? 0) > 0 ? 'pos' : 'neg'" x-text="g.live_open_orders ?? '—'"></td>
                   <td class="num muted" x-text="fmtNum(g.lower_price, 4)"></td>
                   <td class="num muted" x-text="fmtNum(g.upper_price, 4)"></td>
                   <td class="num" x-text="g.total_levels"></td>
@@ -720,7 +723,7 @@
                   <td class="muted" style="font-size:11.5px" x-text="g.mode"></td>
                 </tr>
               </template>
-              <tr x-show="!(gr.markets || []).length"><td colspan="9" class="empty">Geen actieve grids</td></tr>
+              <tr x-show="!(gr.markets || []).length"><td colspan="10" class="empty">Geen grid markten</td></tr>
             </tbody>
           </table>
         </div>

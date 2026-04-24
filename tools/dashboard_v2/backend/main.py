@@ -61,6 +61,7 @@ app.add_middleware(
 )
 
 _cache: TTLCache = TTLCache(maxsize=128, ttl=2)
+_long_cache: TTLCache = TTLCache(maxsize=64, ttl=30)
 
 
 # -------------------------------------------------------------------- Helpers
@@ -245,11 +246,38 @@ def _trades() -> Dict[str, Any]:
     open_trades = log.get("open") or {}
     closed_live = log.get("closed") or []
     closed_all = list(closed_live) + list(archive) if isinstance(closed_live, list) else list(archive)
-    closed_recent = sorted(
-        closed_all,
-        key=lambda t: t.get("closed_ts", 0) or t.get("timestamp", 0),
-        reverse=True,
-    )[:300]
+
+    # Dedup by (market, sell_price, profit) — log.closed and archive overlap when bot rotates
+    _seen = set()
+    _deduped: List[Dict[str, Any]] = []
+    for t in closed_all:
+        if not isinstance(t, dict):
+            continue
+        try:
+            key = (t.get("market"), round(float(t.get("sell_price") or 0), 8), round(float(t.get("profit") or 0), 4))
+        except Exception:
+            key = (t.get("market"), str(t.get("sell_price")), str(t.get("profit")))
+        if key in _seen:
+            continue
+        _seen.add(key)
+        _deduped.append(t)
+    closed_all = _deduped
+
+    def _ts_key(t: Dict[str, Any]) -> float:
+        for k in ("closed_ts", "timestamp", "archived_at"):
+            v = t.get(k)
+            if v is None:
+                continue
+            if isinstance(v, (int, float)):
+                return float(v)
+            if isinstance(v, str):
+                try:
+                    import datetime as _dt
+                    return _dt.datetime.fromisoformat(v.replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    continue
+        return 0.0
+    closed_recent = sorted(closed_all, key=_ts_key, reverse=True)[:300]
 
     prices = _read_json(DATA / "price_cache.json", {}) or {}
     cfg = _merged_config()
@@ -505,15 +533,64 @@ def _grid() -> Dict[str, Any]:
     fills_log = _read_json(DATA / "grid_fills_log.json", []) or []
     if isinstance(fills_log, dict):
         fills_log = fills_log.get("fills") or []
+
+    # Detect actually-active grids by querying open orders (best-effort, cached 30s)
+    open_order_counts: Dict[str, int] = {}
+    try:
+        bv_key = "bv_client::dashboard"
+        if bv_key in _long_cache:
+            bv = _long_cache[bv_key]
+        else:
+            try:
+                from dotenv import load_dotenv  # type: ignore
+                load_dotenv()
+            except Exception:
+                pass
+            try:
+                from python_bitvavo_api.bitvavo import Bitvavo  # type: ignore
+                ak = os.environ.get("BITVAVO_API_KEY", "")
+                sk = os.environ.get("BITVAVO_API_SECRET", "")
+                bv = Bitvavo({"APIKEY": ak, "APISECRET": sk}) if ak and sk else None
+                _long_cache[bv_key] = bv
+            except Exception:
+                bv = None
+        if bv is not None:
+            for market in states.keys():
+                ck = f"grid_open::{market}"
+                if ck in _long_cache:
+                    open_order_counts[market] = _long_cache[ck]
+                    continue
+                try:
+                    oo = bv.ordersOpen({"market": market})
+                    n = len(oo) if isinstance(oo, list) else 0
+                    open_order_counts[market] = n
+                    _long_cache[ck] = n
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     summary = []
     for market, st in states.items():
         cfg = st.get("config", {})
         levels = st.get("levels", []) or []
         placed = sum(1 for L in levels if L.get("status") == "placed")
         filled = sum(1 for L in levels if L.get("status") == "filled")
+        live_orders = open_order_counts.get(market)
+        # "actief" = enabled in config AND at least 1 live open order on Bitvavo (if we could check)
+        cfg_enabled = bool(cfg.get("enabled"))
+        if live_orders is not None:
+            is_active = cfg_enabled and live_orders > 0
+            status_label = "ACTIEF" if is_active else ("GEPAUZEERD" if cfg_enabled else "UIT")
+        else:
+            is_active = cfg_enabled and placed > 0
+            status_label = "ACTIEF (state)" if is_active else ("GEPAUZEERD" if cfg_enabled else "UIT")
         summary.append({
             "market": market,
-            "enabled": cfg.get("enabled"),
+            "enabled": cfg_enabled,
+            "is_active": is_active,
+            "status_label": status_label,
+            "live_open_orders": live_orders,
             "lower_price": cfg.get("lower_price"),
             "upper_price": cfg.get("upper_price"),
             "num_grids": cfg.get("num_grids"),
@@ -581,6 +658,7 @@ def _signal_status() -> Dict[str, Any]:
         scan = hb.get("last_scan_stats") or {}
         total_markets = int(scan.get("total_markets") or 0)
         evaluated = int(scan.get("evaluated") or 0)
+        skipped = int(scan.get("skipped") or 0)
         passed = int(scan.get("passed_min_score") or 0)
         min_score_threshold = float(scan.get("min_score_threshold") or cfg.get("MIN_SCORE_TO_BUY", 7) or 7)
         regime = scan.get("regime") or ""
@@ -650,6 +728,8 @@ def _signal_status() -> Dict[str, Any]:
                 details.append(f"⚠️ {evaluated}/{total_markets} markets gescand — niemand scoort ≥ {effective_min_score:.1f}")
             else:
                 details.append(f"✅ {passed} market(s) voldoen aan min score {effective_min_score:.1f}")
+            if skipped > 0:
+                details.append(f"⏭️ {skipped} market(s) overgeslagen (al open / cooldown / filter)")
         else:
             details.append("⏳ Eerste market-scan loopt nog (geen scan-stats in heartbeat)")
         if abs(adaptive_bump) >= 0.01:
@@ -696,6 +776,7 @@ def _signal_status() -> Dict[str, Any]:
             "scan_stats": {
                 "total_markets": total_markets,
                 "evaluated": evaluated,
+                "skipped": skipped,
                 "passed_min_score": passed,
                 "min_score_threshold": min_score_threshold,
                 "effective_min_score": effective_min_score,
