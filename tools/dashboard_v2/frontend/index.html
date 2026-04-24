@@ -1,276 +1,586 @@
 <!doctype html>
-<html lang="nl" class="h-full bg-slate-950">
+<html lang="nl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0a0e1a" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
-  <title>Bitvavo Bot — Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui'] } } } };
-  </script>
-  <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <title>Bitvavo Bot — Command Center</title>
+  <link rel="preconnect" href="https://rsms.me/" crossorigin>
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <link rel="stylesheet" href="/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
 </head>
-<body class="h-full text-slate-100 antialiased" x-data="dash()" x-init="boot()">
-  <!-- Top bar -->
-  <header class="sticky top-0 z-30 backdrop-blur bg-slate-950/80 border-b border-slate-800">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-4">
-      <div class="flex items-center gap-2">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 grid place-items-center font-bold text-slate-900">B</div>
+<body x-data="dash()" x-init="boot()" x-cloak>
+
+  <div class="app-shell">
+
+    <!-- ============== Sidebar ============== -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo">B</div>
         <div>
-          <div class="font-semibold leading-none">Bitvavo Bot</div>
-          <div class="text-xs text-slate-400 leading-none mt-0.5">Dashboard v2</div>
+          <div class="name">Bitvavo Bot</div>
+          <div class="ver">Command Center · v2.1</div>
         </div>
       </div>
-      <nav class="ml-auto hidden sm:flex gap-1 text-sm">
-        <template x-for="t in tabs" :key="t.id">
-          <button class="px-3 py-1.5 rounded-lg transition"
-                  :class="tab===t.id ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'"
-                  @click="tab=t.id" x-text="t.label"></button>
-        </template>
-      </nav>
-      <div class="ml-auto sm:ml-0 flex items-center gap-2 text-xs">
-        <span class="w-2 h-2 rounded-full"
-              :class="hb.age_seconds && hb.age_seconds < 120 ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'"></span>
-        <span x-text="hb.age_seconds != null ? `${Math.round(hb.age_seconds)}s` : '—'"></span>
-        <button @click="refresh()" class="ml-2 px-2 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700">↻</button>
-      </div>
-    </div>
-    <!-- Mobile tabs -->
-    <div class="sm:hidden overflow-x-auto px-4 pb-2 flex gap-1 text-xs">
+
       <template x-for="t in tabs" :key="t.id">
-        <button class="px-3 py-1.5 rounded-lg whitespace-nowrap"
-                :class="tab===t.id ? 'bg-slate-800 text-white' : 'text-slate-400 bg-slate-900'"
-                @click="tab=t.id" x-text="t.label"></button>
+        <div class="nav-item" :class="{active: tab===t.id}" @click="tab=t.id">
+          <span class="icon" x-html="t.icon"></span>
+          <span class="label" x-text="t.label"></span>
+          <span class="badge" x-show="t.badge" x-text="t.badge"></span>
+        </div>
       </template>
-    </div>
-  </header>
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-
-    <!-- Overview tab ---------------------------------------------------- -->
-    <section x-show="tab==='overview'" class="space-y-6">
-      <!-- KPI grid -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div class="kpi">
-          <div class="kpi-label">Totaal kapitaal</div>
-          <div class="kpi-value text-emerald-400" x-text="fmtEur(p.total_account_value_eur)"></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">EUR vrij</div>
-          <div class="kpi-value" x-text="fmtEur(p.eur_balance)"></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">In posities</div>
-          <div class="kpi-value" x-text="fmtEur(p.asset_value_eur)"></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Open trades</div>
-          <div class="kpi-value" x-text="(t.open_count ?? 0) + ' / ' + (config.MAX_OPEN_TRADES ?? '?')"></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Realised PnL totaal</div>
-          <div class="kpi-value" :class="p.total_realised_pnl_eur >= 0 ? 'text-emerald-400' : 'text-rose-400'"
-               x-text="fmtEur(p.total_realised_pnl_eur)"></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Fees totaal</div>
-          <div class="kpi-value text-amber-400" x-text="fmtEur(p.total_fees_eur)"></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Trades</div>
-          <div class="kpi-value" x-text="p.trade_count ?? 0"></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Regime</div>
-          <div class="kpi-value text-cyan-400" x-text="r.current?.regime || r.current?.name || '—'"></div>
-        </div>
+      <div class="sidebar-footer">
+        <div>Bot: <span :class="hb.bot_online ? 'pos' : 'neg'" x-text="hb.bot_online ? 'online' : 'offline'"></span> · AI: <span :class="hb.ai_online ? 'pos' : 'neg'" x-text="hb.ai_online ? 'online' : 'offline'"></span></div>
+        <div>Heartbeat: <span x-text="fmtAge(hb.age_seconds)"></span></div>
+        <div>Refresh: <span x-text="fmtAge(secondsAgo)"></span> geleden</div>
       </div>
+    </aside>
 
-      <!-- Charts -->
-      <div class="grid lg:grid-cols-2 gap-4">
-        <div class="card">
-          <div class="card-title">Daily PnL (90 dagen)</div>
-          <canvas id="chartDaily" height="160"></canvas>
-        </div>
-        <div class="card">
-          <div class="card-title">Wekelijks PnL</div>
-          <canvas id="chartWeekly" height="160"></canvas>
-        </div>
-      </div>
+    <!-- ============== Main ============== -->
+    <main class="main">
 
-      <!-- Open trades -->
-      <div class="card">
-        <div class="card-title flex items-center gap-2">
-          Open posities
-          <span class="text-xs text-slate-400" x-text="`(${Object.keys(t.open||{}).length})`"></span>
+      <!-- Top bar -->
+      <header class="topbar">
+        <div>
+          <h1 x-text="currentTab().label"></h1>
+          <div class="subtitle" x-text="currentTab().subtitle || ''"></div>
         </div>
-        <div class="overflow-x-auto -mx-4 sm:mx-0">
-          <table class="w-full text-sm">
-            <thead class="text-xs text-slate-400 border-b border-slate-800">
-              <tr><th class="text-left py-2 px-3">Markt</th>
-                  <th class="text-right">Buy</th>
-                  <th class="text-right">Geïnvesteerd</th>
-                  <th class="text-right">Score</th>
-                  <th class="text-right">Leeftijd</th>
-                  <th class="text-right">DCA</th></tr>
-            </thead>
+        <div class="right">
+          <span class="status-pill"
+                :class="hb.bot_online ? '' : 'bad'">
+            <span class="dot"></span>
+            <span x-text="hb.bot_online ? 'Bot live' : 'Bot offline'"></span>
+          </span>
+          <button class="btn icon" @click="refresh()" title="Refresh">↻</button>
+        </div>
+      </header>
+
+      <!-- ============== OVERVIEW ============== -->
+      <section x-show="tab==='overview'" class="stack">
+
+        <!-- KPIs -->
+        <div class="kpi-grid">
+          <div class="kpi accent">
+            <div class="kpi-label">Totaal kapitaal</div>
+            <div class="kpi-value" x-text="fmtEur(p.total_account_value_eur)"></div>
+            <div class="kpi-trend">
+              <span :class="(p.net_change_eur ?? 0) >= 0 ? 'pos' : 'neg'"
+                    x-text="(p.net_change_eur != null ? (p.net_change_eur >= 0 ? '+' : '') + fmtEur(p.net_change_eur) : '—')"></span>
+              <span class="muted" x-text="p.net_change_pct != null ? '(' + (p.net_change_pct >= 0 ? '+' : '') + p.net_change_pct + '%)' : ''"></span>
+              <span class="muted"> sinds storting</span>
+            </div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">EUR vrij</div>
+            <div class="kpi-value" x-text="fmtEur(p.eur_balance)"></div>
+            <div class="kpi-trend muted">In orders: <span x-text="fmtEur(p.eur_in_orders)"></span></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">In posities</div>
+            <div class="kpi-value" x-text="fmtEur(p.asset_value_eur)"></div>
+            <div class="kpi-trend muted"><span x-text="t.open_count ?? 0"></span> / <span x-text="param('MAX_OPEN_TRADES') ?? '?'"></span> trades</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Realised PnL</div>
+            <div class="kpi-value" :class="(p.total_realised_pnl_eur ?? 0) >= 0 ? 'pos' : 'neg'"
+                 x-text="fmtEur(p.total_realised_pnl_eur)"></div>
+            <div class="kpi-trend muted">Fees: <span x-text="fmtEur(p.total_fees_eur)"></span></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Win rate</div>
+            <div class="kpi-value" x-text="(perf.win_rate_pct ?? 0).toFixed(1) + '%'"></div>
+            <div class="kpi-trend muted"><span x-text="perf.wins ?? 0"></span> / <span x-text="perf.total_trades ?? 0"></span></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Regime</div>
+            <div class="kpi-value" x-text="r.current?.regime || r.current?.name || '—'"></div>
+            <div class="kpi-trend muted" x-text="(r.current?.confidence != null ? 'conf ' + r.current.confidence.toFixed(2) : '')"></div>
+          </div>
+        </div>
+
+        <!-- Charts row -->
+        <div class="row-2">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Equity curve</div>
+              <div class="card-action">
+                <select class="input" style="width:auto" x-model="periodEquity" @change="refreshBalanceHistory()">
+                  <option value="1d">24h</option>
+                  <option value="7d">7d</option>
+                  <option value="30d">30d</option>
+                  <option value="90d">90d</option>
+                  <option value="all">all</option>
+                </select>
+              </div>
+            </div>
+            <div class="chart-wrap"><canvas id="chartEquity"></canvas></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div class="card-title">Allocatie</div></div>
+            <div class="chart-wrap"><canvas id="chartAlloc"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Open positions -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Open posities · <span x-text="t.open_count ?? 0"></span></div>
+            <div class="card-action faint" x-text="'totaal ' + fmtEur(p.asset_value_eur)"></div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="tbl">
+              <thead><tr>
+                <th>Markt</th><th class="num">Buy</th><th class="num">Nu</th><th class="num">Geïnvesteerd</th>
+                <th class="num">Waarde</th><th class="num">PnL €</th><th class="num">PnL %</th><th class="num">DCA</th><th class="num">Leeftijd</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="[m, tr] in Object.entries(t.open || {})" :key="m">
+                  <tr>
+                    <td><strong x-text="m.replace('-EUR','')"></strong></td>
+                    <td class="num muted" x-text="fmtNum(tr.buy_price, 6)"></td>
+                    <td class="num" x-text="fmtNum(tr.current_price, 6)"></td>
+                    <td class="num muted" x-text="fmtEur(tr.initial_invested_eur ?? tr.invested_eur)"></td>
+                    <td class="num" x-text="fmtEur(tr.current_value_eur)"></td>
+                    <td class="num" :class="(tr.unrealised_pnl_eur ?? 0) >= 0 ? 'pos' : 'neg'" x-text="fmtEur(tr.unrealised_pnl_eur)"></td>
+                    <td class="num" :class="(tr.unrealised_pnl_pct ?? 0) >= 0 ? 'pos' : 'neg'" x-text="(tr.unrealised_pnl_pct != null ? (tr.unrealised_pnl_pct >= 0 ? '+' : '') + tr.unrealised_pnl_pct + '%' : '—')"></td>
+                    <td class="num" x-text="(tr.dca_buys ?? 0) + '/' + (tr.dca_max ?? 0)"></td>
+                    <td class="num muted" x-text="ageHrs(tr.opened_ts)"></td>
+                  </tr>
+                </template>
+                <tr x-show="!Object.keys(t.open || {}).length"><td colspan="9" class="empty">Geen open trades</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Daily PnL + recent closed -->
+        <div class="row-2">
+          <div class="card">
+            <div class="card-head"><div class="card-title">Daily PnL · 90 dagen</div></div>
+            <div class="chart-wrap"><canvas id="chartDaily"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">Laatste trades</div></div>
+            <table class="tbl">
+              <thead><tr><th>Markt</th><th class="num">PnL €</th><th class="num">%</th><th>Reden</th></tr></thead>
+              <tbody>
+                <template x-for="(c, i) in (t.closed_recent || []).slice(0, 8)" :key="i">
+                  <tr>
+                    <td x-text="(c.market || '?').replace('-EUR','')"></td>
+                    <td class="num" :class="(c.profit ?? 0) >= 0 ? 'pos' : 'neg'" x-text="fmtEur(c.profit)"></td>
+                    <td class="num" :class="(closedPct(c) ?? 0) >= 0 ? 'pos' : 'neg'" x-text="(closedPct(c) != null ? closedPct(c).toFixed(2) + '%' : '—')"></td>
+                    <td class="muted" style="font-size:11.5px" x-text="c.reason || '—'"></td>
+                  </tr>
+                </template>
+                <tr x-show="!(t.closed_recent || []).length"><td colspan="4" class="empty">Nog geen trades</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== TRADES ============== -->
+      <section x-show="tab==='trades'" class="stack">
+        <div class="row-2">
+          <div class="card">
+            <div class="card-head"><div class="card-title">PnL per markt</div></div>
+            <div class="chart-wrap"><canvas id="chartPerMarket"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">Statistieken</div></div>
+            <table class="tbl">
+              <tbody>
+                <tr><td>Totaal trades</td><td class="num" x-text="perf.total_trades ?? 0"></td></tr>
+                <tr><td>Winst trades</td><td class="num pos" x-text="perf.wins ?? 0"></td></tr>
+                <tr><td>Verlies trades</td><td class="num neg" x-text="perf.losses ?? 0"></td></tr>
+                <tr><td>Win rate</td><td class="num" x-text="(perf.win_rate_pct ?? 0).toFixed(1) + '%'"></td></tr>
+                <tr><td>Gem. winst</td><td class="num pos" x-text="fmtEur(perf.avg_win_eur)"></td></tr>
+                <tr><td>Gem. verlies</td><td class="num neg" x-text="fmtEur(perf.avg_loss_eur)"></td></tr>
+                <tr><td>Expectancy</td><td class="num" :class="(perf.expectancy_eur ?? 0) >= 0 ? 'pos' : 'neg'" x-text="fmtEur(perf.expectancy_eur)"></td></tr>
+                <tr><td>Totaal PnL</td><td class="num" :class="(perf.total_profit_eur ?? 0) >= 0 ? 'pos' : 'neg'" x-text="fmtEur(perf.total_profit_eur)"></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="row-eq">
+          <div class="card">
+            <div class="card-head"><div class="card-title">Top 10 winnaars</div></div>
+            <table class="tbl">
+              <thead><tr><th>Markt</th><th class="num">PnL €</th><th class="num">%</th></tr></thead>
+              <tbody>
+                <template x-for="(c, i) in (perf.top_trades || [])" :key="i">
+                  <tr><td x-text="(c.market || '?').replace('-EUR','')"></td>
+                      <td class="num pos" x-text="fmtEur(c.profit)"></td>
+                      <td class="num" x-text="c.pct != null ? c.pct.toFixed(2) + '%' : '—'"></td></tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">Top 10 verliezers</div></div>
+            <table class="tbl">
+              <thead><tr><th>Markt</th><th class="num">PnL €</th><th class="num">%</th></tr></thead>
+              <tbody>
+                <template x-for="(c, i) in (perf.bottom_trades || [])" :key="i">
+                  <tr><td x-text="(c.market || '?').replace('-EUR','')"></td>
+                      <td class="num neg" x-text="fmtEur(c.profit)"></td>
+                      <td class="num" x-text="c.pct != null ? c.pct.toFixed(2) + '%' : '—'"></td></tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Alle gesloten trades</div>
+            <div class="card-action">
+              <input type="text" class="input" style="width:180px" placeholder="filter markt…" x-model="closedFilter">
+            </div>
+          </div>
+          <div style="overflow-x:auto; max-height:60vh; overflow-y:auto">
+            <table class="tbl">
+              <thead><tr>
+                <th>Datum</th><th>Markt</th><th class="num">Buy</th><th class="num">Sell</th>
+                <th class="num">PnL €</th><th class="num">%</th><th>Reden</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="(c, i) in filteredClosed()" :key="i">
+                  <tr>
+                    <td class="muted" style="font-size:11.5px" x-text="fmtDate(c.closed_ts || c.timestamp)"></td>
+                    <td><strong x-text="(c.market || '?').replace('-EUR','')"></strong></td>
+                    <td class="num muted" x-text="fmtNum(c.buy_price, 6)"></td>
+                    <td class="num muted" x-text="fmtNum(c.sell_price, 6)"></td>
+                    <td class="num" :class="(c.profit ?? 0) >= 0 ? 'pos' : 'neg'" x-text="fmtEur(c.profit)"></td>
+                    <td class="num" :class="(closedPct(c) ?? 0) >= 0 ? 'pos' : 'neg'" x-text="(closedPct(c) != null ? closedPct(c).toFixed(2) + '%' : '—')"></td>
+                    <td class="muted" style="font-size:11.5px" x-text="c.reason || '—'"></td>
+                  </tr>
+                </template>
+                <tr x-show="!filteredClosed().length"><td colspan="7" class="empty">Niets gevonden</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== AI ============== -->
+      <section x-show="tab==='ai'" class="stack">
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label">Suggesties</div><div class="kpi-value" x-text="(a.suggestions || []).length"></div></div>
+          <div class="kpi"><div class="kpi-label">Insights</div><div class="kpi-value" x-text="(a.insights || []).length"></div></div>
+          <div class="kpi"><div class="kpi-label">Supervisor run</div><div class="kpi-value" style="font-size:14px" x-text="fmtDate(a.supervisor_run)"></div></div>
+          <div class="kpi"><div class="kpi-label">Health</div><div class="kpi-value" style="font-size:14px" x-text="a.health_report?.status || '—'"></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title">Supervisor suggesties</div></div>
+          <table class="tbl">
+            <thead><tr><th>Param</th><th class="num">Van</th><th class="num">Naar</th><th class="num">Conf</th><th>Reden</th><th>Impact</th></tr></thead>
             <tbody>
-              <template x-for="[m, tr] in Object.entries(t.open || {})" :key="m">
-                <tr class="border-b border-slate-800/60 hover:bg-slate-900/50">
-                  <td class="py-2 px-3 font-medium" x-text="m"></td>
-                  <td class="text-right tabular-nums" x-text="fmtNum(tr.buy_price, 6)"></td>
-                  <td class="text-right tabular-nums" x-text="fmtEur(tr.initial_invested_eur ?? tr.invested_eur)"></td>
-                  <td class="text-right tabular-nums" x-text="(tr.score ?? '—')"></td>
-                  <td class="text-right text-slate-400" x-text="ageHrs(tr.opened_ts)"></td>
-                  <td class="text-right" x-text="(tr.dca_buys ?? 0)"></td>
+              <template x-for="(s, i) in (a.suggestions || [])" :key="i">
+                <tr>
+                  <td><code style="font-size:11.5px" x-text="s.param || s.key"></code></td>
+                  <td class="num muted" x-text="s.from"></td>
+                  <td class="num pos" x-text="s.to"></td>
+                  <td class="num" x-text="(s.confidence != null ? s.confidence.toFixed(2) : '—')"></td>
+                  <td class="muted" style="font-size:11.5px" x-text="s.reason || '—'"></td>
+                  <td><span class="badge" :class="impactClass(s.impact)" x-text="s.impact || '—'"></span></td>
                 </tr>
               </template>
-              <tr x-show="!Object.keys(t.open || {}).length">
-                <td colspan="6" class="text-center text-slate-500 py-6">Geen open trades</td>
-              </tr>
+              <tr x-show="!(a.suggestions || []).length"><td colspan="6" class="empty">Nog geen suggesties</td></tr>
             </tbody>
           </table>
         </div>
-      </div>
-    </section>
 
-    <!-- Trades tab ----------------------------------------------------- -->
-    <section x-show="tab==='trades'" class="space-y-4">
-      <div class="card">
-        <div class="card-title">Recent gesloten trades</div>
-        <div class="overflow-x-auto -mx-4 sm:mx-0">
-          <table class="w-full text-sm">
-            <thead class="text-xs text-slate-400 border-b border-slate-800">
-              <tr><th class="text-left py-2 px-3">Datum</th>
-                  <th class="text-left">Markt</th>
-                  <th class="text-right">PnL €</th>
-                  <th class="text-right">PnL %</th>
-                  <th class="text-left">Reden</th></tr>
-            </thead>
+        <div class="row-eq">
+          <div class="card">
+            <div class="card-head"><div class="card-title">Top market insights</div></div>
+            <table class="tbl">
+              <thead><tr><th>Markt</th><th class="num">Score</th></tr></thead>
+              <tbody>
+                <template x-for="i in (a.insights || []).slice(0, 15)" :key="i.market">
+                  <tr><td x-text="(i.market || '').replace('-EUR','')"></td>
+                      <td class="num" x-text="(+i.score || 0).toFixed(2)"></td></tr>
+                </template>
+                <tr x-show="!(a.insights || []).length"><td colspan="2" class="empty">Geen insights</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">Walkforward / model</div></div>
+            <pre style="font-size:11px; color:var(--text-muted); overflow:auto; max-height:280px" x-text="JSON.stringify(a.walkforward || a.model_metrics || {}, null, 2)"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== MEMORY ============== -->
+      <section x-show="tab==='memory'" class="stack">
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label">Facts</div><div class="kpi-value" x-text="m.fact_count"></div></div>
+          <div class="kpi"><div class="kpi-label">Suggestion log</div><div class="kpi-value" x-text="m.suggestion_log_count"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Recente facts</div></div>
+          <div style="max-height:60vh; overflow-y:auto">
+            <table class="tbl">
+              <thead><tr><th>Datum</th><th>Categorie</th><th>Tekst</th></tr></thead>
+              <tbody>
+                <template x-for="(f, i) in (m.facts_recent || []).slice().reverse()" :key="i">
+                  <tr>
+                    <td class="muted" style="font-size:11.5px" x-text="fmtDate(f.ts)"></td>
+                    <td><span class="badge" x-text="f.category || 'fact'"></span></td>
+                    <td x-text="(typeof f.text === 'string' ? f.text : JSON.stringify(f))"></td>
+                  </tr>
+                </template>
+                <tr x-show="!(m.facts_recent || []).length"><td colspan="3" class="empty">Geen facts</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== SHADOW ============== -->
+      <section x-show="tab==='shadow'" class="stack">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Shadow capital rotation · 14d</div></div>
+          <p class="muted" style="font-size:13px">Wat de bot zou hebben gerouleerd om sterke kandidaten een slot te geven. Pure observatie — er wordt niets gehandeld.</p>
+          <div class="kpi-grid" style="margin-top:8px">
+            <div class="kpi"><div class="kpi-label">Suggesties</div><div class="kpi-value" x-text="s.total ?? 0"></div></div>
+            <div class="kpi"><div class="kpi-label">Window</div><div class="kpi-value" x-text="(s.window_days ?? 14) + 'd'"></div></div>
+          </div>
+        </div>
+        <div class="row-eq">
+          <div class="card">
+            <div class="card-head"><div class="card-title">Te sluiten posities</div></div>
+            <table class="tbl">
+              <thead><tr><th>Markt</th><th class="num">#</th></tr></thead>
+              <tbody>
+                <template x-for="(v, k) in (s.by_close_market || {})" :key="k">
+                  <tr><td x-text="k.replace('-EUR','')"></td><td class="num" x-text="v"></td></tr>
+                </template>
+                <tr x-show="!Object.keys(s.by_close_market || {}).length"><td colspan="2" class="empty">Geen rotaties</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">Voor welke kandidaten?</div></div>
+            <table class="tbl">
+              <thead><tr><th>Markt</th><th class="num">#</th></tr></thead>
+              <tbody>
+                <template x-for="(v, k) in (s.by_candidate_market || {})" :key="k">
+                  <tr><td x-text="k.replace('-EUR','')"></td><td class="num" x-text="v"></td></tr>
+                </template>
+                <tr x-show="!Object.keys(s.by_candidate_market || {}).length"><td colspan="2" class="empty">Geen kandidaten</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== ROADMAP ============== -->
+      <section x-show="tab==='roadmap'" class="stack">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Huidige fase</div></div>
+          <h2 style="margin:0 0 8px;font-size:18px" x-text="rd.current_phase || '—'"></h2>
+          <div class="muted" x-text="rd.next_phase ? 'Volgende: ' + rd.next_phase : ''"></div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label">Max trades</div><div class="kpi-value" x-text="rd.max_open_trades ?? '—'"></div></div>
+          <div class="kpi"><div class="kpi-label">Base €/trade</div><div class="kpi-value" x-text="fmtEur(rd.base_amount_eur)"></div></div>
+          <div class="kpi"><div class="kpi-label">Min score</div><div class="kpi-value" x-text="rd.min_score_to_buy ?? '—'"></div></div>
+          <div class="kpi"><div class="kpi-label">DCA budget</div><div class="kpi-value" x-text="fmtEur(rd.dca_order_eur)"></div></div>
+          <div class="kpi"><div class="kpi-label">DCA max</div><div class="kpi-value" x-text="rd.dca_max_buys ?? '—'"></div></div>
+          <div class="kpi"><div class="kpi-label">Grid €</div><div class="kpi-value" x-text="fmtEur(rd.grid_investment)"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Stortingen</div></div>
+          <div style="display:flex; gap:24px; align-items:baseline">
+            <div><div class="kpi-label">Totaal gestort</div><div class="kpi-value" x-text="fmtEur(d.total)"></div></div>
+            <div><div class="kpi-label">Aantal</div><div class="kpi-value" x-text="d.count"></div></div>
+            <div><div class="kpi-label">Account nu</div><div class="kpi-value" x-text="fmtEur(p.total_account_value_eur)"></div></div>
+            <div><div class="kpi-label">Netto</div><div class="kpi-value" :class="(p.net_change_eur ?? 0) >= 0 ? 'pos' : 'neg'" x-text="fmtEur(p.net_change_eur)"></div></div>
+          </div>
+          <table class="tbl" style="margin-top:14px">
+            <thead><tr><th>Datum</th><th class="num">Bedrag</th><th>Note</th></tr></thead>
             <tbody>
-              <template x-for="(c, i) in (t.closed_recent || [])" :key="i">
-                <tr class="border-b border-slate-800/60">
-                  <td class="py-2 px-3 text-slate-400" x-text="fmtDate(c.closed_ts || c.timestamp)"></td>
-                  <td x-text="c.market || '?'"></td>
-                  <td class="text-right tabular-nums" :class="(c.profit ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'"
-                      x-text="fmtEur(c.profit)"></td>
-                  <td class="text-right tabular-nums" :class="(c.profit_pct ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'"
-                      x-text="(c.profit_pct != null ? c.profit_pct.toFixed(2) + '%' : '—')"></td>
-                  <td class="text-slate-400 text-xs" x-text="c.reason || '—'"></td>
-                </tr>
+              <template x-for="(dep, i) in (d.deposits || [])" :key="i">
+                <tr><td class="muted" x-text="dep.date || fmtDate(dep.timestamp/1000)"></td>
+                    <td class="num pos" x-text="fmtEur(dep.amount)"></td>
+                    <td class="muted" x-text="dep.note || ''"></td></tr>
               </template>
             </tbody>
           </table>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- AI tab --------------------------------------------------------- -->
-    <section x-show="tab==='ai'" class="space-y-4">
-      <div class="grid lg:grid-cols-2 gap-4">
+      <!-- ============== PARAMETERS ============== -->
+      <section x-show="tab==='parameters'" class="stack">
         <div class="card">
-          <div class="card-title">Top market insights</div>
-          <ul class="space-y-1 text-sm">
-            <template x-for="i in (a.insights || []).slice(0, 12)" :key="i.market">
-              <li class="flex items-center justify-between py-1 border-b border-slate-800/40">
-                <span class="font-medium" x-text="i.market"></span>
-                <span class="tabular-nums text-cyan-300" x-text="(+i.score || 0).toFixed(2)"></span>
-              </li>
-            </template>
-            <li x-show="!(a.insights || []).length" class="text-slate-500">Geen insights</li>
-          </ul>
-        </div>
-        <div class="card">
-          <div class="card-title">Supervisor suggesties</div>
-          <ul class="space-y-2 text-sm">
-            <template x-for="(s, i) in (a.suggestions || []).slice(0, 10)" :key="i">
-              <li class="bg-slate-900/50 rounded p-2">
-                <div class="text-xs text-slate-400" x-text="s.key || s.metric || '—'"></div>
-                <div x-text="`${s.from ?? '?'} → ${s.to ?? '?'}`"></div>
-                <div x-show="s.reason" class="text-xs text-slate-500" x-text="s.reason"></div>
-              </li>
-            </template>
-            <li x-show="!(a.suggestions || []).length" class="text-slate-500">Nog geen suggesties</li>
-          </ul>
-        </div>
-      </div>
-      <div class="card" x-show="a.model_metrics && Object.keys(a.model_metrics).length">
-        <div class="card-title">Model metrics</div>
-        <pre class="text-xs text-slate-300 overflow-x-auto" x-text="JSON.stringify(a.model_metrics, null, 2)"></pre>
-      </div>
-    </section>
-
-    <!-- Memory tab ----------------------------------------------------- -->
-    <section x-show="tab==='memory'" class="space-y-4">
-      <div class="grid grid-cols-2 gap-4">
-        <div class="kpi">
-          <div class="kpi-label">Facts</div>
-          <div class="kpi-value" x-text="m.fact_count"></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Suggestion log</div>
-          <div class="kpi-value" x-text="m.suggestion_log_count"></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title">Recente facts</div>
-        <ul class="space-y-1 text-sm">
-          <template x-for="(f, i) in (m.facts_recent || []).slice().reverse()" :key="i">
-            <li class="border-b border-slate-800/40 py-2">
-              <div class="text-xs text-slate-500" x-text="(f.category || 'fact') + ' • ' + fmtDate(f.ts)"></div>
-              <div x-text="(typeof f.text === 'string' ? f.text : JSON.stringify(f))"></div>
-            </li>
-          </template>
-        </ul>
-      </div>
-    </section>
-
-    <!-- Shadow tab ----------------------------------------------------- -->
-    <section x-show="tab==='shadow'" class="space-y-4">
-      <div class="card">
-        <div class="card-title">Shadow capital rotation</div>
-        <p class="text-sm text-slate-400 mb-3">
-          Laat zien wat de bot gerouleerd zou hebben (oude winnende posities sluiten om
-          slot vrij te maken voor sterke kandidaten). Pure observatie — er wordt
-          <em>niets</em> gehandeld.
-        </p>
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-          <div class="kpi"><div class="kpi-label">Suggesties (14d)</div>
-            <div class="kpi-value" x-text="s.total ?? 0"></div></div>
-          <div class="kpi"><div class="kpi-label">Window</div>
-            <div class="kpi-value" x-text="(s.window_days ?? 14) + 'd'"></div></div>
-        </div>
-        <div class="grid lg:grid-cols-2 gap-4">
-          <div>
-            <div class="text-sm text-slate-400 mb-1">Welke posities zou de bot dichtgooien?</div>
-            <ul class="text-sm space-y-1">
-              <template x-for="(v, k) in (s.by_close_market || {})" :key="k">
-                <li class="flex justify-between border-b border-slate-800/40 py-1">
-                  <span x-text="k"></span><span class="tabular-nums" x-text="v"></span>
-                </li>
-              </template>
-            </ul>
+          <div class="card-head">
+            <div class="card-title">Live config · <span class="muted" x-text="param('TOTAL') || (par.total_keys + ' keys')"></span></div>
+            <div class="card-action">
+              <input type="text" class="input" style="width:200px" placeholder="zoek key…" x-model="paramFilter">
+            </div>
           </div>
-          <div>
-            <div class="text-sm text-slate-400 mb-1">Voor welke kandidaten?</div>
-            <ul class="text-sm space-y-1">
-              <template x-for="(v, k) in (s.by_candidate_market || {})" :key="k">
-                <li class="flex justify-between border-b border-slate-800/40 py-1">
-                  <span x-text="k"></span><span class="tabular-nums" x-text="v"></span>
-                </li>
-              </template>
-            </ul>
+          <p class="muted" style="font-size:12px">Schrijven gaat naar layer-3: <code x-text="par.local_path"></code></p>
+        </div>
+        <template x-for="(vals, sect) in (par.sections || {})" :key="sect">
+          <div class="card">
+            <div class="card-head"><div class="card-title" x-text="sect"></div></div>
+            <table class="tbl">
+              <thead><tr><th>Key</th><th>Huidig</th><th>Nieuw</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="(v, k) in vals" :key="k">
+                  <tr x-show="!paramFilter || k.toLowerCase().includes(paramFilter.toLowerCase())">
+                    <td><code style="font-size:11.5px" x-text="k"></code></td>
+                    <td class="muted" x-text="JSON.stringify(v)"></td>
+                    <td><input class="input" :value="JSON.stringify(v)" @keydown.enter="saveParam(k, $event.target.value)" style="width:160px"></td>
+                    <td><button class="btn primary" @click="saveParam(k, $el.parentElement.previousElementSibling.firstElementChild.value)">save</button></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </template>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Overig (<span x-text="Object.keys(par.other || {}).length"></span> keys)</div></div>
+          <div style="max-height:50vh; overflow-y:auto">
+            <table class="tbl">
+              <thead><tr><th>Key</th><th>Waarde</th></tr></thead>
+              <tbody>
+                <template x-for="(v, k) in (par.other || {})" :key="k">
+                  <tr x-show="!paramFilter || k.toLowerCase().includes(paramFilter.toLowerCase())">
+                    <td><code style="font-size:11.5px" x-text="k"></code></td>
+                    <td class="muted" x-text="JSON.stringify(v)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-  </main>
+      <!-- ============== GRID ============== -->
+      <section x-show="tab==='grid'" class="stack">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Grid markten</div></div>
+          <table class="tbl">
+            <thead><tr><th>Markt</th><th class="center">Status</th><th class="num">Lower</th><th class="num">Upper</th><th class="num">Levels</th><th class="num">Placed</th><th class="num">Filled</th><th class="num">Investment</th><th>Mode</th></tr></thead>
+            <tbody>
+              <template x-for="(g, i) in (gr.markets || [])" :key="g.market">
+                <tr>
+                  <td><strong x-text="g.market"></strong></td>
+                  <td class="center"><span class="dot-status" :class="g.enabled ? '' : 'bad'"></span></td>
+                  <td class="num muted" x-text="fmtNum(g.lower_price, 4)"></td>
+                  <td class="num muted" x-text="fmtNum(g.upper_price, 4)"></td>
+                  <td class="num" x-text="g.total_levels"></td>
+                  <td class="num pos" x-text="g.placed"></td>
+                  <td class="num" x-text="g.filled"></td>
+                  <td class="num" x-text="fmtEur(g.investment)"></td>
+                  <td class="muted" style="font-size:11.5px" x-text="g.mode"></td>
+                </tr>
+              </template>
+              <tr x-show="!(gr.markets || []).length"><td colspan="9" class="empty">Geen actieve grids</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Recente fills · totaal <span x-text="gr.fills_total"></span></div></div>
+          <div style="max-height:50vh; overflow-y:auto">
+            <table class="tbl">
+              <thead><tr><th>Datum</th><th>Markt</th><th>Side</th><th class="num">Price</th><th class="num">Amount</th><th class="num">PnL €</th></tr></thead>
+              <tbody>
+                <template x-for="(f, i) in (gr.fills_recent || [])" :key="i">
+                  <tr>
+                    <td class="muted" style="font-size:11.5px" x-text="fmtDate(f.ts || f.timestamp)"></td>
+                    <td x-text="(f.market || '?').replace('-EUR','')"></td>
+                    <td><span class="badge" :class="(f.side === 'sell' ? 'green' : 'cyan')" x-text="f.side || '—'"></span></td>
+                    <td class="num muted" x-text="fmtNum(f.price, 6)"></td>
+                    <td class="num muted" x-text="fmtNum(f.amount, 6)"></td>
+                    <td class="num" :class="(f.profit ?? 0) >= 0 ? 'pos' : 'neg'" x-text="fmtEur(f.profit)"></td>
+                  </tr>
+                </template>
+                <tr x-show="!(gr.fills_recent || []).length"><td colspan="6" class="empty">Geen fills</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== HODL ============== -->
+      <section x-show="tab==='hodl'" class="stack">
+        <div class="card">
+          <div class="card-head"><div class="card-title">HODL plan</div></div>
+          <table class="tbl">
+            <thead><tr><th>Markt</th><th class="num">Target</th><th class="num">Huidige prijs</th><th>Status</th><th>Laatste run</th></tr></thead>
+            <tbody>
+              <template x-for="(h, i) in (hd.items || [])" :key="i">
+                <tr>
+                  <td><strong x-text="h.market"></strong></td>
+                  <td class="num" x-text="JSON.stringify(h.target)"></td>
+                  <td class="num" x-text="fmtNum(h.current_price, 2)"></td>
+                  <td><span class="badge green" x-text="h.status || '—'"></span></td>
+                  <td class="muted" x-text="fmtDate(h.last_run)"></td>
+                </tr>
+              </template>
+              <tr x-show="!(hd.items || []).length"><td colspan="5" class="empty">Geen HODL targets geconfigureerd</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============== MARKETS ============== -->
+      <section x-show="tab==='markets'" class="stack">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Markt-metrics · top 200 op score</div>
+            <div class="card-action">
+              <input type="text" class="input" style="width:160px" placeholder="filter…" x-model="marketsFilter">
+            </div>
+          </div>
+          <div style="max-height:70vh; overflow-y:auto">
+            <table class="tbl">
+              <thead><tr><th>Markt</th><th class="num">Score</th><th class="num">Vol 24h €</th><th class="num">RSI</th><th class="num">MACD</th><th class="num">Vola</th></tr></thead>
+              <tbody>
+                <template x-for="(mm, i) in filteredMarkets()" :key="i">
+                  <tr>
+                    <td><strong x-text="(mm.market || '').replace('-EUR','')"></strong></td>
+                    <td class="num" x-text="(mm.score != null ? mm.score.toFixed(2) : '—')"></td>
+                    <td class="num muted" x-text="fmtEur(mm.volume_24h_eur)"></td>
+                    <td class="num" x-text="mm.rsi != null ? mm.rsi.toFixed(1) : '—'"></td>
+                    <td class="num muted" x-text="mm.macd != null ? mm.macd.toFixed(4) : '—'"></td>
+                    <td class="num muted" x-text="mm.volatility != null ? mm.volatility.toFixed(4) : '—'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Mobile bottom nav -->
+  <nav class="bottom-nav">
+    <template x-for="t in tabs" :key="t.id">
+      <a class="nav-item" :class="{active: tab===t.id}" @click="tab=t.id">
+        <span class="icon" x-html="t.icon"></span>
+        <span x-text="t.label"></span>
+      </a>
+    </template>
+  </nav>
+
+  <!-- Toast -->
+  <div class="toast" :class="toast.error ? 'error' : ''" x-show="toast.show" x-transition x-text="toast.msg"></div>
 
   <script src="/app.js"></script>
 </body>

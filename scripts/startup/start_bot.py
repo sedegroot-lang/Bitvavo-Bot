@@ -759,9 +759,11 @@ def build_processes(mode: str, include_dashboard: bool, include_pairs: bool) -> 
         ManagedProcess("auto_backup", _script_command(str(BASE_DIR / "scripts" / "helpers" / "auto_backup.py")), auto_restart=True)
     )
     
-    # Flask Dashboard (legacy, port 5001 - kept for backwards compatibility)
+    # Flask Dashboard (legacy V1, port 5001) — DISABLED in favour of Dashboard V2 (port 5002).
+    # Keep code path so we can re-enable quickly if needed.
     flask_app_path = BASE_DIR / "tools" / "dashboard_flask" / "app.py"
-    if flask_app_path.exists():
+    _ENABLE_FLASK_V1 = False
+    if _ENABLE_FLASK_V1 and flask_app_path.exists():
         processes.append(
             ManagedProcess(
                 "flask_dashboard",
@@ -769,8 +771,6 @@ def build_processes(mode: str, include_dashboard: bool, include_pairs: bool) -> 
                 auto_restart=True,
             )
         )
-    else:
-        debug_log("flask_dashboard: app.py niet gevonden")
 
     # Dashboard V2 (FastAPI + PWA, port 5002 - new modern dashboard)
     dash_v2_path = BASE_DIR / "tools" / "dashboard_v2" / "backend" / "main.py"

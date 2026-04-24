@@ -1,51 +1,90 @@
-/* Bitvavo Bot Dashboard V2 — Alpine controller + chart helpers */
+/* Bitvavo Bot — Dashboard V2 controller (Alpine + Chart.js) */
 
-const eur = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
+const eur = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// SVG icons (inline, monochrome)
+// Chart.js instances live OUTSIDE Alpine reactive scope to avoid Proxy recursion bugs.
+const CHARTS = {};
+
+const ICONS = {
+  overview: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 12 7 8l4 4 4-4 6 6"/><path d="M3 19h18"/></svg>',
+  trades:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 9h14M5 15h14"/><path d="M9 5l-4 4 4 4M15 11l4 4-4 4"/></svg>',
+  ai:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="4"/></svg>',
+  memory:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M8 10v4M12 10v4M16 10v4"/></svg>',
+  shadow:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16"/></svg>',
+  roadmap:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6l16-2v4l-16 2zM4 14l16-2v4l-16 2z"/></svg>',
+  params:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14 3h-4l-.6 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-.9c.6.5 1.3.9 2 1.2L10 21h4l.6-2.6c.7-.3 1.4-.7 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>',
+  grid:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg>',
+  hodl:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>',
+  markets:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 18l6-8 4 4 8-10"/><path d="M14 4h7v7"/></svg>',
+};
 
 function dash() {
   return {
     tab: 'overview',
     tabs: [
-      { id: 'overview', label: 'Overzicht' },
-      { id: 'trades', label: 'Trades' },
-      { id: 'ai', label: 'AI' },
-      { id: 'memory', label: 'Geheugen' },
-      { id: 'shadow', label: 'Shadow rotatie' },
+      { id: 'overview',   label: 'Overzicht',  subtitle: 'Live status van je portfolio', icon: ICONS.overview },
+      { id: 'trades',     label: 'Trades',     subtitle: 'Open & gesloten posities + statistieken', icon: ICONS.trades },
+      { id: 'ai',         label: 'AI',         subtitle: 'Supervisor suggesties & model metrics', icon: ICONS.ai },
+      { id: 'memory',     label: 'Geheugen',   subtitle: 'BotMemory facts & log', icon: ICONS.memory },
+      { id: 'shadow',     label: 'Shadow',     subtitle: 'Hypothetische rotaties', icon: ICONS.shadow },
+      { id: 'roadmap',    label: 'Roadmap',    subtitle: 'Fase & stortingen', icon: ICONS.roadmap },
+      { id: 'parameters', label: 'Parameters', subtitle: 'Live config (layer-3)', icon: ICONS.params },
+      { id: 'grid',       label: 'Grid',       subtitle: 'Grid trading per markt', icon: ICONS.grid },
+      { id: 'hodl',       label: 'HODL',       subtitle: 'Lange-termijn posities', icon: ICONS.hodl },
+      { id: 'markets',    label: 'Markten',    subtitle: 'Live markt-metrics', icon: ICONS.markets },
     ],
-    p: {}, t: {}, a: {}, m: {}, s: {}, r: {}, hb: {}, config: {},
+    p: {}, t: {}, perf: {}, a: {}, m: {}, s: {}, r: {}, hb: {}, gr: {}, hd: {}, par: {}, rd: {}, d: {}, mk: {}, bh: {},
+    closedFilter: '',
+    paramFilter: '',
+    marketsFilter: '',
+    periodEquity: '30d',
     refreshTimer: null,
-    chartDaily: null,
-    chartWeekly: null,
+    secondsAgo: 0,
+    lastRefresh: 0,
+    toast: { show: false, msg: '', error: false },
 
-    fmtEur(v) {
-      if (v == null || isNaN(v)) return '—';
-      return eur.format(+v);
+    currentTab() { return this.tabs.find(x => x.id === this.tab) || this.tabs[0]; },
+
+    // ---------- formatters
+    fmtEur(v) { if (v == null || isNaN(v)) return '—'; return eur.format(+v); },
+    fmtNum(v, dp = 2) { if (v == null || isNaN(v)) return '—'; return (+v).toLocaleString('nl-NL', { minimumFractionDigits: dp, maximumFractionDigits: dp }); },
+    fmtDate(ts) { if (!ts) return '—'; const d = new Date(typeof ts === 'number' && ts < 1e12 ? ts * 1000 : ts); return d.toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }); },
+    fmtAge(s) { if (s == null) return '—'; if (s < 60) return Math.round(s) + 's'; if (s < 3600) return Math.round(s / 60) + 'm'; if (s < 86400) return (s / 3600).toFixed(1) + 'h'; return (s / 86400).toFixed(1) + 'd'; },
+    ageHrs(ts) { if (!ts) return '—'; const sec = Date.now() / 1000 - (typeof ts === 'number' && ts < 1e12 ? ts : ts / 1000); return this.fmtAge(sec); },
+
+    param(key) {
+      for (const sect of Object.values(this.par.sections || {})) if (key in sect) return sect[key];
+      if ((this.par.other || {})[key] !== undefined) return this.par.other[key];
+      return null;
     },
-    fmtNum(v, dp = 2) {
-      if (v == null || isNaN(v)) return '—';
-      return (+v).toLocaleString('nl-NL', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+    impactClass(i) { return i === 'HIGH' ? 'red' : i === 'MEDIUM' ? 'amber' : 'cyan'; },
+
+    closedPct(c) {
+      if (c.profit_pct != null) return c.profit_pct;
+      const inv = c.initial_invested_eur || c.invested_eur;
+      if (inv && c.profit != null) return (c.profit / inv) * 100;
+      return null;
     },
-    fmtDate(ts) {
-      if (!ts) return '—';
-      const d = new Date(typeof ts === 'number' && ts < 1e12 ? ts * 1000 : ts);
-      return d.toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' });
+    filteredClosed() {
+      const f = (this.closedFilter || '').toLowerCase();
+      const list = this.t.closed_recent || [];
+      if (!f) return list;
+      return list.filter(c => (c.market || '').toLowerCase().includes(f));
     },
-    ageHrs(ts) {
-      if (!ts) return '—';
-      const sec = Date.now() / 1000 - (typeof ts === 'number' && ts < 1e12 ? ts : ts / 1000);
-      const h = sec / 3600;
-      if (h < 1) return Math.round(sec / 60) + 'm';
-      if (h < 48) return h.toFixed(1) + 'h';
-      return (h / 24).toFixed(1) + 'd';
+    filteredMarkets() {
+      const f = (this.marketsFilter || '').toLowerCase();
+      const list = this.mk.markets || [];
+      if (!f) return list;
+      return list.filter(m => (m.market || '').toLowerCase().includes(f));
     },
 
+    // ---------- bootstrap
     async boot() {
-      // Register service worker (PWA install)
-      if ('serviceWorker' in navigator) {
-        try { await navigator.serviceWorker.register('/sw.js'); } catch (e) { /* ignore */ }
-      }
+      if ('serviceWorker' in navigator) { try { await navigator.serviceWorker.register('/sw.js'); } catch {} }
       await this.refresh();
-      this.refreshTimer = setInterval(() => this.refresh(), 15000);
+      this.refreshTimer = setInterval(() => this.refresh(), 10000);
+      setInterval(() => { this.secondsAgo = Math.floor(Date.now() / 1000) - this.lastRefresh; }, 1000);
     },
 
     async refresh() {
@@ -53,80 +92,187 @@ function dash() {
         const res = await fetch('/api/all', { cache: 'no-store' });
         if (!res.ok) throw new Error('http ' + res.status);
         const d = await res.json();
-        this.p = d.portfolio || {};
-        this.t = d.trades || {};
-        this.a = d.ai || {};
-        this.m = d.memory || {};
-        this.s = d.shadow || {};
-        this.r = d.regime || {};
-        this.hb = d.heartbeat || {};
+        this.p   = d.portfolio  || {};
+        this.t   = d.trades     || {};
+        this.perf= d.performance|| {};
+        this.a   = d.ai         || {};
+        this.m   = d.memory     || {};
+        this.s   = d.shadow     || {};
+        this.r   = d.regime     || {};
+        this.hb  = d.heartbeat  || {};
+        this.gr  = d.grid       || {};
+        this.hd  = d.hodl       || {};
+        this.par = d.parameters || {};
+        this.rd  = d.roadmap    || {};
+        this.d   = d.deposits   || {};
+        this.bh  = d.balance_history || {};
+        // Markets is heavy — fetch separately on demand
+        if (this.tab === 'markets' && !this.mk.markets) await this.loadMarkets();
+        this.lastRefresh = Math.floor(Date.now() / 1000);
+        this.secondsAgo = 0;
+        await this.$nextTick();
         this.renderCharts();
       } catch (e) {
         console.warn('refresh failed', e);
+        this.flash('Verbinding mislukt — retry bezig…', true);
       }
     },
 
+    async loadMarkets() {
+      try {
+        const r = await fetch('/api/markets'); this.mk = await r.json();
+      } catch {}
+    },
+
+    async refreshBalanceHistory() {
+      try {
+        const r = await fetch('/api/balance-history?period=' + this.periodEquity);
+        this.bh = await r.json();
+        await this.$nextTick();
+        this.renderEquity();
+      } catch {}
+    },
+
+    async saveParam(key, valueStr) {
+      let value;
+      try { value = JSON.parse(valueStr); } catch { value = valueStr; }
+      try {
+        const r = await fetch('/api/parameters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value }),
+        });
+        if (!r.ok) throw new Error('http ' + r.status);
+        const d = await r.json();
+        this.flash(`Saved ${key} = ${JSON.stringify(value)}`);
+        await this.refresh();
+      } catch (e) {
+        this.flash('Save mislukt: ' + e.message, true);
+      }
+    },
+
+    flash(msg, error = false) {
+      this.toast = { show: true, msg, error };
+      setTimeout(() => { this.toast.show = false; }, 3500);
+    },
+
+    // ---------- charts
     renderCharts() {
-      // Daily PnL bar chart
-      const ctxD = document.getElementById('chartDaily');
-      if (ctxD) {
-        const data = this.p.daily || [];
-        const labels = data.map(d => d.day);
-        const values = data.map(d => d.pnl);
-        const ds = {
+      this.renderEquity();
+      this.renderAlloc();
+      this.renderDaily();
+      this.renderPerMarket();
+    },
+
+    renderEquity() {
+      const ctx = document.getElementById('chartEquity'); if (!ctx) return;
+      const bh = this.bh || {};
+      const labels = bh.labels || [];
+      const values = bh.values || [];
+      this._upsert('chartEquity', ctx, {
+        type: 'line',
+        data: {
           labels,
           datasets: [{
-            label: 'Daily PnL (€)',
+            label: 'Account €',
             data: values,
-            backgroundColor: values.map(v => v >= 0 ? 'rgba(52,211,153,0.7)' : 'rgba(244,63,94,0.7)'),
-            borderRadius: 3,
+            borderColor: '#10b981',
+            backgroundColor: ctx => {
+              const c = ctx.chart.ctx, g = c.createLinearGradient(0, 0, 0, 220);
+              g.addColorStop(0, 'rgba(16,185,129,0.30)'); g.addColorStop(1, 'rgba(16,185,129,0)');
+              return g;
+            },
+            fill: true,
+            tension: 0.3,
+            pointRadius: 0,
+            borderWidth: 2,
           }]
-        };
-        if (this.chartDaily) {
-          this.chartDaily.data = ds;
-          this.chartDaily.update('none');
-        } else {
-          this.chartDaily = new Chart(ctxD, {
-            type: 'bar', data: ds,
-            options: chartOpts()
-          });
-        }
-      }
-      // Weekly cumulative line
-      const ctxW = document.getElementById('chartWeekly');
-      if (ctxW) {
-        const data = this.p.weekly || [];
-        let cum = 0;
-        const cumValues = data.map(d => (cum += d.pnl));
-        const ds = {
-          labels: data.map(d => d.week),
-          datasets: [
-            { label: 'Week PnL (€)', data: data.map(d => d.pnl), backgroundColor: 'rgba(34,211,238,0.6)', type: 'bar' },
-            { label: 'Cumulatief', data: cumValues, borderColor: 'rgb(52,211,153)', backgroundColor: 'transparent', tension: 0.3, type: 'line', yAxisID: 'y' }
-          ]
-        };
-        if (this.chartWeekly) {
-          this.chartWeekly.data = ds;
-          this.chartWeekly.update('none');
-        } else {
-          this.chartWeekly = new Chart(ctxW, { type: 'bar', data: ds, options: chartOpts() });
-        }
-      }
+        },
+        options: this._opts({ legend: false, ticksX: 6 })
+      });
     },
-  };
-}
 
-function chartOpts() {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { labels: { color: '#cbd5e1', font: { size: 11 } } },
-      tooltip: { backgroundColor: 'rgba(15,23,42,0.95)', titleColor: '#fff', bodyColor: '#cbd5e1' }
+    renderAlloc() {
+      const ctx = document.getElementById('chartAlloc'); if (!ctx) return;
+      const open = this.t.open || {};
+      const labels = [], data = [];
+      for (const [m, tr] of Object.entries(open)) {
+        labels.push(m.replace('-EUR', ''));
+        data.push(tr.current_value_eur || tr.initial_invested_eur || 0);
+      }
+      const eurFree = +(this.p.eur_balance || 0);
+      if (eurFree > 0.5) { labels.push('EUR'); data.push(eurFree); }
+      const palette = ['#10b981','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#f43f5e','#f59e0b','#84cc16','#14b8a6','#a855f7'];
+      this._upsert('chartAlloc', ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: palette, borderWidth: 0 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: {
+            legend: { position: 'right', labels: { color: '#cbd5e1', font: { size: 11 }, boxWidth: 10 } },
+            tooltip: { callbacks: { label: (c) => `${c.label}: ${eur.format(c.raw)}` } }
+          }
+        }
+      });
     },
-    scales: {
-      x: { ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,0.1)' } },
-      y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.1)' } }
-    }
+
+    renderDaily() {
+      const ctx = document.getElementById('chartDaily'); if (!ctx) return;
+      const data = this.p.daily || [];
+      const labels = data.map(d => d.day);
+      const values = data.map(d => d.pnl);
+      this._upsert('chartDaily', ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Daily PnL €',
+            data: values,
+            backgroundColor: values.map(v => v >= 0 ? 'rgba(16,185,129,.75)' : 'rgba(244,63,94,.75)'),
+            borderRadius: 3, borderSkipped: false,
+          }]
+        },
+        options: this._opts({ legend: false })
+      });
+    },
+
+    renderPerMarket() {
+      const ctx = document.getElementById('chartPerMarket'); if (!ctx) return;
+      const arr = (this.perf.per_market || []).slice(0, 15);
+      this._upsert('chartPerMarket', ctx, {
+        type: 'bar',
+        data: {
+          labels: arr.map(x => (x.market || '').replace('-EUR', '')),
+          datasets: [{
+            label: 'PnL €',
+            data: arr.map(x => x.pnl),
+            backgroundColor: arr.map(x => x.pnl >= 0 ? 'rgba(16,185,129,.75)' : 'rgba(244,63,94,.75)'),
+            borderRadius: 3
+          }]
+        },
+        options: { ...this._opts({ legend: false }), indexAxis: 'y' }
+      });
+    },
+
+    _upsert(key, ctx, cfg) {
+      if (CHARTS[key]) { CHARTS[key].data = cfg.data; CHARTS[key].update('none'); return; }
+      CHARTS[key] = new Chart(ctx, cfg);
+    },
+
+    _opts({ legend = true, ticksX = 8 } = {}) {
+      return {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 250 },
+        plugins: {
+          legend: { display: legend, labels: { color: '#cbd5e1', font: { size: 11 } } },
+          tooltip: { backgroundColor: 'rgba(15,23,42,.95)', borderColor: '#1f2937', borderWidth: 1, titleColor: '#fff', bodyColor: '#cbd5e1', padding: 10 }
+        },
+        scales: {
+          x: { ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: ticksX, autoSkip: true, maxRotation: 0 }, grid: { color: 'rgba(148,163,184,.07)' } },
+          y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,.07)' } }
+        }
+      };
+    },
   };
 }
