@@ -56,7 +56,22 @@ Daarnaast bevat de AI-laag:
 
 ## Dashboard
 
-Het dashboard draait lokaal op **http://localhost:5001**:
+De bot heeft **twee dashboards**, beide starten automatisch met de bot:
+
+### Dashboard V2 — modern + mobiel (NIEUW, **aanbevolen**)
+Draait op **http://localhost:5002** — FastAPI backend + Tailwind/Alpine SPA + PWA.
+
+- **Mobiel**: open op je telefoon, "Add to Home Screen" → installeert als app, fullscreen, offline-ondersteuning
+- **Snel**: één endpoint `/api/all` ververst alles in 1 round-trip, in-memory cache (5s)
+- **Remote toegang**: via Cloudflare Tunnel ([docs/DASHBOARD_V2_TUNNEL.md](docs/DASHBOARD_V2_TUNNEL.md)) bereikbaar van anywhere
+- **Tabs**: Overzicht (KPI's + dagelijks/wekelijks PnL grafieken), Trades, AI, Geheugen (BotMemory facts), Shadow Rotatie
+
+Dubbelklik `start_dashboard_v2.bat` om alleen het dashboard te starten zonder de bot.
+
+Volledige docs: [docs/DASHBOARD_V2.md](docs/DASHBOARD_V2.md)
+
+### Dashboard V1 — Flask (legacy)
+Draait op **http://localhost:5001** — uitgebreide bestaande UI:
 
 | Tab | Inhoud |
 |---|---|
@@ -164,7 +179,7 @@ De wizard begeleidt je bij:
 
 ## Stap 5: Bot starten
 
-Na de wizard start je de bot met `start_automated.bat`. Het dashboard opent op http://localhost:5001.
+Na de wizard start je de bot met `start_automated.bat`. De dashboards openen op http://localhost:5001 (legacy) en http://localhost:5002 (v2 — aanbevolen).
 
 Sluit het PowerShell-venster niet (dat ís de bot). Minimaliseer het naar de taakbalk.
 
@@ -291,7 +306,8 @@ bot/                     Geëxtraheerde botlogica (API wrapper, signalen, traili
 core/                    Pure berekeningen (indicatoren, regime engine, Kelly sizing, orderbook)
 modules/                 Infrastructuur (config, logging, DCA, grid, ML, websocket, dashboard)
 ai/                      AI/ML pipeline (XGBoost, LSTM, RL ensemble, auto-retrain, supervisor)
-tools/dashboard_flask/   Web dashboard (Flask + SocketIO, poort 5001)
+tools/dashboard_flask/   Legacy web dashboard (Flask + SocketIO, poort 5001)
+tools/dashboard_v2/      Nieuw dashboard (FastAPI + PWA, poort 5002)
 scripts/                 Automatisering (scheduler, backup, monitoring)
 config/bot_config.json   Bot configuratie (via dashboard of editor)
 data/                    Runtime data en trade log

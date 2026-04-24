@@ -759,7 +759,7 @@ def build_processes(mode: str, include_dashboard: bool, include_pairs: bool) -> 
         ManagedProcess("auto_backup", _script_command(str(BASE_DIR / "scripts" / "helpers" / "auto_backup.py")), auto_restart=True)
     )
     
-    # Flask Dashboard (ALWAYS start - production ready)
+    # Flask Dashboard (legacy, port 5001 - kept for backwards compatibility)
     flask_app_path = BASE_DIR / "tools" / "dashboard_flask" / "app.py"
     if flask_app_path.exists():
         processes.append(
@@ -771,9 +771,32 @@ def build_processes(mode: str, include_dashboard: bool, include_pairs: bool) -> 
         )
     else:
         debug_log("flask_dashboard: app.py niet gevonden")
-    
-    # Note: Dashboard watchdog removed - Flask dashboard is self-managing
-    # Flask dashboard runs as subprocess and handles its own health monitoring
+
+    # Dashboard V2 (FastAPI + PWA, port 5002 - new modern dashboard)
+    dash_v2_path = BASE_DIR / "tools" / "dashboard_v2" / "backend" / "main.py"
+    if dash_v2_path.exists():
+        try:
+            import importlib  # noqa: F401
+            import fastapi  # noqa: F401
+            v2_cmd = [
+                PYTHON, "-m", "uvicorn",
+                "tools.dashboard_v2.backend.main:app",
+                "--host", "0.0.0.0",
+                "--port", "5002",
+            ]
+            processes.append(
+                ManagedProcess(
+                    "dashboard_v2",
+                    v2_cmd,
+                    auto_restart=True,
+                )
+            )
+        except Exception as e:
+            debug_log(f"dashboard_v2: niet gestart (fastapi missing? {e})")
+    else:
+        debug_log("dashboard_v2: backend/main.py niet gevonden")
+
+    # Note: Dashboard watchdog removed - dashboards are self-managing
     
     if include_pairs:
         if not _script_al_running("start_pairs.py"):
