@@ -3475,6 +3475,69 @@ async def bot_loop():
                         log(f"[SHADOW] Eval error {m}: {_shadow_eval_err}", level='debug')
 
                 if score >= min_score_threshold:
+                    # ── LLM/Rule Supervisor: extra entry-gate (shadow mode default) ──
+                    # Configurable via:
+                    #   LLM_SUPERVISOR_ENABLED (bool) — turn on/off
+                    #   LLM_SUPERVISOR_MODE   ("shadow"|"active") — log-only or real veto
+                    #   LLM_SUPERVISOR_BACKEND ("rule"|"ollama")
+                    if CONFIG.get('LLM_SUPERVISOR_ENABLED', True):
+                        try:
+                            from modules.ai.llm_supervisor import (
+                                evaluate_entry as _sup_eval,
+                                SupervisorContext as _SupCtx,
+                            )
+                            _sup_candles = get_candles(m, '1m', 60)
+                            _sup_prices = close_prices(_sup_candles) if _sup_candles else []
+                            _sup_rsi = rsi(_sup_prices, 14) if _sup_prices else 50.0
+                            try:
+                                _macd_line, _macd_sig, _ = macd(_sup_prices) if _sup_prices else ([0], [0], [0])
+                                _sup_macd = float((_macd_line[-1] - _macd_sig[-1]) if _macd_line and _macd_sig else 0.0)
+                            except Exception:
+                                _sup_macd = 0.0
+                            try:
+                                _ticker_24 = safe_call(bitvavo.ticker24h, options={'market': m}) or {}
+                                if isinstance(_ticker_24, list) and _ticker_24:
+                                    _ticker_24 = _ticker_24[0]
+                                _sup_vol_eur = float(_ticker_24.get('volumeQuote') or 0.0)
+                            except Exception:
+                                _sup_vol_eur = 0.0
+                            _sup_regime_name = (CONFIG.get('_REGIME_RESULT') or {}).get('regime', 'unknown')
+                            try:
+                                _sup_volat = float(np.std(np.diff(_sup_prices) / _sup_prices[:-1])) if len(_sup_prices) > 2 else 0.0
+                            except Exception:
+                                _sup_volat = 0.0
+                            _sup_ctx = _SupCtx(
+                                market=m,
+                                rsi=float(_sup_rsi or 50.0),
+                                macd=float(_sup_macd or 0.0),
+                                regime=str(_sup_regime_name or 'unknown'),
+                                volatility=float(_sup_volat or 0.0),
+                                volume_24h_eur=float(_sup_vol_eur or 0.0),
+                                score=float(score),
+                            )
+                            _sup_verdict = _sup_eval(_sup_ctx)
+                            _sup_mode = str(CONFIG.get('LLM_SUPERVISOR_MODE', 'shadow')).lower()
+                            if _sup_verdict.veto:
+                                if _sup_mode == 'active':
+                                    log(
+                                        f"[LLM-SUPERVISOR] 🛑 VETO {m} score={score:.1f}: {_sup_verdict.reasoning}",
+                                        level='warning',
+                                    )
+                                    markets_skipped += 1
+                                    continue
+                                else:
+                                    log(
+                                        f"[LLM-SUPERVISOR][shadow] would-veto {m} score={score:.1f}: {_sup_verdict.reasoning}",
+                                        level='info',
+                                    )
+                            else:
+                                log(
+                                    f"[LLM-SUPERVISOR] OK {m} score={score:.1f} conf={_sup_verdict.confidence:.2f}",
+                                    level='debug',
+                                )
+                        except Exception as _sup_err:
+                            log(f"[LLM-SUPERVISOR] Error on {m}: {_sup_err}", level='debug')
+
                     scored.append((score, m, price_now, s_short, ml_info))
             except Exception as scan_err:
                 log(f"[SCAN ERROR] {m}: {scan_err}", level='error')
