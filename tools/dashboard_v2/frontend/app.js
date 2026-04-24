@@ -34,7 +34,7 @@ function dash() {
       { id: 'hodl',       label: 'HODL',       subtitle: 'Lange-termijn posities', icon: ICONS.hodl },
       { id: 'markets',    label: 'Markten',    subtitle: 'Live markt-metrics', icon: ICONS.markets },
     ],
-    p: {}, t: {}, perf: {}, a: {}, m: {}, s: {}, r: {}, hb: {}, gr: {}, hd: {}, par: {}, rd: {}, d: {}, mk: {}, bh: {},
+    p: {}, t: {}, perf: {}, a: {}, m: {}, s: {}, r: {}, hb: {}, gr: {}, hd: {}, par: {}, rd: {}, d: {}, mk: {}, bh: {}, sg: {},
     closedFilter: '',
     paramFilter: '',
     marketsFilter: '',
@@ -89,7 +89,7 @@ function dash() {
     async boot() {
       if ('serviceWorker' in navigator) { try { await navigator.serviceWorker.register('/sw.js'); } catch {} }
       await this.refresh();
-      this.refreshTimer = setInterval(() => this.refresh(), 10000);
+      this.refreshTimer = setInterval(() => this.refresh(), 4000);
       setInterval(() => { this.secondsAgo = Math.floor(Date.now() / 1000) - this.lastRefresh; }, 1000);
     },
 
@@ -112,6 +112,7 @@ function dash() {
         this.rd  = d.roadmap    || {};
         this.d   = d.deposits   || {};
         this.bh  = d.balance_history || {};
+        this.sg  = d.signal_status || {};
         // Markets is heavy — fetch separately on demand
         if (this.tab === 'markets' && !this.mk.markets) await this.loadMarkets();
         this.lastRefresh = Math.floor(Date.now() / 1000);

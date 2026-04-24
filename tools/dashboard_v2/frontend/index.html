@@ -55,8 +55,9 @@
         <div class="right">
           <span class="status-pill"
                 :class="hb.bot_online ? '' : 'bad'">
-            <span class="dot"></span>
-            <span x-text="hb.bot_online ? 'Bot live' : 'Bot offline'"></span>
+            <span class="live-pulse" x-show="hb.bot_online"></span>
+            <span class="dot" x-show="!hb.bot_online"></span>
+            <span x-text="hb.bot_online ? ('Live · ' + fmtAge(secondsAgo)) : 'Bot offline'"></span>
           </span>
           <button class="btn icon" @click="refresh()" title="Refresh">↻</button>
         </div>
@@ -102,6 +103,40 @@
             <div class="kpi-label">Regime</div>
             <div class="kpi-value" x-text="r.current?.regime || r.current?.name || '—'"></div>
             <div class="kpi-trend muted" x-text="(r.current?.confidence != null ? 'conf ' + r.current.confidence.toFixed(2) : '')"></div>
+          </div>
+        </div>
+
+        <!-- Trade signal status (V1-equivalent) -->
+        <div class="card sig-card" :class="'sig-' + (sg.status || 'unknown')">
+          <div class="sig-head">
+            <div class="sig-icon" x-text="sg.icon || '⚪'"></div>
+            <div class="sig-headline">
+              <div class="sig-label">
+                <span x-text="sg.label || 'STATUS LADEN…'"></span>
+                <span class="sig-pill" x-show="sg.scan_stats?.regime" x-text="(sg.scan_stats?.regime || '').toUpperCase()"></span>
+              </div>
+              <div class="sig-message" x-text="sg.message || '—'"></div>
+            </div>
+            <div class="sig-meta">
+              <div class="sig-meta-row"><span class="lbl">MIN_SCORE</span><span class="val" x-text="(sg.scan_stats?.effective_min_score ?? '—').toString()"></span></div>
+              <div class="sig-meta-row"><span class="lbl">Kandidaten</span><span class="val" x-text="(sg.scan_stats?.passed_min_score ?? 0) + ' / ' + (sg.scan_stats?.total_markets ?? 0)"></span></div>
+              <div class="sig-meta-row"><span class="lbl">Slots</span><span class="val" x-text="(sg.capacity?.slots_free ?? 0) + ' vrij'"></span></div>
+              <div class="sig-meta-row"><span class="lbl">Scan</span><span class="val" x-text="sg.scan_stats?.scan_age_sec != null ? fmtAge(sg.scan_stats.scan_age_sec) + ' geleden' : '—'"></span></div>
+            </div>
+          </div>
+          <ul class="sig-details" x-show="(sg.details || []).length">
+            <template x-for="(d, i) in (sg.details || [])" :key="i">
+              <li x-text="d"></li>
+            </template>
+          </ul>
+          <div class="sig-filters">
+            <span class="chip">RSI <b x-text="(sg.filters?.rsi_min ?? '—') + '–' + (sg.filters?.rsi_max ?? '—')"></b></span>
+            <span class="chip">Vol ≥ <b x-text="(sg.filters?.min_volume_1m_keur ?? '—') + 'K'"></b></span>
+            <span class="chip">Spread ≤ <b x-text="(sg.filters?.max_spread_pct ?? 0).toFixed(2) + '%'"></b></span>
+            <span class="chip">Saldo <b x-text="fmtEur(sg.capacity?.eur_balance)"></b></span>
+            <span class="chip">Beschikbaar <b x-text="fmtEur(sg.capacity?.eur_available)"></b></span>
+            <span class="chip" x-show="sg.scan_stats?.adaptive_bump">Adaptive <b x-text="(sg.scan_stats?.adaptive_bump > 0 ? '+' : '') + (sg.scan_stats?.adaptive_bump ?? 0).toFixed(2)"></b></span>
+            <span class="chip warn" x-show="sg.scan_stats?.cooldown_active_count">Cooldown <b x-text="sg.scan_stats?.cooldown_active_count + ' market(s)'"></b></span>
           </div>
         </div>
 
@@ -738,25 +773,37 @@
       <section x-show="tab==='markets'" class="stack">
         <div class="card">
           <div class="card-head">
-            <div class="card-title">Markt-metrics · top 200 op score</div>
+            <div class="card-title">Markt-performance · <span class="muted" x-text="(mk.total ?? 0) + ' markten'"></span></div>
             <div class="card-action">
-              <input type="text" class="input" style="width:160px" placeholder="filter…" x-model="marketsFilter">
+              <input type="text" class="input" style="width:200px" placeholder="filter symbool…" x-model="marketsFilter">
             </div>
           </div>
-          <div style="max-height:70vh; overflow-y:auto">
+          <div style="max-height:75vh; overflow-y:auto">
             <table class="tbl">
-              <thead><tr><th>Markt</th><th class="num">Score</th><th class="num">Vol 24h €</th><th class="num">RSI</th><th class="num">MACD</th><th class="num">Vola</th></tr></thead>
+              <thead><tr>
+                <th>Markt</th>
+                <th class="num">Live €</th>
+                <th class="num">Trades</th>
+                <th class="num">WR</th>
+                <th class="num">Totaal PnL</th>
+                <th class="num">Gem. ROI</th>
+                <th class="num">Hold</th>
+                <th>Laatst</th>
+              </tr></thead>
               <tbody>
                 <template x-for="(mm, i) in filteredMarkets()" :key="i">
                   <tr>
-                    <td><strong x-text="(mm.market || '').replace('-EUR','')"></strong></td>
-                    <td class="num" x-text="(mm.score != null ? mm.score.toFixed(2) : '—')"></td>
-                    <td class="num muted" x-text="fmtEur(mm.volume_24h_eur)"></td>
-                    <td class="num" x-text="mm.rsi != null ? mm.rsi.toFixed(1) : '—'"></td>
-                    <td class="num muted" x-text="mm.macd != null ? mm.macd.toFixed(4) : '—'"></td>
-                    <td class="num muted" x-text="mm.volatility != null ? mm.volatility.toFixed(4) : '—'"></td>
+                    <td><strong x-text="mm.symbol || (mm.market || '').replace('-EUR','')"></strong></td>
+                    <td class="num" x-text="fmtPrice(mm.current_price)"></td>
+                    <td class="num muted" x-text="(mm.wins ?? 0) + 'W / ' + (mm.losses ?? 0) + 'L'"></td>
+                    <td class="num" :class="(mm.win_rate_pct ?? 0) >= 60 ? 'pos' : ((mm.win_rate_pct ?? 0) >= 40 ? '' : 'neg')" x-text="(mm.win_rate_pct ?? 0).toFixed(1) + '%'"></td>
+                    <td class="num" :class="(mm.total_profit_eur ?? 0) >= 0 ? 'pos' : 'neg'" x-text="fmtEur(mm.total_profit_eur)"></td>
+                    <td class="num" :class="(mm.avg_roi_pct ?? 0) >= 0 ? 'pos' : 'neg'" x-text="(mm.avg_roi_pct ?? 0).toFixed(2) + '%'"></td>
+                    <td class="num muted" x-text="(mm.avg_hold_h ?? 0).toFixed(1) + 'h'"></td>
+                    <td class="muted" style="font-size:11.5px" x-text="(mm.last_reason || '—') + ' · ' + (mm.last_closed_ts ? fmtDate(mm.last_closed_ts) : '—')"></td>
                   </tr>
                 </template>
+                <tr x-show="!filteredMarkets().length"><td colspan="8" class="empty">Geen markt-data</td></tr>
               </tbody>
             </table>
           </div>

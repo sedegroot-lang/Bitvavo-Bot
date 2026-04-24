@@ -60,7 +60,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_cache: TTLCache = TTLCache(maxsize=128, ttl=5)
+_cache: TTLCache = TTLCache(maxsize=128, ttl=2)
 
 
 # -------------------------------------------------------------------- Helpers
@@ -559,6 +559,182 @@ def _hodl() -> Dict[str, Any]:
     return {"items": items, "schedule": sched, "updated_at": sched.get("updated_at")}
 
 
+def _signal_status() -> Dict[str, Any]:
+    """Mirror V1 trade-readiness: explain WHY no new trade is starting (or why it would).
+
+    Returns:
+        status: 'green'|'yellow'|'red'
+        label/message/icon/color
+        scan_stats: total_markets, evaluated, passed_min_score, min_score_threshold,
+                    effective_min_score, regime, regime_score_adj, adaptive_bump,
+                    adaptive_reason, cooldown_active_count, pending_reservations
+        blocks/warnings/details: human-readable reasons
+        filters: active config thresholds (min_score, rsi range, volume, spread)
+        capacity: open/max trades + EUR available
+    """
+    try:
+        cfg = _merged_config()
+        hb = _read_json(DATA / "heartbeat.json", {}) or {}
+        log = _read_json(DATA / "trade_log.json", {"open": {}}) or {}
+        open_trades = log.get("open") or {}
+
+        scan = hb.get("last_scan_stats") or {}
+        total_markets = int(scan.get("total_markets") or 0)
+        evaluated = int(scan.get("evaluated") or 0)
+        passed = int(scan.get("passed_min_score") or 0)
+        min_score_threshold = float(scan.get("min_score_threshold") or cfg.get("MIN_SCORE_TO_BUY", 7) or 7)
+        regime = scan.get("regime") or ""
+        regime_score_adj = float(scan.get("regime_score_adj") or 0)
+        scan_ts = float(scan.get("timestamp") or 0)
+        scan_age_sec = max(0.0, time.time() - scan_ts) if scan_ts else None
+
+        # Adaptive score bump (best-effort lazy import)
+        adaptive_bump = 0.0
+        adaptive_reason = ""
+        try:
+            from bot.adaptive_score import get_instance as _get_as  # type: ignore
+            adaptive_bump, adaptive_reason = _get_as().adjustment(cfg=cfg)
+            adaptive_bump = float(adaptive_bump or 0)
+        except Exception:
+            pass
+
+        # Post-loss cooldown
+        cooldown_active_count = 0
+        cooldown_preview: List[str] = []
+        try:
+            from bot.post_loss_cooldown import get_instance as _get_cd  # type: ignore
+            _cd = _get_cd()
+            _now = time.time()
+            for _m, _entry in list(getattr(_cd, "_state", {}).items())[:50]:
+                _until = _entry.get("cooldown_until", 0)
+                if _until and _until > _now:
+                    cooldown_active_count += 1
+                    if len(cooldown_preview) < 3:
+                        cooldown_preview.append(f"{_m} ({int((_until - _now) / 60)}m)")
+        except Exception:
+            pass
+
+        max_trades = int(cfg.get("MAX_OPEN_TRADES", 5) or 5)
+        open_count = len(open_trades) if isinstance(open_trades, dict) else 0
+        eur_balance = float(hb.get("eur_balance") or 0)
+        base_amount = float(cfg.get("BASE_AMOUNT_EUR", 12) or 12)
+        min_balance = float(cfg.get("MIN_BALANCE_RESERVE", 10) or 10)
+        pending_res = int(hb.get("pending_reservations") or 0)
+        regime_blocking = (regime or "").lower() == "bearish" or regime_score_adj > 50
+        effective_min_score = round(min_score_threshold + adaptive_bump, 2)
+
+        rsi_min = float(cfg.get("RSI_MIN_BUY", 35) or 35)
+        rsi_max = float(cfg.get("RSI_MAX_BUY", 65) or 65)
+        min_volume = float(cfg.get("MIN_AVG_VOLUME_1M", 5.0) or 5.0)
+        max_spread = float(cfg.get("MAX_SPREAD_PCT", 0.005) or 0.005)
+
+        blocks: List[str] = []
+        warnings: List[str] = []
+        details: List[str] = []
+
+        if regime_blocking:
+            blocks.append(f"Regime {(regime or 'BEARISH').upper()}: nieuwe entries geblokkeerd (+{regime_score_adj:.0f})")
+        if open_count >= max_trades:
+            blocks.append(f"Max trades bereikt: {open_count}/{max_trades}")
+        elif open_count >= max_trades - 1:
+            warnings.append(f"Bijna max trades: {open_count}/{max_trades}")
+        available = eur_balance - min_balance
+        if available < base_amount:
+            blocks.append(f"Onvoldoende saldo: €{eur_balance:.2f} (nodig: €{base_amount + min_balance:.2f})")
+        elif available < base_amount * 2:
+            warnings.append(f"Laag saldo: €{eur_balance:.2f} — slechts 1 trade-slot")
+
+        # Reason lines
+        if total_markets > 0:
+            if passed == 0:
+                details.append(f"⚠️ {evaluated}/{total_markets} markets gescand — niemand scoort ≥ {effective_min_score:.1f}")
+            else:
+                details.append(f"✅ {passed} market(s) voldoen aan min score {effective_min_score:.1f}")
+        else:
+            details.append("⏳ Eerste market-scan loopt nog (geen scan-stats in heartbeat)")
+        if abs(adaptive_bump) >= 0.01:
+            arrow = "↑" if adaptive_bump > 0 else "↓"
+            details.append(f"🎯 Adaptive MIN_SCORE {arrow} {adaptive_bump:+.1f} — {adaptive_reason or 'WR-aanpassing'}")
+        if cooldown_active_count > 0:
+            extra = f" (+{cooldown_active_count - len(cooldown_preview)} meer)" if cooldown_active_count > len(cooldown_preview) else ""
+            details.append(f"⏸️ {cooldown_active_count} market(s) in post-loss cooldown: {', '.join(cooldown_preview)}{extra}")
+        if pending_res > 0:
+            details.append(f"🔒 {pending_res} reservering(en) worden verwerkt")
+        slots_free = max(0, max_trades - open_count)
+        details.append(f"💰 Saldo €{eur_balance:.2f} · {slots_free} slot(s) vrij · ~{int(available / base_amount) if base_amount > 0 else 0} trade(s) mogelijk")
+
+        if blocks:
+            status, color, icon, label = "red", "#ef4444", "🔴", "GEBLOKKEERD"
+            message = blocks[0]
+        elif warnings:
+            status, color, icon, label = "yellow", "#f59e0b", "🟡", "BEPERKT"
+            if passed == 0 and total_markets > 0:
+                message = f"Wacht op signaal — geen market scoort ≥ {effective_min_score:.1f}"
+            elif total_markets == 0:
+                message = "Wacht op eerste market-scan"
+            else:
+                message = warnings[0]
+        else:
+            status, color, icon, label = "green", "#10b981", "🟢", "GEREED"
+            if passed == 0 and total_markets > 0:
+                label = "GEREED (wacht)"
+                message = f"Wacht op signaal — geen market scoort ≥ {effective_min_score:.1f}"
+            elif total_markets == 0:
+                message = "Wacht op eerste market-scan"
+            else:
+                message = f"{slots_free} slot(s) vrij · {passed} kandidaat(en) ≥ {effective_min_score:.1f}"
+
+        return {
+            "status": status,
+            "color": color,
+            "icon": icon,
+            "label": label,
+            "message": message,
+            "blocks": blocks,
+            "warnings": warnings,
+            "details": details,
+            "scan_stats": {
+                "total_markets": total_markets,
+                "evaluated": evaluated,
+                "passed_min_score": passed,
+                "min_score_threshold": min_score_threshold,
+                "effective_min_score": effective_min_score,
+                "adaptive_bump": adaptive_bump,
+                "adaptive_reason": adaptive_reason,
+                "regime": regime,
+                "regime_score_adj": regime_score_adj,
+                "cooldown_active_count": cooldown_active_count,
+                "cooldown_preview": cooldown_preview,
+                "pending_reservations": pending_res,
+                "scan_age_sec": scan_age_sec,
+                "scan_ts": scan_ts,
+            },
+            "filters": {
+                "min_score": min_score_threshold,
+                "rsi_min": rsi_min,
+                "rsi_max": rsi_max,
+                "min_volume_1m_keur": min_volume,
+                "max_spread_pct": max_spread * 100,
+            },
+            "capacity": {
+                "open_trades": open_count,
+                "max_trades": max_trades,
+                "slots_free": slots_free,
+                "eur_balance": eur_balance,
+                "eur_reserve": min_balance,
+                "eur_available": available,
+                "base_amount": base_amount,
+                "possible_trades": int(available / base_amount) if base_amount > 0 else 0,
+            },
+        }
+    except Exception as e:
+        return {
+            "status": "unknown", "color": "#64748b", "icon": "⚪", "label": "STATUS ONBEKEND",
+            "message": f"signal-status fout: {e}", "blocks": [], "warnings": [], "details": [],
+            "scan_stats": {}, "filters": {}, "capacity": {},
+        }
+
+
 def _parameters() -> Dict[str, Any]:
     cfg = _merged_config()
     safe = _safe_config(cfg)
@@ -587,14 +763,45 @@ def _parameters() -> Dict[str, Any]:
 
 
 def _markets() -> Dict[str, Any]:
+    """Per-market historical performance + live price (rich enough for sorting/filtering)."""
     mm = _read_json(DATA / "market_metrics.json", {}) or {}
+    prices = _read_json(DATA / "price_cache.json", {}) or {}
     rows = []
     if isinstance(mm, dict):
         for market, data in mm.items():
-            if isinstance(data, dict):
-                rows.append({"market": market, **data})
-    rows.sort(key=lambda r: float(r.get("score") or r.get("volume_24h_eur") or 0), reverse=True)
-    return {"markets": rows[:200], "total": len(rows)}
+            if not isinstance(data, dict):
+                continue
+            cur = None
+            try:
+                pinfo = prices.get(market)
+                if isinstance(pinfo, dict):
+                    cur = float(pinfo.get("price") or 0) or None
+                elif isinstance(pinfo, (int, float)):
+                    cur = float(pinfo)
+            except Exception:
+                pass
+            trades = int(data.get("trades") or 0)
+            wins = int(data.get("wins") or 0)
+            wr = (wins / trades * 100) if trades > 0 else 0.0
+            rows.append({
+                "market": market,
+                "symbol": market.replace("-EUR", ""),
+                "current_price": cur,
+                "trades": trades,
+                "wins": wins,
+                "losses": int(data.get("losses") or 0),
+                "win_rate_pct": round(wr, 1),
+                "total_profit_eur": round(float(data.get("total_profit") or 0), 2),
+                "avg_profit_eur": round(float(data.get("avg_profit") or 0), 2),
+                "avg_roi_pct": round(float(data.get("avg_roi_pct") or 0) * 100, 2),
+                "avg_hold_h": round(float(data.get("avg_hold_seconds") or 0) / 3600, 1),
+                "consecutive_losses": int(data.get("consecutive_losses") or 0),
+                "last_reason": data.get("last_reason") or "",
+                "last_profit_eur": round(float(data.get("last_profit") or 0), 2),
+                "last_closed_ts": data.get("last_closed_ts"),
+            })
+    rows.sort(key=lambda r: r["total_profit_eur"], reverse=True)
+    return {"markets": rows, "total": len(rows)}
 
 
 def _roadmap() -> Dict[str, Any]:
@@ -975,6 +1182,11 @@ def roadmap() -> Dict[str, Any]:
     return _roadmap()
 
 
+@app.get("/api/signal-status")
+def signal_status() -> Dict[str, Any]:
+    return _signal_status()
+
+
 @app.get("/api/all")
 def all_payload() -> Dict[str, Any]:
     return {
@@ -994,6 +1206,7 @@ def all_payload() -> Dict[str, Any]:
         "hodl": _hodl(),
         "parameters": _parameters(),
         "roadmap": _roadmap(),
+        "signal_status": _signal_status(),
     }
 
 
