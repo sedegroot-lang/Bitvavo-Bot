@@ -116,3 +116,6 @@ scripts/helpers/heartbeat.json
 *.log
 *.tmp
 *.bak
+
+tools/external/
+data/llm_supervisor_log.jsonl
