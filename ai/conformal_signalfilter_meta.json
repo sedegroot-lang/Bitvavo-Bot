@@ -1,0 +1,102 @@
+{
+  "trigger": "bot-proxy: 4 of 6 (RSI 40-65, MACD>0, ret6>0, vol>1.05, mid-range, slope>0)",
+  "feature_cols": [
+    "ret_1",
+    "ret_6",
+    "ret_24",
+    "vol",
+    "pos_in_range",
+    "macd_diff",
+    "rsi",
+    "vol_ratio",
+    "vol_trend",
+    "slope"
+  ],
+  "fee_pct": 0.0025,
+  "tp_pct": 0.015,
+  "sl_pct": -0.02,
+  "horizon_bars": 24,
+  "lookback": 50,
+  "raw_samples": 32507,
+  "filtered_samples": 13764,
+  "filter_rate": 0.42341649490878885,
+  "filtered_base_winrate": 0.510171461784365,
+  "break_even_winrate": 0.6428571428571429,
+  "trained_samples": 9634,
+  "calib_samples": 2064,
+  "test_samples": 2066,
+  "test_days": 7.416666666666667,
+  "alpha": 0.1,
+  "q_hat": 0.65328049659729,
+  "empirical_coverage": 0.8789932236205228,
+  "results": {
+    "take_all_filtered": {
+      "trades": 2066,
+      "pnl_eur": -262.32499999999993,
+      "win_rate": 0.5392061955469506,
+      "avg_pnl_eur": -0.12697241045498545
+    },
+    "xgb_only": {
+      "trades": 1229,
+      "pnl_eur": -149.5375,
+      "win_rate": 0.5435313262815297,
+      "avg_pnl_eur": -0.12167412530512611
+    },
+    "conformal_strict": {
+      "trades": 261,
+      "pnl_eur": -23.012500000000006,
+      "win_rate": 0.5708812260536399,
+      "avg_pnl_eur": -0.08817049808429121
+    },
+    "conformal_loose": {
+      "trades": 1830,
+      "pnl_eur": -245.52499999999992,
+      "win_rate": 0.5333333333333333,
+      "avg_pnl_eur": -0.13416666666666663
+    },
+    "threshold_sweep": {
+      "proba>=0.45": {
+        "trades": 1469,
+        "pnl_eur": -191.53749999999997,
+        "win_rate": 0.5364193328795098,
+        "avg_pnl_eur": -0.13038631722260038
+      },
+      "proba>=0.50": {
+        "trades": 1229,
+        "pnl_eur": -149.5375,
+        "win_rate": 0.5435313262815297,
+        "avg_pnl_eur": -0.12167412530512611
+      },
+      "proba>=0.55": {
+        "trades": 925,
+        "pnl_eur": -106.1375,
+        "win_rate": 0.5491891891891892,
+        "avg_pnl_eur": -0.11474324324324324
+      },
+      "proba>=0.60": {
+        "trades": 583,
+        "pnl_eur": -57.312500000000014,
+        "win_rate": 0.5626072041166381,
+        "avg_pnl_eur": -0.09830617495711838
+      },
+      "proba>=0.65": {
+        "trades": 277,
+        "pnl_eur": -24.587500000000006,
+        "win_rate": 0.5703971119133574,
+        "avg_pnl_eur": -0.08876353790613721
+      },
+      "proba>=0.70": {
+        "trades": 102,
+        "pnl_eur": -11.725,
+        "win_rate": 0.5490196078431373,
+        "avg_pnl_eur": -0.11495098039215686
+      },
+      "proba>=0.75": {
+        "trades": 20,
+        "pnl_eur": 0.17499999999999954,
+        "win_rate": 0.65,
+        "avg_pnl_eur": 0.008749999999999977
+      }
+    }
+  }
+}
