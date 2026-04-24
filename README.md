@@ -1,10 +1,10 @@
-﻿# 🤖 Bitvavo Trading Bot
+# 🤖 Bitvavo Trading Bot
 
 [![GitHub stars](https://img.shields.io/github/stars/sedegroot-lang/Bitvavo-Bot?style=social)](https://github.com/sedegroot-lang/Bitvavo-Bot/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/sedegroot-lang/Bitvavo-Bot)](https://github.com/sedegroot-lang/Bitvavo-Bot/issues)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)](#installatie)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Docker-lightgrey)](#installatie)
 [![Release](https://img.shields.io/github/v/release/sedegroot-lang/Bitvavo-Bot)](https://github.com/sedegroot-lang/Bitvavo-Bot/releases)
 
 Geautomatiseerde crypto trading bot voor [Bitvavo](https://bitvavo.com/invite?a=B8942E4528). Gratis, open source, draait lokaal op je eigen PC.
@@ -29,8 +29,15 @@ Als een munt daalt na aankoop, koopt de bot bij op lagere niveaus om je gemiddel
 **3. Grid Bot**
 Voor zijwaartse markten. De bot koopt op support en verkoopt op resistance. Pakt kleine winsten bij elke schommeling.
 
-**AI Koopscore**
-Een XGBoost model analyseert technische indicatoren (RSI, MACD, SMA, volume) en geeft elk koopmoment een score van 0 tot 10. Alleen boven de drempel wordt gekocht. Het model leert van je eigen trades, dus het wordt beter naarmate de bot langer draait.
+**AI Koopscore & Machine Learning**
+Een XGBoost model analyseert technische indicatoren (RSI, MACD, SMA, ATR, Bollinger Bands, volume) en geeft elk koopmoment een score van 0 tot 10. Alleen boven de drempel wordt gekocht. Het model leert van je eigen trades en wordt beter naarmate de bot langer draait.
+
+Daarnaast bevat de AI-laag:
+- **LSTM neuraal netwerk** voor tijdserie-patronen (optioneel)
+- **Reinforcement Learning (RL)** voor dynamische ensemble-gating
+- **Marktregime-detectie** (TRENDING_UP / RANGING / HIGH_VOLATILITY / BEARISH) — de bot past zijn strategie automatisch aan
+- **Kelly-sizing** voor optimale positiegrootte op basis van historische winrate en volatiliteit
+- **Auto-retrain** — het model hertraint automatisch zodra er genoeg nieuwe trades zijn
 
 ---
 
@@ -53,13 +60,19 @@ Het dashboard draait lokaal op **http://localhost:5001**:
 
 | Tab | Inhoud |
 |---|---|
-| Overview | Portfolio P&L, open trades, winst vandaag |
+| Portfolio | Portfolio P&L, open trades, winst vandaag |
 | Trades | Alle open en gesloten posities |
 | AI | AI scores, markt regime, suggesties |
 | Analytics | Historische performance, grafieken |
-| Settings | Alle parameters + Telegram instellen |
+| Performance | Winst/verlies per munt, equity curve |
+| Settings | API-sleutels, Telegram, geavanceerde opties |
+| Parameters | Alle handelsparameters vanuit het dashboard |
+| Notifications | Telegram-notificaties instellen en testen |
 | HODL | Wekelijkse DCA voor BTC/ETH |
 | Grid | Grid bot status en instellingen |
+| Hedge | Hedge-posities en beschermingsstrategieën |
+| Reports | Exporteerbare handelrapporten |
+| Roadmap | Portfolio groeidoelen en mijlpalen |
 
 ### Screenshots
 
@@ -84,6 +97,15 @@ Het dashboard draait lokaal op **http://localhost:5001**:
 **HODL DCA**
 ![HODL](docs/screenshots/hodl.png)
 
+**Hedge**
+![Hedge](docs/screenshots/hedge.png)
+
+**Notifications**
+![Notifications](docs/screenshots/notifications.png)
+
+**Parameters**
+![Parameters](docs/screenshots/parameters.png)
+
 **Rapporten**
 ![Reports](docs/screenshots/reports.png)
 
@@ -101,7 +123,7 @@ Al een account? Ga naar stap 2.
 
 ## Stap 2: Python installeren
 
-De bot vereist Python 3.11 of hoger.
+De bot vereist Python 3.11 of hoger (getest met 3.13).
 
 1. Download Python van [python.org/downloads](https://www.python.org/downloads/)
 2. Start de installer
@@ -154,16 +176,18 @@ Ga naar http://localhost:5001 → tab Settings:
 
 | Instelling | Wat het doet | Standaard |
 |---|---|---|
-| Budget per trade | Hoeveel euro per aankoop | €12 |
-| Max open trades | Hoeveel munten tegelijk | 5 |
-| Trailing stop % | Hoe ver de prijs mag dalen na een top | 4% |
+| Budget per trade | Hoeveel euro per aankoop | €38 |
+| Max open trades | Hoeveel munten tegelijk | 2 |
+| Trailing stop % | Hoe ver de prijs mag dalen na een top | 2.5% |
 | DCA levels | Hoeveel keer bijkopen bij daling | 9x |
-| Min AI score | Hoe zeker de AI moet zijn voor aankoop | 5 |
+| Min AI score | Hoe zeker de AI moet zijn voor aankoop | 7.0 |
 | Budget verdeling | % voor Trailing Bot vs Grid Bot | 75% / 25% |
 
 Alle configuratie-opties staan beschreven in [CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md).
 
 **Tip:** begin met de standaardinstellingen. Pas alleen het budget per trade aan op je kapitaal. Klein beginnen (€10/trade) is verstandig.
+
+> **Geavanceerd:** De bot gebruikt een 3-lagen config-systeem. Aanpassingen die je wilt bewaren ga je instellen in het lokale override-bestand (`%LOCALAPPDATA%\BotConfig\bot_config_local.json`). Dit bestand heeft altijd voorrang en wordt nooit overschreven door updates.
 
 ---
 
@@ -210,6 +234,7 @@ Klik op "Watch" → "Releases only" op GitHub voor e-mailmeldingen bij nieuwe ve
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Veelvoorkomende problemen oplossen |
 | [STRATEGY_LOGIC.md](docs/STRATEGY_LOGIC.md) | Hoe de trading strategieën werken |
 | [TRADING_STRATEGY.md](docs/TRADING_STRATEGY.md) | Entry/exit logica in detail |
+| [PORTFOLIO_ROADMAP_V2.md](docs/PORTFOLIO_ROADMAP_V2.md) | Portfolio groeistrategie en mijlpalen |
 
 ---
 
@@ -261,12 +286,14 @@ Cryptocurrency trading brengt financiële risico's met zich mee. Deze bot is een
 ## Architectuur
 
 ```
-trailing_bot.py          Hoofd trading engine
-modules/                 DCA, grid, risk management
-core/                    Signalen, prijzen, indicatoren
-ai/                      XGBoost AI, supervisor
-tools/dashboard_flask/   Web dashboard (Flask, poort 5001)
-config/bot_config.json   Bot configuratie (via dashboard)
+trailing_bot.py          Hoofd trading engine (~6.800 regels)
+bot/                     Geëxtraheerde botlogica (API wrapper, signalen, trailing, lifecycle)
+core/                    Pure berekeningen (indicatoren, regime engine, Kelly sizing, orderbook)
+modules/                 Infrastructuur (config, logging, DCA, grid, ML, websocket, dashboard)
+ai/                      AI/ML pipeline (XGBoost, LSTM, RL ensemble, auto-retrain, supervisor)
+tools/dashboard_flask/   Web dashboard (Flask + SocketIO, poort 5001)
+scripts/                 Automatisering (scheduler, backup, monitoring)
+config/bot_config.json   Bot configuratie (via dashboard of editor)
 data/                    Runtime data en trade log
 logs/                    Logbestanden
 ```
