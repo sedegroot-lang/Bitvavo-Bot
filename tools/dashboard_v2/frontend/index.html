@@ -558,6 +558,76 @@
           </div>
         </div>
 
+        <!-- ============== REALISTISCHE VERWACHTING (V1 parity) ============== -->
+        <div class="card projection-card">
+          <div class="card-head">
+            <div class="card-title">📊 Realistische verwachting · per dag · maand · jaar</div>
+            <div class="card-action muted" style="font-size:11px" x-show="rd.passive_income_stats?.has_data">
+              uit <strong x-text="rd.passive_income_stats?.sample_weeks"></strong> volledige weken eigen data
+            </div>
+          </div>
+
+          <template x-if="rd.passive_income_stats?.has_data">
+            <div>
+              <div class="proj-summary">
+                <span class="proj-chip bad">slechte week <strong x-text="((rd.passive_income_stats?.p25_week_pct ?? 0) >= 0 ? '+' : '') + (rd.passive_income_stats?.p25_week_pct ?? 0).toFixed(2) + '%'"></strong></span>
+                <span class="proj-chip good">typische week <strong x-text="((rd.passive_income_stats?.median_week_pct ?? 0) >= 0 ? '+' : '') + (rd.passive_income_stats?.median_week_pct ?? 0).toFixed(2) + '%'"></strong></span>
+                <span class="proj-chip best">goede week <strong x-text="((rd.passive_income_stats?.p75_week_pct ?? 0) >= 0 ? '+' : '') + (rd.passive_income_stats?.p75_week_pct ?? 0).toFixed(2) + '%'"></strong></span>
+                <span class="proj-chip" x-show="(rd.passive_income_stats?.max_dd_pct ?? 0) < 0">MaxDD 30d <strong x-text="(rd.passive_income_stats?.max_dd_pct ?? 0).toFixed(1) + '%'"></strong></span>
+                <span class="proj-chip" x-show="rd.current_value">jouw kapitaal <strong x-text="fmtEur(rd.current_value)"></strong> → vandaag <strong :class="(rd.passive_income_stats?.med_day_eur ?? 0) >= 0 ? 'pos' : 'neg'" x-text="((rd.passive_income_stats?.med_day_eur ?? 0) >= 0 ? '+' : '') + fmtEur(rd.passive_income_stats?.med_day_eur)"></strong></span>
+              </div>
+
+              <div class="projection-wrap">
+                <table class="projection-table">
+                  <thead>
+                    <tr>
+                      <th rowspan="2" class="sticky-col">Kapitaal</th>
+                      <th colspan="3" class="grp">€ / dag</th>
+                      <th colspan="3" class="grp">€ / maand <span class="muted">(gecompound)</span></th>
+                      <th colspan="3" class="grp">€ / jaar <span class="muted">(gecompound)</span></th>
+                    </tr>
+                    <tr>
+                      <th class="sub bad">slecht</th><th class="sub good">typisch</th><th class="sub best">goed</th>
+                      <th class="sub bad">slecht</th><th class="sub good">typisch</th><th class="sub best">goed</th>
+                      <th class="sub bad">slecht</th><th class="sub good">typisch</th><th class="sub best">goed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(r, i) in (rd.passive_income_table || [])" :key="i">
+                      <tr :class="r.is_current ? 'is-current' : ''">
+                        <td class="sticky-col cap" x-text="'€' + r.capital.toLocaleString('nl-NL')"></td>
+                        <td class="num bad" x-text="((r.day_p25 ?? 0) >= 0 ? '+' : '') + r.day_p25.toFixed(2)"></td>
+                        <td class="num good" x-text="((r.day_med ?? 0) >= 0 ? '+' : '') + r.day_med.toFixed(2)"></td>
+                        <td class="num best" x-text="((r.day_p75 ?? 0) >= 0 ? '+' : '') + r.day_p75.toFixed(2)"></td>
+                        <td class="num bad" x-text="((r.month_p25 ?? 0) >= 0 ? '+' : '') + r.month_p25.toLocaleString('nl-NL')"></td>
+                        <td class="num good" x-text="((r.month_med ?? 0) >= 0 ? '+' : '') + r.month_med.toLocaleString('nl-NL')"></td>
+                        <td class="num best" x-text="((r.month_p75 ?? 0) >= 0 ? '+' : '') + r.month_p75.toLocaleString('nl-NL')"></td>
+                        <td class="num bad" x-text="((r.year_p25 ?? 0) >= 0 ? '+' : '') + r.year_p25.toLocaleString('nl-NL')"></td>
+                        <td class="num good" x-text="((r.year_med ?? 0) >= 0 ? '+' : '') + r.year_med.toLocaleString('nl-NL')"></td>
+                        <td class="num best" x-text="((r.year_p75 ?? 0) >= 0 ? '+' : '') + r.year_p75.toLocaleString('nl-NL')"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="muted" style="font-size:11px;margin:10px 0 0;line-height:1.5">
+                <span x-text="rd.passive_income_stats?.cap_note"></span>.
+                Compound = (1 + week%)<sup>N</sup> − 1. Geen rekening met bull/bear cycli, draw-downs of config-veranderingen.
+                Totaal gerealiseerd PnL: <strong :class="(rd.passive_income_stats?.total_realised_pnl ?? 0) >= 0 ? 'pos' : 'neg'" x-text="((rd.passive_income_stats?.total_realised_pnl ?? 0) >= 0 ? '+' : '') + fmtEur(rd.passive_income_stats?.total_realised_pnl)"></strong>.
+              </p>
+            </div>
+          </template>
+
+          <template x-if="!rd.passive_income_stats?.has_data">
+            <div class="proj-empty">
+              <div style="font-size:32px">📈</div>
+              <div><strong>Onvoldoende trade-historie</strong></div>
+              <div class="muted" style="font-size:12px" x-text="rd.passive_income_stats?.cap_note || 'Minimaal 3 volledige handelsweken nodig.'"></div>
+            </div>
+          </template>
+        </div>
+
         <!-- Weekly profits -->
         <div class="card" x-show="(rd.weekly_profits || []).length">
           <div class="card-head"><div class="card-title">📅 Wekelijkse winst (laatste 8 weken)</div></div>

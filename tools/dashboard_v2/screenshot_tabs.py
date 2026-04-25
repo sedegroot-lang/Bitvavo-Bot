@@ -29,13 +29,18 @@ def main() -> int:
             page.screenshot(path=str(out), full_page=True)
             print(f"  OK {tab}.png ({out.stat().st_size // 1024} KB)")
 
-        # Mobile screenshot too
-        page2 = ctx.new_page()
-        page2.set_viewport_size({"width": 390, "height": 844})
-        page2.goto(BASE, wait_until="networkidle", timeout=20000)
-        page2.wait_for_timeout(1500)
-        page2.screenshot(path=str(OUT / "mobile_overview.png"), full_page=True)
-        print(f"  OK mobile_overview.png")
+        # Mobile - capture each tab at iPhone-12 viewport (390x844)
+        ctx_m = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
+        m = ctx_m.new_page()
+        m.on("pageerror", lambda e: print(f"[MOBILE JS ERROR] {e}"))
+        m.goto(BASE, wait_until="networkidle", timeout=20000)
+        m.wait_for_timeout(2000)
+        for tab in TABS:
+            m.evaluate(f"() => {{ const root = document.querySelector('body'); const a = Alpine.$data(root); a.tab = '{tab}'; if (a.tab === 'markets') a.loadMarkets(); }}")
+            m.wait_for_timeout(900)
+            out = OUT / f"mobile_{tab}.png"
+            m.screenshot(path=str(out), full_page=True)
+            print(f"  OK mobile_{tab}.png ({out.stat().st_size // 1024} KB)")
 
         b.close()
     print(f"\nDone — saved to {OUT}")

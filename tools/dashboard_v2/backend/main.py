@@ -1150,6 +1150,97 @@ def _roadmap() -> Dict[str, Any]:
         "grid_investment": (cfg.get("GRID_TRADING") or {}).get("investment_eur") if isinstance(cfg.get("GRID_TRADING"), dict) else cfg.get("GRID_INVESTMENT"),
     }
 
+    # ── Realistische Verwachting (passive_income table) ──
+    # Compute week-yield distribution (P25/median/P75) from real weekly_profits,
+    # then compound month (4.33w) + year (52w) projections per capital step.
+    passive_income_stats = {
+        "sample_weeks": 0, "has_data": False,
+        "p25_week_pct": 0.0, "median_week_pct": 0.0, "p75_week_pct": 0.0,
+        "max_dd_pct": 0.0, "total_realised_pnl": 0.0, "cap_note": "",
+        "p25_day_eur": 0.0, "med_day_eur": 0.0, "p75_day_eur": 0.0,
+    }
+    passive_income_table: List[Dict[str, Any]] = []
+    try:
+        # MaxDD over sparkline (last 30d)
+        if sparkline and len(sparkline) >= 3:
+            vals = [p["value"] for p in sparkline if p.get("value", 0) > 0]
+            if vals:
+                peak = vals[0]
+                worst = 0.0
+                for v in vals:
+                    if v > peak:
+                        peak = v
+                    dd = (v - peak) / peak * 100 if peak > 0 else 0
+                    if dd < worst:
+                        worst = dd
+                passive_income_stats["max_dd_pct"] = round(worst, 2)
+
+        # Distribution from full weeks (excl. current)
+        from datetime import datetime as _dt3
+        now_wk = _dt3.now().strftime("%Y-W%W")
+        full_weeks = [w for w in weekly_profits if w["week"] != now_wk and w["trades"] > 0]
+        if full_weeks and current_value > 0 and len(full_weeks) >= 3:
+            pcts = sorted([(w["profit"] / current_value) * 100 for w in full_weeks])
+            n = len(pcts)
+            def _pct(arr, q):
+                if not arr:
+                    return 0.0
+                k = (len(arr) - 1) * q
+                f = int(k)
+                c = min(f + 1, len(arr) - 1)
+                if f == c:
+                    return arr[f]
+                return arr[f] + (arr[c] - arr[f]) * (k - f)
+            p25 = _pct(pcts, 0.25)
+            med = _pct(pcts, 0.50)
+            p75 = _pct(pcts, 0.75)
+            passive_income_stats.update({
+                "sample_weeks": n, "has_data": True,
+                "p25_week_pct": round(p25, 3),
+                "median_week_pct": round(med, 3),
+                "p75_week_pct": round(p75, 3),
+                "total_realised_pnl": round(sum(w["profit"] for w in full_weeks), 2),
+                "cap_note": (f"Slechts {n} volledige weken data — projecties zijn ruw"
+                             if n < 6 else f"{n} weken realtime data"),
+                # Daily yield in € for current_value (informative)
+                "p25_day_eur": round(current_value * p25 / 100.0 / 7.0, 2),
+                "med_day_eur": round(current_value * med / 100.0 / 7.0, 2),
+                "p75_day_eur": round(current_value * p75 / 100.0 / 7.0, 2),
+            })
+
+            # Compound projections
+            def _comp(weekly_pct: float, weeks: float) -> float:
+                if weekly_pct == 0:
+                    return 0.0
+                return ((1 + weekly_pct / 100.0) ** weeks - 1) * 100.0
+
+            m_p25, m_med, m_p75 = _comp(p25, 4.33), _comp(med, 4.33), _comp(p75, 4.33)
+            y_p25, y_med, y_p75 = _comp(p25, 52), _comp(med, 52), _comp(p75, 52)
+
+            for cap in [1000, 1500, 2000, 3000, 5000, 7500, 10000, 15000, 25000, 50000]:
+                passive_income_table.append({
+                    "capital": cap,
+                    "day_p25": round(cap * p25 / 100.0 / 7.0, 2),
+                    "day_med": round(cap * med / 100.0 / 7.0, 2),
+                    "day_p75": round(cap * p75 / 100.0 / 7.0, 2),
+                    "week_p25": round(cap * p25 / 100.0, 2),
+                    "week_med": round(cap * med / 100.0, 2),
+                    "week_p75": round(cap * p75 / 100.0, 2),
+                    "month_p25": round(cap * m_p25 / 100.0, 0),
+                    "month_med": round(cap * m_med / 100.0, 0),
+                    "month_p75": round(cap * m_p75 / 100.0, 0),
+                    "year_p25": round(cap * y_p25 / 100.0, 0),
+                    "year_med": round(cap * y_med / 100.0, 0),
+                    "year_p75": round(cap * y_p75 / 100.0, 0),
+                    "is_current": (cap <= current_value < cap * 1.5) if cap < 50000 else (current_value >= cap),
+                })
+        else:
+            passive_income_stats["cap_note"] = (
+                f"Slechts {len(full_weeks)} volledige week(en) data — minimaal 3 nodig"
+            )
+    except Exception:
+        pass
+
     return {
         "current_value": round(current_value, 2),
         "current_idx": current_idx,
@@ -1169,6 +1260,8 @@ def _roadmap() -> Dict[str, Any]:
         "deposit_scenarios": deposit_scenarios,
         "scenario_targets": TARGETS,
         "active_config": active_config,
+        "passive_income_stats": passive_income_stats,
+        "passive_income_table": passive_income_table,
     }
 
 
