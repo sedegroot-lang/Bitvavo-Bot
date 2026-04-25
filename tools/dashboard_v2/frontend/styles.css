@@ -539,3 +539,7 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
   .topbar h1 { font-size: 16px !important; }
   .card { padding: 12px 10px !important; }
 }
+
+/* Trade-card partial-sell indicator */
+.badge-sold { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: rgba(59,130,246,.15); color: #93c5fd; font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; vertical-align: 1px; }
+.tc-cell .sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; line-height: 1.3; }

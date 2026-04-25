@@ -5,6 +5,30 @@
 
 ---
 
+## #049 — Trade-card toonde verkeerde "Geïnvesteerd" + inconsistente P/L na partial sell (2026-04-25)
+
+### Symptom
+LTC trade-card op dashboard toont:
+- Geïnvesteerd: €320,03 (de originele aankoop)
+- Huidige waarde: €145,44
+- P/L: €-174,59 / +1,67%
+
+→ getallen kloppen niet bij elkaar (€-174 met +1,67%?). Gebruiker dacht dat de bot de partial sell had gemist.
+
+### Root cause
+Bot detecteerde de partial sell wel correct: `invested_eur` stond op €143,06 (current cost basis), `initial_invested_eur` op €320,03 (immutable origineel). Maar:
+- **Backend** (`tools/dashboard_v2/backend/main.py:322`): `invested = initial_invested_eur or invested_eur` → gebruikte de €320 voor `unrealised_pnl_eur`-berekening, terwijl `unrealised_pnl_pct` los uit `cur/buy_price` kwam → tegenstrijdige getallen.
+- **Frontend** (`index.html:192`): toonde `initial_invested_eur` als "Geïnvesteerd" zonder uitleg over de partial sell.
+
+### Fix
+1. Backend: `invested = invested_eur or initial_invested_eur` (huidige cost basis wint). Nieuwe velden: `invested_eur_current`, `partially_sold`, `total_pnl_eur` (incl. al-teruggehaalde EUR).
+2. Frontend: toont `invested_eur_current`, badge "deels verkocht" + sub-regel met origineel + teruggekomen EUR.
+
+### Lesson
+Cost basis voor live P/L = `invested_eur` (mutable, current). `initial_invested_eur` is alleen voor context/historie. Twee getallen op dezelfde card moeten ALTIJD dezelfde basis gebruiken anders krijg je inconsistente outputs (€-174 vs +1.67%).
+
+---
+
 ## #048 — Dashboard V2 toonde lege pagina (heartbeat null) door stale uvicorn-proces (2026-04-25)
 
 ### Symptom

@@ -189,7 +189,13 @@
                 </div>
 
                 <div class="tc-grid-2">
-                  <div class="tc-cell"><div class="lbl">Geïnvesteerd</div><div class="val" x-text="fmtEur(tr.initial_invested_eur ?? tr.invested_eur)"></div></div>
+                  <div class="tc-cell">
+                    <div class="lbl">Geïnvesteerd
+                      <span x-show="tr.partially_sold" class="badge-sold" :title="'Deels verkocht — origineel €' + tr.initial_invested_eur">deels verkocht</span>
+                    </div>
+                    <div class="val" x-text="fmtEur(tr.invested_eur_current ?? tr.invested_eur ?? tr.initial_invested_eur)"></div>
+                    <div class="sub" x-show="tr.partially_sold" x-text="'origineel ' + fmtEur(tr.initial_invested_eur) + ' · terug ' + fmtEur(tr.partial_tp_returned_eur)"></div>
+                  </div>
                   <div class="tc-cell"><div class="lbl">Huidige waarde</div><div class="val" x-text="fmtEur(tr.current_value_eur)"></div></div>
                 </div>
 

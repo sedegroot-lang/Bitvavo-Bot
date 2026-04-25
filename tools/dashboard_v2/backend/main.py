@@ -319,7 +319,12 @@ def _trades() -> Dict[str, Any]:
         except Exception:
             cur = None
 
-        invested = float(tr.get("initial_invested_eur") or tr.get("invested_eur") or 0)
+        # invested_eur = ACTUAL current cost basis (decreases on partial sells / increases on DCA).
+        # initial_invested_eur = original entry (immutable, for context).
+        # We use invested_eur for live P/L because that matches what's still on the books.
+        invested = float(tr.get("invested_eur") or tr.get("initial_invested_eur") or 0)
+        initial_invested = float(tr.get("initial_invested_eur") or invested)
+        partial_returned = float(tr.get("partial_tp_returned_eur") or 0)
         amount = float(tr.get("amount") or 0)
         buy_p = float(tr.get("buy_price") or 0)
         # honour partial TPs: amount on log might be original; partial_tp_events.last.remaining_amount wins
@@ -335,6 +340,11 @@ def _trades() -> Dict[str, Any]:
         cur_value = (cur * amount) if (cur and amount) else None
         unrealised = round(cur_value - invested, 2) if (cur_value is not None and invested) else None
         unrealised_pct = round((cur / buy_p - 1) * 100, 2) if (cur and buy_p) else None
+        # Total P/L (incl. realised partial sells) = (current value + already returned) - initial invested
+        total_pnl = None
+        if cur_value is not None and initial_invested:
+            total_pnl = round((cur_value + partial_returned) - initial_invested, 2)
+        partially_sold = invested + 1.0 < initial_invested  # >€1 sold off
 
         # Trailing
         trailing_activated = bool(tr.get("trailing_activated"))
@@ -388,6 +398,11 @@ def _trades() -> Dict[str, Any]:
             "current_value_eur": round(cur_value, 2) if cur_value is not None else None,
             "unrealised_pnl_eur": unrealised,
             "unrealised_pnl_pct": unrealised_pct,
+            "total_pnl_eur": total_pnl,
+            "invested_eur_current": round(invested, 2) if invested else None,
+            "initial_invested_eur": round(initial_invested, 2) if initial_invested else None,
+            "partial_tp_returned_eur": round(partial_returned, 2),
+            "partially_sold": partially_sold,
             "activation_price": activation_price,
             "trailing_stop": trailing_stop,
             "trailing_progress_pct": round(trailing_progress_pct, 1) if trailing_progress_pct is not None else None,
