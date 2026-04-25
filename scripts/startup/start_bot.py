@@ -796,6 +796,19 @@ def build_processes(mode: str, include_dashboard: bool, include_pairs: bool) -> 
     else:
         debug_log("dashboard_v2: backend/main.py niet gevonden")
 
+    # Dashboard V2 watchdog: auto-restarts the FastAPI uvicorn process if
+    # /api/health reports stale data while heartbeat.json is fresh
+    # (catches Windows file-handle freezes / OneDrive sync glitches).
+    dash_v2_wd = BASE_DIR / "scripts" / "dashboard_v2_watchdog.py"
+    if dash_v2_wd.exists():
+        processes.append(
+            ManagedProcess(
+                "dashboard_v2_watchdog",
+                [PYTHON, str(dash_v2_wd)],
+                auto_restart=True,
+            )
+        )
+
     # Note: Dashboard watchdog removed - dashboards are self-managing
     
     if include_pairs:

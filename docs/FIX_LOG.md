@@ -5,6 +5,26 @@
 
 ---
 
+## #048 — Dashboard V2 toonde lege pagina (heartbeat null) door stale uvicorn-proces (2026-04-25)
+
+### Symptom
+Dashboard pagina laadt wel, maar alle KPI/portfolio velden zijn leeg / `--`. `GET /api/health` geeft `bot_online:false, heartbeat_age_s:null` terwijl `data/heartbeat.json` wel vers is (bot draait gewoon).
+
+### Root cause
+1. **Race condition**: bot schrijft heartbeat via atomic `os.replace()`. Op Windows kan tussen unlink en rename de file kortstondig "in use" zijn → `_read_json` vangt exception → returnt `{}` → `bot_online:false`.
+2. **Geen fallback**: 1 mislukte read → `{}` werd gewoon doorgegeven aan UI. Gecombineerd met TTL-cache van 2s voelt het alsof het "vast zit", maar elke read ging fout.
+3. **Geen watchdog**: niets controleerde of dashboard nog gezond was vs. werkelijke heartbeat-versheid.
+
+### Fix
+1. `_read_json` in `tools/dashboard_v2/backend/main.py`: 3x retry met 50/100/150 ms backoff + **last-known-good fallback** per pad. Bij transiënte fouten serveert hij vorige succesvolle waarde i.p.v. `{}`.
+2. Nieuw script `scripts/dashboard_v2_watchdog.py`: pingt elke 30s `GET /api/health`, en als 3 checks (≈90s) achter elkaar onhealthy zijn TERWIJL `heartbeat.json` wel vers is → kill+restart uvicorn op `0.0.0.0:5002`. Cooldown 5 min tegen restart-loops.
+3. Watchdog toegevoegd aan `scripts/startup/start_bot.py` als ManagedProcess met auto_restart=True.
+
+### Lesson
+Op Windows is atomic JSON-replace nooit 100% race-vrij door file locks. Lezers MOETEN retryen + last-known-good fallback hebben, anders krijgen UI's lege schermen bij transiënte fouten. **Nooit `except: return {}`** zonder fallback bij hoog-frequente bestanden.
+
+---
+
 ## #047 — SCAN_WATCHDOG_SECONDS te laag → maar 1-2 markten gescand per cycle (2026-04-25)
 
 ### Symptom

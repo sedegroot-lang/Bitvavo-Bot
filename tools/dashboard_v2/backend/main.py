@@ -62,24 +62,49 @@ app.add_middleware(
 
 _cache: TTLCache = TTLCache(maxsize=128, ttl=2)
 _long_cache: TTLCache = TTLCache(maxsize=64, ttl=30)
+# Persistent fallback: last successfully-read value per path. Survives
+# transient OS errors / atomic-replace race conditions on Windows so the
+# dashboard never goes blank.
+_last_good: Dict[str, Any] = {}
 
 
 # -------------------------------------------------------------------- Helpers
 
 
 def _read_json(path: Path, default: Any = None) -> Any:
+    """Robust JSON read with retry + last-known-good fallback.
+
+    Why retry: on Windows the bot writes JSON via atomic os.replace().
+    During the swap the file may be transiently locked or missing,
+    causing reads to fail. We retry up to 3x with tiny backoff.
+    Why last-known-good: if the file is genuinely broken, we still
+    serve the previously cached value instead of '{}', preventing
+    the dashboard from going blank.
+    """
     if not path.exists():
-        return default
-    try:
-        key = f"json::{path}::{path.stat().st_mtime_ns}"
-        if key in _cache:
-            return _cache[key]
-        with path.open("r", encoding="utf-8-sig") as f:
-            data = json.load(f)
-        _cache[key] = data
-        return data
-    except Exception:
-        return default
+        return _last_good.get(str(path), default)
+    last_err: Optional[Exception] = None
+    for attempt in range(3):
+        try:
+            key = f"json::{path}::{path.stat().st_mtime_ns}"
+            if key in _cache:
+                return _cache[key]
+            with path.open("r", encoding="utf-8-sig") as f:
+                data = json.load(f)
+            _cache[key] = data
+            _last_good[str(path)] = data
+            return data
+        except (OSError, PermissionError, json.JSONDecodeError) as e:
+            last_err = e
+            time.sleep(0.05 * (attempt + 1))
+        except Exception as e:
+            last_err = e
+            break
+    # All attempts failed — serve last good value if we have one
+    fallback = _last_good.get(str(path))
+    if fallback is not None:
+        return fallback
+    return default
 
 
 def _read_jsonl(path: Path, max_lines: int = 5000) -> List[Dict[str, Any]]:
