@@ -5,6 +5,26 @@
 
 ---
 
+## #047 — SCAN_WATCHDOG_SECONDS te laag → maar 1-2 markten gescand per cycle (2026-04-25)
+
+### Symptom
+Dashboard signal-status toont continu `1/20 markets gescand`, geen entries hoewel 2 slots vrij + EUR cash = €373.93. Log:
+```
+[SCAN WATCHDOG] Aborting scan after 2 markets / 20 (elapsed 60.5s)
+[SCAN SUMMARY] 20 markets, 2 evaluated ... 0.03 markets/s
+```
+
+### Root cause
+`SCAN_WATCHDOG_SECONDS` default = **60s** (`trailing_bot.py:1088`), maar elke market kost 25-30s door LSTM + ensemble inference (XGB+LSTM+RL). Na 2 markten breekt watchdog af → 18 markten worden nooit geëvalueerd → bot mist alle entries behalve random eerste 2.
+
+### Fix
+Bumped `SCAN_WATCHDOG_SECONDS = 300` (5 min) in `%LOCALAPPDATA%\BotConfig\bot_config_local.json`. Hot-reloaded zonder restart. Bij volgende cycle worden alle 20 markten geëvalueerd (~9 min worst case, ruim binnen 5-min budget op gemiddelde snelheid).
+
+### Lesson
+Scan-tijd schaalt lineair met aantal markten × inference-tijd per markt. LSTM + ensemble ≈ 25s per markt → minimum watchdog = `markets × 30s` met buffer. Bij future model-uitbreidingen: meet nieuwe per-markt tijd en pas watchdog aan.
+
+---
+
 ## #046 — Telegram /set met dot-key faalde stil + Portfolio toonde slechts 5 closed trades (i.p.v. 800+) + Roadmap stortingsscenario's miste compounding-uitleg en hogere stappen + Stortingsplan-component overbodig (2026-04-23)
 
 ### Symptom / Aanleiding
