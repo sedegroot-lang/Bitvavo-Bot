@@ -415,6 +415,14 @@ class MonitoringManager:
         ctx = self.ctx
         log = ctx.log
 
+        # Re-read this flag inside the loop so config hot-reload works without restart.
+        def _alerts_enabled() -> bool:
+            try:
+                from modules.config import CONFIG as _CFG
+                return bool(_CFG.get("HEARTBEAT_STALE_ALERT_ENABLED", True))
+            except Exception:
+                return True
+
         def monitor() -> None:
             # Wacht eerst lang genoeg zodat de bot zijn eerste heartbeat kan schrijven
             # voordat we beginnen te controleren (voorkomt valse alerts na herstart)
@@ -423,33 +431,59 @@ class MonitoringManager:
             base_cooldown = max(600, alert_stale_seconds * 3)  # min 10 min between alerts
             current_cooldown = base_cooldown
             max_cooldown = 7200  # max 2 uur tussen alerts bij aanhoudende downtime
+            consecutive_stale = 0  # require N consecutive stale reads before alerting
+            STALE_CONFIRMATIONS = 3  # ~3 minutes at interval=60s
             while True:
                 try:
                     ts = None
-                    if os.path.exists(ctx.heartbeat_file):
-                        with open(ctx.heartbeat_file, "r", encoding="utf-8") as fh:
-                            content = fh.read().strip()
-                            if content:  # Only parse if file is not empty
-                                data = json.loads(content)
-                                ts = data.get("ts")
+                    # Retry the read up to 3x with small backoff so a transient
+                    # OS error mid os.replace() doesn't trigger a false alert.
+                    for attempt in range(3):
+                        try:
+                            if os.path.exists(ctx.heartbeat_file):
+                                with open(ctx.heartbeat_file, "r", encoding="utf-8-sig") as fh:
+                                    content = fh.read().strip()
+                                    if content:
+                                        data = json.loads(content)
+                                        ts = data.get("ts") or data.get("timestamp")
+                            if ts is not None:
+                                break
+                        except (OSError, json.JSONDecodeError):
+                            time.sleep(0.1 * (attempt + 1))
                     if ts is not None and time.time() - float(ts) <= alert_stale_seconds:
-                        # Heartbeat is healthy — reset exponential backoff
+                        # Heartbeat is healthy — reset state
                         if current_cooldown != base_cooldown:
                             log("Heartbeat hersteld, backoff gereset.", level="info")
                         current_cooldown = base_cooldown
                         last_alert_ts = 0.0
+                        consecutive_stale = 0
                     else:
-                        now = time.time()
-                        if now - last_alert_ts >= current_cooldown:
-                            send_alert(
-                                f"ALERT: heartbeat stale or missing (last_ts={ts}). Bot may be down."
+                        consecutive_stale += 1
+                        # Only alert after N consecutive confirmations AND if alerts enabled
+                        if consecutive_stale < STALE_CONFIRMATIONS:
+                            log(
+                                f"Heartbeat stale check {consecutive_stale}/{STALE_CONFIRMATIONS} "
+                                f"(last_ts={ts}); waiting for confirmation.",
+                                level="debug",
                             )
-                            last_alert_ts = now
-                            # Verdubbel de cooldown bij elke herhaalde alert (exponential backoff)
-                            current_cooldown = min(current_cooldown * 2, max_cooldown)
-                except json.JSONDecodeError:
-                    # Ignore transient JSON errors from file being written
-                    pass
+                        else:
+                            now = time.time()
+                            if now - last_alert_ts >= current_cooldown:
+                                msg = (
+                                    f"ALERT: heartbeat stale or missing (last_ts={ts}). "
+                                    "Bot may be down."
+                                )
+                                if _alerts_enabled():
+                                    send_alert(msg)
+                                else:
+                                    log(
+                                        f"[heartbeat-monitor] {msg} "
+                                        "(Telegram alert disabled via HEARTBEAT_STALE_ALERT_ENABLED=false)",
+                                        level="warning",
+                                    )
+                                last_alert_ts = now
+                                # Verdubbel de cooldown bij elke herhaalde alert
+                                current_cooldown = min(current_cooldown * 2, max_cooldown)
                 except Exception as exc:
                     log(f"Heartbeat monitor error: {exc}", level="warning")
                 time.sleep(interval)

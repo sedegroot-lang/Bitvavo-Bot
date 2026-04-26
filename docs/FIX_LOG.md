@@ -5,6 +5,32 @@
 
 ---
 
+## #050 — Telegram-spam "heartbeat stale or missing" terwijl bot gewoon draait (2026-04-26)
+
+### Symptom
+Gebruiker krijgt herhaaldelijk Telegram-meldingen:
+> `ALERT: heartbeat stale or missing (last_ts=...). Bot may be down.`
+
+Terwijl `data/heartbeat.json` vers is (age ~30-60s), bot draait, trades gaan door. Echte false-positives.
+
+### Root cause
+`modules/trading_monitoring.py::start_heartbeat_monitor`:
+1. Eén transient OS-error tijdens `os.replace()` (Windows/OneDrive race) → `OSError` werd niet opgevangen → `ts=None` → alert pad.
+2. Geen retry, geen "consecutive confirmation" — eerste hiccup alert direct.
+3. Lege/half-geschreven JSON gaf `JSONDecodeError` (wel gevangen) maar `ts` bleef None → ook alert pad bij volgende loop.
+
+### Fix
+1. `_alerts_enabled()`: nieuwe config flag `HEARTBEAT_STALE_ALERT_ENABLED` (default `True`), per loop hot-reloadbaar.
+2. **Retry-loop** binnen monitor: 3x read met 100/200/300ms backoff voor transient OSError/JSONDecodeError.
+3. **Consecutive confirmation**: alert pas na 3 opeenvolgende stale checks (~3 minuten bij interval=60s) — niet bij 1 hiccup.
+4. Read als `utf-8-sig` (verdraagt BOM), accept `ts` of `timestamp` veld.
+5. In `bot_config_local.json`: `HEARTBEAT_STALE_ALERT_ENABLED = false` om de Telegram-melding helemaal uit te zetten.
+
+### Lesson
+Atomic `os.replace()` op Windows + OneDrive geeft soms transient OS-errors zelfs als de write succesvol is. Lezers moeten ALTIJD retry + last-known-good fallback hebben, NIET één read = waarheid. Dit was hetzelfde patroon als FIX #048 maar dan in de monitor i.p.v. dashboard.
+
+---
+
 ## #049 — Trade-card toonde verkeerde "Geïnvesteerd" + inconsistente P/L na partial sell (2026-04-25)
 
 ### Symptom
