@@ -3657,6 +3657,34 @@ async def open_trades_async(scored, eur_balance):
         _hard_total = _hard_current + _hard_reserved + _hard_pending
         if _hard_total >= _hard_max:
             log(f"[TRADE EXEC] HARD STOP: already at max trades ({_hard_current}+{_hard_reserved}+{_hard_pending}/{_hard_max}), skipping ALL {len(scored)} scored markets", level='info')
+            # Shadow rotation logger — observation only, no trades executed.
+            try:
+                from bot import shadow_rotation as _shadow_rot
+                _cands = []
+                for _it in scored:
+                    if len(_it) >= 4:
+                        _sc, _mk, _pn, _ = _it[:4]
+                        _cands.append({"market": _mk, "score": float(_sc), "price": float(_pn or 0)})
+                _cur_prices = {_mk: float(_pn or 0) for _sc, _mk, _pn, *_ in (s for s in scored if len(s) >= 4)}
+                # Add prices for open markets via get_current_price (cached, cheap)
+                for _om in list(open_trades.keys()):
+                    if _om not in _cur_prices:
+                        try:
+                            _p = get_current_price(_om)
+                            if _p:
+                                _cur_prices[_om] = float(_p)
+                        except Exception:
+                            pass
+                _sugg = _shadow_rot.evaluate(
+                    open_trades, _cands,
+                    max_open_trades=_hard_max,
+                    current_prices=_cur_prices,
+                    config=CONFIG,
+                )
+                if _sugg:
+                    log(f"[SHADOW_ROT] {len(_sugg)} would-be rotation(s) logged → data/shadow_rotation.jsonl", level='info')
+            except Exception as _shadow_err:
+                log(f"[SHADOW_ROT] evaluate failed (non-fatal): {_shadow_err}", level='debug')
             return
     except Exception as _hard_err:
         log(f"[ERROR] Hard stop check failed: {_hard_err} — blocking all new trades (fail-closed)", level='error')
