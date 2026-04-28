@@ -26,11 +26,19 @@ def send_email(subject, body):
 
 
 def send_telegram(text: str) -> bool:
-    """Stuur een Telegram-notificatie via modules.telegram_handler."""
+    """Stuur een Telegram-notificatie via modules.telegram_handler.
+
+    Gebruikt send_message direct (niet notify) zodat ALLE berichten doorkomen.
+    notify() filtert op trade/alert keywords — niet bruikbaar voor algemene
+    status/update berichten.
+
+    Roept _reload_credentials() aan zodat standalone scripts (zonder init())
+    ook credentials uit config/env hebben.
+    """
     try:
-        from modules.telegram_handler import notify
-        notify(text)
-        return True
+        from modules.telegram_handler import send_message, _reload_credentials
+        _reload_credentials()
+        return bool(send_message(text))
     except Exception as e:
         logger.warning(f"[Notifier] Telegram melding mislukt: {e}")
         return False
