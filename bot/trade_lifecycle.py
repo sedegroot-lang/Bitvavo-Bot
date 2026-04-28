@@ -76,15 +76,26 @@ def save_trades(force: bool = False):
     except Exception:
         pending = []
 
-    # Filter out immediate saldo_error entries from closed_trades
+    # Filter out immediate saldo_error entries from closed_trades.
+    # FIX_LOG #013: only treat RECENT saldo_errors (<48h) as pending.
+    # Old archived saldo_errors (months old) were re-detected every cycle,
+    # blowing up pending_saldo.json count and triggering Saldo Guard
+    # which cancelled DCA buy orders. Stale entries must be ignored.
+    saldo_recent_window_s = float((CONFIG.get('SALDO_GUARD') or {}).get('pending_max_age_hours', 48)) * 3600.0
+    cutoff_ts = time.time() - saldo_recent_window_s
     new_closed = []
     for t in all_trades:
         if not isinstance(t, dict):
             log(f"Skipping unexpected trade record type {type(t)}: {t}", level='warning')
             continue
         if t.get('reason') == 'saldo_error' and float(t.get('sell_price', 0) or 0) == 0.0:
-            pending.append(t)
-            log(f"Detected saldo_error for {t.get('market')}, storing pending for reconciliation", level='warning')
+            ts = float(t.get('timestamp') or t.get('opened_ts') or 0)
+            if ts >= cutoff_ts:
+                pending.append(t)
+                log(f"Detected saldo_error for {t.get('market')}, storing pending for reconciliation", level='warning')
+            else:
+                # stale: drop silently from closed list, do not re-pend
+                pass
         else:
             new_closed.append(t)
 

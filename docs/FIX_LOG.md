@@ -5,6 +5,30 @@
 
 ---
 
+## #051 — Stale saldo_errors uit archive triggerden Saldo Guard → DCA buy orders cancelled elke cycle (2026-04-28)
+
+### Symptom
+DCA's faalden de hele dag. Smart DCA logde "executing DCA" voor RENDER-EUR, ENJ-EUR, XLM-EUR maar er gingen geen orders door. Gebruiker moest handmatig kopen. Logs:
+```
+WARNING: Detected saldo_error for MIRA-EUR/XPL-EUR/CROSS-EUR/... (30+ markets, elke cycle)
+WARNING: Saldo Guard: 29 saldo errors > drempel 5 — beschermingsmaatregelen actief
+WARNING: Saldo Guard: openstaande BUY orders geannuleerd
+WARNING: Saldo Guard: nieuwe entries gepauzeerd voor 300s
+```
+
+### Root cause
+`bot/trade_lifecycle.py::save_trades` itereert elke cyclus over `closed_trades + trade_archive`. Voor elke trade met `reason=='saldo_error'` en `sell_price==0` werd hij re-pending gemarkeerd — **zonder timestamp-cutoff**. Het archive bevatte 29 saldo_errors van **206-207 dagen geleden** (april 2025) die elke cyclus opnieuw werden geappend aan `pending_saldo.json`. Resultaat: Saldo Guard `_get_pending_saldo_count()` → 29 > drempel 5 → cancelt elke cyclus alle openstaande BUY limit orders, inclusief DCA-orders die net waren geplaatst.
+
+### Fix
+- `bot/trade_lifecycle.py`: alleen saldo_errors van **<48h oud** als pending behandelen. Configurable via `SALDO_GUARD.pending_max_age_hours` (default 48).
+- `data/pending_saldo.json` geleegd.
+- Bot herstart om CONFIG `_SALDO_COOLDOWN_UNTIL` te clearen en nieuwe code te laden.
+
+### Lesson
+Re-detectie zonder timestamp-cutoff = bug-klasse. Elk filter dat closed/archive scant moet een leeftijdsgrens hebben — anders worden oude states eindeloos geherregistreerd. Tests dekten alleen de "fresh" path, niet "archive met oude entries". Test toevoegen die archive met saldo_errors >48h oud opneemt en verifieert dat ze NIET re-pended worden.
+
+---
+
 ## #050 — Telegram-spam "heartbeat stale or missing" terwijl bot gewoon draait (2026-04-26)
 
 ### Symptom
