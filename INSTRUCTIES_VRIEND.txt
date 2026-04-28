@@ -1,0 +1,398 @@
+================================================================
+  BITVAVO BOT - VOLLEDIGE INSTALLATIE & GEBRUIK
+  Voor portfolio van ~100 EUR (incl. grid bot)
+================================================================
+
+Deze bot is precies dezelfde als die mijn vriend draait:
+  - Trailing trading bot (koopt + verkoopt automatisch)
+  - Optioneel: Grid bot (handelt in vast prijsbereik)
+  - AI Supervisor (LSTM + XGBoost ensemble)
+  - Auto-backup, Auto-retrain (XGB wekelijks)
+  - Dashboard met live overzicht
+  - Health Monitor sidecar venster
+  - Een klik = alles draait automatisch
+
+
+================================================================
+  STAP 0 - BELANGRIJK: NIET IN ONEDRIVE!
+================================================================
+
+Pak de ZIP NIET uit in OneDrive, Dropbox of Google Drive.
+OneDrive synct realtime en zet je config terug naar oudere versies.
+
+GOED:  C:\BitvavoBot\   of   D:\Trading\BitvavoBot\
+FOUT:  C:\Users\<naam>\OneDrive\...
+FOUT:  C:\Users\<naam>\Documents\...  (als Documents in OneDrive zit)
+
+
+================================================================
+  STAP 1 - Pak de ZIP uit
+================================================================
+
+Pak BitvavoBot_share.zip uit naar bv. C:\BitvavoBot\
+
+
+================================================================
+  STAP 2 - Python 3.11 of 3.12 installeren
+================================================================
+
+Download van https://python.org/downloads
+BELANGRIJK: vink "Add Python to PATH" aan tijdens installatie!
+
+
+================================================================
+  STAP 3 - Setup script draaien (een klik!)
+================================================================
+
+In de map C:\BitvavoBot\ vind je:   setup.bat
+
+DUBBELKLIK setup.bat
+
+Dit doet automatisch:
+  - Maakt de virtual environment (.venv) aan
+  - Installeert alle Python packages (xgboost, pandas, flask, etc.)
+  - Klaar in 3-5 minuten
+
+Als xgboost of lightgbm faalt: open PowerShell in de map en draai:
+   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+
+================================================================
+  STAP 4 - Bitvavo API keys aanmaken
+================================================================
+
+1. Ga naar https://account.bitvavo.com/user/api
+2. Maak een nieuwe key aan
+3. Geef ALLEEN: [v] View info  +  [v] Trade
+4. NOOIT [v] Withdrawals aanvinken!
+5. IP whitelist op je eigen IP (sterk aanbevolen)
+
+
+================================================================
+  STAP 5 - .env bestand aanmaken
+================================================================
+
+In de map C:\BitvavoBot\ ligt al .env.example
+Kopieer dit bestand en hernoem de kopie naar:   .env
+
+Open .env in notepad en vul in:
+
+   BITVAVO_API_KEY=jouw_eigen_key
+   BITVAVO_API_SECRET=jouw_eigen_secret
+   TELEGRAM_BOT_TOKEN=
+   TELEGRAM_CHAT_ID=
+
+Telegram velden mag je leeg laten (tenzij je meldingen wilt).
+
+
+================================================================
+  STAP 6 - LOKALE CONFIG VOOR 100 EURO PORTFOLIO
+================================================================
+
+In de ZIP zit:   bot_config_local.SAMPLE.json
+Dat bevat de FULL setup van mijn vriend (BASE=320 EUR, te groot voor 100 EUR).
+
+Voor JOUW 100 EUR portfolio gebruik je een AANGEPASTE versie.
+
+Open PowerShell (Start menu, typ "powershell", Enter) en doe:
+
+   $dst = "$env:LOCALAPPDATA\BotConfig"
+   New-Item -ItemType Directory -Path $dst -Force | Out-Null
+   notepad "$dst\bot_config_local.json"
+
+Notepad opent een leeg bestand. Plak DEZE config erin
+(speciaal afgesteld voor ~100 EUR, met budget-verdeling 70% trailing / 30% grid):
+
+----------------------------------------------------------------
+{
+    "_comment": "100 EUR portfolio - 70% trailing / 30% grid",
+    "WHITELIST_MARKETS": [
+        "SOL-EUR", "XRP-EUR", "ADA-EUR", "LINK-EUR", "AAVE-EUR",
+        "UNI-EUR", "LTC-EUR", "DOT-EUR", "AVAX-EUR", "DOGE-EUR",
+        "NEAR-EUR", "ATOM-EUR", "XLM-EUR", "BTC-EUR", "ETH-EUR"
+    ],
+    "EXCLUDED_MARKETS": [
+        "USDC-EUR", "USDT-EUR", "DAI-EUR", "EURC-EUR"
+    ],
+
+    "BASE_AMOUNT_EUR": 20.0,
+    "MAX_OPEN_TRADES": 3,
+    "MIN_SCORE_TO_BUY": 8,
+
+    "EXIT_MODE": "trailing_only",
+    "DEFAULT_TRAILING": 0.022,
+    "TRAILING_ACTIVATION_PCT": 0.025,
+    "STOP_LOSS_ENABLED": false,
+
+    "DCA_ENABLED": true,
+    "DCA_MAX_BUYS": 1,
+    "DCA_MAX_ORDERS": 1,
+    "DCA_DROP_PCT": 0.025,
+    "DCA_AMOUNT_EUR": 10,
+    "DCA_AMOUNT_RATIO": 0.5,
+    "DCA_SIZE_MULTIPLIER": 0.5,
+    "DCA_MIN_AMOUNT_EUR": 5,
+    "SMART_DCA_ENABLED": true,
+    "RSI_DCA_THRESHOLD": 100,
+    "MOMENTUM_FILTER_THRESHOLD": -8,
+    "DCA_MAX_BUYS_PER_ITERATION": 1,
+
+    "TAKE_PROFIT_ENABLED": false,
+    "TAKE_PROFIT_TARGETS": [0.03, 0.06, 0.1],
+    "TAKE_PROFIT_PERCENTAGES": [0.3, 0.35, 0.35],
+    "PARTIAL_TP_SELL_PCT_1": 0.3,
+    "PARTIAL_TP_SELL_PCT_2": 0.35,
+    "PARTIAL_TP_SELL_PCT_3": 0.35,
+
+    "CIRCUIT_BREAKER_MIN_WIN_RATE": 0.25,
+    "CIRCUIT_BREAKER_COOLDOWN_MINUTES": 120,
+
+    "MAX_TOTAL_EXPOSURE_EUR": 100,
+    "MIN_BALANCE_EUR": 5,
+    "REINVEST_ENABLED": true,
+    "CONFIG_HOT_RELOAD_SECONDS": 60,
+
+    "BUDGET_RESERVATION": {
+        "enabled": true,
+        "mode": "fixed",
+        "grid_pct": 30,
+        "trailing_pct": 70,
+        "reserve_pct": 0,
+        "min_reserve_eur": 5,
+        "grid_bot_max_eur": 30,
+        "trailing_bot_max_eur": 70,
+        "reinvest_grid_profits": true,
+        "reinvest_trailing_profits": true
+    },
+
+    "POSITION_SIZE_FLOOR_ENABLED": true,
+    "POSITION_SIZE_ABS_MIN_EUR": 10,
+    "POSITION_SIZE_SOFT_MIN_EUR": 8,
+    "POSITION_SIZE_HIGH_CONVICTION_SCORE": 14,
+    "MARKET_EV_SIZING_ENABLED": true,
+    "DUST_TRADE_THRESHOLD_EUR": 5,
+    "DUST_THRESHOLD_EUR": 5,
+
+    "GRID_TRADING": {
+        "enabled": false,
+        "preferred_markets": ["ETH-EUR"],
+        "num_grids": 8,
+        "grid_mode": "arithmetic",
+        "stop_loss_pct": 0.12,
+        "take_profit_pct": 0.1,
+        "trailing_tp_enabled": true,
+        "volatility_adaptive": true,
+        "max_grids": 1
+    },
+
+    "AI_AUTO_RETRAIN_ENABLED": true,
+    "AI_RETRAIN_INTERVAL_DAYS": 7,
+    "AI_RETRAIN_UTC_HOUR": "02:00",
+    "XGB_MODEL_PATH": "ai/ai_xgb_model.json",
+    "USE_LSTM": true,
+    "LLM_SUPERVISOR_ENABLED": true,
+    "LLM_SUPERVISOR_MODE": "shadow",
+    "LLM_SUPERVISOR_BACKEND": "rule",
+
+    "BAYESIAN_FUSION_ENABLED": true,
+    "META_LEARNER_ENABLED": true,
+    "MARKOV_REGIME_ENABLED": true,
+
+    "SIGNAL_PUBLISHER": {
+        "enabled": false,
+        "channel_id": "",
+        "bot_token": "",
+        "delay_seconds": 30,
+        "include_price": true,
+        "include_score": false,
+        "include_regime": true,
+        "affiliate_link": ""
+    },
+
+    "ALERT_STALE_SECONDS": 600,
+    "ALERT_DEDUPE_SECONDS": 7200,
+    "SCAN_WATCHDOG_SECONDS": 300,
+    "HEARTBEAT_STALE_ALERT_ENABLED": false,
+    "HODL_SCHEDULER": {"enabled": false}
+}
+----------------------------------------------------------------
+
+Sla op (Ctrl+S) en sluit notepad.
+
+UITLEG VAN DE BUDGET-VERDELING (zie BUDGET_RESERVATION):
+  - 70% van je 100 EUR (= 70 EUR) gaat naar trailing trading
+  - 30% van je 100 EUR (= 30 EUR) gaat naar grid trading
+  - 5 EUR minimum reserve houdt de bot vrij
+
+Met 70 EUR voor trailing en BASE=20 EUR + max 3 trades:
+  3 x 20 = 60 EUR (basis koop)
+  +1 DCA x 10 = 10 EUR (1 bijkoop bij dip)
+  Totaal: 70 EUR  - past precies in budget
+
+Wil je MEER trades of GROTERE trades? Verhoog je portfolio EERST naar
+bv. 200 EUR, dan kun je BASE_AMOUNT_EUR = 40 nemen.
+
+
+================================================================
+  STAP 7 - START DE BOT (een dubbelklik!)
+================================================================
+
+In de map C:\BitvavoBot\ vind je:   start_automated.bat
+
+DUBBELKLIK start_automated.bat
+
+Dit start AUTOMATISCH:
+  [*] Trading bot (main loop)
+  [*] Flask dashboard  -> http://localhost:5001
+  [*] AI Supervisor (LSTM + XGBoost)
+  [*] Monitoring daemon
+  [*] Auto backup service
+  [*] Auto retrain service (XGB wekelijks)
+  [*] Pairs arbitrage runner
+  [*] Scheduler (metrics, health checks)
+  [*] Health Monitor sidecar (refresh elke 15s)
+
+ALLES draait nu. Bot scant elke ~25 sec.
+Stoppen? Ctrl+C in het hoofdvenster.
+
+
+================================================================
+  STAP 8 - DASHBOARD OPENEN
+================================================================
+
+Het dashboard start AL automatisch met start_automated.bat.
+
+Open je browser op:   http://localhost:5001
+
+Daar zie je live:
+  - Portfolio waarde + EUR saldo
+  - Open trades met huidige winst/verlies
+  - Gesloten trades historie
+  - AI scores en signalen per markt
+  - Budget verdeling (trailing vs grid)
+  - Logs en errors
+
+Als dashboard NIET opent:
+  - Wacht 30 seconden na bot start
+  - Check of poort 5001 niet bezet is
+  - Of start losse: .\.venv\Scripts\python.exe -m tools.dashboard_flask.app
+
+
+================================================================
+  STAP 9 - GRID BOT INSCHAKELEN (voor je 100 EUR portfolio)
+================================================================
+
+Wacht eerst 1-2 dagen tot trailing bot stabiel draait. Dan grid aanzetten:
+
+1. Stop de bot (Ctrl+C in hoofdvenster).
+
+2. Open je local config:
+   notepad "$env:LOCALAPPDATA\BotConfig\bot_config_local.json"
+
+3. Zoek "GRID_TRADING" en wijzig:
+       "enabled": false   ->   "enabled": true
+
+   Met de instellingen die ik je gaf:
+   - 30 EUR budget (zie BUDGET_RESERVATION.grid_bot_max_eur)
+   - ETH-EUR als markt (rustige coin, perfect voor grid)
+   - 8 grids (levels)
+   - 12% stop-loss als prijs uit bereik valt
+   - 10% take-profit per gerealiseerde fill
+
+4. Sla op en herstart: dubbelklik start_automated.bat
+
+5. Check dashboard, tab "Grid":
+   - Actieve buy/sell orders per level
+   - Gerealiseerde winst per fill
+   - Of prijs binnen het bereik valt
+
+WAARSCHUWINGEN GRID:
+  - Bereik te smal -> prijs valt eruit, grid stopt -> coins blijven vast
+  - Bereik te breed -> weinig fills, lage winst
+  - GEBRUIK ALLEEN ETH/BTC/SOL voor grid, NOOIT memecoins
+  - Begin klein (30 EUR is prima voor 100 EUR portfolio)
+  - Houd 1-2 weken in de gaten voor je opschaalt
+
+
+================================================================
+  STAP 10 - 24/7 LATEN DRAAIEN?
+================================================================
+
+Zorg dat je PC NIET in slaapstand gaat:
+  Windows -> Instellingen -> Energie -> "Slaapstand: Nooit"
+
+Tip: laat start_automated.bat na reboot automatisch starten:
+  Win+R -> typ:  shell:startup  -> Enter
+  Sleep een snelkoppeling van start_automated.bat naar die map
+
+
+================================================================
+  OPTIONEEL: TELEGRAM MELDINGEN ACTIVEREN
+================================================================
+
+1. Open Telegram, zoek @BotFather
+2. /newbot, volg stappen, krijg een TOKEN
+3. Stuur jouw nieuwe bot een willekeurig bericht
+4. Open in browser:
+   https://api.telegram.org/bot<JOUW_TOKEN>/getUpdates
+5. Zoek "chat":{"id":<NUMMER>} -> dat is je chat_id
+6. Open .env en vul in:
+      TELEGRAM_BOT_TOKEN=jouw_token
+      TELEGRAM_CHAT_ID=jouw_chat_id
+7. Herstart de bot. Je krijgt nu meldingen bij koop/verkoop.
+
+
+================================================================
+  VEELVOORKOMENDE PROBLEMEN
+================================================================
+
+start_automated.bat sluit direct
+  -> .venv niet aanwezig. Eerst setup.bat draaien.
+
+Bot doet niks / koopt niet
+  -> EUR saldo voldoende? (minstens 70 EUR vrij voor trailing)
+  -> MIN_SCORE_TO_BUY = 8 is streng (correct, niet verlagen!)
+  -> Wacht: signalen zijn schaars, soms uren niets
+
+Config wijzigt niks
+  -> Edit je echt %LOCALAPPDATA%\BotConfig\bot_config_local.json?
+     notepad "$env:LOCALAPPDATA\BotConfig\bot_config_local.json"
+
+Module not found / ImportError
+  -> .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+AI / XGBoost errors bij start
+  -> Tijdelijk uitzetten in local config:
+     "USE_LSTM": false,
+     "LLM_SUPERVISOR_ENABLED": false
+
+Config wordt elke dag teruggezet
+  -> Bot staat in OneDrive. Verplaats naar C:\BitvavoBot\
+
+Heartbeat stale alerts
+  -> Al uit (HEARTBEAT_STALE_ALERT_ENABLED = false in jouw config)
+
+
+================================================================
+  EXTRA TIPS
+================================================================
+
+  - MIN_SCORE_TO_BUY = 8 (streng = veiliger). Verlaag dit NIET.
+  - MAX_OPEN_TRADES NOOIT lager dan 3 (bot werkt anders niet goed).
+  - Eerste 1-2 dagen: laat trailing draaien zonder grid.
+  - Bij twijfel: README.md en docs\FIX_LOG.md raadplegen.
+  - Bot draait 24/7, check 1x per dag dashboard.
+
+================================================================
+  SAMENVATTING - DE 4 KLIK-METHODE
+================================================================
+
+  1. setup.bat              -> installeert venv + packages (eenmalig)
+  2. .env aanmaken          -> Bitvavo API keys invullen
+  3. Local config maken     -> bovenstaande JSON in
+                              %LOCALAPPDATA%\BotConfig\bot_config_local.json
+  4. start_automated.bat    -> dubbelklik om alles te starten
+
+Bot draait. Dashboard op http://localhost:5001
+Klaar! Veel succes met 100 EUR portfolio.
+================================================================

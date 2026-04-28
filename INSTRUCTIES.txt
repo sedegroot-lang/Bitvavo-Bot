@@ -1,0 +1,234 @@
+================================================================
+  BITVAVO BOT — SETUP-INSTRUCTIES
+================================================================
+
+STAP 0 — BELANGRIJK: NIET IN ONEDRIVE!
+---------------------------------------
+Pak de ZIP NIET uit in OneDrive, Dropbox of Google Drive.
+OneDrive synct realtime en zet je config terug naar oudere versies
+→ bot doet dan rare dingen (verkeerde instellingen, slechte trades).
+
+GOED:  C:\BitvavoBot\   of   D:\Trading\BitvavoBot\
+FOUT:  ergens onder C:\Users\<naam>\OneDrive\...
+FOUT:  C:\Users\<naam>\Documents\...  (als Documents in OneDrive zit)
+
+
+STAP 1 — Pak de ZIP uit
+------------------------
+Pak BitvavoBot_share.zip uit naar bv. C:\BitvavoBot\
+Open daarna PowerShell in die map:
+  Shift + rechtermuisklik op de map → "PowerShell hier openen"
+
+
+STAP 2 — Python + venv
+------------------------
+Je hebt Python 3.11 of 3.12 nodig → https://python.org/downloads
+
+Voer dit in PowerShell uit:
+
+  cd C:\BitvavoBot
+  python -m venv .venv
+  .\.venv\Scripts\Activate.ps1
+  pip install --upgrade pip
+  pip install -r requirements.txt
+
+Duurt 2-5 minuten. Als xgboost of lightgbm faalt: prima, gewoon
+doorgaan — je zet AI straks toch uit.
+
+
+STAP 3 — Bitvavo API keys aanmaken
+------------------------------------
+1. Ga naar https://account.bitvavo.com/user/api
+2. Maak een nieuwe key aan
+3. Geef ALLEEN: [v] View info  +  [v] Trade
+4. NOOIT [v] Withdrawals aanvinken!
+5. IP whitelist op je eigen IP (aanrader)
+
+
+STAP 4 — .env bestand aanmaken
+--------------------------------
+Maak in C:\BitvavoBot\ een bestand met de naam:   .env
+(precies zo, géén extensie zoals .txt)
+
+Inhoud:
+
+  BITVAVO_API_KEY=jouw_eigen_key
+  BITVAVO_API_SECRET=jouw_eigen_secret
+  TELEGRAM_BOT_TOKEN=
+  TELEGRAM_CHAT_ID=
+
+Telegram regels mag je leeg laten als je geen meldingen wilt.
+
+
+STAP 5 — Lokale config aanmaken (HIER zet je AL je instellingen!)
+------------------------------------------------------------------
+De bot leest 3 lagen config, waarbij de LAATSTE wint:
+  1. config/bot_config.json          → defaults (NIET aanraken)
+  2. config/bot_config_overrides.json → legacy  (NIET aanraken)
+  3. %LOCALAPPDATA%\BotConfig\bot_config_local.json  ← HIER!
+
+Maak die laatste aan via PowerShell:
+
+  $dir = "$env:LOCALAPPDATA\BotConfig"
+  New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  '{}' | Out-File -Encoding utf8 "$dir\bot_config_local.json"
+  notepad "$dir\bot_config_local.json"
+
+Notepad opent het bestand. Ga door naar stap 6.
+
+
+STAP 6 — Veilige eerste config
+--------------------------------
+Plak dit in het bot_config_local.json bestand dat je opende:
+
+  {
+    "MAX_OPEN_TRADES": 3,
+    "BASE_INVESTMENT_EUR": 10,
+    "DCA_MAX": 0,
+    "MIN_SCORE_TO_BUY": 7.0,
+    "AI_ENABLED": false,
+    "GRID_ENABLED": false,
+    "TELEGRAM_ENABLED": false,
+    "HEARTBEAT_STALE_ALERT_ENABLED": false
+  }
+
+Sla op en sluit notepad.
+
+Betekenis:
+  - Max 3 trades tegelijk open
+  - 10 euro per trade (laag om te leren)
+  - Geen DCA, geen AI, geen grid, geen Telegram
+  - Zorg dat je minstens 45 EUR vrij hebt op Bitvavo (3 x 10 + reserve)
+
+
+STAP 7 — Bot starten
+----------------------
+  .\.venv\Scripts\python.exe trailing_bot.py
+
+Laat dit venster open! Bot scant elke ~25 sec en koopt automatisch
+als hij een goed signaal vindt.
+
+
+STAP 8 — Dashboard starten (apart venster)
+-------------------------------------------
+Nieuw PowerShell venster openen in C:\BitvavoBot:
+
+  .\.venv\Scripts\Activate.ps1
+  .\.venv\Scripts\python.exe -m tools.dashboard_flask.app
+
+Open in browser: http://127.0.0.1:5001
+Daar zie je live trades, portfolio, signalen en AI-status.
+
+
+================================================================
+  OPTIONEEL: GRID BOT INSCHAKELEN
+================================================================
+
+De grid bot handelt in een vast prijsbereik (bv. ETH tussen 2800
+en 3400 EUR). Pakt kleine winsten op zijwaartse markten.
+Kost extra EUR budget — hou daar rekening mee.
+
+GRID STAP 1 — Genoeg saldo
+---------------------------
+Grid heeft een eigen pot. Standaard 150-200 EUR.
+Zorg dat je naast je trailing-budget (3 x 10 = 30 EUR) ook
+minstens 150-200 EUR extra vrij hebt op Bitvavo.
+
+GRID STAP 2 — Grid config aanpassen
+-------------------------------------
+Open in je botmap:  config\grid_strategy_eth.json
+
+Bekijk deze velden:
+  "pair"         → bv. "ETH-EUR"  (kies een liquide coin)
+  "lower_price"  → ondergrens van je bereik
+  "upper_price"  → bovengrens van je bereik
+  "grid_count"   → aantal levels (10-20 is normaal)
+  "total_investment_eur" → totaal budget voor deze grid
+
+Tip: bekijk de 30-dagen grafiek op Bitvavo om een realistisch
+bereik te kiezen. Niet te smal, niet te breed.
+
+GRID STAP 3 — Grid aanzetten in local config
+---------------------------------------------
+Open notepad "$env:LOCALAPPDATA\BotConfig\bot_config_local.json"
+en vervang de inhoud door:
+
+  {
+    "MAX_OPEN_TRADES": 3,
+    "BASE_INVESTMENT_EUR": 10,
+    "DCA_MAX": 0,
+    "MIN_SCORE_TO_BUY": 7.0,
+    "AI_ENABLED": false,
+
+    "GRID_ENABLED": true,
+    "GRID_STRATEGY_FILE": "config/grid_strategy_eth.json",
+    "GRID_INVESTMENT_EUR": 150,
+    "GRID_MAX_OPEN_ORDERS": 10,
+
+    "TELEGRAM_ENABLED": false,
+    "HEARTBEAT_STALE_ALERT_ENABLED": false
+  }
+
+GRID STAP 4 — Bot herstarten
+------------------------------
+Stop de bot (Ctrl+C in trailing-bot venster) en start opnieuw:
+
+  .\.venv\Scripts\python.exe trailing_bot.py
+
+In de log zie je nu regels als [GRID] met buy/sell orders.
+
+GRID STAP 5 — Monitoren
+-------------------------
+Op http://127.0.0.1:5001 → tab "Grid":
+  - Actieve orders per level
+  - Gerealiseerde winst per fill
+  - Of prijs nog binnen je bereik zit
+
+GRID WAARSCHUWINGEN
+--------------------
+  - Bereik te smal  → prijs valt eruit, grid stopt, zit vast met coins
+  - Bereik te breed → weinig fills, lage winst
+  - Memecoins       → te volatiel voor grid, gebruik ETH/BTC/SOL
+  - Begin klein (100-150 EUR) en schaal pas op na 1-2 weken stabiele winst
+
+
+================================================================
+  VEELVOORKOMENDE PROBLEMEN
+================================================================
+
+Bot doet niks / koopt niet
+  → EUR saldo voldoende?  MIN_SCORE_TO_BUY niet te hoog (7.0)?
+
+Config wijzigt niks
+  → Edit je echt %LOCALAPPDATA%\BotConfig\bot_config_local.json?
+     Open met:  notepad "$env:LOCALAPPDATA\BotConfig\bot_config_local.json"
+
+Module not found / ImportError
+  → pip install -r requirements.txt  (opnieuw uitvoeren)
+
+AI / XGBoost errors
+  → Zet "AI_ENABLED": false  in local config
+
+Config keep reverting / worden dagelijks teruggezet
+  → Bot staat in OneDrive. Verplaats naar C:\BitvavoBot\
+
+Grid plaatst geen orders
+  → GRID_ENABLED: true?  Genoeg EUR?  Prijs binnen bereik?
+
+Heartbeat stale alerts
+  → Zet "HEARTBEAT_STALE_ALERT_ENABLED": false  in local config
+
+
+================================================================
+  EXTRA TIPS
+================================================================
+
+  - Start EERST 1-2 dagen ZONDER grid en met 10 EUR per trade
+  - Pas als alles draait schakel je grid in en verhoog je bedragen
+  - MIN_SCORE_TO_BUY = 7.0 is streng maar beschermt je kapitaal
+    → Verlaag dit NIET zomaar
+  - MAX_OPEN_TRADES mag NOOIT lager dan 3 (bot werkt anders niet goed)
+  - Lees README_VRIEND.md in de ZIP voor meer achtergrond
+  - Bij bugs: docs\FIX_LOG.md bevat alle bekende problemen en fixes
+
+================================================================

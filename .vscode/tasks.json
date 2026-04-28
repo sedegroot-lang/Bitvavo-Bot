@@ -1,0 +1,68 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Bot: run (foreground)",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": ["trailing_bot.py"],
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Bot: start_automated.bat (all subprocesses)",
+      "type": "shell",
+      "command": ".\\start_automated.bat",
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Tests: run all",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "pytest", "tests/", "-v"],
+      "group": { "kind": "test", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Tests: parallel (xdist)",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "pytest", "tests/", "-n", "auto", "-q"],
+      "group": "test"
+    },
+    {
+      "label": "Lint: ruff check",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "ruff", "check", "bot/", "core/", "modules/", "ai/", "tests/"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Format: ruff format + fix",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "ruff", "format", "bot/", "core/", "modules/", "ai/", "tests/"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Health check",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": ["scripts/helpers/ai_health_check.py"],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Agents demo (Ollama + LangGraph)",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": ["tools/agents_demo.py"],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Backup",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": ["scripts/auto_backup.py"]
+    }
+  ]
+}

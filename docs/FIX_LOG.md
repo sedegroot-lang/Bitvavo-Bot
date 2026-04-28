@@ -5,6 +5,24 @@
 
 ---
 
+## #052 — Repo-hygiëne sweep: 98 debug-scripts naar `scripts/debug/`, analyse-output naar `tmp/` (2026-04-28)
+
+### Symptom
+Project root had 98 `_*.py` debug-scripts en 35+ `_*.txt`/`_*.json`/`_*.log` analyse-bestanden. Repo-hygiëne score 4/10 — onmogelijk te navigeren, ze waren ook in workspace listings, geen import-relatie maar maakten root onleesbaar.
+
+### Fix
+- 98 `_*.py` verplaatst naar `scripts/debug/` (untracked, dus gewone `Move-Item`).
+- 37 `_*.txt`/`_*.json`/`_*.log`/`_*.html`/`_*.csv` verplaatst naar `tmp/` (gitignored).
+- `.gitignore` uitgebreid met `tmp/`, `_*.{txt,json,log,html,csv,old}`, `scripts/debug/_*.py`.
+- Geen test of module importeert ooit `_*.py` (geverifieerd met grep) — geen functioneel risico.
+- Toegevoegd: `.editorconfig`, `Makefile`, `.vscode/tasks.json`, `SETUP.md`.
+- `requirements.txt` opgesplitst in `-core.txt`, `-ml.txt`, `-dev.txt`.
+
+### Lesson
+Debug/analyse-scripts moeten vanaf dag 1 in een aparte map (`scripts/debug/` of `notebooks/scratch/`). Root-spam ontstaat sneller dan je denkt — voorkom door PR-review of pre-commit hook die `_*.py` in root weigert.
+
+---
+
 ## #051 — Stale saldo_errors uit archive triggerden Saldo Guard → DCA buy orders cancelled elke cycle (2026-04-28)
 
 ### Symptom

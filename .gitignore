@@ -123,3 +123,16 @@ scripts/helpers/heartbeat.json
 
 tools/external/
 data/llm_supervisor_log.jsonl
+
+# ==============================================
+# Debug scripts and analysis output (root underscore-prefixed)
+# ==============================================
+scripts/debug/_*.py
+tmp/
+_*.txt
+_*.json
+_*.log
+_*.html
+_*.csv
+_*.old
+

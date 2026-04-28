@@ -1,0 +1,11 @@
+# Dev tools — testing, linting, formatting
+# Install: pip install -r requirements-dev.txt
+pytest==9.0.2
+pytest-xdist>=3.8.0
+pluggy==1.6.0
+iniconfig==2.3.0
+hypothesis>=6.150.0
+ruff>=0.15.0
+mypy>=1.10.0
+bandit>=1.7.0
+pre-commit>=3.7.0
