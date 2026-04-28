@@ -15,10 +15,10 @@ import json
 import math
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 _ROOT = Path(__file__).resolve().parent.parent
 _DATA = _ROOT / "data"

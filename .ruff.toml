@@ -1,0 +1,23 @@
+line-length = 120
+target-version = "py313"
+extend-exclude = [
+    ".venv",
+    "__pycache__",
+    "_*.py",          # ad-hoc debug scripts in repo root
+    "build",
+    "dist",
+    "data",
+    "logs",
+]
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",  # line too long (matches existing flake8 config)
+    "E203",  # whitespace before ':' (Black-compatible)
+    "E741",  # ambiguous variable name (lots of l/h/c in indicators)
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["F401", "F841"]
+"trailing_bot.py" = ["F401", "F841"]   # legacy monolith — clean during refactor

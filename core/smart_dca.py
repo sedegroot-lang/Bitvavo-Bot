@@ -6,8 +6,7 @@ Instead of DCA at fixed price drops, waits for selling exhaustion (BB squeeze be
 
 from __future__ import annotations
 
-import math
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 
 def bollinger_bandwidth(closes: Sequence[float], window: int = 20, num_std: float = 2.0) -> Optional[float]:

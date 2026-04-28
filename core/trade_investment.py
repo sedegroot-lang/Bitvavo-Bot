@@ -15,7 +15,7 @@ NEVER mutate these fields directly on a trade dict. Always use this module.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 _log = logging.getLogger("trade_investment")
 

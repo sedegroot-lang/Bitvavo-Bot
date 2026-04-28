@@ -150,7 +150,7 @@ def get_market_signal(market: str) -> Dict[str, object]:
         if signal not in ("strong_bearish",):
             score_mod = min(score_mod, -2.0)
             should_skip = True
-            signal = f"btc_systemic_bearish"
+            signal = "btc_systemic_bearish"
 
     return {
         "rate": round(rate, 8),

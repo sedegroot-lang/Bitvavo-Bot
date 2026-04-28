@@ -6,10 +6,8 @@ All shared state accessed via ``bot.shared.state``.
 """
 from __future__ import annotations
 
-import json
 import os
 import time
-from typing import Any, Dict, List, Optional
 
 
 def _get_state():

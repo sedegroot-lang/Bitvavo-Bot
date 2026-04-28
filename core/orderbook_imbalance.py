@@ -20,7 +20,7 @@ Uses Bitvavo's public book API at depth 25 (available without auth).
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from modules.logging_utils import log
 

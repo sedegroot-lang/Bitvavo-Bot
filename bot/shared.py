@@ -16,7 +16,7 @@ Usage in extracted modules::
 from __future__ import annotations
 
 import threading
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List
 
 
 def _noop(*a: Any, **kw: Any) -> None:

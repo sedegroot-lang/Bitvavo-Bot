@@ -10,7 +10,7 @@ import json
 import os
 import time
 from decimal import Decimal, ROUND_DOWN
-from typing import Any, Dict, List, Optional
+from typing import Dict
 
 
 def _get_state():
@@ -383,7 +383,7 @@ def place_sell(market, amount_base, *, skip_dust: bool = False, sell_all: bool =
         now = time.time()
         if now - _BALANCE_API_FAILURE_TS > 60:
             _BALANCE_API_FAILURE_TS = now
-            log(f"Balance API returned None — skipping force-closes. Will retry later.", level='error')
+            log("Balance API returned None — skipping force-closes. Will retry later.", level='error')
         return {"error": "Balance API unavailable"}
 
     for asset in balances or []:
@@ -432,7 +432,6 @@ def place_sell(market, amount_base, *, skip_dust: bool = False, sell_all: bool =
 
                 if retries >= max_retries:
                     log(f"[saldo_error] {market}: {retries} retries bereikt, trade wordt gesloten", level='error')
-                    from bot.helpers import as_float
                     invested_eur = S.get_true_invested_eur(t, market=market)
                     partial_tp_returned = float(t.get('partial_tp_returned_eur', 0) or 0)
                     saldo_loss = -(invested_eur - partial_tp_returned)

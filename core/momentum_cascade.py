@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 

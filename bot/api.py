@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import copy
 import json
-import math
 import os
 import random
 import socket
@@ -15,7 +14,6 @@ import threading
 import time
 from collections import deque
 from decimal import Decimal, ROUND_DOWN
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from bot.helpers import as_bool, as_int, as_float

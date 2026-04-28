@@ -10,7 +10,7 @@ Stateless — caller provides BTC candles. Cheap to evaluate (last-N closes).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Optional, Sequence
+from typing import Mapping, Sequence
 
 
 @dataclass(slots=True)
