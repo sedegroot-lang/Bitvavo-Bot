@@ -5,6 +5,27 @@
 
 ---
 
+## #060 — Monolith split: validate_config() extracted to bot/startup_validation.py (2026-04-29)
+
+### Symptom
+Na #059 stond `bot/main_loop.py` als seam klaar, maar er was nog geen échte code-extractie uit `trailing_bot.py` (4635 regels). Eerste concrete monolith-reductie nodig om de pattern te bewijzen voor toekomstige extracties.
+
+### Fix
+- **`bot/startup_validation.py`** (NIEUW) — `validate_config(config: Mapping)` als pure functie; logt + returnt list van issues. Eerder ~70 regels logica in `trailing_bot.py`.
+- **`trailing_bot.py:validate_config`** — gereduceerd tot 4-regelige shim die `bot.startup_validation.validate_config(CONFIG)` aanroept.
+- **`tests/test_startup_validation.py`** (NIEUW) — 10 tests dekken alle 7 issue-takken + edge cases (lege config, ongeldige tier-entries).
+
+### Validation
+- 744 tests pass / 0 fail / 3 skip (was 734).
+- Bandit clean op nieuwe module.
+- Backwards-compatible: oude callsite `validate_config()` blijft werken.
+
+### Lesson
+- Veel "monolith functies" zijn al shims die naar `bot/`, `core/`, of `modules/` delegeren. Echte extractie-targets zijn pure functies die module-level globals lezen via dict-arg ipv globals.
+- Pure functies (geen state-mutatie) zijn de veiligste eerste extracties — testbaar zonder mocks.
+
+---
+
 ## #059 — Road-to-10 phase 2: conformal wiring, per-market trailing overrides, regime entry block, main_loop wrapper, Prometheus alert rules (2026-04-29)
 
 ### Symptom

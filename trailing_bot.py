@@ -787,68 +787,9 @@ ACCOUNT_OVERVIEW_FILE = Path(CONFIG.get('ACCOUNT_OVERVIEW_FILE', 'data/account_o
 # CONFIG VALIDATION (Issue #9)
 # ========================================
 def validate_config():
-    """
-    Validate CONFIG for contradictions & nonsensical combinations
-    Log warnings if detected
-    """
-    issues = []
-    
-    # 1. Whitelist + Blacklist overlap
-    wl = set(CONFIG.get('WHITELIST', []))
-    bl = set(CONFIG.get('BLACKLIST', []))
-    overlap = wl & bl
-    if overlap:
-        issues.append(f"CONFIG: Markets in both WHITELIST and BLACKLIST: {overlap}")
-    
-    # 2. TP_PCT_MIN > TP_PCT_MAX
-    tp_min = _as_float(CONFIG.get('TP_PCT_MIN'), 0.01)
-    tp_max = _as_float(CONFIG.get('TP_PCT_MAX'), 0.05)
-    if tp_min > tp_max:
-        issues.append(f"CONFIG: TP_PCT_MIN ({tp_min}) > TP_PCT_MAX ({tp_max})")
-    
-    # 3. TIERS max_buy < min_buy
-    tiers = CONFIG.get('TIERS', [])
-    for idx, tier in enumerate(tiers):
-        min_buy = _as_float(tier.get('min_buy'), 0)
-        max_buy = _as_float(tier.get('max_buy'), 9999)
-        if min_buy > max_buy:
-            issues.append(f"CONFIG: TIERS[{idx}] min_buy ({min_buy}) > max_buy ({max_buy})")
-    
-    # 4. DCA_MAX_BUYS < 1
-    dca_max = _as_int(CONFIG.get('DCA_MAX_BUYS'), 3)
-    if dca_max < 1:
-        issues.append(f"CONFIG: DCA_MAX_BUYS ({dca_max}) < 1")
-    
-    # 5. AI config contradictions
-    if _as_bool(CONFIG.get('AI_ENABLED'), False):
-        ai_min = _as_float(CONFIG.get('AI_MIN_CONFIDENCE'), 0.6)
-        ai_max = _as_float(CONFIG.get('AI_MAX_CONFIDENCE'), 1.0)
-        if ai_min > ai_max:
-            issues.append(f"CONFIG: AI_MIN_CONFIDENCE ({ai_min}) > AI_MAX_CONFIDENCE ({ai_max})")
-    
-    # 6. SESSION2: Risk limits sanity checks
-    max_exp = _as_float(CONFIG.get('MAX_TOTAL_EXPOSURE_EUR'), 9999)
-    base_amt = _as_float(CONFIG.get('BASE_AMOUNT_EUR'), 6)
-    max_trades = _as_int(CONFIG.get('MAX_OPEN_TRADES'), 5)
-    if max_exp >= 9000:
-        issues.append(f"CONFIG: MAX_TOTAL_EXPOSURE_EUR={max_exp} is effectively DISABLED (set to a real limit!)")
-    elif max_exp < base_amt * max_trades:
-        issues.append(f"CONFIG: MAX_TOTAL_EXPOSURE_EUR={max_exp} < BASE_AMOUNT_EUR*MAX_OPEN_TRADES ({base_amt*max_trades})")
-    daily_loss = _as_float(CONFIG.get('RISK_MAX_DAILY_LOSS'), 9999)
-    weekly_loss = _as_float(CONFIG.get('RISK_MAX_WEEKLY_LOSS'), 9999)
-    if daily_loss >= 9000:
-        issues.append(f"CONFIG: RISK_MAX_DAILY_LOSS={daily_loss} is effectively DISABLED")
-    if weekly_loss >= 9000:
-        issues.append(f"CONFIG: RISK_MAX_WEEKLY_LOSS={weekly_loss} is effectively DISABLED")
-    if daily_loss < 9000 and weekly_loss < 9000 and daily_loss > weekly_loss:
-        issues.append(f"CONFIG: RISK_MAX_DAILY_LOSS ({daily_loss}) > RISK_MAX_WEEKLY_LOSS ({weekly_loss})")
-    
-    if issues:
-        log("[CONFIG] Validation warnings:", level='warning')
-        for issue in issues:
-            log(f"  - {issue}", level='warning')
-    else:
-        log("[CONFIG] Validation passed: no contradictions found")
+    """Delegated to bot.startup_validation (monolith split — Road-to-10)."""
+    from bot.startup_validation import validate_config as _impl
+    return _impl(CONFIG)
 
 
 # ========================================
