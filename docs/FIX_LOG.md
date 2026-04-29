@@ -5,6 +5,55 @@
 
 ---
 
+## #053 — V2 dashboard toonde €1696 in posities terwijl bot 3 trades had (2026-04-29)
+
+### Symptom
+Gebruiker: *"In posities € 1.696,25 < dit klopt niet, is te hoog. 3 / 4 trades."*  
+Heartbeat zei `open_exposure_eur=1434.14` met 3 open trades, dashboard V2 toonde €1696.25 met 4 trades.
+
+### Root cause
+`tools/dashboard_v2/backend/main.py::_portfolio()` las `data/account_overview.json` (snapshot van ~90 min geleden, toen er nog 4 trades open waren). Snapshot werd niet vergeleken met fresh heartbeat data.
+
+### Fix
+Stale-detection toegevoegd: als heartbeat `ts` >300s nieuwer is dan overview `snapshot_ts`, gebruik `hb.open_exposure_eur` en `hb.open_trades` als bron i.p.v. de stale overview-velden.
+
+### Lesson
+Bij snapshot+stream architectuur ALTIJD freshness van snapshot vergelijken met latest stream-event vóór render. Heartbeat is single source of truth voor live exposure.
+
+---
+
+## #054 — V2 dashboard "TRAILING WACHT" label was misleidend (2026-04-29)
+
+### Symptom
+Gebruiker: *"bij RENDER en ENJ staat trailing wacht, waarom staat er trailing wacht terwijl de trailing niet is geactiveerd, ook staat er al een trailing stop bedrag."*
+
+### Root cause
+`_compute_trailing_stop()` zette `status_label="TRAILING WACHT"` voor de toestand "trailing was activated → highest crossed +1.8% boven buy → daarna zakte prijs terug onder buy". Klant las "wacht" als "is nog niet actief", terwijl het in werkelijkheid betekende "actief maar tijdelijk inactief omdat prijs onder buy zit".
+
+### Fix
+Status label hernoemd naar `"TRAILING TERUG ONDER BUY"` met inline comment in code. Frontend `tr.status_label` binding bijgewerkt zodat de oranje (`warn`) class op beide labels matcht.
+
+### Lesson
+Status-strings moeten zelfverklarend zijn. "WACHT" = ambigu. Geef altijd de oorzaak, niet alleen de toestand.
+
+---
+
+## #055 — Stale `data/grid_states.json` in repo terwijl `GRID_TRADING.enabled=False` (2026-04-29)
+
+### Symptom
+Gebruiker: *"ik krijg op telegram berichten over grid bot btc rebalance, maar er staat helemaal geen gridbot aan."*
+
+### Root cause
+`data/grid_states.json` bevatte een BTC-EUR grid van een eerdere sessie met `config.enabled=true` en 12 historical rebalances. Hoewel `trailing_bot.py` `auto_manage()` correct guard via globale `grid_enabled`, kunnen externe scripts die het state-file direct laden de Telegram alerts triggeren. Daarnaast geeft het in dashboard V2 verwarrende grid-tab data.
+
+### Fix
+`data/grid_states.json` verplaatst naar `data/grid_states.json.disabled-{ts}.bak`. Bot blijft veilig (file regenerates leeg op enable). Alle nieuwe alerts zijn nu eenduidig.
+
+### Lesson
+Wanneer een feature wordt uitgeschakeld (`enabled=false`), schoon ook persistent state op — niet alleen config. State files overleven config-disables en kunnen latente alerts triggeren.
+
+---
+
 ## #052 — Repo-hygiëne sweep: 98 debug-scripts naar `scripts/debug/`, analyse-output naar `tmp/` (2026-04-28)
 
 ### Symptom

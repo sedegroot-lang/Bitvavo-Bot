@@ -72,6 +72,43 @@ function dash() {
       if (inv && c.profit != null) return (c.profit / inv) * 100;
       return null;
     },
+
+    // ---------- PnL aggregation (today/this-week/this-month)
+    _pnlBucket(list, key, value) {
+      const row = (list || []).find(r => r && r[key] === value);
+      return row ? { pnl: +row.pnl || 0, trades: +row.trades || 0, fees: +row.fees || 0 } : { pnl: 0, trades: 0, fees: 0 };
+    },
+    get pnlToday() {
+      const d = new Date();
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      return this._pnlBucket(this.p.daily, 'day', key);
+    },
+    get pnlWeek() {
+      // ISO week — match backend's strftime('%V')
+      const d = new Date();
+      const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      const dayNr = (target.getUTCDay() + 6) % 7;
+      target.setUTCDate(target.getUTCDate() - dayNr + 3);
+      const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+      const week = 1 + Math.round(((target - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+      const key = `${target.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+      return this._pnlBucket(this.p.weekly, 'week', key);
+    },
+    get pnlMonth() {
+      const d = new Date();
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      return this._pnlBucket(this.p.monthly, 'month', key);
+    },
+    get avg7Day() {
+      const list = (this.p.daily || []).slice(-7);
+      if (!list.length) return 0;
+      return list.reduce((a, r) => a + (+r.pnl || 0), 0) / list.length;
+    },
+    get avg4Week() {
+      const list = (this.p.weekly || []).slice(-4);
+      if (!list.length) return 0;
+      return list.reduce((a, r) => a + (+r.pnl || 0), 0) / list.length;
+    },
     filteredClosed() {
       const f = (this.closedFilter || '').toLowerCase();
       const list = this.t.closed_recent || [];

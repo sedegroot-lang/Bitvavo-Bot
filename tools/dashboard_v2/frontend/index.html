@@ -164,6 +164,45 @@
           </div>
         </div>
 
+        <!-- PnL summary (Daily / Weekly / Monthly) -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">PnL overzicht</div>
+            <div class="card-action muted" x-text="'Realised PnL · ' + (p.trade_count ?? 0) + ' trades'"></div>
+          </div>
+          <div class="row-3">
+            <div class="kpi">
+              <div class="kpi-label">Vandaag</div>
+              <div class="kpi-value" :class="(pnlToday.pnl ?? 0) >= 0 ? 'pos' : 'neg'"
+                   x-text="fmtEur(pnlToday.pnl ?? 0)"></div>
+              <div class="kpi-trend muted"><span x-text="pnlToday.trades ?? 0"></span> trades · fees <span x-text="fmtEur(pnlToday.fees ?? 0)"></span></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Deze week</div>
+              <div class="kpi-value" :class="(pnlWeek.pnl ?? 0) >= 0 ? 'pos' : 'neg'"
+                   x-text="fmtEur(pnlWeek.pnl ?? 0)"></div>
+              <div class="kpi-trend muted"><span x-text="pnlWeek.trades ?? 0"></span> trades · fees <span x-text="fmtEur(pnlWeek.fees ?? 0)"></span></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Deze maand</div>
+              <div class="kpi-value" :class="(pnlMonth.pnl ?? 0) >= 0 ? 'pos' : 'neg'"
+                   x-text="fmtEur(pnlMonth.pnl ?? 0)"></div>
+              <div class="kpi-trend muted"><span x-text="pnlMonth.trades ?? 0"></span> trades · fees <span x-text="fmtEur(pnlMonth.fees ?? 0)"></span></div>
+            </div>
+          </div>
+          <div class="row-3" style="margin-top:8px">
+            <div class="muted" x-show="(p.daily ?? []).length > 1">
+              7-daags gem.: <b :class="avg7Day >= 0 ? 'pos' : 'neg'" x-text="fmtEur(avg7Day) + '/dag'"></b>
+            </div>
+            <div class="muted" x-show="(p.weekly ?? []).length > 1">
+              4-weeks gem.: <b :class="avg4Week >= 0 ? 'pos' : 'neg'" x-text="fmtEur(avg4Week) + '/week'"></b>
+            </div>
+            <div class="muted">
+              Totaal: <b :class="(p.total_realised_pnl_eur ?? 0) >= 0 ? 'pos' : 'neg'" x-text="fmtEur(p.total_realised_pnl_eur)"></b>
+            </div>
+          </div>
+        </div>
+
         <!-- Open positions (rich V1-style cards) -->
         <div class="card">
           <div class="card-head">
@@ -177,7 +216,7 @@
                 <div class="tc-head">
                   <div class="tc-symbol" x-text="tr.symbol || m.replace('-EUR','')"></div>
                   <div class="tc-status"
-                       :class="{trailing: tr.status_label==='TRAILING ACTIEF', warn: tr.status_label==='TRAILING WACHT', bad: tr.status_label==='HOOG VERLIES'}"
+                       :class="{trailing: tr.status_label==='TRAILING ACTIEF', warn: (tr.status_label==='TRAILING WACHT' || tr.status_label==='TRAILING TERUG ONDER BUY'), bad: tr.status_label==='HOOG VERLIES'}"
                        x-text="tr.status_label || 'ACTIEF'"></div>
                 </div>
 

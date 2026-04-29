@@ -220,12 +220,30 @@ def _portfolio() -> Dict[str, Any]:
     total_value = float(overview.get("total_account_value_eur") or 0)
     realised = round(total_pnl, 2)
 
+    # Prefer fresh heartbeat values when overview snapshot is stale (> 5 min old).
+    # The bot writes overview snapshots opportunistically; meanwhile heartbeat is
+    # refreshed every loop cycle (~25s) with the live exposure/open-trade count.
+    overview_ts = float(overview.get("snapshot_ts") or overview.get("ts") or 0)
+    hb_ts = float(hb.get("ts") or hb.get("timestamp") or 0)
+    asset_value = overview.get("open_trade_value_eur")
+    open_positions = overview.get("open_trade_count")
+    if hb_ts and (not overview_ts or (hb_ts - overview_ts) > 300):
+        hb_expo = hb.get("open_exposure_eur")
+        if hb_expo is not None:
+            asset_value = float(hb_expo)
+        hb_open = hb.get("open_trades")
+        if hb_open is not None:
+            try:
+                open_positions = int(hb_open)
+            except (TypeError, ValueError):
+                pass
+
     return {
         "total_account_value_eur": total_value,
         "eur_balance": overview.get("eur_available", hb.get("eur_balance")),
         "eur_in_orders": overview.get("eur_in_orders", 0),
-        "asset_value_eur": overview.get("open_trade_value_eur"),
-        "open_positions": overview.get("open_trade_count"),
+        "asset_value_eur": asset_value,
+        "open_positions": open_positions,
         "total_deposited_eur": total_deposited,
         "total_realised_pnl_eur": realised,
         "total_fees_eur": round(total_fees, 2),
@@ -376,10 +394,13 @@ def _trades() -> Dict[str, Any]:
             dca_distance_pct = max(0.0, (cur - dca_next_price) / cur * 100)
 
         # Status
+        # NOTE: 'TRAILING WACHT' = trailing was activated (price crossed +activation%)
+        # but has since dropped back below buy_price. Stop is shown for transparency,
+        # but it's above current price — bot waits for either a recovery or a fall to stop.
         if trailing_activated and (unrealised_pct or 0) >= 0:
             status = "TRAILING ACTIEF"
         elif trailing_activated:
-            status = "TRAILING WACHT"
+            status = "TRAILING TERUG ONDER BUY"
         elif (unrealised_pct or 0) <= -10:
             status = "HOOG VERLIES"
         elif (unrealised_pct or 0) >= 5:
