@@ -154,6 +154,27 @@ class DCAManager:
             self._record_dca_audit(market, trade, "skip", "no_current_price")
             return
 
+        # DCA_MIN_SCORE gate (Road-to-10 #061): skip DCA on positions opened with weak score.
+        # Default 0.0 = disabled (legacy behaviour). Roadmap recommends >= 12.0 for stricter DCA.
+        try:
+            _dca_min_score = float(self.ctx.config.get('DCA_MIN_SCORE', 0.0) or 0.0)
+        except Exception:
+            _dca_min_score = 0.0
+        if _dca_min_score > 0:
+            try:
+                _trade_score = float(trade.get('score', 0.0) or 0.0)
+            except Exception:
+                _trade_score = 0.0
+            if _trade_score < _dca_min_score:
+                self.ctx.log(
+                    f"DCA voor {market} overgeslagen: trade-score {_trade_score:.2f} < DCA_MIN_SCORE {_dca_min_score:.2f}"
+                )
+                self._record_dca_audit(
+                    market, trade, "skip", "score_below_min",
+                    {"trade_score": _trade_score, "min_score": _dca_min_score},
+                )
+                return
+
         # DCA cooldown after sync: skip DCA for 5 minutes after a position is synced
         # to prevent cascading DCAs from potentially inaccurate buy_price
         import time as _time_mod

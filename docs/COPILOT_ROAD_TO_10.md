@@ -37,13 +37,15 @@
 
 ### Fase 2 — Monoliet opsplitsen (`trailing_bot.py` 4911 regels → ~500)
 
-- [ ] Identificeer alle nog niet-geëxtraheerde verantwoordelijkheden (loop, scheduler, signal-orchestrator, partial-TP, DCA-trigger, regime-switch).
-- [ ] Maak `bot/main_loop.py` (de echte run-loop, dunne wrapper).
+- [x] Identificeer alle nog niet-geëxtraheerde verantwoordelijkheden (loop, scheduler, signal-orchestrator, partial-TP, DCA-trigger, regime-switch). _(inventaris gemaakt 2026-04-29)_
+- [x] Maak `bot/main_loop.py` (de echte run-loop, dunne wrapper). _(#059)_
 - [ ] Maak `bot/scheduler.py` (alle background threads/scheduled jobs).
 - [ ] Maak `bot/entry_pipeline.py` (signal scan → score → entry beslissing).
 - [ ] Maak `bot/exit_pipeline.py` (trailing/partial-TP/no-loss/sync).
+- [x] **`bot/order_cleanup.py`** (cancel_open_buys_if_capped + cancel_open_buys_by_age, ~180 regels) (#061)
+- [x] **`bot/startup_validation.py`** (validate_config) (#060)
 - [ ] `trailing_bot.py` wordt entrypoint van max 300 regels.
-- [ ] **Voor elke extractie:** schrijf integratie-test eerst, dan refactor.
+- [ ] **Voor elke extractie:** schrijf integratie-test eerst, dan refactor. _(13 tests bij #061, 10 tests bij #060)_
 
 ### Fase 3 — Observability (6.5 → 9.0) — 🟡 deels (Telegram + V2 PnL + JSON metrics)
 
@@ -69,9 +71,9 @@
 
 - [ ] **Limit-orders i.p.v. market** — recapture de 39% slippage.
 - [ ] **WebSocket prijs-feed** — sneller dan 25s polling (zie UNI-incident).
-- [ ] **DCA opnieuw evalueren** — uitschakelen of strikter (alleen sterk score >12).
+- [x] **DCA opnieuw evalueren** — `DCA_MIN_SCORE` gate toegevoegd in `modules/trading_dca.py` (#061). Default 0.0 = legacy. Aanbeveling: zet op 12.0+ in local config voor strikte DCA.
 - [ ] **Per-market parameters** — top performers (BTC/ETH/SOL) krijgen eigen trailing-config.
-- [ ] **Regime-aware entry** — entries blokkeren in `BEARISH` regime tenzij oversold.
+- [x] **Regime-aware entry** — entries blokkeren in `BEARISH` regime (#059, configurable via `BLOCK_ENTRY_REGIMES`).
 - [x] **Entry-Confidence framework** (6-pillar gating) — `bot/entry_confidence.py` + 23 tests + actief in local config (2026-04-29). Vervangt single-score filter met multi-dimensional kwaliteitscheck.
 
 ### Fase 6 — Deelbaarheid (5.5 → 9.0) — 🟡 deels
@@ -171,3 +173,7 @@
 | 2026-04-28 | Initiële versie | Copilot |
 | 2026-04-28 | Fase 1 ✅ (repo hygiene) + Fase 6 deels (SETUP.md, Docker), Fase 7 deels (.env check) | Copilot |
 | 2026-04-29 | 8 outdated tests fixed (719/719), CrewAI demo + MAPIE installed, V2 PnL overzicht + fresh exposure fix, stale grid_states.json verplaatst, score 7.0→7.9 | Copilot |
+| 2026-04-29 | #058 MLOps backbone (feature store, registry, walk-forward, demo, drift, shadow report, conformal, Grafana, ghcr.io, bandit clean) | Copilot |
+| 2026-04-29 | #059 Phase 2 wiring (conformal calls, per-market trailing, regime entry block, main_loop seam, alert rules) | Copilot |
+| 2026-04-29 | #060 First monolith extraction: validate_config → bot/startup_validation.py | Copilot |
+| 2026-04-29 | #061 Second monolith extraction: cancel_open_buys_* → bot/order_cleanup.py + DCA_MIN_SCORE gate | Copilot |

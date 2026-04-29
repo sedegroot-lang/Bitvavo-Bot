@@ -1401,11 +1401,13 @@ def get_supported_markets():
     return _api.get_supported_markets()
 
 def cancel_open_buys_if_capped():
-    """Proactively cancel outstanding open BUY orders when (open+reserved+pending) >= MAX_OPEN_TRADES.
+    """Shim → bot.order_cleanup.cancel_open_buys_if_capped (extracted #061)."""
+    from bot.order_cleanup import cancel_open_buys_if_capped as _impl
+    return _impl()
 
-    Only cancels orders for markets not yet present in open_trades to avoid interfering
-    with DCA or partial fills. Skips grid trading orders. Best-effort: logs and continues on errors.
-    """
+
+def _cancel_open_buys_if_capped_legacy():
+    """LEGACY (kept for reference, not invoked)."""
     try:
         max_trades = max(1, int(CONFIG.get('MAX_OPEN_TRADES', 5)))
         current = count_active_open_trades(threshold=DUST_TRADE_THRESHOLD_EUR)
@@ -1476,14 +1478,13 @@ def cancel_open_buys_if_capped():
 
 
 def cancel_open_buys_by_age():
-    """Cancel outstanding BUY limit orders older than LIMIT_ORDER_TIMEOUT_SECONDS.
+    """Shim → bot.order_cleanup.cancel_open_buys_by_age (extracted #061)."""
+    from bot.order_cleanup import cancel_open_buys_by_age as _impl
+    return _impl()
 
-    Behavior:
-    - Only considers buy side orders with status new/open/partiallyfilled
-    - Skips markets already present in `open_trades` (avoid DCA/partial-fill interference)
-    - Uses order field `created` (Bitvavo milliseconds epoch) when available; skips orders without timestamp
-    - Honors LIMIT_ORDER_CANCEL_BEHAVIOR, but currently only implements 'cancel_only'
-    """
+
+def _cancel_open_buys_by_age_legacy():
+    """LEGACY (kept for reference, not invoked)."""
     try:
         timeout = int(CONFIG.get('LIMIT_ORDER_TIMEOUT_SECONDS', 0) or 0)
         if timeout <= 0:

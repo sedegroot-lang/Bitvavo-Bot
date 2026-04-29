@@ -5,7 +5,32 @@
 
 ---
 
-## #060 — Monolith split: validate_config() extracted to bot/startup_validation.py (2026-04-29)
+## #061 — Monolith split #2: order_cleanup extracted + DCA_MIN_SCORE gate (2026-04-29)
+
+### Symptom
+Roadmap fase 2 (monoliet opsplitsen) en fase 5 (DCA strikter) waren beide nog open. `cancel_open_buys_if_capped` + `cancel_open_buys_by_age` (~180 regels) zaten nog in `trailing_bot.py`. DCA had geen score-floor: een trade met score 4 kreeg dezelfde DCA-behandeling als een score-15 trade.
+
+### Fix
+1. **`bot/order_cleanup.py`** (NIEUW) — beide cancel-functies geëxtraheerd; gebruiken `bot.shared.state` voor alle deps (CONFIG, bitvavo, log, metrics_collector, OPERATOR_ID, count_active_open_trades, _get_pending_count, count_pending_bitvavo_orders, get_active_grid_markets). Grid-protection identiek (markt+orderId allowlist).
+2. **`trailing_bot.py`** — beide functies gereduceerd tot 3-regelige shims; legacy bodies hernoemd `_*_legacy` (ongebruikt).
+3. **`modules/trading_dca.py`** — `DCA_MIN_SCORE` config check toegevoegd in `handle_trade()` direct na enabled/price-checks. Default 0.0 = disabled (legacy gedrag). Wanneer `> 0`, slaat DCA over voor trades met `trade.get('score') < DCA_MIN_SCORE` met log + audit-entry `score_below_min`.
+4. **`tests/test_order_cleanup_and_dca_min_score.py`** (NIEUW) — 13 tests:
+   - 5 voor `cancel_open_buys_if_capped` (under-cap skip, capped cancel, market-already-open, grid-protect, sell-side skip)
+   - 5 voor `cancel_open_buys_by_age` (timeout=0 disabled, old cancel, fresh keep, market-type skip, no-timestamp skip)
+   - 3 voor `DCA_MIN_SCORE` (block on low score, allow on high score, no-op when threshold=0)
+
+### Validation
+- 757 tests pass / 0 fail / 3 skip (was 744).
+- `py_compile bot/order_cleanup.py trailing_bot.py modules/trading_dca.py` clean.
+- Backwards-compatible: oude config zonder `DCA_MIN_SCORE` gedraagt zich identiek.
+
+### Lesson
+- Tweede monoliet-extractie was makkelijker dan de eerste omdat `bot.shared.state` al alle deps had (bitvavo, OPERATOR_ID, metrics_collector, grid helpers). Pattern is nu: zoek functie → check shared state heeft de deps → schrijf module met `from bot.shared import state` → vervang body door shim.
+- Configurable thresholds met sane default (0 = off) maakt nieuwe gates risk-vrij om te shippen.
+
+---
+
+
 
 ### Symptom
 Na #059 stond `bot/main_loop.py` als seam klaar, maar er was nog geen échte code-extractie uit `trailing_bot.py` (4635 regels). Eerste concrete monolith-reductie nodig om de pattern te bewijzen voor toekomstige extracties.

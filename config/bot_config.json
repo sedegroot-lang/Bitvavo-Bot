@@ -69,7 +69,6 @@
     "PYUSD-EUR",
     "EURC-EUR",
     "USDCV-EUR",
-    "ZEUS-EUR",
     "SOL-EUR"
   ],
   "SIGNAL_PUBLISHER": {
@@ -112,7 +111,19 @@
     "ONDO-EUR",
     "HBAR-EUR",
     "BTC-EUR",
-    "ETH-EUR"
+    "ETH-EUR",
+    "VET-EUR",
+    "JUP-EUR",
+    "SEI-EUR",
+    "TIA-EUR",
+    "POL-EUR",
+    "ARB-EUR",
+    "OP-EUR",
+    "WLD-EUR",
+    "ZEUS-EUR",
+    "HYPE-EUR",
+    "PUMP-EUR",
+    "PEPE-EUR"
   ],
   "DCA_MAX_ORDERS": 2,
   "ENABLE_STOP_LOSS": false,
@@ -156,5 +167,9 @@
   "LLM_SUPERVISOR_MODE": "shadow",
   "LLM_SUPERVISOR_BACKEND": "rule",
   "SCAN_WATCHDOG_SECONDS": 300,
-  "HEARTBEAT_STALE_ALERT_ENABLED": false
+  "HEARTBEAT_STALE_ALERT_ENABLED": false,
+  "ENTRY_CONFIDENCE_ENABLED": true,
+  "ENTRY_CONFIDENCE_MIN": 0.55,
+  "ENTRY_CONFIDENCE_RANK_ONLY": false,
+  "_REGIME_ENTRY_BLOCKED": false
 }

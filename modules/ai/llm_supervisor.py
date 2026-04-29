@@ -83,11 +83,23 @@ def _rule_backend(ctx: SupervisorContext) -> SupervisorVerdict:
     risk_score = 0.0
 
     # CORE RULE (uit threshold-sweep over 57 historical trades met features):
-    #   "score<14 AND RSI in [52,60]" → +€6.31 (+12.5%) delta vs baseline.
+    #   "marginale score AND RSI in [52,60]" → +€6.31 (+12.5%) delta vs baseline.
     #   Reden: dit zijn lage-conviction entries in RSI-danger-zone waar
     #   alle 5 historische verliezers in vielen.
-    if 0 < ctx.score < 14 and 52 <= ctx.rsi <= 60:
-        reasons.append(f"low score {ctx.score:.1f} + RSI {ctx.rsi:.1f} danger-zone")
+    # FIX (29-04-2026): drempel was hardcoded op 14, terwijl effectieve
+    #   entry-drempel adaptief is (~8). Score 12.9 = HOGE conviction maar werd
+    #   ten onrechte als "low" gelabeld. Nu absoluut + configureerbaar.
+    #   Default cutoff = 11.0: alles boven 11 is conviction, alleen 0..11
+    #   wordt als marginaal beschouwd in de RSI danger-zone.
+    try:
+        from modules.config import CONFIG as _CFG
+        _low_cutoff = float(_CFG.get("LLM_SUP_LOW_SCORE_CUTOFF", 11.0))
+    except Exception:
+        _low_cutoff = 11.0
+    if 0 < ctx.score < _low_cutoff and 52 <= ctx.rsi <= 60:
+        reasons.append(
+            f"marginal score {ctx.score:.1f} (<{_low_cutoff:.1f}) + RSI {ctx.rsi:.1f} danger-zone"
+        )
         risk_score += 0.55  # auto-veto
 
     # Aanvullende risk-bumpers (kunnen veto triggeren bij combinaties):
