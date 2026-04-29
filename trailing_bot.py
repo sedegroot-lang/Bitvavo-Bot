@@ -2007,6 +2007,22 @@ async def bot_loop():
     last_dca_reconcile = start_time  # Track Bitvavo DCA reconcile (SSOT)
 
     while RUNNING:
+        # External kill-switch via dashboard / scripts: data/shutdown.flag
+        try:
+            _kill_flag = Path('data') / 'shutdown.flag'
+            if _kill_flag.exists():
+                log("🛑 data/shutdown.flag detected — graceful shutdown requested via dashboard kill-switch.", level='warning')
+                try:
+                    save_trades()
+                except Exception as _ks_save_err:
+                    log(f"Save during kill-switch failed: {_ks_save_err}", level='error')
+                try:
+                    send_message("🛑 Bot stopped via dashboard kill-switch")
+                except Exception:
+                    pass
+                break
+        except Exception:
+            pass
         # Auto-stop for dry-run sanity tests
         if STOP_AFTER_SECONDS and (time.time() - start_time) >= STOP_AFTER_SECONDS:
             log(f"⏱️ STOP_AFTER_SECONDS reached ({STOP_AFTER_SECONDS}s), stopping bot loop.")
@@ -3616,6 +3632,11 @@ async def bot_loop():
                 _confs = [(_s[1], (_s[4] or {}).get('entry_confidence'), (_s[4] or {}).get('entry_weakest_pillar')) for _s in scored]
                 _summary = ", ".join(f"{m}:{(c or 0):.2f}({w or '-'})" for m, c, w in _confs[:8])
                 log(f"[ENTRY_CONF] candidates={len(scored)} {_summary}", level='info')
+                try:
+                    from modules.event_logger import log_event as _log_event
+                    _log_event("entry_conf_scan", candidates=len(scored), top=[(m, round((c or 0), 4), w) for m, c, w in _confs[:5]])
+                except Exception:
+                    pass
                 if ec_enabled:
                     before_n = len(scored)
                     if ec_rank_only:

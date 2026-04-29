@@ -1474,6 +1474,124 @@ def refresh() -> Dict[str, Any]:
     return {"ok": True, "ts": time.time()}
 
 
+# -------------------------------------------------------------------- Prometheus metrics
+
+
+def _prom_format(name: str, value: Any, help_text: str = "", typ: str = "gauge", labels: Optional[Dict[str, str]] = None) -> str:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return ""
+    lines = []
+    if help_text:
+        lines.append(f"# HELP {name} {help_text}")
+    lines.append(f"# TYPE {name} {typ}")
+    if labels:
+        lbl = ",".join(f'{k}="{str(v)}"' for k, v in labels.items())
+        lines.append(f"{name}{{{lbl}}} {v}")
+    else:
+        lines.append(f"{name} {v}")
+    return "\n".join(lines)
+
+
+@app.get("/metrics")
+def prometheus_metrics():
+    """Prometheus exposition format. Scrape-friendly text/plain."""
+    from fastapi.responses import PlainTextResponse
+    try:
+        hb = _heartbeat()
+        pf = _portfolio()
+        perf = _performance()
+        out: List[str] = []
+        out.append(_prom_format("bitvavo_bot_online", 1 if hb.get("bot_online") else 0,
+                                "Bot heartbeat is fresh (<180s)"))
+        out.append(_prom_format("bitvavo_bot_ai_online", 1 if hb.get("ai_online") else 0,
+                                "AI supervisor heartbeat is fresh (<600s)"))
+        out.append(_prom_format("bitvavo_heartbeat_age_seconds",
+                                hb.get("age_seconds") or 0,
+                                "Seconds since last bot heartbeat"))
+        out.append(_prom_format("bitvavo_open_trades", hb.get("open_trades") or pf.get("open_trades") or 0,
+                                "Currently open trades count"))
+        out.append(_prom_format("bitvavo_open_exposure_eur",
+                                hb.get("open_exposure_eur") or pf.get("exposure_eur") or 0,
+                                "EUR exposure across open positions"))
+        out.append(_prom_format("bitvavo_eur_cash",
+                                hb.get("eur_balance") or pf.get("eur_cash") or 0,
+                                "Free EUR balance"))
+        out.append(_prom_format("bitvavo_total_account_value_eur",
+                                pf.get("total_value_eur") or 0,
+                                "Total account value (cash + positions)"))
+        out.append(_prom_format("bitvavo_total_pnl_eur",
+                                pf.get("total_pnl_eur") or 0,
+                                "Cumulative realised PnL"))
+        out.append(_prom_format("bitvavo_total_fees_eur",
+                                pf.get("total_fees_eur") or 0,
+                                "Cumulative paid fees"))
+        out.append(_prom_format("bitvavo_win_rate",
+                                perf.get("win_rate") or 0,
+                                "Win rate over closed trades [0..1]"))
+        out.append(_prom_format("bitvavo_total_closed_trades",
+                                perf.get("total_trades") or 0,
+                                "Total number of closed trades", typ="counter"))
+        body = "\n".join([s for s in out if s]) + "\n"
+        return PlainTextResponse(body, media_type="text/plain; version=0.0.4")
+    except Exception as exc:
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(f"# error {exc}\n", status_code=500, media_type="text/plain")
+
+
+# -------------------------------------------------------------------- Kill switch
+
+
+SHUTDOWN_FLAG = DATA / "shutdown.flag"
+
+
+@app.post("/api/admin/shutdown")
+def admin_shutdown(body: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Request graceful bot shutdown by writing data/shutdown.flag.
+
+    Bot loop checks for this flag and exits cleanly. Token-protected via
+    `KILL_SWITCH_TOKEN` env var (if set).
+    """
+    expected = os.getenv("KILL_SWITCH_TOKEN", "").strip()
+    if expected:
+        provided = (body or {}).get("token", "")
+        if provided != expected:
+            raise HTTPException(status_code=403, detail="invalid token")
+    try:
+        SHUTDOWN_FLAG.parent.mkdir(parents=True, exist_ok=True)
+        SHUTDOWN_FLAG.write_text(json.dumps({
+            "requested_ts": time.time(),
+            "reason": (body or {}).get("reason", "manual"),
+        }), encoding="utf-8")
+        return {"ok": True, "flag": str(SHUTDOWN_FLAG)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.delete("/api/admin/shutdown")
+def admin_clear_shutdown() -> Dict[str, Any]:
+    """Clear an existing shutdown.flag (allows bot to be started again)."""
+    try:
+        if SHUTDOWN_FLAG.exists():
+            SHUTDOWN_FLAG.unlink()
+            return {"ok": True, "removed": True}
+        return {"ok": True, "removed": False}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/admin/shutdown")
+def admin_shutdown_status() -> Dict[str, Any]:
+    if SHUTDOWN_FLAG.exists():
+        try:
+            payload = json.loads(SHUTDOWN_FLAG.read_text(encoding="utf-8"))
+        except Exception:
+            payload = {}
+        return {"shutdown_requested": True, **payload}
+    return {"shutdown_requested": False}
+
+
 # -------------------------------------------------------------------- Static
 
 

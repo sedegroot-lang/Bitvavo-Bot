@@ -47,9 +47,9 @@
 
 ### Fase 3 — Observability (6.5 → 9.0) — 🟡 deels (Telegram + V2 PnL + JSON metrics)
 
-- [ ] Eén dashboard (kies `dashboard_flask` óf `dashboard_v2`, niet beide).
-- [ ] **Structured logging (JSON-lines)** in `logs/events.jsonl` — eenvoudig filterbaar.
-- [ ] **Prometheus exporter** op `:9100/metrics` (open_trades, equity, win_rate, slippage_pct). _(JSON metrics op `/api/metrics` werkt, Prometheus formaat nog niet)_
+- [ ] Eén dashboard (kies `dashboard_flask` óf `dashboard_v2`, niet beide). ik kies V2 op http://127.0.0.1:5002/, verwijder de andere.
+- [x] **Structured logging (JSON-lines)** in `logs/events.jsonl` via `modules/event_logger.py` — thread-safe, never raises (2026-04-29).
+- [x] **Prometheus exporter** op dashboard V2 `/metrics` — bot_online, open_trades, exposure, equity, pnl, fees, win_rate (2026-04-29). _(reuse V2 process; geen aparte port nodig)_
 - [ ] **Grafana dashboard JSON** in `docs/grafana/`.
 - [x] **Telegram daily report** met: equity, P/L, # trades, win rate, top/bottom market, missed signals (zoals UNI). _(deels: telegram_summary.py bestaat)_
 - [x] **V2 dashboard PnL overzicht** (dagelijks/wekelijks/maandelijks) — toegevoegd 2026-04-29.
@@ -72,6 +72,7 @@
 - [ ] **DCA opnieuw evalueren** — uitschakelen of strikter (alleen sterk score >12).
 - [ ] **Per-market parameters** — top performers (BTC/ETH/SOL) krijgen eigen trailing-config.
 - [ ] **Regime-aware entry** — entries blokkeren in `BEARISH` regime tenzij oversold.
+- [x] **Entry-Confidence framework** (6-pillar gating) — `bot/entry_confidence.py` + 23 tests + actief in local config (2026-04-29). Vervangt single-score filter met multi-dimensional kwaliteitscheck.
 
 ### Fase 6 — Deelbaarheid (5.5 → 9.0) — 🟡 deels
 
@@ -85,7 +86,7 @@
 
 - [x] **Secrets via env**, nooit in `.json` (geen API-keys in OneDrive!). _(`.env` confirmed niet in git, 2026-04-28)_
 - [ ] **`bandit` schoon** — alle warnings opgelost.
-- [ ] **Kill-switch endpoint** op dashboard (graceful shutdown van bot).
+- [x] **Kill-switch endpoint** `POST/GET/DELETE /api/admin/shutdown` schrijft `data/shutdown.flag`; bot loop checkt en stopt graceful (2026-04-29). Optionele `KILL_SWITCH_TOKEN` env var beveiliging.
 - [ ] **Healthcheck** voor `docker compose` en `systemd`.
 - [ ] **Rate-limit metrics** zichtbaar — alert bij >80% van quota.
 

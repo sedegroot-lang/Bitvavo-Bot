@@ -5,7 +5,21 @@
 
 ---
 
-## #056 — Entry-Confidence framework: 6-pillar gating om underwater trades aan de bron te voorkomen (2026-04-29)
+## #057 — Road-to-10: Prometheus exporter + kill-switch + structured JSON events (2026-04-29)
+
+### Symptom
+Roadmap items uit Fase 3 (observability) en Fase 7 (veiligheid) waren nog open: geen Prometheus formaat, geen externe kill-switch, geen structured JSON event log.
+
+### Fix
+1. **`GET /metrics` op dashboard V2** — Prometheus exposition format met `bitvavo_bot_online`, `bitvavo_bot_ai_online`, `bitvavo_heartbeat_age_seconds`, `bitvavo_open_trades`, `bitvavo_open_exposure_eur`, `bitvavo_eur_cash`, `bitvavo_total_account_value_eur`, `bitvavo_total_pnl_eur`, `bitvavo_total_fees_eur`, `bitvavo_win_rate`, `bitvavo_total_closed_trades`. Hergebruikt bestaande `_heartbeat()/_portfolio()/_performance()` accessors — geen extra subprocess of port nodig.
+2. **`POST/GET/DELETE /api/admin/shutdown`** — schrijft `data/shutdown.flag`. Bot loop checkt het flag bij elke cycle-start en doet graceful shutdown (save trades + Telegram bericht). Optionele `KILL_SWITCH_TOKEN` env var voor token-protected POST.
+3. **`modules/event_logger.py`** — `log_event(event, **fields)` schrijft thread-safe JSON-lines naar `logs/events.jsonl` (override via `BOT_EVENTS_LOG`). Nooit raises, ook niet bij invalid path. Gewired aan entry-confidence scan.
+4. **6 nieuwe unit tests** (`tests/test_event_logger.py`) — single line, multi append, non-serializable, thread safety (200 concurrent writes), invalid-path safety.
+
+### Lesson
+Observability + safety scoort hoog op risico/reward bij kleine code-investering: ~150 regels en je krijgt scrape-friendly metrics, externe kill-switch en JSON-event audit trail. Hergebruik van bestaande dashboard process voorkomt aparte port/proces management.
+
+
 
 ### Symptom
 Drie open trades (RENDER 6.3d, XLM 1.5d, ENJ 1.5d) zaten onder water. FIX #003 verbiedt time-based exits en verlies-sells, dus de enige weg is **betere entries**. Gebruiker vroeg: *"pas de allerbeste signal confidence toe en test."*
