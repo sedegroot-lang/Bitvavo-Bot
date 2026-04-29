@@ -3606,6 +3606,30 @@ async def bot_loop():
                 log(f"[SHADOW] Error: {_shadow_err}", level='debug')
 
 
+        # ── Entry Confidence Gate (passive log + optional gating) ──
+        try:
+            ec_enabled = bool(CONFIG.get('ENTRY_CONFIDENCE_ENABLED', False))
+            ec_min = float(CONFIG.get('ENTRY_CONFIDENCE_MIN', 0.55))
+            ec_rank_only = bool(CONFIG.get('ENTRY_CONFIDENCE_RANK_ONLY', False))
+            if scored:
+                # Always log distribution so we have data even when disabled
+                _confs = [(_s[1], (_s[4] or {}).get('entry_confidence'), (_s[4] or {}).get('entry_weakest_pillar')) for _s in scored]
+                _summary = ", ".join(f"{m}:{(c or 0):.2f}({w or '-'})" for m, c, w in _confs[:8])
+                log(f"[ENTRY_CONF] candidates={len(scored)} {_summary}", level='info')
+                if ec_enabled:
+                    before_n = len(scored)
+                    if ec_rank_only:
+                        # Re-sort by entry_confidence (highest first); keep all
+                        scored.sort(key=lambda x: float(((x[4] or {}).get('entry_confidence') or 0.0)), reverse=True)
+                        log(f"[ENTRY_CONF] rank-only: re-sorted {before_n} candidates by confidence", level='info')
+                    else:
+                        # Hard filter by min threshold
+                        scored = [s for s in scored if float(((s[4] or {}).get('entry_confidence') or 0.0)) >= ec_min]
+                        scored.sort(key=lambda x: float(((x[4] or {}).get('entry_confidence') or 0.0)), reverse=True)
+                        log(f"[ENTRY_CONF] gated: {before_n} → {len(scored)} (min_conf={ec_min:.2f})", level='info')
+        except Exception as _ec_err:
+            log(f"[ENTRY_CONF] gate error: {_ec_err}", level='debug')
+
         # Trades openen via async
         await open_trades_async(scored, eur_balance)
 

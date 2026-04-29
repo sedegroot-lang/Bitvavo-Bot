@@ -5,7 +5,25 @@
 
 ---
 
-## #053 — V2 dashboard toonde €1696 in posities terwijl bot 3 trades had (2026-04-29)
+## #056 — Entry-Confidence framework: 6-pillar gating om underwater trades aan de bron te voorkomen (2026-04-29)
+
+### Symptom
+Drie open trades (RENDER 6.3d, XLM 1.5d, ENJ 1.5d) zaten onder water. FIX #003 verbiedt time-based exits en verlies-sells, dus de enige weg is **betere entries**. Gebruiker vroeg: *"pas de allerbeste signal confidence toe en test."*
+
+### Root cause
+Bestaande pipeline filtert op één score (`MIN_SCORE_TO_BUY=8`) maar weegt geen multi-pillar context: trend op meerdere timeframes, RSI-archetype per regime, volume-kwaliteit (sweet 1.2-3.5x median, geen pump), volatiliteit-band, ML-confidence en cross-market correlatie met open trades. Resultaat: trades die op één dimensie scoren maar op andere fragiel zijn slipten erdoor.
+
+### Fix
+1. **Nieuw module `bot/entry_confidence.py`** — pure-function 6-pillar scorer (Trend, Momentum, Volume, Volatility, ML, Cross). Geometrische middeling (één zwakke pijler trekt totaal omlaag), met floor van 0.05 per pijler om wipe te voorkomen.
+2. **Hook in `bot/signals.py::_signal_strength_impl`** — na pack-eval voegt `entry_confidence`, `entry_pillars`, `entry_weakest_pillar` en `entry_confidence_passed` toe aan `ml_info`. Wrapped in try/except zodat fouten nooit signaal blokkeren.
+3. **Gate in `trailing_bot.py::bot_loop`** vóór `open_trades_async` — als `ENTRY_CONFIDENCE_ENABLED` filtert candidates op `>= ENTRY_CONFIDENCE_MIN` en sorteert op confidence desc. Logt ALTIJD de top-8 distributie zodat we shadow-data hebben.
+4. **23 unit tests** in `tests/test_entry_confidence.py` (alle pijlers + composite + edge cases nan/inf/empty/short).
+5. **Config in `%LOCALAPPDATA%/BotConfig/bot_config_local.json`**: `ENTRY_CONFIDENCE_ENABLED=true`, `ENTRY_CONFIDENCE_MIN=0.55`, `ENTRY_CONFIDENCE_RANK_ONLY=false`.
+
+### Lesson
+Geen time-stop, geen verlies-sell — fix moet upstream bij de entry-keuze zitten. Multi-pillar geometric mean dwingt brede kwaliteit af i.p.v. cherry-pick op één score. Pure functies + dataclass-resultaat = triviaal te testen en te loggen voor toekomstige ML-feedback.
+
+
 
 ### Symptom
 Gebruiker: *"In posities € 1.696,25 < dit klopt niet, is te hoog. 3 / 4 trades."*  

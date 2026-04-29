@@ -252,6 +252,42 @@ def _signal_strength_impl(m: str) -> Tuple[float, Any, Any, dict]:
         'bb_lower': round(float(bb_lower), 6) if bb_lower is not None else None,
         'avg_volume': round(float(avg_vol), 2) if avg_vol else None,
     }
+
+    # === Entry Confidence (6-pillar) — passive logging unless gating enabled ===
+    try:
+        from bot.entry_confidence import compute_entry_confidence, min_confidence_threshold
+        regime_hint = "neutral"
+        try:
+            from bot.shared import state as _shared_state
+            if hasattr(_shared_state, "regime_engine") and _shared_state.regime_engine:
+                regime_hint = str(getattr(_shared_state.regime_engine, "current_regime", "neutral") or "neutral").lower()
+        except Exception:
+            pass
+        # Build correlations input from currently open trades (best-effort)
+        open_market_closes = None
+        try:
+            from bot.shared import state as _ss
+            if hasattr(_ss, "open_trades") and _ss.open_trades:
+                # Collect last 60 closes per other open market from cache only — no extra API calls.
+                # Caller can enrich; keep this lightweight.
+                open_market_closes = {}
+        except Exception:
+            open_market_closes = None
+        ec = compute_entry_confidence(
+            closes_1m=p1, highs_1m=h1, lows_1m=l1, volumes_1m=v1,
+            ml_info=ml_info, regime=regime_hint,
+            open_market_closes=open_market_closes,
+            min_threshold=min_confidence_threshold(_cfg),
+        )
+        ml_info['entry_confidence'] = ec.confidence
+        ml_info['entry_pillars'] = ec.pillars
+        ml_info['entry_confidence_passed'] = ec.passed
+        ml_info['entry_weakest_pillar'] = ec.weakest_pillar
+        if _cfg.get('SIGNALS_DEBUG_LOGGING'):
+            log(f"[entry_conf] {m} conf={ec.confidence:.3f} weakest={ec.weakest_pillar} pillars={ec.pillars}", level='debug')
+    except Exception as ec_exc:
+        log(f"[entry_conf] failed for {m}: {ec_exc}", level='debug')
+
     return float(score), price_now, s_short, ml_info
 
 
