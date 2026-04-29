@@ -3131,6 +3131,21 @@ async def bot_loop():
                 # Block new buys in bearish regime
                 if _regime_adj.get('base_amount_mult', 1.0) <= 0:
                     log(f"[REGIME] 🔴 BEARISH regime – all new entries BLOCKED", level='warning')
+                # ── Configurable entry block per regime (BLOCK_ENTRY_REGIMES) ──
+                # Schema: ["HIGH_VOLATILITY", "BEARISH"] (case-insensitive)
+                try:
+                    _blocked_regimes = CONFIG.get('BLOCK_ENTRY_REGIMES') or []
+                    if isinstance(_blocked_regimes, list) and _blocked_regimes:
+                        _blocked_set = {str(x).strip().upper() for x in _blocked_regimes}
+                        if str(_regime_name).strip().upper() in _blocked_set:
+                            CONFIG['_REGIME_ENTRY_BLOCKED'] = True
+                            log(f"[REGIME] 🚫 Entries blocked by BLOCK_ENTRY_REGIMES (regime={_regime_name})", level='warning')
+                        else:
+                            CONFIG['_REGIME_ENTRY_BLOCKED'] = False
+                    else:
+                        CONFIG['_REGIME_ENTRY_BLOCKED'] = False
+                except Exception:
+                    CONFIG['_REGIME_ENTRY_BLOCKED'] = False
             except Exception as _regime_err:
                 log(f"[REGIME] Error: {_regime_err}", level='debug')
 
@@ -3398,7 +3413,13 @@ async def bot_loop():
                     log(f"[REGIME] {m}: Entry blocked (bearish regime)", level='info')
                     markets_skipped += 1
                     continue
-                
+
+                # ── Configurable regime entry block (BLOCK_ENTRY_REGIMES) ──
+                if CONFIG.get('_REGIME_ENTRY_BLOCKED'):
+                    log(f"[REGIME] {m}: Entry blocked by BLOCK_ENTRY_REGIMES policy", level='info')
+                    markets_skipped += 1
+                    continue
+
                 # ── Correlation Shield: block if portfolio is too correlated ──
                 if _corr_block_entries:
                     try:

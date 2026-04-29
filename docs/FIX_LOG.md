@@ -5,6 +5,32 @@
 
 ---
 
+## #059 — Road-to-10 phase 2: conformal wiring, per-market trailing overrides, regime entry block, main_loop wrapper, Prometheus alert rules (2026-04-29)
+
+### Symptom
+Na #058 stonden nog 4 items open: MAPIE conformal helper bestond maar werd niet aangeroepen vanuit `bot/signals.py`, geen per-market trailing override mechanisme, geen configurable regime entry block (alleen hardcoded BEARISH), geen `bot/main_loop.py` seam voor monolith-extractie, en geen Prometheus alert rules YAML naast het Grafana JSON.
+
+### Fix
+1. **`ai/conformal.py`** — `save_calibrator()/load_calibrator()/enrich_ml_info()` toegevoegd; memoised disk-load van `models/conformal_calibrator.pkl`, no-op zonder MAPIE.
+2. **`bot/signals.py`** — na entry-confidence block roept `enrich_ml_info(ml_info, X=features)` aan; voegt `ml_calibrated` + `ml_conf_interval_width` toe aan ml_info zonder te breken als calibrator ontbreekt.
+3. **`bot/trailing.py`** — `MARKET_TRAILING_OVERRIDES` schema gelezen voor zowel `base_trailing_pct` als `stepped_levels` per markt; per-market wint van regime override wint van trade-level wint van DEFAULT.
+4. **`trailing_bot.py`** — `BLOCK_ENTRY_REGIMES` config (lijst van regime-namen); zet `_REGIME_ENTRY_BLOCKED` flag, gecheckt vlak na bearish-block in entry-loop, slaat market over met log.
+5. **`bot/main_loop.py`** (NIEUW) — thin wrapper die `trailing_bot.bot_loop` re-exporteert + `run(once=False)` runner. Seam waar geleidelijke monolith-extractie kan landen.
+6. **`docs/grafana/prometheus_alerts.yml`** (NIEUW) — 4 groups / 9 alerts: BotOffline, HeartbeatStale, NoOpenTrades, ExposureSpike, DrawdownDeep, RateLimitNearExhaustion (>80%), RateLimitExhausted (>95%), AIOffline.
+7. **`tests/test_road_to_10_phase2.py`** (NIEUW) — 6 tests, 100% pass.
+
+### Validation
+- 728 tests pass / 0 fail (pre-fase 2), 6 nieuwe tests pass = 734 totaal.
+- Geen errors op `bot/signals.py`, `bot/trailing.py`, `bot/main_loop.py`, `ai/conformal.py`, `trailing_bot.py`.
+- Bot draait door op zelfde PID; configurabele opties default off (backwards-compatible).
+
+### Lesson
+- Als je een module-skeleton publiceert (zoals MAPIE conformal in #058), verifieer dat het ergens wordt aangeroepen — anders is het dood gewicht.
+- Per-market overrides MOETEN ook stepped_levels respecteren, niet alleen `base_trailing_pct`.
+- Configurabele regime blocks moeten een persistente flag op CONFIG zetten zodat ze in de scan-loop zonder lookup beschikbaar zijn.
+
+---
+
 ## #058 — Road-to-10 sweep: feature store, model registry, walk-forward, demo mode, drift monitor, shadow report, conformal wrapper, Grafana, Docker healthcheck, ghcr.io CI, bandit clean, rate-limit metrics (2026-04-29)
 
 ### Symptom

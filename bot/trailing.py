@@ -576,6 +576,20 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                 except Exception:
                     base_percent = DEFAULT_TRAILING
 
+                # ── Per-market trailing override (MARKET_TRAILING_OVERRIDES) ──
+                # Schema: { "BTC-EUR": { "base_trailing_pct": 0.015,
+                #                         "stepped_levels": [{"profit_pct":..,"trailing_pct":..}, ...] } }
+                try:
+                    _per_market = _cfg.get("MARKET_TRAILING_OVERRIDES") or {}
+                    _market_key = m if isinstance(m, str) else (trade.get("market") if isinstance(trade, dict) else None)
+                    _market_cfg = _per_market.get(_market_key) if isinstance(_per_market, dict) and _market_key else None
+                    if isinstance(_market_cfg, dict):
+                        _override_base = _market_cfg.get("base_trailing_pct")
+                        if _override_base is not None and float(_override_base) > 0:
+                            base_percent = float(_override_base)
+                except Exception:
+                    pass
+
                 # ── Regime Engine: apply trailing_pct_override ──
                 try:
                     _regime_adj = _cfg.get("_REGIME_ADJ") or {}
@@ -597,6 +611,17 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                         {"profit_pct": 0.25, "trailing_pct": 0.004},
                         {"profit_pct": 0.35, "trailing_pct": 0.003},
                     ])
+                    # Per-market stepped override wins if present
+                    try:
+                        _per_market = _cfg.get("MARKET_TRAILING_OVERRIDES") or {}
+                        _market_key = m if isinstance(m, str) else (trade.get("market") if isinstance(trade, dict) else None)
+                        _market_cfg = _per_market.get(_market_key) if isinstance(_per_market, dict) and _market_key else None
+                        if isinstance(_market_cfg, dict):
+                            _override_steps = _market_cfg.get("stepped_levels")
+                            if isinstance(_override_steps, list) and _override_steps:
+                                stepped_levels = _override_steps
+                    except Exception:
+                        pass
                     if buy is not None and buy > 0 and used_high > buy:
                         profit_pct = (used_high - buy) / buy
                         for level in reversed(stepped_levels):

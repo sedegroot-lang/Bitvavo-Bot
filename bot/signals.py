@@ -288,6 +288,20 @@ def _signal_strength_impl(m: str) -> Tuple[float, Any, Any, dict]:
     except Exception as ec_exc:
         log(f"[entry_conf] failed for {m}: {ec_exc}", level='debug')
 
+    # === Conformal interval (MAPIE) — optional, no-op if calibrator absent ===
+    try:
+        from ai.conformal import enrich_ml_info as _enrich_conformal
+        _X_conf = None
+        try:
+            if 'features' in locals() and features is not None:
+                _X_conf = np.asarray(features, dtype=float)
+        except Exception:
+            _X_conf = None
+        _enrich_conformal(ml_info, X=_X_conf)
+    except Exception:
+        ml_info.setdefault('ml_calibrated', False)
+        ml_info.setdefault('ml_conf_interval_width', None)
+
     return float(score), price_now, s_short, ml_info
 
 

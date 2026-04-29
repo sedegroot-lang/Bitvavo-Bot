@@ -1,0 +1,93 @@
+# Prometheus alerting rules for the Bitvavo bot.
+#
+# Drop this file into your Prometheus config and reference it from prometheus.yml:
+#   rule_files:
+#     - /etc/prometheus/rules/bitvavo_bot_alerts.yml
+#
+# The bot exposes Prometheus metrics at http://<dashboard>:5002/metrics
+# (FastAPI dashboard V2). All gauges live under the bitvavo_* namespace.
+
+groups:
+  - name: bitvavo_bot_health
+    interval: 30s
+    rules:
+      - alert: BotOffline
+        expr: bitvavo_bot_online == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bitvavo bot is offline (no heartbeat)"
+          description: "bitvavo_bot_online has been 0 for >2m. Check trailing_bot.py process and watchdog."
+
+      - alert: HeartbeatStale
+        expr: bitvavo_heartbeat_age_s > 180
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Heartbeat is stale ({{ $value }}s)"
+          description: "Bot has not written heartbeat for >180s. Possible deadlock or rate-limit storm."
+
+      - alert: NoOpenTrades
+        expr: bitvavo_open_trades == 0
+        for: 6h
+        labels:
+          severity: info
+        annotations:
+          summary: "Bot has no open trades for 6h"
+          description: "Long idle period. Verify MIN_SCORE_TO_BUY, MAX_OPEN_TRADES, and EUR balance."
+
+  - name: bitvavo_bot_risk
+    interval: 30s
+    rules:
+      - alert: ExposureSpike
+        expr: bitvavo_open_exposure_eur > 5000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Open exposure above €5,000"
+          description: "Open exposure {{ $value }} EUR. Check MAX_OPEN_TRADES and BASE_AMOUNT_EUR."
+
+      - alert: DrawdownDeep
+        expr: bitvavo_portfolio_drawdown_pct < -10
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Portfolio drawdown below -10%"
+          description: "Drawdown {{ $value }}%. Manual review required."
+
+  - name: bitvavo_bot_ratelimit
+    interval: 15s
+    rules:
+      - alert: RateLimitNearExhaustion
+        expr: bitvavo_ratelimit_usage_ratio > 0.80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Bitvavo rate-limit bucket {{ $labels.bucket }} >80%"
+          description: "Usage {{ $value | humanizePercentage }}. Risk of HTTP 429. Reduce scan rate or extend caching."
+
+      - alert: RateLimitExhausted
+        expr: bitvavo_ratelimit_usage_ratio > 0.95
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bitvavo rate-limit bucket {{ $labels.bucket }} >95%"
+          description: "Imminent HTTP 429. Bot will throttle automatically but trades may be missed."
+
+  - name: bitvavo_bot_ai
+    interval: 60s
+    rules:
+      - alert: AIOffline
+        expr: bitvavo_ai_online == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI supervisor offline"
+          description: "ai_supervisor.py daemon not reporting. Auto-retrain and rule suggestions paused."
