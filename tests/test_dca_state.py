@@ -251,11 +251,16 @@ class TestSyncDerivedFields:
         dca_buys_repairs = [r for r in repairs if "dca_buys" in r]
         assert len(dca_buys_repairs) == 0
 
-    def test_sync_dca_max_preserved(self):
-        """FIX #008: per-trade dca_max is preserved, not forced to global config."""
+    def test_sync_dca_max_synced_to_global(self):
+        """FIX #030b: dca_max syncs to global config so config changes take effect on existing trades.
+
+        (Supersedes earlier FIX #008 preservation: dca_max is the per-trade cap and must
+        track the global DCA_MAX_BUYS so existing trades see config updates.)
+        """
         trade = _make_trade(dca_max=17)
         state, repairs = sync_derived_fields(trade, dca_max=5)
-        assert trade["dca_max"] == 17  # preserved, not overridden
+        assert trade["dca_max"] == 5  # synced to global config
+        assert any("dca_max" in r for r in repairs)
 
     def test_sync_last_dca_price(self):
         """last_dca_price corrected from events."""
@@ -314,19 +319,22 @@ class TestInflatedDCABuys:
     """sync_engine wrote dca_buys from buy_order_count → must correct."""
 
     def test_dca_buys_17_no_events_preserved(self):
-        """FIX #008: XRP dca_buys=17 with zero events — preserved (historical buys)."""
+        """FIX #008: XRP dca_buys=17 with zero events — preserved (historical buys).
+
+        NOTE: dca_max syncs to global (FIX #030b), but dca_buys remains preserved.
+        """
         trade = _make_trade(dca_buys=17, dca_events=[], dca_max=17)
         state, repairs = sync_derived_fields(trade, dca_max=5)
         assert trade["dca_buys"] == 17  # preserved
-        assert trade["dca_max"] == 17   # per-trade preserved
+        assert trade["dca_max"] == 5    # synced to global (FIX #030b)
 
     def test_dca_buys_17_with_3_events_preserved(self):
-        """NEAR had dca_buys=17, 3 real events — 17 preserved (>= 3)."""
+        """NEAR had dca_buys=17, 3 real events — 17 preserved (>= 3). dca_max syncs to global."""
         events = [_make_event(i + 1) for i in range(3)]
         trade = _make_trade(dca_buys=17, dca_events=events, dca_max=17)
         state, repairs = sync_derived_fields(trade, dca_max=5)
         assert trade["dca_buys"] == 17  # max(3 events, 17 stored)
-        assert trade["dca_max"] == 17   # per-trade preserved
+        assert trade["dca_max"] == 5    # synced to global (FIX #030b)
 
     def test_dca_buys_preserved_when_higher_than_events(self):
         """Stored dca_buys higher than events count is preserved."""

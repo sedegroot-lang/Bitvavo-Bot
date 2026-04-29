@@ -40,10 +40,23 @@ def test_get_total_deposited_falls_back_to_stored_total(monkeypatch):
 
 
 def test_calculate_portfolio_totals_uses_deposits_and_balance(monkeypatch):
-    """Test portfolio totals use deposits and balance correctly."""
+    """Test portfolio totals use deposits and balance correctly.
+
+    Production code computes total_account_value from ALL Bitvavo balances
+    × live prices. The mock must therefore include both EUR AND the underlying
+    coin balance (with its live price) so live_total reflects reality.
+    """
     monkeypatch.setattr(app, "get_total_deposited", lambda: 100.0)
-    # Mock get_cached_balances to return controlled data
-    monkeypatch.setattr(app, "get_cached_balances", lambda: [{"symbol": "EUR", "available": 25.0, "inOrder": 0}])
+    # Mock get_cached_balances: EUR=25 + BTC=1 (priced at 50)
+    monkeypatch.setattr(
+        app,
+        "get_cached_balances",
+        lambda: [
+            {"symbol": "EUR", "available": 25.0, "inOrder": 0},
+            {"symbol": "BTC", "available": 1.0, "inOrder": 0},
+        ],
+    )
+    monkeypatch.setattr(app, "get_live_price", lambda market: 50.0 if market == "BTC-EUR" else None)
     cards = [
         {"invested": 40.0, "current_value": 50.0, "pnl": 10.0, "pnl_pct": 25.0},
     ]

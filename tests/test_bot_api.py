@@ -201,9 +201,8 @@ class TestGetCurrentPrice:
 
     def test_returns_none_on_failure(self):
         with patch.object(_api, '_fetch_price_once', return_value=None):
-            # Also mock the disk cache
-            with patch('bot.api.Path') as mock_path:
-                mock_path.return_value.exists.return_value = False
+            # Also mock the disk cache via os.path.exists (bot.api uses os.path, not pathlib.Path)
+            with patch('bot.api.os.path.exists', return_value=False):
                 result = _api.get_current_price("NOEXIST-EUR", force_refresh=True)
                 # May return None or cached value
                 assert result is None or isinstance(result, float)
