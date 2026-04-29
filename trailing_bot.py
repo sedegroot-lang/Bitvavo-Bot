@@ -1087,27 +1087,16 @@ def send_alert(msg):
         log(f"[ERROR] send_alert failed: {e}", level='error')
 
 def _start_heartbeat_monitor():
-    if monitoring_manager is None:
-        return
-    monitoring_manager.start_heartbeat_monitor(
-        send_alert,
-        alert_stale_seconds=ALERT_STALE_SECONDS,
-        interval=60,
-    )
+    """Shim → bot.scheduler.start_heartbeat_monitor (#062)."""
+    from bot.scheduler import start_heartbeat_monitor as _impl
+    return _impl(alert_stale_seconds=ALERT_STALE_SECONDS, interval=60)
 
 
 def _start_heartbeat_writer(interval=30):
-    """Daemon thread that periodically writes HEARTBEAT_FILE with timestamp and summary info.
-
-    Uses atomic write (tmp -> replace) to avoid partial files.
-    """
-    if monitoring_manager is None:
-        return
-    monitoring_manager.start_heartbeat_writer(
-        lambda: dict(open_trades),  # Return snapshot copy to avoid race conditions
-        _get_pending_markets_dict,
+    """Shim → bot.scheduler.start_heartbeat_writer (#062)."""
+    from bot.scheduler import start_heartbeat_writer as _impl
+    return _impl(
         interval=interval,
-        dust_threshold_eur=DUST_TRADE_THRESHOLD_EUR,
         scan_stats_provider=lambda: {
             **CONFIG.get('LAST_SCAN_STATS', {}),
             'regime': CONFIG.get('_REGIME_RESULT', {}).get('regime'),
@@ -1115,13 +1104,11 @@ def _start_heartbeat_writer(interval=30):
         },
     )
 
+
 def _start_reservation_watchdog(interval=30):
-    if monitoring_manager is None:
-        return
-    monitoring_manager.start_reservation_watchdog(
-        _get_pending_markets_dict,
-        interval=interval,
-    )
+    """Shim → bot.scheduler.start_reservation_watchdog (#062)."""
+    from bot.scheduler import start_reservation_watchdog as _impl
+    return _impl(interval=interval)
 
 # =========================
 # UTILS
@@ -4802,6 +4789,8 @@ def _init_shared_state():
         dca_manager=dca_manager,
         synchronizer=synchronizer,
         metrics_collector=metrics_collector,
+        monitoring_manager=monitoring_manager,
+        liquidation_manager=liquidation_manager,
         _reservation_manager=_reservation_manager,
         _perf=_perf,
         _clamp=_clamp,

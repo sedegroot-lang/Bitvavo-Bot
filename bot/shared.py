@@ -143,6 +143,8 @@ class _SharedState:
     dca_manager: Any = None
     synchronizer: Any = None
     metrics_collector: Any = None
+    monitoring_manager: Any = None
+    liquidation_manager: Any = None
     _reservation_manager: Any = None
 
     # ── Performance ─────────────────────────────────────────

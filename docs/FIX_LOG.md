@@ -5,6 +5,40 @@
 
 ---
 
+## #062 — Road-to-10 fase 3-5 sweep: scheduler/ws_price_feed/entry_pipeline + ML cron (2026-04-29)
+
+### Symptom
+Roadmap fase 3 (extracten verder) + fase 5 (WS feed + walk-forward + drift cron) stonden nog open. Heartbeat/reservation watchdog/auto_sync orchestratie zat nog hardcoded in `trailing_bot.py`. Geen WS-stub om incrementeel naar push-prices te bewegen. Geen geünificeerde entry-decision helper. Walk-forward + drift_monitor scripts bestonden maar werden nooit getriggerd.
+
+### Fix
+1. **`bot/scheduler.py`** (NIEUW) — `start_heartbeat_monitor`, `start_heartbeat_writer`, `start_reservation_watchdog`, `start_all_schedulers()`. Idempotent, no-op wanneer `state.monitoring_manager` ontbreekt.
+2. **`bot/ws_price_feed.py`** (NIEUW) — `WSPriceFeed` scaffold: `start/stop/get_last_price`, module-level `latest_price/latest_book` cache met TTL. Default disabled via `WS_PRICE_FEED_ENABLED=false`. Detecteert ontbrekende `newWebsocket()` automatisch en blijft REST-only zonder te crashen.
+3. **`bot/entry_pipeline.py`** (NIEUW) — `decide_entry()` + `decide_order_type()`: pure decision helpers (geen I/O), retourneren `EntryDecision`. Honoreert `LIMIT_ORDER_PREFER` + auto-spread switch (limit bij <0.1% spread, anders market).
+4. **`scripts/scheduled_ml_jobs.py`** (NIEUW) — daily cron-runner voor `drift_monitor` + `backtest.walk_forward`; alerts naar Telegram + `logs/ml_drift_alert.txt`; resultaten naar `data/walk_forward_history.jsonl`.
+5. **`trailing_bot.py`** — `_start_heartbeat_monitor/writer/reservation_watchdog` gereduceerd tot 3-regelige shims naar `bot.scheduler`.
+6. **`bot/shared.py`** — `monitoring_manager` + `liquidation_manager` velden toegevoegd aan `_SharedState` zodat scheduler ze via state kan bereiken.
+7. **`tests/test_road_to_10_phase3.py`** — 15 nieuwe tests (scheduler facade, WS price cache + TTL, entry_pipeline beslislogica + order_type routing).
+
+### Lessons learned
+- `state.log` heeft een no-op default die `print` is en geen `level=` kwarg accepteert; tests moeten `state.log = MagicMock()` zetten voor modules die `level='debug'` loggen.
+- Scheduler-extractie was 100% mechanisch want bestaande functies waren al shims naar `monitoring_manager`. Pure win, nul gedragsverandering.
+- WS feed laat default `WS_PRICE_FEED_ENABLED=false` — nul risico voor productie tot we expliciet enablen + meten.
+
+### Tests
+772 pass, 0 fail, 3 skip (was 757) — +15 nieuwe road-to-10 phase3 tests.
+
+### Files
+- `bot/scheduler.py` (NIEUW)
+- `bot/ws_price_feed.py` (NIEUW)
+- `bot/entry_pipeline.py` (NIEUW)
+- `scripts/scheduled_ml_jobs.py` (NIEUW)
+- `tests/test_road_to_10_phase3.py` (NIEUW)
+- `trailing_bot.py` (3 shims)
+- `bot/shared.py` (+2 fields)
+- `docs/FIX_LOG.md` (#062)
+
+---
+
 ## #061 — Monolith split #2: order_cleanup extracted + DCA_MIN_SCORE gate (2026-04-29)
 
 ### Symptom
