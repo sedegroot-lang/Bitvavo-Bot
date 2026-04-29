@@ -236,6 +236,7 @@ class TestDCAEvents:
         assert old_actual_dcas < old_trade['dca_buys'], "Events list is source of truth"
 
 
+@pytest.mark.skip(reason="dashboard_flask removed 2026-04-29; logic now in tools/dashboard_v2 backend")
 class TestDashboardCalculations:
     """Test dashboard P/L calculations."""
     

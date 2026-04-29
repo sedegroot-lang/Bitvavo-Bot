@@ -1533,6 +1533,25 @@ def prometheus_metrics():
         out.append(_prom_format("bitvavo_total_closed_trades",
                                 perf.get("total_trades") or 0,
                                 "Total number of closed trades", typ="counter"))
+        # Rate-limit usage (best-effort: import bot.api state if loaded in this process)
+        try:
+            import importlib
+            api_mod = importlib.import_module("bot.api")
+            getter = getattr(api_mod, "get_rate_limit_status", None)
+            if callable(getter):
+                status = getter() or {}
+                for bucket, info in status.items():
+                    safe_bucket = str(bucket).replace('"', '')
+                    out.append(_prom_format("bitvavo_ratelimit_usage_ratio",
+                                            info.get("usage_ratio", 0),
+                                            "Rate-limit usage [0..1] per bucket",
+                                            labels={"bucket": safe_bucket}))
+                    out.append(_prom_format("bitvavo_ratelimit_used",
+                                            info.get("used", 0),
+                                            "Recent calls counted in window", typ="gauge",
+                                            labels={"bucket": safe_bucket}))
+        except Exception:
+            pass
         body = "\n".join([s for s in out if s]) + "\n"
         return PlainTextResponse(body, media_type="text/plain; version=0.0.4")
     except Exception as exc:

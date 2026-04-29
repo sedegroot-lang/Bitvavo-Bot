@@ -36,7 +36,7 @@ Bitvavo REST API → bot/api.py (rate limit, cache, circuit breaker)
 The **main loop** (`bot_loop()` in `trailing_bot.py`) runs every ~25s: hot-reloads config → syncs with exchange → scans markets for entries → manages open trades (trailing stops, DCA, partial TP) → persists state.
 
 ### Dashboard & Deployment
-- **Flask dashboard** on port 5001 (`tools/dashboard_flask/`) — real-time portfolio, trades, AI, analytics
+- **Dashboard V2** on port 5002 (`tools/dashboard_v2/`) — FastAPI + PWA; real-time portfolio, trades, AI, analytics, Prometheus `/metrics`, kill-switch `/api/admin/shutdown`
 - **Docker**: multi-stage build (`python:3.11-slim`), `docker-compose.yml` with persistent volumes for `data/`, `logs/`, `config/`
 - **CI**: `.github/workflows/python-tests.yml` (Python 3.11 + 3.12), `release.yml` (version tags → GitHub Release ZIP)
 

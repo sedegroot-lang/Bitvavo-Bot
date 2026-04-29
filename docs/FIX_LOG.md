@@ -5,6 +5,37 @@
 
 ---
 
+## #058 — Road-to-10 sweep: feature store, model registry, walk-forward, demo mode, drift monitor, shadow report, conformal wrapper, Grafana, Docker healthcheck, ghcr.io CI, bandit clean, rate-limit metrics (2026-04-29)
+
+### Symptom
+Veel kleine roadmap-items uit Road-to-10 stonden nog open: geen feature-store versionering, geen model registry naast `ai/ai_xgb_model.json`, geen reproduceerbaar walk-forward framework (oude `_backtest_*.py` waren ad-hoc), geen demo mode voor onboarding zonder API-keys, geen rate-limit metrics, oude Flask docker healthcheck (poort 5001), geen Docker image in ghcr.io, en bandit had 1 HIGH severity finding (`shell=True` in `scripts/helpers/monitor.py`).
+
+### Fix
+1. **`ai/features/`** — `FEATURE_STORE_VERSION='1.0.0'` + 11-feature schema + `vectorize()` helper, single source of truth voor model features.
+2. **`ai/model_registry.py`** — `register_model()/read_metadata()/latest_model_metadata()` schrijven `<model>.meta.json` naast elk artefact (n_train, val_metric, feature_store_version, git commit).
+3. **`backtest/walk_forward.py`** — vervangt ad-hoc backtest scripts. `WalkForwardConfig(train_days, test_days, step_days)` + `run_walk_forward(trades_path, cfg)` produceert windowed PnL/win-rate/sharpe-like.
+4. **`bot/demo_mode.py` + `tests/fixtures/demo/`** — `BOT_DEMO_MODE=1` env var + canned balance/ticker fixtures voor demos & CI smoke tests.
+5. **`scripts/drift_monitor.py`** — z-score check per feature t.o.v. baseline (`--update-baseline` flag), exit code 1 bij drift > 3σ. Pure-functions geüt.
+6. **`scripts/shadow_report.py`** — aggregator over `data/shadow_trades.jsonl` met PnL, win-rate, blocked-by-reason histogram.
+7. **`ai/conformal.py`** — MAPIE wrapper voor calibrated prediction intervals; gracefully no-op als MAPIE niet geïnstalleerd is.
+8. **`bot/api.py::get_rate_limit_status()`** — snapshot van `_rate_buckets` per endpoint; `tools/dashboard_v2/backend/main.py` exposeert `bitvavo_ratelimit_usage_ratio{bucket=...}` op `/metrics`.
+9. **`docs/grafana/bitvavo_bot_dashboard.json` + README** — drop-in Grafana dashboard met 11 panels + suggested alerts (bot down, heartbeat stale, rate-limit > 80%, PnL drawdown).
+10. **`Dockerfile` + `docker-compose.yml`** — healthcheck nu op poort **5002** (V2) i.p.v. dode 5001/dashboard_flask.
+11. **`.github/workflows/release.yml`** — extra job `publish-docker` bouwt en pusht image naar `ghcr.io/<owner>/bitvavo-bot:{VERSION,latest}` op tag-push.
+12. **`tests/test_road_to_10_helpers.py`** — 17 nieuwe tests dekken alle 7 nieuwe modules.
+13. **`scripts/helpers/monitor.py`** — `subprocess.run(shell=True)` vervangen door `shlex.split` + `shell=False` (bandit HIGH B602 weg).
+14. **`tests/test_integration.py`** — module-level `pytest.skip(allow_module_level=True)`: legacy Flask-dashboard tests retired.
+
+### Stats
+- Tests: **728 pass, 3 skip, 0 fail** (was 747 pass / 8 fail door dode dashboard_flask).
+- Bandit: **0 HIGH**, 14 MEDIUM (B113 timeouts in legacy scripts, B310 url-open allowlist, B608 SQL string concat in archive scripts), 310 LOW.
+- Files: +9 nieuwe modules, +1 Grafana JSON, +1 fixtures dir, ~200 regels tests.
+
+### Lesson
+Roadmap items die "klein" lijken (registry, feature versioning, drift, walk-forward) zijn elk losstaand een paar honderd regels — maar samen worden ze multiplicatief: feature_store + model_registry + walk_forward + drift_monitor vormen samen het minimale **MLOps backbone** dat reproducibility geeft. Bandit lopen voor commit kost <1 min en vangt directe shell-injection vectors.
+
+---
+
 ## #057 — Road-to-10: Prometheus exporter + kill-switch + structured JSON events (2026-04-29)
 
 ### Symptom

@@ -86,7 +86,7 @@ Expected: ~all tests pass.
 ```powershell
 .\start_automated.bat
 ```
-Spawns: trailing_bot, dashboard (`:5001`), AI supervisor, auto-retrain, auto-backup, monitor.
+Spawns: trailing_bot, dashboard V2 (`:5002`), AI supervisor, auto-retrain, auto-backup, monitor.
 
 ### Option B: Just the trading loop
 ```powershell
@@ -95,9 +95,9 @@ python trailing_bot.py
 
 ### Option C: Dashboard only (read-only inspection)
 ```powershell
-python tools\dashboard_flask\app.py
+python -m uvicorn tools.dashboard_v2.backend.main:app --host 127.0.0.1 --port 5002
 ```
-Open <http://localhost:5001>.
+Open <http://localhost:5002>.
 
 ## 9. Optional — local AI agents (Ollama)
 

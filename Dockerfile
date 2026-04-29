@@ -69,16 +69,14 @@ USER botuser
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    FLASK_APP=tools.dashboard_flask.app \
-    FLASK_ENV=production \
     LOG_LEVEL=INFO
 
-# Expose ports
-EXPOSE 5001
+# Expose ports (5002 = Dashboard V2)
+EXPOSE 5002
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:5001/api/health || exit 1
+# Health check — uses Dashboard V2 health endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:5002/api/health || exit 1
 
 # Default command (can be overridden in docker-compose.yml)
 CMD ["python", "scripts/startup/start_bot.py"]

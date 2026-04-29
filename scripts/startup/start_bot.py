@@ -759,18 +759,7 @@ def build_processes(mode: str, include_dashboard: bool, include_pairs: bool) -> 
         ManagedProcess("auto_backup", _script_command(str(BASE_DIR / "scripts" / "helpers" / "auto_backup.py")), auto_restart=True)
     )
     
-    # Flask Dashboard (legacy V1, port 5001) — DISABLED in favour of Dashboard V2 (port 5002).
-    # Keep code path so we can re-enable quickly if needed.
-    flask_app_path = BASE_DIR / "tools" / "dashboard_flask" / "app.py"
-    _ENABLE_FLASK_V1 = False
-    if _ENABLE_FLASK_V1 and flask_app_path.exists():
-        processes.append(
-            ManagedProcess(
-                "flask_dashboard",
-                _script_command(str(flask_app_path)),
-                auto_restart=True,
-            )
-        )
+    # Flask Dashboard V1 removed 2026-04-29 — replaced entirely by Dashboard V2 (port 5002).
 
     # Dashboard V2 (FastAPI + PWA, port 5002 - new modern dashboard)
     dash_v2_path = BASE_DIR / "tools" / "dashboard_v2" / "backend" / "main.py"

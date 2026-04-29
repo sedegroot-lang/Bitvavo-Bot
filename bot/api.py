@@ -164,6 +164,31 @@ def _acquire_rate_slot(endpoint: str) -> None:
         total_wait += sleep_for
 
 
+def get_rate_limit_status() -> Dict[str, Any]:
+    """Snapshot of current rate-limit usage per bucket. Read-only, safe to call from anywhere."""
+    out: Dict[str, Any] = {}
+    default_calls = as_int(_cfg.get('BITVAVO_RATE_LIMIT_CALLS', 950), 950)
+    default_window = as_float(_cfg.get('BITVAVO_RATE_LIMIT_WINDOW', 1.0), 1.0)
+    now = time.time()
+    with _rate_limit_lock:
+        for name, dq in _rate_buckets.items():
+            if name == '__global__':
+                limit = default_calls
+                window = default_window
+            else:
+                limit, window = _endpoint_limit(name)
+            # Trim window
+            used = sum(1 for ts in dq if now - ts < window)
+            usage = (used / limit) if limit > 0 else 0.0
+            out[name] = {
+                "limit": limit,
+                "window": window,
+                "used": used,
+                "usage_ratio": round(usage, 3),
+            }
+    return out
+
+
 # ===================================================================
 # CACHE
 # ===================================================================

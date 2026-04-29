@@ -17,7 +17,7 @@ OneDrive synct files in realtime en zal regelmatig je config bestanden **terugze
 - Alle code (`trailing_bot.py`, `bot/`, `core/`, `modules/`, `ai/`, `scripts/`, `tools/`)
 - Config defaults (`config/bot_config.json`)
 - Tests (`tests/`) en docs (`docs/`)
-- Dashboard (`tools/dashboard_flask/` en `tools/dashboard_v2/`)
+- Dashboard (`tools/dashboard_v2/` op poort 5002)
 
 ## Wat zit er NIET in (en moet je vriend zelf maken/leeg)
 - `.env` — eigen Bitvavo API keys
@@ -98,7 +98,7 @@ Hiermee:
 
 ### 7. Dashboard starten (apart venster)
 ```powershell
-.\.venv\Scripts\python.exe -m tools.dashboard_flask.app
+.\.venv\Scripts\python.exe -m uvicorn tools.dashboard_v2.backend.main:app --host 127.0.0.1 --port 5002
 ```
 → Open http://127.0.0.1:5001 in browser.
 

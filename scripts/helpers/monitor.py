@@ -531,7 +531,13 @@ def monitor_loop():
                                 if smoke_cmd:
                                     try:
                                         formatted = smoke_cmd.format(file=fname, path=dest)
-                                        smoke_proc = subprocess.run(formatted, shell=True, capture_output=True, text=True, timeout=smoke_timeout, cwd=BASE_DIR)
+                                        # Use shlex.split to avoid shell=True (CWE-78). Smoke command is operator-controlled config.
+                                        import shlex as _shlex
+                                        smoke_argv = _shlex.split(formatted, posix=False)
+                                        smoke_proc = subprocess.run(  # nosec B603
+                                            smoke_argv, shell=False, capture_output=True, text=True,
+                                            timeout=smoke_timeout, cwd=BASE_DIR,
+                                        )
                                     except Exception as smoke_exc:
                                         smoke_proc = None
                                         smoke_error = str(smoke_exc)

@@ -29,15 +29,15 @@ services:
       # Configuration (read-only)
       - ./config:/app/config:ro
     ports:
-      - "${DASHBOARD_PORT:-5001}:5001"
+      - "${DASHBOARD_PORT:-5002}:5002"
     networks:
       - bot-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5002/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
     logging:
       driver: "json-file"
       options:

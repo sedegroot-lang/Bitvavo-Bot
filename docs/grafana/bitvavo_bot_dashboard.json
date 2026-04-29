@@ -1,0 +1,100 @@
+{
+  "annotations": {"list": []},
+  "title": "Bitvavo Trading Bot",
+  "uid": "bitvavo-bot",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "tags": ["bitvavo", "trading", "bot"],
+  "templating": {"list": []},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Bot Online",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}, "mappings": [{"options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}, "type": "value"}]}},
+      "targets": [{"expr": "bitvavo_bot_online", "refId": "A"}]
+    },
+    {
+      "id": 2,
+      "title": "AI Supervisor Online",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}, "mappings": [{"options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}, "type": "value"}]}},
+      "targets": [{"expr": "bitvavo_bot_ai_online", "refId": "A"}]
+    },
+    {
+      "id": 3,
+      "title": "Open Trades",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "targets": [{"expr": "bitvavo_open_trades", "refId": "A"}]
+    },
+    {
+      "id": 4,
+      "title": "Total Account Value (€)",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "currencyEUR", "decimals": 2}},
+      "targets": [{"expr": "bitvavo_total_account_value_eur", "refId": "A"}]
+    },
+    {
+      "id": 5,
+      "title": "EUR Cash",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "currencyEUR", "decimals": 2}},
+      "targets": [{"expr": "bitvavo_eur_cash", "refId": "A"}]
+    },
+    {
+      "id": 10,
+      "title": "Cumulative Realised PnL (€)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "fieldConfig": {"defaults": {"unit": "currencyEUR", "color": {"mode": "fixed", "fixedColor": "green"}}},
+      "targets": [{"expr": "bitvavo_total_pnl_eur", "refId": "A", "legendFormat": "PnL"}]
+    },
+    {
+      "id": 11,
+      "title": "Open Exposure (€)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "fieldConfig": {"defaults": {"unit": "currencyEUR"}},
+      "targets": [{"expr": "bitvavo_open_exposure_eur", "refId": "A", "legendFormat": "Exposure"}]
+    },
+    {
+      "id": 20,
+      "title": "Win Rate (%)",
+      "type": "gauge",
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 12},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "yellow", "value": 0.4}, {"color": "green", "value": 0.55}]}}},
+      "targets": [{"expr": "bitvavo_win_rate", "refId": "A"}]
+    },
+    {
+      "id": 21,
+      "title": "Heartbeat Age (s)",
+      "type": "gauge",
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 12},
+      "fieldConfig": {"defaults": {"unit": "s", "min": 0, "max": 300, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 60}, {"color": "red", "value": 180}]}}},
+      "targets": [{"expr": "bitvavo_heartbeat_age_seconds", "refId": "A"}]
+    },
+    {
+      "id": 22,
+      "title": "Total Closed Trades",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 12},
+      "targets": [{"expr": "bitvavo_total_closed_trades", "refId": "A"}]
+    },
+    {
+      "id": 30,
+      "title": "Bitvavo Rate-Limit Usage per Bucket",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 18},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 0.6}, {"color": "red", "value": 0.8}]}}},
+      "targets": [{"expr": "bitvavo_ratelimit_usage_ratio", "refId": "A", "legendFormat": "{{bucket}}"}]
+    }
+  ]
+}

@@ -306,7 +306,7 @@ bot/                     Geëxtraheerde botlogica (API wrapper, signalen, traili
 core/                    Pure berekeningen (indicatoren, regime engine, Kelly sizing, orderbook)
 modules/                 Infrastructuur (config, logging, DCA, grid, ML, websocket, dashboard)
 ai/                      AI/ML pipeline (XGBoost, LSTM, RL ensemble, auto-retrain, supervisor)
-tools/dashboard_flask/   Legacy web dashboard (Flask + SocketIO, poort 5001)
+tools/dashboard_v2/      Web dashboard (FastAPI + PWA, poort 5002) — nieuwe enige dashboard sinds 2026-04-29.
 tools/dashboard_v2/      Nieuw dashboard (FastAPI + PWA, poort 5002)
 scripts/                 Automatisering (scheduler, backup, monitoring)
 config/bot_config.json   Bot configuratie (via dashboard of editor)

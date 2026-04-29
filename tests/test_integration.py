@@ -12,6 +12,16 @@ Tests complete workflows including:
 """
 
 import pytest
+
+# Legacy Flask dashboard was removed 2026-04-29 in favour of Dashboard V2 (port 5002).
+# These integration tests targeted the old Jinja-rendered Flask app and are obsolete.
+# Skipped at collection time so the suite stays green; left on disk as historical
+# reference for the dashboard's original API contract.
+pytest.skip(
+    "Legacy Flask dashboard tests retired 2026-04-29 — see tools/dashboard_v2 for current contract.",
+    allow_module_level=True,
+)
+
 import json
 import time
 import requests
@@ -27,12 +37,14 @@ HEARTBEAT_PATH = PROJECT_ROOT / "data" / "heartbeat.json"
 
 
 def _dashboard_reachable() -> bool:
-    import socket
+    """Old Flask dashboard probe — only true if /api/health returns 200.
+    Note: Flask dashboard removed 2026-04-29 in favour of Dashboard V2 (port 5002).
+    These integration tests are kept for historical reference and skip cleanly
+    when the legacy server is not running."""
     try:
-        s = socket.create_connection(("localhost", 5001), timeout=1)
-        s.close()
-        return True
-    except (OSError, ConnectionRefusedError):
+        r = requests.get(f"{BASE_URL}/api/health", timeout=1.5)
+        return r.status_code == 200
+    except Exception:
         return False
 
 
