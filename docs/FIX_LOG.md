@@ -16,13 +16,16 @@
 3. **`bot/path_utils.py`** (NIEUW, ~100 regels) — `log_throttled`, `ensure_parent_dir`, `resolve_path`, `append_trade_pnl_jsonl`. Pure helpers, valt terug op `Path(__file__).parent.parent` als `state.PROJECT_ROOT` ontbreekt.
 4. **`trailing_bot.py`** — alle bovenstaande functies vervangen door 4-line shims die naar de extracted modules forwarden. Behoud van publieke API (geen call-site changes nodig).
 
-### Result
-- `trailing_bot.py`: 4908 → **4560 regels** (-348, -7.1%).
+### Result (batch 1+2 combined)
+- `trailing_bot.py`: 4908 → **4449 regels** (-459, -9.4%).
 - 806 tests pass (geen regressies).
 - Geen gedragsverandering — pure code-reorganisatie. Bot-restart niet nodig.
 
+### Batch 2 additions (commit 2)
+- **`bot/close_trade.py`** (NIEUW, ~165 regels) — `finalize_close_trade()` extracted. Bevat alle close-bookkeeping (archive → record stats → market_profits → market_expectancy → post_loss_cooldown → adaptive_score → bayesian_fusion → meta_learner → del open_trades → save → cleanup → signal_publisher). Geen gedragsverandering. Alle hooks zijn `try/except: pass` zodat één faler niet de hele close blokkeert.
+- `_signal_pub` wordt lazy gefetched via `from modules import signal_publisher` binnen de extracted functie — geen state-registratie nodig.
+
 ### Lessons / Notes
-- `_finalize_close_trade` extractie gepland voor batch 2: vereist `_signal_pub` op `bot.shared.state` te registreren (nu nog module-global).
 - `bot_loop()` (2640 regels) en `initialize_managers()` (167 regels met Context-dataclass closures) blijven multi-day werk — eerlijke scope-separatie.
 - Pattern bevestigd: extract → shim met lazy import → smoke test → pytest → commit. Werkt veilig.
 

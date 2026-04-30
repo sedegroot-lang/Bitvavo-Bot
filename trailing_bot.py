@@ -155,132 +155,21 @@ def archive_trade(**closed_entry):
 
 
 def _finalize_close_trade(
-    market: str,
-    trade: Dict[str, Any],
-    closed_entry: Dict[str, Any],
+    market,
+    trade,
+    closed_entry,
     *,
     update_market_profits: bool = False,
-    profit_for_market: Optional[float] = None,
+    profit_for_market=None,
     do_save: bool = True,
     do_cleanup: bool = True,
 ) -> None:
-    """Unified close-trade sequence: archive → append → record stats → remove → save.
-
-    Callers build *closed_entry* with whatever fields they need; this function
-    handles the repetitive bookkeeping that was copy-pasted 7× throughout the
-    codebase.
-    """
-    # Compute max_profit_pct from trade price tracking
-    if trade and not closed_entry.get('max_profit_pct'):
-        _hp = trade.get('highest_price', 0)
-        _bp = trade.get('buy_price', 0)
-        if _hp > 0 and _bp > 0:
-            closed_entry['max_profit_pct'] = round((_hp - _bp) / _bp * 100, 2)
-    # Carry forward useful metadata from open trade
-    for _meta_key in ('score', 'rsi_at_entry', 'volume_24h_eur', 'volatility_at_entry',
-                      'opened_regime', 'macd_at_entry', 'sma_short_at_entry', 'sma_long_at_entry',
-                      'dca_buys', 'tp_levels_done', 'highest_price', 'trailing_activation_pct',
-                      'base_trailing_pct'):
-        if _meta_key not in closed_entry and trade and _meta_key in trade:
-            closed_entry[_meta_key] = trade[_meta_key]
-    archive_trade(**closed_entry)
-    closed_trades.append(closed_entry)
-    _record_market_stats_for_close(market, closed_entry, trade)
-    if update_market_profits:
-        p = profit_for_market if profit_for_market is not None else closed_entry.get('profit', 0.0)
-        market_profits[market] = market_profits.get(market, 0.0) + p
-
-    # Per-market empirical-Bayes expectancy update (sizing feedback loop).
-    # Skip operational error closes — they are not a signal of market quality.
-    try:
-        _reason = (closed_entry.get('reason') or '').lower()
-        _operational_errors = {'saldo_error', 'sync_removed', 'manual_close',
-                               'reconstructed', 'dust_cleanup'}
-        if _reason not in _operational_errors and closed_entry.get('profit') is not None:
-            from core.market_expectancy import market_ev as _mev
-            _mev.record_trade(market, float(closed_entry.get('profit', 0) or 0))
-    except Exception:
-        pass
-
-    # Post-loss per-market cooldown — record every non-operational close.
-    try:
-        _reason = (closed_entry.get('reason') or '').lower()
-        _operational_errors = {'saldo_error', 'sync_removed', 'manual_close',
-                               'reconstructed', 'dust_cleanup'}
-        if _reason not in _operational_errors and closed_entry.get('profit') is not None:
-            from pathlib import Path as _Path
-            from bot.post_loss_cooldown import get_instance as _get_pl
-            _pl = _get_pl(_Path(__file__).parent / 'data' / 'post_loss_cooldown.json')
-            _pl.record_close(market, float(closed_entry.get('profit', 0) or 0))
-    except Exception:
-        pass
-
-    # Adaptive MIN_SCORE — feed rolling 7-trade outcome buffer.
-    try:
-        _reason = (closed_entry.get('reason') or '').lower()
-        _operational_errors = {'saldo_error', 'sync_removed', 'manual_close',
-                               'reconstructed', 'dust_cleanup'}
-        if _reason not in _operational_errors and closed_entry.get('profit') is not None:
-            from bot.adaptive_score import get_instance as _get_adapt
-            _get_adapt().record_close(float(closed_entry.get('profit', 0) or 0))
-    except Exception:
-        pass
-
-    # Bayesian Signal Fusion: update signal weights from trade outcome
-    try:
-        if CONFIG.get('BAYESIAN_FUSION_ENABLED', True):
-            from core.bayesian_fusion import update_from_trade_result
-            _active_sigs = {}
-            for _sn in ('sma_cross', 'price_above_sma', 'rsi_ok', 'macd_ok',
-                         'ema_ok', 'bb_breakout', 'stoch_ok', 'trend_1m',
-                         'trend_5m', 'trend_5m_strong', 'breakout', 'vol_above_avg',
-                         'rsi_momentum'):
-                _active_sigs[_sn] = True  # We don't track per-signal activation yet; default active
-            _trade_profit = float(closed_entry.get('profit', 0) or 0)
-            update_from_trade_result(_active_sigs, _trade_profit)
-    except Exception:
-        pass
-
-    # Meta-Learner: update strategy performance from trade outcome
-    try:
-        if CONFIG.get('META_LEARNER_ENABLED', True):
-            from core.meta_learner import MetaLearner
-            _ml_instance = MetaLearner.load()
-            _rsi_entry = trade.get('rsi_at_entry') if trade else None
-            _sma_cross = trade.get('sma_short_at_entry') and trade.get('sma_long_at_entry') and \
-                         float(trade.get('sma_short_at_entry', 0) or 0) > float(trade.get('sma_long_at_entry', 0) or 0)
-            _strategy = _ml_instance.classify_trade(rsi=_rsi_entry, sma_cross=_sma_cross)
-            _ml_instance.record_outcome(_strategy, float(closed_entry.get('profit', 0) or 0))
-            _ml_instance.update_weights()
-            _ml_instance.save()
-    except Exception:
-        pass
-
-    if market in open_trades:
-        del open_trades[market]
-    if do_save:
-        save_trades()
-    if do_cleanup:
-        cleanup_trades()
-
-    # Signal Publisher: publiceer SELL signaal
-    try:
-        if _signal_pub:
-            _bp = float(closed_entry.get('buy_price', 0) or 0)
-            _sp = float(closed_entry.get('sell_price', 0) or 0)
-            _profit = float(closed_entry.get('profit', 0) or 0)
-            _pct = ((_sp - _bp) / _bp * 100) if _bp > 0 else 0.0
-            _hold_h = None
-            if trade and trade.get('opened_ts'):
-                _hold_h = (time.time() - float(trade['opened_ts'])) / 3600
-            _signal_pub.publish_sell(
-                market, _bp, _sp, _profit, _pct,
-                reason=closed_entry.get('reason', 'unknown'),
-                hold_time_hours=_hold_h,
-                dca_count=int(closed_entry.get('dca_buys', 0) or 0),
-            )
-    except Exception:
-        pass
+    """Shim -> bot.close_trade.finalize_close_trade (extracted #066)."""
+    from bot.close_trade import finalize_close_trade as _impl
+    _impl(market, trade, closed_entry,
+          update_market_profits=update_market_profits,
+          profit_for_market=profit_for_market,
+          do_save=do_save, do_cleanup=do_cleanup)
 
 
 def _get_true_total_invested(trade: Dict[str, Any]) -> float:
