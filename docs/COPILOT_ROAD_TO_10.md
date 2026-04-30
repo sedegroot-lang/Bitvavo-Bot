@@ -189,3 +189,4 @@
 | 2026-04-30 | #066 fase 2 monoliet shrink batch 4: market_helpers + event_hooks_adapter extracted, trailing_bot.py 4335→4206 (-14.3% totaal), 806 tests groen | Copilot |
 | 2026-04-30 | #066 fase 2 monoliet shrink batch 5: circuit_breaker + auto_sync_manager extracted, trailing_bot.py 4206→4126 (-15.9% totaal), 806 tests groen | Copilot |
 | 2026-04-30 | #066 fase 2 monoliet shrink batch 6: cost_basis_helpers + ml_optimizer_runner + safety_buy extracted, trailing_bot.py 4126→4080 (-16.9% totaal), 806 tests groen | Copilot |
+| 2026-04-30 | #066 fase 2 monoliet shrink batch 7: grid_market_helpers extracted, trailing_bot.py 4080→4058 (-17.3% totaal), 806 tests groen | Copilot |

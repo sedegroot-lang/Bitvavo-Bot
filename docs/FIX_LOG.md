@@ -57,6 +57,14 @@
 - `trailing_bot.py`: 4908 → **4080 regels** (-828, -16.9%).
 - Tests: 806 pass / 3 skip.
 
+### Batch 7 additions (commit 7)
+- **`bot/grid_market_helpers.py`** (NIEUW, ~45 regels) — `get_active_grid_markets()` extracted. Leest `state.CONFIG['GRID_TRADING'].enabled` en `modules.grid_trading.get_grid_manager()`.
+- `trailing_bot.py` shimmed: `get_active_grid_markets` (~30 regels) vervangen door 4-line shim.
+
+### Result (na batch 7)
+- `trailing_bot.py`: 4908 → **4058 regels** (-850, -17.3%).
+- Tests: 806 pass / 3 skip.
+
 ### Lessons / Notes
 - `bot_loop()` (2640 regels) en `initialize_managers()` (167 regels met Context-dataclass closures) blijven multi-day werk — eerlijke scope-separatie.
 - Pattern bevestigd: extract → shim met lazy import → smoke test → pytest → commit. Werkt veilig.
