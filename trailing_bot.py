@@ -317,69 +317,30 @@ def _as_float(value: Any, default: float = 0.0) -> float:
 _log_throttle_ts: Dict[str, float] = {}
 
 def _log_throttled(key: str, msg: str, interval: float = 60.0, level: str = 'info') -> None:
-    """Log a message at most once per `interval` seconds for a given key."""
-    now = time.time()
-    last = _log_throttle_ts.get(key, 0.0)
-    if now - last >= interval:
-        _log_throttle_ts[key] = now
-        log(msg, level=level)
+    """Shim → bot.path_utils.log_throttled (extracted #066)."""
+    from bot.path_utils import log_throttled as _impl
+    _impl(key, msg, interval=interval, level=level)
 
 # FIX #4: save_trades() debound globals
 _SAVE_TRADES_LOCK = threading.Lock()
 _SAVE_TRADES_DEBOUNCE_TS = 0.0
 _SAVE_TRADES_MIN_INTERVAL = 2.0  # seconds
 def _ensure_parent_dir(path: str) -> None:
-    try:
-        parent = Path(path).parent
-        if parent:
-            parent.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        log(f"[ERROR] Failed to create parent directory for {path}: {e}", level='error')
+    """Shim → bot.path_utils.ensure_parent_dir (extracted #066)."""
+    from bot.path_utils import ensure_parent_dir as _impl
+    return _impl(path)
 
 
 def _append_trade_pnl_jsonl(closed_entry: dict) -> None:
-    """Persist per-trade PnL to JSONL for PF/winrate analysis."""
-    try:
-        path = _resolve_path(TRADE_PNL_HISTORY_FILE)
-        _ensure_parent_dir(path)
-
-        opened_ts = closed_entry.get('opened_ts') or closed_entry.get('timestamp_open')
-        closed_ts = closed_entry.get('timestamp') or closed_entry.get('closed_ts')
-        hold_seconds = None
-        try:
-            if opened_ts is not None and closed_ts is not None:
-                hold_seconds = max(0.0, float(closed_ts) - float(opened_ts))
-        except Exception:
-            hold_seconds = None
-
-        record = {
-            'ts': time.time(),
-            'market': closed_entry.get('market'),
-            'profit_eur': closed_entry.get('profit'),
-            'profit_pct': closed_entry.get('profit_pct'),
-            'invested_eur': closed_entry.get('invested_eur'),
-            'amount': closed_entry.get('amount'),
-            'buy_price': closed_entry.get('buy_price'),
-            'sell_price': closed_entry.get('sell_price'),
-            'opened_ts': opened_ts,
-            'closed_ts': closed_ts,
-            'hold_seconds': hold_seconds,
-            'reason': closed_entry.get('reason'),
-            'trailing_used': closed_entry.get('trailing_used'),
-            'dca_buys': closed_entry.get('dca_buys'),
-        }
-
-        with open(path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(record, ensure_ascii=True) + '\n')
-    except Exception as e:
-        log(f"PnL export failed: {e}", level='debug')
+    """Shim → bot.path_utils.append_trade_pnl_jsonl (extracted #066)."""
+    from bot.path_utils import append_trade_pnl_jsonl as _impl
+    _impl(closed_entry, target_path=TRADE_PNL_HISTORY_FILE)
 
 
 def _resolve_path(path_like: str | Path) -> Path:
-    path_obj = Path(path_like)
-    if not path_obj.is_absolute():
-        path_obj = PROJECT_ROOT / path_obj
-    return path_obj
+    """Shim → bot.path_utils.resolve_path (extracted #066)."""
+    from bot.path_utils import resolve_path as _impl
+    return _impl(path_like)
 
 
 # Note: load_dotenv() and CONFIG already loaded at module start (lines 23-30)
@@ -796,142 +757,9 @@ def validate_config():
 # TRADE DATA INTEGRITY CHECK (Anti-corruption guard)
 # ========================================
 def validate_and_repair_trades():
-    """
-    Periodic sanity check to detect and repair corrupted trade data.
-    Runs on bot startup and periodically during runtime.
-    
-    Guards against:
-    - dca_buys exceeding dca_max
-    - Negative invested_eur values
-    - Absurdly high total_invested_eur (> 10x BASE_AMOUNT_EUR)
-    - Missing required fields
-    """
-    repairs_made = 0
-    base_amount = float(CONFIG.get('BASE_AMOUNT_EUR', 8))
-    dca_max_global = int(CONFIG.get('DCA_MAX_BUYS', 3))
-    max_reasonable_invested = base_amount * (dca_max_global + 1) * 3  # 3x safety margin
-    
-    for market, trade in list(open_trades.items()):
-        try:
-            # Get trade-specific dca_max or use global
-            dca_max_local = int(trade.get('dca_max') or dca_max_global)
-            dca_buys = int(trade.get('dca_buys', 0) or 0)
-            invested = float(trade.get('invested_eur', 0) or 0)
-            total_invested = float(trade.get('total_invested_eur', invested) or invested)
-
-            # GUARD 0+1+4+5 UNIFIED: Use dca_state.sync_derived_fields() as
-            # SINGLE source of truth for dca_buys, dca_max, last_dca_price.
-            # FIX #007: Replaces 4 separate guards that had overlapping/conflicting logic.
-            # dca_buys is NOW always len(dca_events). Desync is structurally impossible.
-            try:
-                from core.dca_state import sync_derived_fields as _ds_sync
-                _dca_state, _dca_repairs = _ds_sync(trade, dca_max_global)
-                for _r in _dca_repairs:
-                    log(f"⚠️ DCA-REPAIR [{market}]: {_r}", level='warning')
-                    repairs_made += 1
-                # Re-read dca_buys after sync (may have changed)
-                dca_buys = trade.get('dca_buys', 0)
-                dca_max_local = dca_max_global
-            except Exception as _ds_err:
-                log(f"⚠️ dca_state.sync_derived_fields failed for {market}: {_ds_err}", level='error')
-            
-            # GUARD 2: Negative invested_eur — delegate to TradeInvestment module
-            if invested < 0:
-                from core.trade_investment import repair_negative as _ti_repair
-                if _ti_repair(trade, market):
-                    repairs_made += 1
-            
-            # GUARD 3: Absurdly high total_invested_eur
-            if total_invested > max_reasonable_invested:
-                reasonable_value = base_amount * (1 + min(dca_buys, dca_max_local))
-                log(f"⚠️ REPAIR [{market}]: total_invested_eur {total_invested:.2f} unreasonably high (max {max_reasonable_invested:.2f}), resetting invested_eur to {reasonable_value:.2f}", level='warning')
-                trade['invested_eur'] = reasonable_value
-                if total_invested > reasonable_value * 5:
-                    trade['total_invested_eur'] = reasonable_value
-                repairs_made += 1
-
-            # GUARD 6: invested_eur ↔ initial + sum(dca_events) consistency
-            # Only fix when invested_eur is LOWER than expected (missing DCA EUR).
-            # When invested_eur is HIGHER, it likely includes untracked DCAs whose
-            # tokens are in the balance but events were lost — don't reduce it.
-            initial_inv = float(trade.get('initial_invested_eur', 0) or 0)
-            partial_tp_returned = float(trade.get('partial_tp_returned_eur', 0) or 0)
-            _guard6_events = trade.get('dca_events', []) or []
-            if initial_inv > 0 and _guard6_events:
-                dca_eur_sum = sum(
-                    float(ev.get('amount_eur', 0) or 0) for ev in _guard6_events
-                )
-                expected_invested = initial_inv + dca_eur_sum - partial_tp_returned
-                current_invested = float(trade.get('invested_eur', 0) or 0)
-                if current_invested > 0 and current_invested < expected_invested - 0.5:
-                    # invested_eur is too LOW — DCA events exist but EUR wasn't added
-                    log(
-                        f"⚠️ REPAIR [{market}]: invested_eur={current_invested:.2f} too low. "
-                        f"initial({initial_inv:.2f}) + DCAs({dca_eur_sum:.2f}) "
-                        f"- tp({partial_tp_returned:.2f}) = {expected_invested:.2f}. Fixing.",
-                        level='warning',
-                    )
-                    trade['invested_eur'] = round(expected_invested, 4)
-                    expected_total = initial_inv + dca_eur_sum
-                    trade['total_invested_eur'] = round(expected_total, 4)
-                    amount = float(trade.get('amount', 0) or 0)
-                    if amount > 0 and expected_total > 0:
-                        trade['buy_price'] = round(expected_total / amount, 12)
-                    repairs_made += 1
-                elif current_invested > expected_invested + 5.0:
-                    # invested_eur is significantly higher than tracked events —
-                    # likely untracked DCAs exist. Log warning only, don't reduce.
-                    log(
-                        f"⚠️ WARN [{market}]: invested_eur={current_invested:.2f} > expected "
-                        f"{expected_invested:.2f} (possible untracked DCAs). Review manually.",
-                        level='warning',
-                    )
-
-            # GUARD 7: buy_price × amount consistency with invested_eur
-            # This is the FINAL safety net. If buy_price and amount are correct
-            # (updated by sync/derive) but invested_eur is wildly off, log a warning.
-            # We do NOT blindly overwrite invested_eur with buy_price*amount because
-            # derive_cost_basis computes invested_eur including fees — it may differ
-            # slightly from buy_price*amount.  Only fix if invested_eur == 0.
-            # See FIX_LOG.md #001 for the root cause analysis.
-            try:
-                _bp = float(trade.get('buy_price') or 0)
-                _amt = float(trade.get('amount') or 0)
-                _inv = float(trade.get('invested_eur') or 0)
-                _ptp = float(trade.get('partial_tp_returned_eur') or 0)
-                if _bp > 0 and _amt > 0:
-                    _expected_total = round(_bp * _amt, 4)
-                    _expected_active = round(_expected_total - _ptp, 4)
-                    if _inv <= 0:
-                        # invested_eur is missing — use buy_price*amount as fallback
-                        log(
-                            f"⚠️ REPAIR [{market}]: invested_eur is 0, setting to "
-                            f"buy_price({_bp:.6f}) × amount({_amt:.6f}) = €{_expected_active:.2f}",
-                            level='warning',
-                        )
-                        trade['invested_eur'] = _expected_active
-                        trade['total_invested_eur'] = _expected_total
-                        repairs_made += 1
-                    elif abs(_inv - _expected_active) / max(_expected_active, 0.01) > 0.10:
-                        # >10% divergence — log warning but let sync_engine derive fix it
-                        log(
-                            f"⚠️ WARN [{market}]: invested_eur €{_inv:.2f} diverges >10% from "
-                            f"buy_price×amount €{_expected_active:.2f}. Sync engine will re-derive.",
-                            level='warning',
-                        )
-            except Exception:
-                pass
-
-        except Exception as e:
-            log(f"⚠️ REPAIR [{market}]: Error during validation: {e}", level='warning')
-    
-    if repairs_made > 0:
-        save_trades()
-        log(f"✅ Trade integrity check complete: {repairs_made} repairs made", level='warning')
-    else:
-        log(f"✅ Trade integrity check complete: all trades valid", level='info')
-    
-    return repairs_made
+    """Shim → bot.trade_repair.validate_and_repair_trades (extracted #066)."""
+    from bot.trade_repair import validate_and_repair_trades as _impl
+    return _impl()
 
 
 # ========================================
@@ -1393,186 +1221,10 @@ def cancel_open_buys_if_capped():
     return _impl()
 
 
-def _cancel_open_buys_if_capped_legacy():
-    """LEGACY (kept for reference, not invoked)."""
-    try:
-        max_trades = max(1, int(CONFIG.get('MAX_OPEN_TRADES', 5)))
-        current = count_active_open_trades(threshold=DUST_TRADE_THRESHOLD_EUR)
-        reserved = _get_pending_count()
-        pending_orders = count_pending_bitvavo_orders()
-        total_slots = current + reserved + pending_orders
-        if total_slots < max_trades:
-            return
-        # Get grid markets + order IDs to protect from cancellation
-        grid_markets = get_active_grid_markets()
-        grid_order_ids = set()
-        try:
-            from modules.grid_trading import get_grid_manager
-            gm = get_grid_manager()
-            grid_order_ids = gm.get_grid_order_ids()
-        except Exception:
-            pass
-        # fetch open orders
-        orders = safe_call(bitvavo.ordersOpen, {}) or []
-        # Identify markets to cancel: buy side, not in open_trades, NOT grid orders
-        to_cancel = []
-        success = 0
-        failed = 0
-        for o in orders:
-            try:
-                if o.get('side') != 'buy':
-                    continue
-                market = o.get('market') or o.get('symbol')
-                if not market or market in open_trades:
-                    continue
-                # CRITICAL: Skip grid trading orders
-                if market in grid_markets or o.get('orderId') in grid_order_ids:
-                    continue
-                status = o.get('status', '').lower()
-                if status not in ('new', 'open', 'partiallyfilled', 'partially filled'):
-                    continue
-                to_cancel.append((o.get('orderId'), market))
-            except Exception:
-                continue
-        # Cancel them
-        for orderId, market in to_cancel:
-            try:
-                # CRITICAL: Include operatorId for order cancellation
-                if OPERATOR_ID:
-                    res = bitvavo.cancelOrder(market, orderId, operatorId=str(OPERATOR_ID))
-                else:
-                    res = safe_call(bitvavo.cancelOrder, market, orderId)
-                log(f"Canceled open BUY order {orderId} for {market} due to cap reached: {res}", level='warning')
-                success += 1
-            except Exception as e:
-                log(f"Failed to cancel order {orderId} for {market}: {e}", level='error')
-                failed += 1
-
-        try:
-            if metrics_collector and (success or failed):
-                metrics_collector.publish(
-                    {
-                        'cancel_if_capped_attempts': float(len(to_cancel)),
-                        'cancel_if_capped_success': float(success),
-                        'cancel_if_capped_fail': float(failed),
-                    },
-                    labels={'source': 'cancel_if_capped'},
-                )
-        except Exception as e:
-            log(f"and failed: {e}", level='warning')
-    except Exception as e:
-        log(f"cancel_open_buys_if_capped error: {e}", level='error')
-
-
 def cancel_open_buys_by_age():
     """Shim → bot.order_cleanup.cancel_open_buys_by_age (extracted #061)."""
     from bot.order_cleanup import cancel_open_buys_by_age as _impl
     return _impl()
-
-
-def _cancel_open_buys_by_age_legacy():
-    """LEGACY (kept for reference, not invoked)."""
-    try:
-        timeout = int(CONFIG.get('LIMIT_ORDER_TIMEOUT_SECONDS', 0) or 0)
-        if timeout <= 0:
-            return
-        behavior = str(CONFIG.get('LIMIT_ORDER_CANCEL_BEHAVIOR', 'cancel_only') or 'cancel_only')
-
-        # Get grid markets + order IDs to protect from cancellation
-        grid_markets = get_active_grid_markets()
-        grid_order_ids = set()
-        try:
-            from modules.grid_trading import get_grid_manager
-            gm = get_grid_manager()
-            grid_order_ids = gm.get_grid_order_ids()
-        except Exception:
-            pass
-
-        orders = safe_call(bitvavo.ordersOpen, {}) or []
-        now = time.time()
-        to_cancel = []
-        success = 0
-        failed = 0
-        ages: List[float] = []
-        status_allowlist = {
-            'new', 'open', 'partiallyfilled', 'partially filled', 'partiallyfilled', 'awaitingtrigger',
-        }
-        timestamp_keys = ('created', 'createdAt', 'timestamp', 'ts', 'time', 'lastUpdate', 'lastUpdated')
-        for o in orders:
-            try:
-                if o.get('side') != 'buy':
-                    continue
-                market = o.get('market') or o.get('symbol')
-                if not market or market in open_trades:
-                    continue
-                # CRITICAL: Skip grid trading orders
-                if market in grid_markets or o.get('orderId') in grid_order_ids:
-                    continue
-                status = str(o.get('status', '')).lower().replace('_', '').replace('-', '').strip()
-                if status not in status_allowlist:
-                    continue
-
-                # Limit orders only (skip any stop/market artifacts)
-                order_type = str(o.get('type', '')).lower()
-                if order_type and order_type != 'limit':
-                    continue
-
-                # Bitvavo returns 'created' in milliseconds; fallback checks for other keys
-                created_ms = None
-                for key in timestamp_keys:
-                    if o.get(key) is not None:
-                        try:
-                            created_ms = int(o.get(key))
-                            break
-                        except Exception:
-                            try:
-                                created_ms = int(float(o.get(key)))
-                                break
-                            except Exception:
-                                continue
-                if not created_ms:
-                    # Cannot determine age reliably; log once per run to aid debugging
-                    if not getattr(cancel_open_buys_by_age, "_missing_ts_logged", False):
-                        log(f"Skip cancel_open_buys_by_age: no timestamp for order {o.get('orderId')} ({market})", level='debug')
-                        cancel_open_buys_by_age._missing_ts_logged = True
-                    continue
-
-                created_ts = created_ms / 1000.0
-                age = now - created_ts
-                if age >= timeout:
-                    to_cancel.append((o.get('orderId'), market, age))
-            except Exception:
-                continue
-
-        for orderId, market, age in to_cancel:
-            try:
-                # CRITICAL: Include operatorId for order cancellation
-                if OPERATOR_ID:
-                    res = bitvavo.cancelOrder(market, orderId, operatorId=str(OPERATOR_ID))
-                else:
-                    res = safe_call(bitvavo.cancelOrder, market, orderId)
-                log(f"Canceled open BUY order {orderId} for {market} due to timeout ({int(age)}s >= {timeout}s): {res}", level='warning')
-                success += 1
-                ages.append(float(age))
-            except Exception as e:
-                log(f"Failed to cancel order {orderId} for {market}: {e}", level='error')
-                failed += 1
-
-        try:
-            if metrics_collector and (success or failed):
-                metrics_payload = {
-                    'cancel_age_attempts': float(len(to_cancel)),
-                    'cancel_age_success': float(success),
-                    'cancel_age_fail': float(failed),
-                }
-                if ages:
-                    metrics_payload['cancel_age_avg_s'] = float(statistics.mean(ages))
-                    metrics_payload['cancel_age_max_s'] = float(max(ages))
-                metrics_collector.publish(metrics_payload, labels={'source': 'cancel_by_age'})
-        except Exception as e:
-            log(f"and failed: {e}", level='warning')
-    except Exception as e:
-        log(f"cancel_open_buys_by_age error: {e}", level='error')
 
 def get_markets_to_trade():
     whitelist = CONFIG.get('WHITELIST_MARKETS', [])

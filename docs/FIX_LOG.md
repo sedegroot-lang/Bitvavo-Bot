@@ -5,6 +5,34 @@
 
 ---
 
+## #066 — Road-to-10 monolith shrink batch 1: trade_repair + path_utils extraction (2026-04-30)
+
+### Symptom
+`trailing_bot.py` was 4908 regels — laatste open item van road-to-10 (target ≤300). Veel dead code (`_legacy` wrappers) en zelfstandige helpers zaten nog in de monoliet. Volledige extractie is meerdaags werk; deze batch pakt veilige low-risk extractions.
+
+### Fix
+1. **Verwijderd**: `_cancel_open_buys_if_capped_legacy` (~75 regels) en `_cancel_open_buys_by_age_legacy` (~105 regels). Geen callers (geverifieerd via grep).
+2. **`bot/trade_repair.py`** (NIEUW, ~150 regels) — `validate_and_repair_trades()` extracted. Implementeert GUARD 0+1+4+5 (dca_state.sync_derived_fields), GUARD 2 (negative invested repair), GUARD 3 (absurd total_invested), GUARD 6 (initial+events consistency), GUARD 7 (buy_price×amount fallback). Gebruikt `bot.shared.state` voor open_trades/CONFIG/save_trades_fn.
+3. **`bot/path_utils.py`** (NIEUW, ~100 regels) — `log_throttled`, `ensure_parent_dir`, `resolve_path`, `append_trade_pnl_jsonl`. Pure helpers, valt terug op `Path(__file__).parent.parent` als `state.PROJECT_ROOT` ontbreekt.
+4. **`trailing_bot.py`** — alle bovenstaande functies vervangen door 4-line shims die naar de extracted modules forwarden. Behoud van publieke API (geen call-site changes nodig).
+
+### Result
+- `trailing_bot.py`: 4908 → **4560 regels** (-348, -7.1%).
+- 806 tests pass (geen regressies).
+- Geen gedragsverandering — pure code-reorganisatie. Bot-restart niet nodig.
+
+### Lessons / Notes
+- `_finalize_close_trade` extractie gepland voor batch 2: vereist `_signal_pub` op `bot.shared.state` te registreren (nu nog module-global).
+- `bot_loop()` (2640 regels) en `initialize_managers()` (167 regels met Context-dataclass closures) blijven multi-day werk — eerlijke scope-separatie.
+- Pattern bevestigd: extract → shim met lazy import → smoke test → pytest → commit. Werkt veilig.
+
+### Files Changed
+- `trailing_bot.py` (legacy wrappers verwijderd, 5 functies vervangen door shims)
+- `bot/trade_repair.py` (nieuw)
+- `bot/path_utils.py` (nieuw)
+
+---
+
 ## #065 — Road-to-10 fase 4/5/6/7 final closure: registry + per-market trailing + rate-limit alert + bandit clean (2026-04-30)
 
 ### Symptom
