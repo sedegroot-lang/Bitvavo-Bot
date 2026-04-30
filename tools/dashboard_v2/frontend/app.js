@@ -126,7 +126,7 @@ function dash() {
     async boot() {
       if ('serviceWorker' in navigator) { try { await navigator.serviceWorker.register('/sw.js'); } catch {} }
       await this.refresh();
-      this.refreshTimer = setInterval(() => this.refresh(), 4000);
+      this.refreshTimer = setInterval(() => this.refresh(), 2000);
       setInterval(() => { this.secondsAgo = Math.floor(Date.now() / 1000) - this.lastRefresh; }, 1000);
     },
 

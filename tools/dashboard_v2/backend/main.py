@@ -257,6 +257,68 @@ def _portfolio() -> Dict[str, Any]:
     }
 
 
+# ── Live ticker fetch (independent of bot's price_cache.json) ─────────────
+# Bitvavo `ticker24h()` without args returns ALL markets in 1 call (~600ms)
+# AND gives us last-trade price + bid/ask + 24h high/low/volume — much richer
+# than tickerPrice (which lags). We cache for 3 seconds so the dashboard can
+# poll every 1-2s without hammering the API.
+
+_LIVE_TICKER_CACHE: Dict[str, Any] = {"ts": 0.0, "data": {}}
+_LIVE_TICKER_TTL = 3.0
+
+
+def _get_live_prices() -> Dict[str, Dict[str, float]]:
+    """Return {market: {price, bid, ask, high24h, low24h, volume}}, cached 3s."""
+    now = time.time()
+    if now - _LIVE_TICKER_CACHE["ts"] < _LIVE_TICKER_TTL and _LIVE_TICKER_CACHE["data"]:
+        return _LIVE_TICKER_CACHE["data"]
+    try:
+        bv_key = "bv_client::dashboard"
+        bv = _long_cache.get(bv_key)
+        if bv is None:
+            try:
+                from dotenv import load_dotenv  # type: ignore
+                load_dotenv()
+            except Exception:
+                pass
+            from python_bitvavo_api.bitvavo import Bitvavo  # type: ignore
+            ak = os.environ.get("BITVAVO_API_KEY", "")
+            sk = os.environ.get("BITVAVO_API_SECRET", "")
+            if not (ak and sk):
+                return _LIVE_TICKER_CACHE.get("data", {})
+            bv = Bitvavo({"APIKEY": ak, "APISECRET": sk})
+            _long_cache[bv_key] = bv
+        tickers = bv.ticker24h({})
+        if isinstance(tickers, list):
+            data: Dict[str, Dict[str, float]] = {}
+            for t in tickers:
+                try:
+                    mkt = t.get("market")
+                    if not mkt:
+                        continue
+                    last = float(t.get("last") or 0)
+                    bid = float(t.get("bid") or 0) or last
+                    ask = float(t.get("ask") or 0) or last
+                    data[mkt] = {
+                        "price": last,
+                        "bid": bid,
+                        "ask": ask,
+                        "high24h": float(t.get("high") or 0),
+                        "low24h": float(t.get("low") or 0),
+                        "open24h": float(t.get("open") or 0),
+                        "volume24h": float(t.get("volume") or 0),
+                    }
+                except Exception:
+                    continue
+            if data:
+                _LIVE_TICKER_CACHE["data"] = data
+                _LIVE_TICKER_CACHE["ts"] = now
+                return data
+    except Exception:
+        pass
+    return _LIVE_TICKER_CACHE.get("data", {})
+
+
 def _compute_trailing_stop(buy_price: float, highest_price: float, trailing_activated: bool, cfg: Dict[str, Any]) -> Optional[float]:
     """Mirror bot.trailing logic for dashboard display."""
     if not (trailing_activated and highest_price and highest_price > buy_price > 0):
@@ -323,19 +385,41 @@ def _trades() -> Dict[str, Any]:
     closed_recent = sorted(closed_all, key=_ts_key, reverse=True)[:300]
 
     prices = _read_json(DATA / "price_cache.json", {}) or {}
+    live_data = _get_live_prices()  # {market: {price, bid, ask, high24h, low24h, ...}}, refreshed every 3s
     cfg = _merged_config()
 
     enriched = {}
     for mkt, tr in (open_trades.items() if isinstance(open_trades, dict) else []):
         cur = None
+        bid = None
+        ask = None
+        high24h = None
+        low24h = None
+        change24h_pct = None
+        # 1) PREFER live ticker24h.last (sub-3s freshness, 1 API call covers all markets)
         try:
-            pinfo = prices.get(mkt) or prices.get(mkt.replace("-EUR", ""))
-            if isinstance(pinfo, dict):
-                cur = float(pinfo.get("price") or pinfo.get("last") or 0) or None
-            elif isinstance(pinfo, (int, float)):
-                cur = float(pinfo)
+            ld = live_data.get(mkt)
+            if isinstance(ld, dict) and ld.get("price"):
+                cur = float(ld["price"])
+                bid = float(ld.get("bid") or 0) or None
+                ask = float(ld.get("ask") or 0) or None
+                high24h = float(ld.get("high24h") or 0) or None
+                low24h = float(ld.get("low24h") or 0) or None
+                open24h = float(ld.get("open24h") or 0) or None
+                if open24h and cur:
+                    change24h_pct = round((cur - open24h) / open24h * 100, 2)
         except Exception:
             cur = None
+        # 2) Fallback: stale price_cache.json from bot loop
+        if cur is None:
+            try:
+                pinfo = prices.get(mkt) or prices.get(mkt.replace("-EUR", ""))
+                if isinstance(pinfo, dict):
+                    cur = float(pinfo.get("price") or pinfo.get("last") or 0) or None
+                elif isinstance(pinfo, (int, float)):
+                    cur = float(pinfo)
+            except Exception:
+                cur = None
 
         # invested_eur = ACTUAL current cost basis (decreases on partial sells / increases on DCA).
         # initial_invested_eur = original entry (immutable, for context).
@@ -416,6 +500,12 @@ def _trades() -> Dict[str, Any]:
             "symbol": mkt.replace("-EUR", ""),
             "amount_remaining": amount,
             "current_price": cur,
+            "bid": bid,
+            "ask": ask,
+            "spread_pct": round((ask - bid) / cur * 100, 3) if (bid and ask and cur) else None,
+            "high24h": high24h,
+            "low24h": low24h,
+            "change24h_pct": change24h_pct,
             "current_value_eur": round(cur_value, 2) if cur_value is not None else None,
             "unrealised_pnl_eur": unrealised,
             "unrealised_pnl_pct": unrealised_pct,
