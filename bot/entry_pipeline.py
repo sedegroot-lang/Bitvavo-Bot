@@ -97,3 +97,39 @@ def decide_entry(
         order_type=order_type,
         metadata={'spread_pct': spread_pct},
     )
+
+
+def apply_decorrelation_filter(
+    decision: EntryDecision,
+    *,
+    candidate_closes,
+    open_market_closes,
+    config: Optional[Dict[str, Any]] = None,
+) -> EntryDecision:
+    """Optionally veto a passing decision when correlation with open trades > threshold.
+
+    Reads `DECORRELATION_ENABLED` (bool) and `DECORRELATION_MAX_CORR` (float, default 0.7)
+    from config. When disabled or insufficient data, returns the input decision unchanged.
+    """
+    config = config or {}
+    if not bool(config.get('DECORRELATION_ENABLED', False)):
+        return decision
+    if not decision.proceed:
+        return decision
+    try:
+        from bot.decorrelation import is_decorrelated
+    except Exception:
+        return decision
+    max_corr = float(config.get('DECORRELATION_MAX_CORR', 0.7) or 0.7)
+    ok, corrs = is_decorrelated(candidate_closes, open_market_closes, max_corr=max_corr)
+    if ok:
+        decision.metadata['correlations'] = corrs
+        return decision
+    worst = max(corrs.items(), key=lambda kv: abs(kv[1])) if corrs else ('?', 0.0)
+    return EntryDecision(
+        market=decision.market,
+        proceed=False,
+        reason=f'too_correlated_with_{worst[0]}({worst[1]:.2f}>{max_corr})',
+        score=decision.score,
+        metadata={'correlations': corrs},
+    )

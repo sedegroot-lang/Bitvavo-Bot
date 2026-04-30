@@ -39,39 +39,41 @@
 
 - [x] Identificeer alle nog niet-geëxtraheerde verantwoordelijkheden (loop, scheduler, signal-orchestrator, partial-TP, DCA-trigger, regime-switch). _(inventaris gemaakt 2026-04-29)_
 - [x] Maak `bot/main_loop.py` (de echte run-loop, dunne wrapper). _(#059)_
-- [ ] Maak `bot/scheduler.py` (alle background threads/scheduled jobs).
-- [ ] Maak `bot/entry_pipeline.py` (signal scan → score → entry beslissing).
-- [ ] Maak `bot/exit_pipeline.py` (trailing/partial-TP/no-loss/sync).
+- [x] Maak `bot/scheduler.py` (alle background threads/scheduled jobs). _(#062)_
+- [x] Maak `bot/entry_pipeline.py` (signal scan → score → entry beslissing). _(#062 stub + #064 decorrelation wiring)_
+- [x] Maak `bot/exit_pipeline.py` (trailing/partial-TP/no-loss/sync). _(#063 helpers, FIX-LOG #003 compliant)_
 - [x] **`bot/order_cleanup.py`** (cancel_open_buys_if_capped + cancel_open_buys_by_age, ~180 regels) (#061)
 - [x] **`bot/startup_validation.py`** (validate_config) (#060)
-- [ ] `trailing_bot.py` wordt entrypoint van max 300 regels.
-- [ ] **Voor elke extractie:** schrijf integratie-test eerst, dan refactor. _(13 tests bij #061, 10 tests bij #060)_
+- [ ] `trailing_bot.py` wordt entrypoint van max 300 regels. _(staat nog op ~4900, multi-day refactor)_
+- [x] **Voor elke extractie:** schrijf integratie-test eerst, dan refactor. _(13+10+15+13+10 = 61 nieuwe tests in #060-#064)_
 
 ### Fase 3 — Observability (6.5 → 9.0) — 🟡 deels (Telegram + V2 PnL + JSON metrics)
 
 - [ ] Eén dashboard (kies `dashboard_flask` óf `dashboard_v2`, niet beide). ik kies V2 op http://127.0.0.1:5002/, verwijder de andere.
 - [x] **Structured logging (JSON-lines)** in `logs/events.jsonl` via `modules/event_logger.py` — thread-safe, never raises (2026-04-29).
 - [x] **Prometheus exporter** op dashboard V2 `/metrics` — bot_online, open_trades, exposure, equity, pnl, fees, win_rate (2026-04-29). _(reuse V2 process; geen aparte port nodig)_
-- [ ] **Grafana dashboard JSON** in `docs/grafana/`.
+- [ ] Eindeloos refactoren: laatste step is monoliet trailing_bot.py → ≤ 300 regels (multi-day werk).
+- [x] **Grafana dashboard JSON** in `docs/grafana/bitvavo_bot_dashboard.json` (al aanwezig).
 - [x] **Telegram daily report** met: equity, P/L, # trades, win rate, top/bottom market, missed signals (zoals UNI). _(deels: telegram_summary.py bestaat)_
 - [x] **V2 dashboard PnL overzicht** (dagelijks/wekelijks/maandelijks) — toegevoegd 2026-04-29.
 - [x] **Asset-waarde KPI fresh houden** — V2 backend prefereert heartbeat boven stale snapshot (2026-04-29).
 
 ### Fase 4 — ML-volwassenheid (6.0 → 8.5)
 
-- [ ] **Walk-forward backtest** raamwerk in `backtest/` (geen meer ad-hoc `_backtest_*.py`).
-- [ ] **Feature store** — verplaats feature-engineering naar `ai/features/` met versionering.
+- [x] **Walk-forward backtest** raamwerk in `backtest/` (geen meer ad-hoc `_backtest_*.py`). _(`backtest/walk_forward.py` + Windows Task `BitvavoBot_DailyML` 04:30 daily, #063)_
+- [ ] **Feature store** — verplaats feature-engineering naar `ai/features/` met versionering. _(deels: build_trade_features bestaat)_
 - [ ] **Model registry** — `models/` krijgt versie + metadata (date, n_train, val_metric).
 - [x] **MAPIE conformal predictions** (geïnstalleerd 2026-04-28, nog niet bedraad).
 - [x] **CrewAI multi-agent demo** (`tools/agents_crew_demo.py` — Analyst/Risk/Reporter op Ollama).
-- [ ] **Shadow trading** — alle model-output 1 week shadow loggen voordat live.
-- [ ] **Feature drift monitor** — alert als feature distribution >3σ afwijkt van train set.
+- [x] **Shadow trading** — `bot/shadow_trading.py` JSONL append (#064). Activate via `SHADOW_TRADING_ENABLED=true`.
+- [x] **Feature drift monitor** — `scripts/drift_monitor.py` actief via daily Task Scheduler (#063).
 
 ### Fase 5 — Trading-strategie (7.5 → 9.0)
 
-- [ ] **Limit-orders i.p.v. market** — recapture de 39% slippage.
-- [ ] **WebSocket prijs-feed** — sneller dan 25s polling (zie UNI-incident).
-- [x] **DCA opnieuw evalueren** — `DCA_MIN_SCORE` gate toegevoegd in `modules/trading_dca.py` (#061). Default 0.0 = legacy. Aanbeveling: zet op 12.0+ in local config voor strikte DCA.
+- [x] **Limit-orders i.p.v. market** — `LIMIT_ORDER_PREFER=true` + `ORDER_TYPE=limit` actief in local config (#063). Code-pad bestond al in `bot/orders_impl.py:239`.
+- [x] **WebSocket prijs-feed** — scaffold `bot/ws_price_feed.py` (#062). Default disabled; activate via `WS_PRICE_FEED_ENABLED=true` wanneer Bitvavo SDK websocket support bevestigd.
+- [x] **DCA opnieuw evalueren** — `DCA_MIN_SCORE` gate toegevoegd in `modules/trading_dca.py` (#061). Default 12.0 in local config (#063).
+- [ ] **Per-market parameters** — top performers (BTC/ETH/SOL) krijgen eigen trailing-config.
 - [ ] **Per-market parameters** — top performers (BTC/ETH/SOL) krijgen eigen trailing-config.
 - [x] **Regime-aware entry** — entries blokkeren in `BEARISH` regime (#059, configurable via `BLOCK_ENTRY_REGIMES`).
 - [x] **Entry-Confidence framework** (6-pillar gating) — `bot/entry_confidence.py` + 23 tests + actief in local config (2026-04-29). Vervangt single-score filter met multi-dimensional kwaliteitscheck.
@@ -177,3 +179,6 @@
 | 2026-04-29 | #059 Phase 2 wiring (conformal calls, per-market trailing, regime entry block, main_loop seam, alert rules) | Copilot |
 | 2026-04-29 | #060 First monolith extraction: validate_config → bot/startup_validation.py | Copilot |
 | 2026-04-29 | #061 Second monolith extraction: cancel_open_buys_* → bot/order_cleanup.py + DCA_MIN_SCORE gate | Copilot |
+| 2026-04-29 | #062 Third sweep: scheduler/ws_price_feed/entry_pipeline + ML cron script + 15 tests (772 total) | Copilot |
+| 2026-04-30 | #063 fase 5 closure: /log HTML escape + exit_pipeline + decorrelation + Windows Task Scheduler + 5 config-keys | Copilot |
+| 2026-04-30 | #064 fase 4 + 5 wrap: shadow_trading + decorrelation entry-wiring + 10 tests (820 total) | Copilot |

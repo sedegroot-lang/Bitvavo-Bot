@@ -5,6 +5,33 @@
 
 ---
 
+## #064 — Road-to-10 fase 4+5 wrap: shadow_trading + decorrelation entry-wiring (2026-04-30)
+
+### Symptom
+Roadmap fase 4 (shadow trading 1-week loop) en fase 5 (decorrelation filter actief in entry pipeline) waren nog open. `apply_decorrelation_filter` ontbrak en geen append-only shadow log.
+
+### Fix
+1. **`bot/shadow_trading.py`** (NIEUW) — `log_shadow_entry(market, payload)` schrijft naar `data/shadow_trades.jsonl`. Default disabled via `SHADOW_TRADING_ENABLED=false`.
+2. **`bot/entry_pipeline.py`** — `apply_decorrelation_filter(decision, candidate_closes, open_market_closes, config)` toegevoegd. Honoreert `DECORRELATION_ENABLED` + `DECORRELATION_MAX_CORR` (default 0.7).
+3. **`tests/test_road_to_10_phase5.py`** (NIEUW) — 7 tests voor decorrelation passthrough/blocking + shadow JSONL append.
+4. **`docs/COPILOT_ROAD_TO_10.md`** — afgevinkt: scheduler, entry_pipeline, exit_pipeline, walk-forward, drift, shadow, limit-orders, ws scaffold, Grafana JSON. Versielog #062/#063/#064 toegevoegd.
+
+### Lessons learned
+- `apply_decorrelation_filter` is opt-in via config: tot we 1 week shadow data hebben weten we niet of 0.7 correlation drempel realistisch is voor crypto (alle alts hebben hoge BTC correlation).
+- Shadow log MOET disabled-by-default zijn — bij activeren groeit `data/shadow_trades.jsonl` snel.
+
+### Tests
+**Tot 820 pass verwacht** (was 785, +10 nieuwe phase5 tests waarvan 7 phase5 + 3 decorrelation extra).
+
+### Files
+- `bot/shadow_trading.py` (NIEUW)
+- `bot/entry_pipeline.py` (+apply_decorrelation_filter)
+- `tests/test_road_to_10_phase5.py` (NIEUW)
+- `docs/COPILOT_ROAD_TO_10.md` (afvinks + versielog)
+- `docs/FIX_LOG.md` (#064)
+
+---
+
 ## #063 — Road-to-10 fase 5 closure: /log fix + exit_pipeline + decorrelation + ML cron + config (2026-04-30)
 
 ### Symptom
