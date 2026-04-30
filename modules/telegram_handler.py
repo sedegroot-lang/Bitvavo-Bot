@@ -198,7 +198,7 @@ def _get_status_text() -> str:
             f"📐 Grid: {'✅' if grid_on else '❌'}\n"
             f"📂 Open trades: {open_count}\n\n"
             "<b>Laatste log:</b>\n"
-            + "\n".join(f"<code>{l[-120:]}</code>" for l in lines)
+            + "\n".join(f"<code>{__import__('html').escape(l[-120:])}</code>" for l in lines)
         )
     except Exception as e:
         return f"Status ophalen mislukt: {e}"

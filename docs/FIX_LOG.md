@@ -5,6 +5,42 @@
 
 ---
 
+## #063 — Road-to-10 fase 5 closure: /log fix + exit_pipeline + decorrelation + ML cron + config (2026-04-30)
+
+### Symptom
+1. `/log` Telegram commando gaf niets terug — bot_log.txt regels bevatten `<` (bv `EUR balans (0.00 < 9.60)`) wat Telegram HTML-parser breekt: `Bad Request: can't parse entities: Unsupported start tag "" at byte offset 338`.
+2. Roadmap fase 5 had limit-orders code maar niet aan in productie config; geen exit_pipeline; geen decorrelation filter; walk-forward script werd nooit getriggerd.
+
+### Fix
+1. **`modules/telegram_handler.py`** — `_get_log_text()` nu `html.escape(l[-120:])` zodat `<`/`>`/`&` niet breken. Status-text idem (inline `__import__('html').escape`).
+2. **`bot/exit_pipeline.py`** (NIEUW) — `derive_unrealised_pct`, `should_lock_breakeven`, `should_partial_tp`. Pure helpers. **Honoreert FIX-LOG #003**: nooit sell-at-loss, nooit time-based.
+3. **`bot/decorrelation.py`** (NIEUW) — `pearson_correlation` + `is_decorrelated`. Filter voor entry-pipeline om SOL+AVAX+MATIC-allemaal-long te voorkomen.
+4. **`tests/test_road_to_10_phase4.py`** (NIEUW) — 13 tests.
+5. **Windows Task Scheduler** — `BitvavoBot_DailyML` daily 04:30 → `scripts/scheduled_ml_jobs.py` (drift_monitor + walk_forward).
+6. **`bot_config_local.json`** geüpdatet:
+   - `LIMIT_ORDER_PREFER=true` + `ORDER_TYPE=limit` (recapture 39% slippage)
+   - `BLOCK_ENTRY_REGIMES=["BEARISH"]` (#059 framework geactiveerd)
+   - `TRAILING_ACTIVATION_PCT=1.5` (was hoger; lost RENDER/ENJ "trailing nooit geactiveerd op +2.6% piek" probleem op)
+   - `DCA_MIN_SCORE=12.0` (#061 gate strikt; legacy 0.0)
+
+### Lessons learned
+- Telegram HTML mode crasht stilletjes op user-content (logs/JSON) — escape ALTIJD bij `<code>...</code>`.
+- Existing trades (RENDER/ENJ) blijven gelocked want trailing-activation was te hoog t.o.v. realistische piek-bewegingen op €400-€1100 alts.
+
+### Tests
+**785 pass, 0 fail, 3 skip** (was 772, +13 nieuwe).
+
+### Files
+- `modules/telegram_handler.py` (HTML escape)
+- `bot/exit_pipeline.py` (NIEUW)
+- `bot/decorrelation.py` (NIEUW)
+- `tests/test_road_to_10_phase4.py` (NIEUW)
+- `scripts/scheduled_ml_jobs.py` (al uit #062, nu Task Scheduler aan)
+- `%LOCALAPPDATA%/BotConfig/bot_config_local.json` (5 keys)
+- `docs/FIX_LOG.md` (#063)
+
+---
+
 ## #062 — Road-to-10 fase 3-5 sweep: scheduler/ws_price_feed/entry_pipeline + ML cron (2026-04-29)
 
 ### Symptom
