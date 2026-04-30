@@ -249,16 +249,14 @@
                   </div>
                   <div class="tc-price">
                     <div class="lbl"><span class="dot stop"></span>Trailing stop</div>
-                    <div class="val stop" x-text="tr.trailing_stop != null ? fmtPrice(tr.trailing_stop) : '—'"></div>
+                    <div class="val stop"
+                         x-text="tr.trailing_stop != null ? fmtPrice(tr.trailing_stop) : (tr.activation_price != null ? '@ ' + fmtPrice(tr.activation_price) : '—')"></div>
                   </div>
                 </div>
 
                 <div class="tc-row">
-                  <span class="lbl">
-                    <span x-text="tr.trailing_activated ? 'Trailing actief' : 'Naar activatie'"></span>
-                    <span class="muted" x-show="tr.activation_price != null"
-                          x-text="' @ ' + fmtPrice(tr.activation_price)"></span>
-                  </span>
+                  <span class="lbl"
+                        x-text="tr.trailing_activated ? 'Trailing actief' : 'Naar activatie'"></span>
                   <div class="progress-bar">
                     <div class="fill"
                          :class="tr.trailing_activated ? 'active' : ((tr.trailing_progress_pct ?? 0) >= 70 ? 'near' : ((tr.trailing_progress_pct ?? 0) >= 30 ? 'mid' : 'early'))"
