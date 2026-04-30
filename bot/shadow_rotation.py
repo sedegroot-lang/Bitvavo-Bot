@@ -112,7 +112,11 @@ def evaluate(
     """
     if not isinstance(open_trades, dict) or not candidates:
         return []
-    if len(open_trades) < int(max_open_trades):
+    # When force_observe=True we always evaluate (even if a slot is open) so
+    # the shadow log keeps growing for analysis.  When False (legacy) we only
+    # evaluate at hard stop.
+    force_observe = bool((config or {}).get("SHADOW_FORCE_OBSERVE", False))
+    if not force_observe and len(open_trades) < int(max_open_trades):
         return []  # No rotation needed — slot available
 
     min_score = _cfg(config, "ROTATE_MIN_CANDIDATE_SCORE")
@@ -236,6 +240,11 @@ def analyse(window_days: int = 14) -> Dict[str, Any]:
         else:
             pnl_buckets["1-1.5%"] += 1
 
+    # outcome stats (only entries that have backfilled outcome_pct)
+    outcomes = [r for r in rows if isinstance(r.get("outcome_pct"), (int, float))]
+    profitable = sum(1 for r in outcomes if float(r["outcome_pct"]) > 0)
+    avg_outcome = (sum(float(r["outcome_pct"]) for r in outcomes) / len(outcomes)) if outcomes else 0.0
+
     return {
         "total": len(rows),
         "window_days": window_days,
@@ -243,4 +252,88 @@ def analyse(window_days: int = 14) -> Dict[str, Any]:
         "by_candidate_market": dict(sorted(by_candidate.items(), key=lambda x: -x[1])[:10]),
         "age_buckets": age_buckets,
         "pnl_buckets": pnl_buckets,
+        "outcomes_evaluated": len(outcomes),
+        "outcomes_profitable": profitable,
+        "outcomes_winrate": round(profitable / len(outcomes), 3) if outcomes else None,
+        "outcomes_avg_pct": round(avg_outcome, 3) if outcomes else None,
     }
+
+
+def backfill_outcomes(
+    *,
+    fetch_price_at: Optional[Any] = None,
+    fetch_price_now: Optional[Any] = None,
+    min_age_hours: float = 6.0,
+    fees_pct: float = 0.5,
+) -> int:
+    """Walk shadow log entries older than `min_age_hours` and backfill
+    `outcome_pct` (the realised PnL the candidate would've delivered minus
+    round-trip fees). Returns count of entries updated.
+
+    fetch_price_now(market) -> float | None
+    fetch_price_at(market, ts) -> float | None  (best-effort historical price)
+
+    Re-writes the log atomically (tmp + replace).
+    """
+    if not LOG_PATH.exists() or fetch_price_now is None:
+        return 0
+    cutoff = _now() - min_age_hours * 3600.0
+    rows: List[Dict[str, Any]] = []
+    try:
+        with LOG_PATH.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except Exception:
+                    continue
+    except Exception:
+        return 0
+
+    updated = 0
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        if isinstance(r.get("outcome_pct"), (int, float)):
+            continue  # already backfilled
+        ts = float(r.get("ts", 0) or 0)
+        if ts <= 0 or ts > cutoff:
+            continue
+        cand = r.get("candidate_market")
+        close_m = r.get("close_market")
+        if not cand:
+            continue
+        try:
+            cand_now = fetch_price_now(cand)
+            cand_then = fetch_price_at(cand, ts) if fetch_price_at else None
+            if cand_then is None or cand_now is None or float(cand_then) <= 0:
+                continue
+            cand_pct = (float(cand_now) - float(cand_then)) / float(cand_then) * 100.0
+            close_pct = float(r.get("close_pnl_pct", 0) or 0)
+            if close_m and fetch_price_at:
+                close_then = fetch_price_at(close_m, ts)
+                close_now = fetch_price_now(close_m)
+                if close_then and close_now and float(close_then) > 0:
+                    close_pct = (float(close_now) - float(close_then)) / float(close_then) * 100.0
+            # would-be net = candidate gain - kept gain - round-trip fees
+            outcome = round(cand_pct - close_pct - float(fees_pct), 3)
+            r["outcome_pct"] = outcome
+            r["outcome_cand_pct"] = round(cand_pct, 3)
+            r["outcome_close_pct"] = round(close_pct, 3)
+            r["outcome_evaluated_ts"] = _now()
+            updated += 1
+        except Exception:
+            continue
+
+    if updated:
+        try:
+            tmp = LOG_PATH.with_suffix(".jsonl.tmp")
+            with tmp.open("w", encoding="utf-8") as f:
+                for r in rows:
+                    f.write(json.dumps(r, ensure_ascii=True) + "\n")
+            tmp.replace(LOG_PATH)
+        except Exception:
+            pass
+    return updated

@@ -248,9 +248,12 @@
                     <div class="val" x-text="fmtPrice(tr.current_price)"></div>
                   </div>
                   <div class="tc-price">
-                    <div class="lbl"><span class="dot stop"></span>Trailing stop</div>
+                    <div class="lbl">
+                      <span class="dot stop"></span>
+                      <span x-text="tr.trailing_activated ? 'Trailing stop' : 'Trailing activatie'"></span>
+                    </div>
                     <div class="val stop"
-                         x-text="tr.trailing_stop != null ? fmtPrice(tr.trailing_stop) : (tr.activation_price != null ? '@ ' + fmtPrice(tr.activation_price) : '—')"></div>
+                         x-text="tr.trailing_activated ? (tr.trailing_stop != null ? fmtPrice(tr.trailing_stop) : '—') : (tr.activation_price != null ? fmtPrice(tr.activation_price) : '—')"></div>
                   </div>
                 </div>
 
