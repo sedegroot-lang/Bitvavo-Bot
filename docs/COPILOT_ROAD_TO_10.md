@@ -184,3 +184,4 @@
 | 2026-04-30 | #063 fase 5 closure: /log HTML escape + exit_pipeline + decorrelation + Windows Task Scheduler + 5 config-keys | Copilot |
 | 2026-04-30 | #064 fase 4 + 5 wrap: shadow_trading + decorrelation entry-wiring + 10 tests (820 total) | Copilot |
 | 2026-04-30 | #065 fase 4+5+6+7 closure: model registry + per-market trailing + rate-limit alert + bandit clean + 14 tests (820 total) | Copilot |
+| 2026-04-30 | #066 fase 2 monoliet shrink batch 1+2: trade_repair + path_utils + close_trade extracted, trailing_bot.py 4908→4449 (-9.4%), 806 tests groen | Copilot |
