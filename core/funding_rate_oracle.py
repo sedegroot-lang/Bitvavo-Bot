@@ -52,7 +52,7 @@ def _fetch_json(url: str, timeout: int = 5) -> Optional[list | dict]:
     """Fetch JSON from URL with User-Agent header."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "BitvavoBotOracle/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310 - trusted hardcoded Binance funding-rate URL only
             return json.loads(resp.read())
     except Exception as e:
         log(f"[FundingOracle] Fetch failed {url}: {e}", level="debug")

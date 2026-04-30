@@ -50,7 +50,7 @@ def _fetch_json(url: str, timeout: int = 3) -> Optional[dict | list]:
     """Fetch JSON from URL."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "BitvavoBotLeadLag/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310 - trusted hardcoded Binance/Coinbase URLs only
             return json.loads(resp.read())
     except Exception as e:
         log(f"[LeadLag] Fetch failed: {e}", level="debug")

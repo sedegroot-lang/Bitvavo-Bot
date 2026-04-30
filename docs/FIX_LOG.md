@@ -5,6 +5,44 @@
 
 ---
 
+## #065 — Road-to-10 fase 4/5/6/7 final closure: registry + per-market trailing + rate-limit alert + bandit clean (2026-04-30)
+
+### Symptom
+Roadmap had nog open items in fase 4 (model registry), fase 5 (per-market trailing), fase 6 (CI/CD ghcr.io + demo-mode tickoff), en fase 7 (bandit medium warnings + healthcheck + rate-limit alerts). Demo-mode + ghcr.io + healthcheck waren al geïmplementeerd maar niet afgevinkt.
+
+### Fix
+1. **`models/registry.py`** (NIEUW) — scant `models/ai_xgb_model_*.json` + bijbehorende `_metrics_` files en schrijft `models/registry.json` met `{trained_at, auc, support, positive_ratio, version_ts}`. Run via `python -m models.registry`.
+2. **`bot/per_market_trailing.py`** (NIEUW) — `get_trailing_params(market, config)` met curated defaults voor BTC-EUR (1.0/0.6/0.4), ETH-EUR (1.2/0.7/0.5), SOL-EUR (1.5/0.9/0.6). Override-keten: `PER_MARKET_TRAILING` config → curated → globale config keys.
+3. **`bot/rate_limit_alert.py`** (NIEUW) — `check_and_alert(threshold=0.8, cooldown_sec=300)` leest `bot.api.get_rate_limit_status()` en logt WARNING per bucket met cooldown.
+4. **`bot/scheduler.py`** — nieuwe `check_rate_limits()` wrapper die scheduler-managed rate-limit health-check aanbiedt.
+5. **`core/binance_lead_lag.py` + `core/funding_rate_oracle.py`** — `# nosec B310` justifications voor trusted internal Binance/Coinbase URLs.
+6. **`modules/database_manager.py`** — `# nosec B608` justifications: `set_clause` is samengesteld uit interne dict-keys (geen user input), `where_clause` is interne literal met parameter placeholders.
+7. **`tests/test_road_to_10_phase6.py`** (NIEUW) — 14 tests (4 registry + 4 per-market + 4 rate-limit + 1 demo + 1 scheduler hook).
+8. **`docs/COPILOT_ROAD_TO_10.md`** — afvinks: dashboard_flask weg, feature store, model registry, per-market trailing, demo-mode, CI/CD ghcr.io, bandit clean, healthcheck, rate-limit metrics. Versielog #065 toegevoegd.
+
+### Lessons learned
+- Bandit B310 (urlopen) en B608 (SQL string format) zijn vaak false-positives in trusted-internal flows. `# nosec` met justification is de juiste oplossing als de input-source bewezen veilig is.
+- Per-market trailing-config is een drop-in helper die naar wens kan worden ingebouwd in `bot/trailing.py` zonder bestaande globale defaults te breken.
+- Model registry is leesbaar zonder dat de bot er aan gewend hoeft te zijn — `python -m models.registry` werkt standalone.
+
+### Tests
+**806 pass / 0 fail / 3 skip** (was 792, +14 nieuwe phase6 tests).
+**Bandit medium = 0 / high = 0** ✅.
+
+### Files
+- `models/registry.py` (NEW)
+- `bot/per_market_trailing.py` (NEW)
+- `bot/rate_limit_alert.py` (NEW)
+- `bot/scheduler.py` (+check_rate_limits)
+- `core/binance_lead_lag.py` (+nosec B310)
+- `core/funding_rate_oracle.py` (+nosec B310)
+- `modules/database_manager.py` (+nosec B608 ×2)
+- `tests/test_road_to_10_phase6.py` (NEW, 14 tests)
+- `docs/COPILOT_ROAD_TO_10.md` (8 tickoffs + versielog)
+- `docs/FIX_LOG.md` (#065)
+
+---
+
 ## #064 — Road-to-10 fase 4+5 wrap: shadow_trading + decorrelation entry-wiring (2026-04-30)
 
 ### Symptom

@@ -220,7 +220,7 @@ class DatabaseManager:
                 UPDATE trades 
                 SET {set_clause}
                 WHERE market = ? AND status = 'open'
-            """, values)
+            """, values)  # nosec B608 - set_clause built from internal dict keys, not user input
             conn.commit()
     
     def close_trade(self, market: str, sell_price: float, reason: str):
@@ -307,7 +307,7 @@ class DatabaseManager:
                     AVG(CASE WHEN profit <= 0 THEN profit END) as avg_loss
                 FROM trades
                 WHERE status = 'closed' {where_clause}
-            """, params).fetchone()
+            """, params).fetchone()  # nosec B608 - where_clause is internal literal with parameter placeholders
             
             result = dict(stats)
             result['win_rate'] = (result['winning_trades'] / result['total_trades'] * 100) if result['total_trades'] > 0 else 0

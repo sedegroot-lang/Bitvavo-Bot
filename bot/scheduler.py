@@ -74,3 +74,19 @@ def start_all_schedulers() -> Dict[str, bool]:
             state.log(f"scheduler.{name} failed: {exc}", level='warning')
             out[name] = False
     return out
+
+
+def check_rate_limits(threshold: float = 0.80, cooldown_sec: float = 300.0) -> Dict[str, float]:
+    """Periodic rate-limit health check — emits WARNING when any bucket exceeds threshold.
+
+    Designed to be called every ~30s from the main loop. Returns breached buckets.
+    """
+    try:
+        from bot.rate_limit_alert import check_and_alert
+        return check_and_alert(threshold=threshold, cooldown_sec=cooldown_sec, log_fn=state.log)
+    except Exception as exc:
+        try:
+            state.log(f"check_rate_limits failed: {exc}", level='debug')
+        except Exception:
+            pass
+        return {}
