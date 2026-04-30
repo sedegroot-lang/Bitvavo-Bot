@@ -54,6 +54,8 @@ logs/
 metrics/
 reports/
 models/
+!models/registry.py
+!models/__init__.py
 backups/
 locks/
 
