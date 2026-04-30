@@ -25,6 +25,14 @@
 - **`bot/close_trade.py`** (NIEUW, ~165 regels) — `finalize_close_trade()` extracted. Bevat alle close-bookkeeping (archive → record stats → market_profits → market_expectancy → post_loss_cooldown → adaptive_score → bayesian_fusion → meta_learner → del open_trades → save → cleanup → signal_publisher). Geen gedragsverandering. Alle hooks zijn `try/except: pass` zodat één faler niet de hele close blokkeert.
 - `_signal_pub` wordt lazy gefetched via `from modules import signal_publisher` binnen de extracted functie — geen state-registratie nodig.
 
+### Batch 3 additions (commit 3)
+- **`bot/maintenance.py`** (NIEUW, ~110 regels) — `apply_dynamic_performance_tweaks`, `register_saldo_error`, `optimize_parameters` extracted.
+- **`bot/ai_regime.py`** (NIEUW, ~95 regels) — `get_ai_regime_bias` extracted met eigen module-level cache. Leest `AI_HEARTBEAT_FILE` + alle thresholds via `state.CONFIG`.
+
+### Result (na batch 3)
+- `trailing_bot.py`: 4908 → **4335 regels** (-573, -11.7%).
+- Tests: 806 pass / 3 skip (zelfde als vóór deze sessie).
+
 ### Lessons / Notes
 - `bot_loop()` (2640 regels) en `initialize_managers()` (167 regels met Context-dataclass closures) blijven multi-day werk — eerlijke scope-separatie.
 - Pattern bevestigd: extract → shim met lazy import → smoke test → pytest → commit. Werkt veilig.

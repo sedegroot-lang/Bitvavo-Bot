@@ -472,48 +472,9 @@ def write_account_overview(
 
 
 def get_ai_regime_bias() -> Tuple[str, float]:
-    now = time.time()
-    cached = _AI_REGIME_CACHE.get('value') if isinstance(_AI_REGIME_CACHE, dict) else None
-    if cached and (now - float(_AI_REGIME_CACHE.get('ts', 0.0))) < AI_REGIME_CACHE_SECONDS:
-        return cached  # type: ignore[return-value]
-    regime = 'neutral'
-    multiplier = AI_REGIME_NEUTRAL_SIZE_MULT
-    try:
-        path = Path(AI_HEARTBEAT_FILE)
-        data: Dict[str, Any] = {}
-        if path.exists():
-            with path.open('r', encoding='utf-8') as fh:
-                loaded = json.load(fh) or {}
-                data = loaded if isinstance(loaded, dict) else {}
-        ts = float(data.get('ts', 0) or 0)
-        stale = not ts or (now - ts) > AI_HEARTBEAT_STALE_SECONDS
-        critical = int(data.get('critical_suggestions', 0) or 0)
-        declared_regime = str(data.get('regime') or '').lower()
-        if critical >= AI_REGIME_HALT_CRITICAL_COUNT:
-            regime = 'halt'
-            multiplier = AI_REGIME_HALT_SIZE_MULT
-        elif critical >= AI_REGIME_DEFENSIVE_CRITICAL_COUNT:
-            regime = 'defensive'
-            multiplier = AI_REGIME_DEFENSIVE_SIZE_MULT
-        elif declared_regime == 'aggressive':
-            regime = 'aggressive'
-            multiplier = AI_REGIME_AGGRESSIVE_SIZE_MULT
-        else:
-            regime = declared_regime or 'neutral'
-            multiplier = AI_REGIME_NEUTRAL_SIZE_MULT
-        if stale and regime != 'halt':
-            regime = 'neutral'
-            multiplier = AI_REGIME_NEUTRAL_SIZE_MULT
-            try:
-                log(f"AI regime fallback to neutral (stale heartbeat: {int(now - ts)}s old)", level='debug')
-            except Exception as e:
-                log(f"log failed: {e}", level='warning')
-    except Exception:
-        regime = 'halt'
-        multiplier = AI_REGIME_HALT_SIZE_MULT
-    _AI_REGIME_CACHE['value'] = (regime, multiplier)
-    _AI_REGIME_CACHE['ts'] = now
-    return regime, multiplier
+    """Shim → bot.ai_regime.get_ai_regime_bias (#066 batch 3)."""
+    from bot.ai_regime import get_ai_regime_bias as _impl
+    return _impl()
 
 
 def _init_perf_sampler() -> Optional["PerfSampler"]:
@@ -871,50 +832,9 @@ def get_expected_slippage_sell(market, amount_base, ref_price):
 
 
 def apply_dynamic_performance_tweaks() -> None:
-    """Adjust key config knobs based on recent trading performance."""
-    updated = False  # Ensure defined even if we exit early
-    try:
-        data = load_trade_snapshot(TRADE_LOG)
-    except Exception as exc:
-        log(f"Dynamische analyse trade-log mislukt: {exc}", level='warning')
-        return
-
-    closed = data.get('closed', []) if isinstance(data, dict) else []
-    if not closed:
-        return
-
-    pnl_list = [t.get('profit', 0) for t in closed if isinstance(t, dict)]
-    if not pnl_list:
-        return
-
-    avg_pnl = statistics.mean(pnl_list)
-    win_rate = sum(1 for p in pnl_list if p > 0) / len(pnl_list)
-
-    # NOTE: Dynamic risk scaling of BASE_AMOUNT_EUR disabled — AI supervisor handles this via auto-apply
-
-    # Dynamische score drempel op basis van gemiddelde winst per trade
-    # Scores komen uit signal_strength() met max ~15, dus drempel moet 5-9 zijn
-    min_score = float(CONFIG.get('MIN_SCORE_TO_BUY', 7))
-    if avg_pnl < -0.5:  # Alleen bij significant verlies verhogen
-        new_score = min(min_score + 0.5, 9.0)  # Max 9, niet hoger
-    elif avg_pnl > 0.5:
-        new_score = max(min_score - 0.5, 5.0)  # Min 5, niet lager
-    else:
-        new_score = min_score
-    if abs(new_score - min_score) > 0.01:
-        CONFIG['MIN_SCORE_TO_BUY'] = new_score
-        updated = True
-        log(f"MIN_SCORE_TO_BUY aangepast naar {new_score:.1f} (gemiddelde winst {avg_pnl:.2f} EUR).")
-
-    if updated:
-        payload = {'MIN_SCORE_TO_BUY': CONFIG.get('MIN_SCORE_TO_BUY')}
-        if 'BASE_AMOUNT_EUR' in CONFIG:
-            payload['BASE_AMOUNT_EUR'] = CONFIG['BASE_AMOUNT_EUR']
-        try:
-            with open('param_log.txt', 'a', encoding='utf-8') as fh:
-                fh.write(f"{datetime.now()} | {json.dumps(payload)}\n")
-        except Exception as e:
-            log(f"encoding failed: {e}", level='warning')
+    """Shim → bot.maintenance.apply_dynamic_performance_tweaks (#066 batch 3)."""
+    from bot.maintenance import apply_dynamic_performance_tweaks as _impl
+    return _impl()
 
 
 _LAST_ML_OPTIMIZER_RUN = 0.0
@@ -941,29 +861,9 @@ async def maybe_run_ml_optimizer() -> None:
     except Exception as exc:
         log(f"ML-optimalisatie mislukt: {exc}", level='error')
 def register_saldo_error(market: str, bitvavo_balance: Optional[dict], trade_snapshot: Optional[dict]) -> None:
-    """Log saldo errors for later inspection and flood detection."""
-    entry = {
-        'market': market,
-        'timestamp': time.time(),
-        'bitvavo_balance': bitvavo_balance,
-        'trade_snapshot': trade_snapshot,
-    }
-    max_entries = int(CONFIG.get('SALDO_ERROR_MAX_LOG', 200))
-    try:
-        with file_lock:
-            try:
-                with open('data/pending_saldo.json', 'r', encoding='utf-8') as fh:
-                    pending = json.load(fh)
-                if not isinstance(pending, list):
-                    pending = []
-            except Exception:
-                pending = []
-            pending.append(entry)
-            if max_entries > 0:
-                pending = pending[-max_entries:]
-            json_write_compat('data/pending_saldo.json', pending, indent=2)
-    except Exception as exc:
-        log(f"Fout bij registreren saldo_error voor {market}: {exc}", level='error')
+    """Shim → bot.maintenance.register_saldo_error (#066 batch 3)."""
+    from bot.maintenance import register_saldo_error as _impl
+    return _impl(market, bitvavo_balance, trade_snapshot)
 
 
 def saldo_flood_guard() -> None:
@@ -1031,23 +931,9 @@ def start_auto_sync(*, interval: int = 60) -> None:
 
 
 def optimize_parameters(trades: List[Dict[str, Any]]) -> None:
-    """Placeholder for parameter optimization based on trade history.
-    
-    Can be extended to:
-    - Analyze win/loss patterns
-    - Adjust MIN_SCORE_TO_BUY dynamically
-    - Optimize position sizing
-    - Fine-tune trailing parameters
-    """
-    try:
-        if not trades or len(trades) < 5:
-            return  # Not enough data to optimize
-        
-        # Basic analysis already covered by apply_dynamic_performance_tweaks()
-        # This is a hook for future optimization logic
-        log(f"[OPTIMIZE] Analyzed {len(trades)} trades for parameter optimization", level='debug')
-    except Exception as e:
-        log(f"[ERROR] Parameter optimization failed: {e}", level='warning')
+    """Shim → bot.maintenance.optimize_parameters (#066 batch 3)."""
+    from bot.maintenance import optimize_parameters as _impl
+    return _impl(trades)
 
 
 def save_trades(force: bool = False):
