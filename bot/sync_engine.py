@@ -192,6 +192,11 @@ def sync_with_bitvavo():
                     _need_derive = False
                     _derive_reason = ''
 
+                    # MANUAL OVERRIDE: skip cost-basis derive if user manually aligned
+                    # cost basis (e.g. to match Bitvavo dashboard view). Other sync
+                    # fields (amount, trailing, dca) still update normally.
+                    _override_cb = bool(local.get('_manual_cost_basis_override'))
+
                     # Check 1: amount changed
                     _amount_change_pct = abs(new_amount - old_amount) / max(old_amount, 1e-12)
                     if _amount_change_pct > 0.001:  # >0.1% change
@@ -220,6 +225,10 @@ def sync_with_bitvavo():
                                 _need_derive = True
                                 _derive_reason = f'invested_eur €{_cur_inv:.2f} diverges >2% from expected €{_expected:.2f}'
 
+                    if _need_derive:
+                        if _override_cb:
+                            log(f"[{m}] skip derive_cost_basis (manual override active): {_derive_reason}", level='debug')
+                            _need_derive = False
                     if _need_derive:
                         try:
                             # ALWAYS use full history — no opened_ts filter (see FIX_LOG.md #001)

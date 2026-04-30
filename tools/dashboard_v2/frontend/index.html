@@ -254,7 +254,11 @@
                 </div>
 
                 <div class="tc-row">
-                  <span class="lbl" x-text="tr.trailing_activated ? 'Trailing actief' : 'Naar activatie'"></span>
+                  <span class="lbl">
+                    <span x-text="tr.trailing_activated ? 'Trailing actief' : 'Naar activatie'"></span>
+                    <span class="muted" x-show="tr.activation_price != null"
+                          x-text="' @ ' + fmtPrice(tr.activation_price)"></span>
+                  </span>
                   <div class="progress-bar">
                     <div class="fill"
                          :class="tr.trailing_activated ? 'active' : ((tr.trailing_progress_pct ?? 0) >= 70 ? 'near' : ((tr.trailing_progress_pct ?? 0) >= 30 ? 'mid' : 'early'))"
