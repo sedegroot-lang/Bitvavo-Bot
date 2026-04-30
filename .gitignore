@@ -130,6 +130,7 @@ data/llm_supervisor_log.jsonl
 # Debug scripts and analysis output (root underscore-prefixed)
 # ==============================================
 scripts/debug/_*.py
+scripts/_*.py
 tmp/
 _*.txt
 _*.json
@@ -137,4 +138,12 @@ _*.log
 _*.html
 _*.csv
 _*.old
+
+# ==============================================
+# Rotation/legacy artefacts (cleanup 2026-04-30)
+# ==============================================
+*.old
+logs/*.rotation.log
+logs/*.jsonl
+testout.txt
 
