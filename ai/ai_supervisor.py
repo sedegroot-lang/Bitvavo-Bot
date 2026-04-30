@@ -358,6 +358,40 @@ def _safe_load_json(path, default):
         return default
 
 
+def _archive_old_suggestions(doc: dict, max_age_days: int = 1) -> dict:
+    """Move suggestions older than `max_age_days` to a dated archive file.
+
+    Keeps `ai/ai_market_suggestions.json` lean. Returns the trimmed document.
+    Best-effort: any failure leaves the original document untouched.
+    """
+    try:
+        suggestions = doc.get('suggestions') or []
+        if not suggestions:
+            return doc
+        cutoff = int(time.time()) - int(max_age_days * 86400)
+        old = [s for s in suggestions if isinstance(s, dict) and int(s.get('ts', 0)) < cutoff]
+        if not old:
+            return doc
+        archive_dir = os.path.join(_PROJECT_ROOT, 'ai', 'archive')
+        os.makedirs(archive_dir, exist_ok=True)
+        from datetime import datetime as _dt
+        stamp = _dt.utcfromtimestamp(cutoff).strftime('%Y-%m-%d')
+        archive_file = os.path.join(archive_dir, f'ai_market_suggestions_{stamp}.json')
+        existing = _safe_load_json(archive_file, {'suggestions': []})
+        if not isinstance(existing, dict):
+            existing = {'suggestions': []}
+        existing_list = existing.get('suggestions') or []
+        existing_list.extend(old)
+        existing['suggestions'] = existing_list
+        with open(archive_file, 'w', encoding='utf-8') as f:
+            json.dump(existing, f, indent=2)
+        kept = [s for s in suggestions if not (isinstance(s, dict) and int(s.get('ts', 0)) < cutoff)]
+        doc['suggestions'] = kept
+    except Exception:
+        pass
+    return doc
+
+
 def suggest_market(market: str, reason: str | None = None) -> bool:
     """Append a market suggestion to `ai/ai_market_suggestions.json`.
 
@@ -367,6 +401,8 @@ def suggest_market(market: str, reason: str | None = None) -> bool:
         doc = _safe_load_json(AI_MARKET_SUGGESTIONS_FILE, {'suggestions': []})
         if not isinstance(doc, dict):
             doc = {'suggestions': []}
+        # Archive entries older than 1 day to keep the live file small.
+        doc = _archive_old_suggestions(doc, max_age_days=1)
         suggestions = doc.get('suggestions') or []
         ts = int(time.time())
         # avoid duplicates

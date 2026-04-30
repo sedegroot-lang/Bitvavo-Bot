@@ -48,6 +48,14 @@ repos:
         additional_dependencies: ['bandit[toml]']
         exclude: ^(tests/|archive/|backups/)
 
+  # Secret scanning with detect-secrets
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: ^(archive/|backups/|\.venv/|docs/archive/|tests/|.*\.lock|.*\.json)$
+
   # General pre-commit checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

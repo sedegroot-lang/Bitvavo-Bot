@@ -76,6 +76,10 @@ except Exception:
 class SafeRotatingFileHandler(RotatingFileHandler):
     """RotatingFileHandler that tolerates Windows file locks (e.g. OneDrive)."""
 
+    # Cap the rotation-fallback notice file. Without this it grew unbounded
+    # (one append per failed rollover) — observed at 5 GB on 2026-04-30.
+    _ROTATION_FALLBACK_MAX_BYTES = 1 * 1024 * 1024  # 1 MB
+
     def doRollover(self):
         try:
             super().doRollover()
@@ -85,6 +89,12 @@ class SafeRotatingFileHandler(RotatingFileHandler):
             # Skip rotation and continue logging to the current file instead of crashing.
             try:
                 fallback = f"{self.baseFilename}.rotation.log"
+                # Truncate if it exceeds cap to prevent unbounded growth.
+                try:
+                    if os.path.exists(fallback) and os.path.getsize(fallback) > self._ROTATION_FALLBACK_MAX_BYTES:
+                        os.remove(fallback)
+                except Exception:
+                    pass
                 with open(fallback, 'a', encoding=self.encoding or 'utf-8') as fh:
                     ts = datetime.utcnow().isoformat()
                     fh.write(f"{ts} WARNING rotation skipped for {self.baseFilename}: {exc}\n")

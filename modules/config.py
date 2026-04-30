@@ -311,3 +311,39 @@ def save_config(config: dict) -> None:
     _sync_overrides(clean)
 
 CONFIG = load_config()
+
+
+def _cli_validate() -> int:
+    """Dry-run config validator. Loads the merged config and reports schema
+    issues. Exits non-zero on errors so this can be used in CI/pre-commit.
+
+    Usage: python -m modules.config --validate
+    """
+    import sys as _sys
+    cfg = load_config()
+    try:
+        from modules.config_schema import validate_config as _validate
+    except Exception as e:
+        print(f"[validate] schema module niet beschikbaar: {e}")
+        return 2
+    issues = _validate(cfg)
+    errors = [i for i in issues if i.get('severity') == 'error']
+    warnings = [i for i in issues if i.get('severity') != 'error']
+    print(f"[validate] config keys: {len(cfg)}")
+    print(f"[validate] errors:   {len(errors)}")
+    print(f"[validate] warnings: {len(warnings)}")
+    for item in issues:
+        sev = str(item.get('severity', '?')).upper()
+        print(f"  [{sev}] {item.get('key')}: {item.get('issue')}")
+    print(f"[validate] LOCAL_OVERRIDE_PATH = {LOCAL_OVERRIDE_PATH}")
+    print(f"[validate] exists = {os.path.exists(LOCAL_OVERRIDE_PATH)}")
+    return 1 if errors else 0
+
+
+if __name__ == '__main__':
+    import sys as _sys
+    if '--validate' in _sys.argv:
+        _sys.exit(_cli_validate())
+    print("Usage: python -m modules.config --validate")
+    _sys.exit(2)
+
