@@ -47,6 +47,16 @@
 - `trailing_bot.py`: 4908 → **4126 regels** (-782, -15.9%).
 - Tests: 806 pass / 3 skip.
 
+### Batch 6 additions (commit 6)
+- **`bot/cost_basis_helpers.py`** (NIEUW, ~30 regels) — `get_true_total_invested(trade)` pure helper.
+- **`bot/ml_optimizer_runner.py`** (NIEUW, ~45 regels) — `maybe_run()` async, eigen module-level `_LAST_RUN` timestamp.
+- **`bot/safety_buy.py`** (NIEUW, ~45 regels) — `safety_buy(market, amt_eur, entry_price)` async met market-order fallback.
+- `trailing_bot.py` shimmed: 3 functies (~58 regels totaal) vervangen door 4-line shims.
+
+### Result (na batch 6)
+- `trailing_bot.py`: 4908 → **4080 regels** (-828, -16.9%).
+- Tests: 806 pass / 3 skip.
+
 ### Lessons / Notes
 - `bot_loop()` (2640 regels) en `initialize_managers()` (167 regels met Context-dataclass closures) blijven multi-day werk — eerlijke scope-separatie.
 - Pattern bevestigd: extract → shim met lazy import → smoke test → pytest → commit. Werkt veilig.

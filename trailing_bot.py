@@ -173,27 +173,9 @@ def _finalize_close_trade(
 
 
 def _get_true_total_invested(trade: Dict[str, Any]) -> float:
-    """Return the most reliable total investment cost for a trade.
-
-    Prefers initial_invested_eur (immutable) as ground truth.
-    Falls back to total_invested_eur, then invested_eur, then buy_price*amount.
-    Ensures total_invested is never less than initial_invested (would indicate corruption).
-    """
-    _init = float(trade.get('initial_invested_eur', 0) or 0)
-    _total = float(trade.get('total_invested_eur', 0) or 0)
-    _current = float(trade.get('invested_eur', 0) or 0)
-    _bp = float(trade.get('buy_price', 0) or 0)
-    _amt = float(trade.get('amount', 0) or 0)
-    _computed = round(_bp * _amt, 4) if _bp > 0 and _amt > 0 else 0.0
-
-    # Best source: initial + DCA amounts via total_invested_eur
-    result = _total if _total > 0 else (_current if _current > 0 else _computed)
-
-    # Sanity: total should never be less than initial (means it was corrupted)
-    if _init > 0 and result < _init:
-        result = _init
-
-    return result
+    """Shim → bot.cost_basis_helpers.get_true_total_invested (#066 batch 6)."""
+    from bot.cost_basis_helpers import get_true_total_invested as _impl
+    return _impl(trade)
 
 
 def _as_float(value: Any, default: float = 0.0) -> float:
@@ -805,25 +787,9 @@ _LAST_ML_OPTIMIZER_RUN = 0.0
 
 
 async def maybe_run_ml_optimizer() -> None:
-    """Run the ML optimizer at most once per configured interval."""
-    global _LAST_ML_OPTIMIZER_RUN
-    interval = float(CONFIG.get('ML_OPTIMIZER_INTERVAL_SECONDS', 86400))
-    if interval <= 0:
-        return
-    now = time.time()
-    if (now - _LAST_ML_OPTIMIZER_RUN) < interval:
-        return
-    try:
-        from ai import ml_optimizer  # Fixed: was 'import ml_optimizer'
-        log("Start ML-optimalisatie van parameters...")
-        if hasattr(ml_optimizer, 'optimize_ml_parameters_async'):
-            await ml_optimizer.optimize_ml_parameters_async()
-        else:
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, ml_optimizer.optimize_ml_parameters)
-        _LAST_ML_OPTIMIZER_RUN = now
-    except Exception as exc:
-        log(f"ML-optimalisatie mislukt: {exc}", level='error')
+    """Shim → bot.ml_optimizer_runner.maybe_run (#066 batch 6)."""
+    from bot.ml_optimizer_runner import maybe_run as _impl
+    await _impl()
 def register_saldo_error(market: str, bitvavo_balance: Optional[dict], trade_snapshot: Optional[dict]) -> None:
     """Shim → bot.maintenance.register_saldo_error (#066 batch 3)."""
     from bot.maintenance import register_saldo_error as _impl
@@ -3726,21 +3692,9 @@ async def open_trade_async(score, m, price_now, s_short, eur_balance, ml_info=No
     _release_market(m)
     return {'buy_executed': True, 'eur_used': amt_eur}
 async def safety_buy(m, amt_eur, entry_price):
-    buy_result = place_buy(m, amt_eur, entry_price)
-    if not is_order_success(buy_result):
-        log(f"⚠️ Eerste koop voor {m} mislukt, probeer safety buy (market order) na 2s...")
-        await asyncio.sleep(2)
-        buy_result = place_buy(m, amt_eur, None, order_type='market')
-        if not is_order_success(buy_result):
-            log(f"❌ Safety buy voor {m} ook mislukt, sla trade over.")
-            return None, entry_price
-    # Update entry_price if available in response
-    try:
-        if isinstance(buy_result, dict) and buy_result.get('price'):
-            entry_price = float(buy_result.get('price'))
-    except Exception as e:
-        log(f"entry_price failed: {e}", level='error')
-    return buy_result, entry_price
+    """Shim → bot.safety_buy.safety_buy (#066 batch 6)."""
+    from bot.safety_buy import safety_buy as _impl
+    return await _impl(m, amt_eur, entry_price)
 
 # =========================
 # DASHBOARD (FLASK) - optional
