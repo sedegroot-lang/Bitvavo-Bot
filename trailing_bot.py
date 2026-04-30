@@ -339,55 +339,19 @@ risk_manager: Optional[RiskManager] = None
 metrics_collector: Optional[MetricsCollector] = None
 
 try:
-    EVENT_STATE = EventState() if EventState else None
+    from bot.event_hooks_adapter import (
+        EVENT_STATE,
+        event_hooks_paused as _event_hooks_paused,
+        event_hook_status_payload as _event_hook_status_payload,
+    )
 except Exception:
     EVENT_STATE = None
 
-_EVENT_PAUSE_CACHE: Dict[str, bool] = {}
-
-
-def _event_hooks_paused(market: str) -> bool:
-    """Return True if a market (or global) pause is active via event hooks."""
-    if not EVENT_STATE or not getattr(EVENT_STATE, "enabled", False):
-        if _EVENT_PAUSE_CACHE.get(market):
-            _EVENT_PAUSE_CACHE[market] = False
+    def _event_hooks_paused(market: str) -> bool:  # type: ignore[no-redef]
         return False
-    try:
-        paused = EVENT_STATE.market_paused(market)
-    except Exception as exc:
-        log(f"[event_hooks] Kon pausestatus niet ophalen voor {market}: {exc}", level='warning')
-        return False
-    previous = _EVENT_PAUSE_CACHE.get(market)
-    if paused and previous is not True:
-        log(f"[event_hooks] Pauze actief voor {market} -> nieuwe entries geblokkeerd", level='info')
-    elif not paused and previous:
-        log(f"[event_hooks] Pauze opgeheven voor {market}", level='info')
-    _EVENT_PAUSE_CACHE[market] = paused
-    return paused
 
-
-def _event_hook_status_payload() -> Dict[str, Any]:
-    if not EVENT_STATE:
+    def _event_hook_status_payload() -> Dict[str, Any]:  # type: ignore[no-redef]
         return {"enabled": False}
-    try:
-        records = EVENT_STATE.active_actions()
-    except Exception as exc:
-        log(f"[event_hooks] Status opvragen mislukt: {exc}", level='debug')
-        return {"enabled": getattr(EVENT_STATE, "enabled", False)}
-    formatted = [
-        {
-            "market": rec.market or "GLOBAL",
-            "action": rec.action,
-            "message": rec.message,
-            "expires_ts": rec.expires_ts,
-        }
-        for rec in records
-    ]
-    return {
-        "enabled": getattr(EVENT_STATE, "enabled", False),
-        "active": formatted,
-        "last_refresh": time.time(),
-    }
 
 
 def load_market_performance() -> Dict[str, Any]:
@@ -1095,57 +1059,9 @@ def _iter_trade_values(price_cache: Optional[Dict[str, Optional[float]]]=None):
     from bot.portfolio import iter_trade_values as _impl
     yield from _impl(price_cache)
 def get_true_invested_eur(trade: Dict[str, Any], market: str = '') -> float:
-    """BULLETPROOF invested_eur calculation.
-    
-    Returns the TRUE current invested EUR for a trade.
-    Cross-checks stored invested_eur against buy_price * amount.
-    If they diverge by >20%, uses buy_price * amount (always correct).
-    
-    This is the ONLY function that should be used to get invested_eur
-    for profit calculations, sell decisions, and logging.
-    """
-    buy_price = float(trade.get('buy_price', 0) or 0)
-    amount = float(trade.get('amount', 0) or 0)
-    stored_invested = float(trade.get('invested_eur', 0) or 0)
-    total_invested = float(trade.get('total_invested_eur', 0) or 0)
-    
-    # Ground truth: what the position is actually worth at cost basis
-    computed = round(buy_price * amount, 4) if buy_price > 0 and amount > 0 else 0.0
-    
-    if stored_invested <= 0 and total_invested > 0:
-        stored_invested = total_invested
-    
-    if stored_invested <= 0 and computed > 0:
-        # No stored value at all — use computed
-        log(f"[INVESTED FIX] {market}: No stored invested_eur, using computed €{computed:.2f}", level='warning')
-        trade['invested_eur'] = computed
-        # Only set total/initial if they are also missing
-        if total_invested <= 0:
-            trade['total_invested_eur'] = computed
-        if float(trade.get('initial_invested_eur', 0) or 0) <= 0:
-            trade['initial_invested_eur'] = computed
-        return computed
-    
-    if stored_invested > 0 and computed > 0:
-        # Cross-check: if >20% divergence, the stored invested_eur is wrong
-        divergence = abs(computed - stored_invested) / max(stored_invested, 0.01)
-        if divergence > 0.20:
-            log(f"[INVESTED FIX] {market}: stored invested €{stored_invested:.2f} vs computed €{computed:.2f} (divergence {divergence:.0%}) — CORRECTING invested_eur to computed", level='warning')
-            trade['invested_eur'] = computed
-            # CRITICAL: Do NOT overwrite total_invested_eur here!
-            # total_invested_eur tracks cumulative cost (initial + DCAs) and must
-            # never be reduced by partial TP or recalculation. It is the base for
-            # final profit calculation: profit = (proceeds + partial_tp_revenue) - total_invested.
-            # Only fix total/initial if they are clearly unset/zero.
-            if total_invested <= 0:
-                trade['total_invested_eur'] = computed
-            init_inv = float(trade.get('initial_invested_eur', 0) or 0)
-            if init_inv <= 0:
-                trade['initial_invested_eur'] = computed
-            return computed
-    
-    # Stored value is reasonable
-    return stored_invested if stored_invested > 0 else computed
+    """Shim → bot.market_helpers.get_true_invested_eur (#066 batch 4)."""
+    from bot.market_helpers import get_true_invested_eur as _impl
+    return _impl(trade, market)
 def count_active_open_trades(
     threshold: Optional[float] = None,
     *,
@@ -1156,60 +1072,15 @@ def count_active_open_trades(
 
 
 def get_pending_bitvavo_orders() -> List[Dict[str, Any]]:
-    """Get list of pending BUY orders from Bitvavo that are NOT yet in open_trades.
-    
-    These orders count towards MAX_OPEN_TRADES to prevent over-allocation.
-    Excludes grid trading orders to avoid conflicts.
-    """
-    try:
-        # Get grid markets + order IDs to exclude
-        grid_markets = get_active_grid_markets()
-        grid_order_ids = set()
-        try:
-            from modules.grid_trading import get_grid_manager
-            gm = get_grid_manager()
-            grid_order_ids = gm.get_grid_order_ids()
-        except Exception:
-            pass
-
-        orders = safe_call(bitvavo.ordersOpen, {}) or []
-        pending = []
-        for o in orders:
-            try:
-                if o.get('side') != 'buy':
-                    continue
-                market = o.get('market') or o.get('symbol')
-                if not market or market in open_trades:
-                    continue
-                # CRITICAL: Skip grid trading orders
-                if market in grid_markets or o.get('orderId') in grid_order_ids:
-                    continue
-                status = str(o.get('status', '')).lower().replace('_', '').replace('-', '').strip()
-                if status not in {'new', 'open', 'partiallyfilled', 'partially filled', 'awaitingtrigger'}:
-                    continue
-                # Add to pending list
-                created_ms = o.get('created', 0)
-                age_sec = (time.time() * 1000 - created_ms) / 1000 if created_ms else 0
-                pending.append({
-                    'market': market,
-                    'orderId': o.get('orderId'),
-                    'amount': float(o.get('amount', 0) or 0),
-                    'price': float(o.get('price', 0) or 0),
-                    'status': o.get('status'),
-                    'created': created_ms,
-                    'age_seconds': age_sec,
-                })
-            except Exception:
-                continue
-        return pending
-    except Exception as e:
-        log(f"Error getting pending Bitvavo orders: {e}", level='debug')
-        return []
+    """Shim → bot.market_helpers.get_pending_bitvavo_orders (#066 batch 4)."""
+    from bot.market_helpers import get_pending_bitvavo_orders as _impl
+    return _impl()
 
 
 def count_pending_bitvavo_orders() -> int:
-    """Count pending BUY orders not yet in open_trades."""
-    return len(get_pending_bitvavo_orders())
+    """Shim → bot.market_helpers.count_pending_bitvavo_orders (#066 batch 4)."""
+    from bot.market_helpers import count_pending_bitvavo_orders as _impl
+    return _impl()
 def count_dust_trades(threshold: Optional[float] = None) -> int:
     from bot.portfolio import count_dust_trades as _impl
     return _impl(threshold)

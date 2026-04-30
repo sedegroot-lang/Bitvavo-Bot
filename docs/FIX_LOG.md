@@ -29,8 +29,13 @@
 - **`bot/maintenance.py`** (NIEUW, ~110 regels) — `apply_dynamic_performance_tweaks`, `register_saldo_error`, `optimize_parameters` extracted.
 - **`bot/ai_regime.py`** (NIEUW, ~95 regels) — `get_ai_regime_bias` extracted met eigen module-level cache. Leest `AI_HEARTBEAT_FILE` + alle thresholds via `state.CONFIG`.
 
-### Result (na batch 3)
-- `trailing_bot.py`: 4908 → **4335 regels** (-573, -11.7%).
+### Batch 4 additions (commit 4)
+- **`bot/market_helpers.py`** (NIEUW, ~120 regels) — `get_true_invested_eur(trade, market)` (bulletproof invested met 20% divergence cross-check), `get_pending_bitvavo_orders()` (excludeert grid orders en in-memory open_trades), `count_pending_bitvavo_orders()` (len wrapper). Leest `state.bitvavo`/`state.safe_call`/`state.open_trades`/`state.get_active_grid_markets`.
+- **`bot/event_hooks_adapter.py`** (NIEUW, ~80 regels) — module-level `EVENT_STATE` singleton (één-malig `EventState()` op import) + `event_hooks_paused(market)` met module-private transition cache + `event_hook_status_payload()` voor dashboard. Graceful fallback als `modules.event_hooks` ontbreekt.
+- `trailing_bot.py` shimmed: 3 functies vervangen door 4-line stubs en het volledige `EVENT_STATE`/`_event_hooks_paused`/`_event_hook_status_payload` blok (~50 regels) vervangen door één 13-line `try/except` import.
+
+### Result (na batch 4)
+- `trailing_bot.py`: 4908 → **4206 regels** (-702, -14.3%).
 - Tests: 806 pass / 3 skip (zelfde als vóór deze sessie).
 
 ### Lessons / Notes

@@ -186,3 +186,4 @@
 | 2026-04-30 | #065 fase 4+5+6+7 closure: model registry + per-market trailing + rate-limit alert + bandit clean + 14 tests (820 total) | Copilot |
 | 2026-04-30 | #066 fase 2 monoliet shrink batch 1+2: trade_repair + path_utils + close_trade extracted, trailing_bot.py 4908→4449 (-9.4%), 806 tests groen | Copilot |
 | 2026-04-30 | #066 fase 2 monoliet shrink batch 3: maintenance + ai_regime extracted, trailing_bot.py 4449→4335 (-11.7% totaal), 806 tests groen | Copilot |
+| 2026-04-30 | #066 fase 2 monoliet shrink batch 4: market_helpers + event_hooks_adapter extracted, trailing_bot.py 4335→4206 (-14.3% totaal), 806 tests groen | Copilot |
