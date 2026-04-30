@@ -38,6 +38,15 @@
 - `trailing_bot.py`: 4908 → **4206 regels** (-702, -14.3%).
 - Tests: 806 pass / 3 skip (zelfde als vóór deze sessie).
 
+### Batch 5 additions (commit 5)
+- **`bot/circuit_breaker.py`** (NIEUW, ~85 regels) — `is_active()` extracted uit nested fn binnen `open_trade_async`. Leest grace/cooldown/wr/pf via `state.CONFIG`, mutateert `_circuit_breaker_until_ts` + `_cb_trades_since_reset`. Gebruikt lazy `import trailing_bot` om `tb.TRADE_LOG` runtime-patches te respecteren (test-compat).
+- **`bot/auto_sync_manager.py`** (NIEUW, ~70 regels) — `start(interval)` extracted uit `start_auto_sync`. Eigen module-level `_auto_sync_thread` handle. Leest `synchronizer`/`trades_lock`/`open_trades`/`closed_trades`/`market_profits` via `state`.
+- `trailing_bot.py` shimmed: nested `_circuit_breaker_active` (~53 regels) vervangen door 1-line lazy import; `start_auto_sync` body (~33 regels) vervangen door 4-line shim.
+
+### Result (na batch 5)
+- `trailing_bot.py`: 4908 → **4126 regels** (-782, -15.9%).
+- Tests: 806 pass / 3 skip.
+
 ### Lessons / Notes
 - `bot_loop()` (2640 regels) en `initialize_managers()` (167 regels met Context-dataclass closures) blijven multi-day werk — eerlijke scope-separatie.
 - Pattern bevestigd: extract → shim met lazy import → smoke test → pytest → commit. Werkt veilig.

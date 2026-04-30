@@ -860,38 +860,9 @@ def sanitize_balance_payload(payload, *, source: str = 'bitvavo.balance') -> Lis
 
 
 def start_auto_sync(*, interval: int = 60) -> None:
-    global _auto_sync_thread
-    # Always start the auto-sync thread; the running thread will consult
-    # the shared CONFIG at runtime to determine whether syncing should occur.
-    # This makes the dashboard/config hot-reload effective without restarting.
-    if synchronizer is None:
-        log("Auto-sync niet gestart: synchronizer ontbreekt.", level='debug')
-        return
-    if interval <= 0:
-        interval = SYNC_INTERVAL_SECONDS
-    if interval <= 0:
-        interval = 60
-    if _auto_sync_thread and _auto_sync_thread.is_alive():
-        return
-
-    def state_provider():
-        with trades_lock:
-            return dict(open_trades), list(closed_trades), dict(market_profits)
-
-    def state_consumer(new_open, new_closed, new_profits):
-        with trades_lock:
-            open_trades.clear()
-            open_trades.update(new_open)
-            closed_trades[:] = list(new_closed)
-            market_profits.clear()
-            market_profits.update(new_profits)
-
-    _auto_sync_thread = synchronizer.start_auto_sync(
-        state_provider,
-        state_consumer,
-        interval=interval,
-    )
-    log(f"Auto-sync thread gestart (interval={interval}s).", level='info')
+    """Shim → bot.auto_sync_manager.start (#066 batch 5)."""
+    from bot.auto_sync_manager import start as _impl
+    return _impl(interval=interval)
 
 
 def optimize_parameters(trades: List[Dict[str, Any]]) -> None:
@@ -3106,59 +3077,8 @@ async def open_trade_async(score, m, price_now, s_short, eur_balance, ml_info=No
     if ml_info is None:
         ml_info = {}
     # Circuit breaker: pause new entries on poor recent performance
-    # Grace period prevents deadlock: after cooldown expires, allow GRACE trades
-    # before re-evaluating (otherwise same bad stats re-trigger immediately).
-    def _circuit_breaker_active() -> tuple[bool, str]:
-        cfg = CONFIG
-        min_wr = float(cfg.get('CIRCUIT_BREAKER_MIN_WIN_RATE', 0) or 0)
-        min_pf = float(cfg.get('CIRCUIT_BREAKER_MIN_PROFIT_FACTOR', 0) or 0)
-        cooldown_min = int(cfg.get('CIRCUIT_BREAKER_COOLDOWN_MINUTES', 0) or 0)
-        grace_trades = int(cfg.get('CIRCUIT_BREAKER_GRACE_TRADES', 5) or 5)
-        if min_wr <= 0 and min_pf <= 0:
-            return False, ''
-        now = time.time()
-        until = cfg.get('_circuit_breaker_until_ts', 0)
-        if until and now < until:
-            return True, f"cooldown_until={time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(until))}"
-        # Cooldown just expired — enter grace period
-        if until and now >= until:
-            trades_since = cfg.get('_cb_trades_since_reset', 0)
-            if trades_since < grace_trades:
-                # Grace period: allow trading, don't re-check yet
-                if trades_since == 0:
-                    log(f"[CIRCUIT BREAKER] Cooldown expired, grace period: {grace_trades} trades allowed before re-check", level='info')
-                return False, ''
-            # Grace period over — clear state and re-evaluate below
-            cfg.pop('_circuit_breaker_until_ts', None)
-            cfg.pop('_cb_trades_since_reset', None)
-        trade_log_path = TRADE_LOG
-        try:
-            with open(trade_log_path, 'r', encoding='utf-8') as fh:
-                data = json.load(fh)
-            closed = data.get('closed', []) if isinstance(data, dict) else []
-            recent = closed[-20:] if len(closed) > 20 else closed
-            if not recent:
-                return False, ''
-            # CRITICAL FIX: Don't activate circuit breaker with too few trades
-            # With only 1-4 trades, win_rate is too noisy to be meaningful
-            min_trades_for_cb = max(5, grace_trades)
-            if len(recent) < min_trades_for_cb:
-                return False, ''
-            wins = [t for t in recent if t.get('profit', 0) > 0]
-            losses = [t for t in recent if t.get('profit', 0) < 0]
-            win_rate = len(wins) / len(recent)
-            total_win = sum(t.get('profit', 0) for t in wins)
-            total_loss = abs(sum(t.get('profit', 0) for t in losses))
-            profit_factor = (total_win / total_loss) if total_loss > 0 else float('inf') if total_win > 0 else 0.0
-            if (min_wr > 0 and win_rate < min_wr) or (min_pf > 0 and profit_factor < min_pf):
-                if cooldown_min > 0:
-                    cfg['_circuit_breaker_until_ts'] = now + cooldown_min * 60
-                    cfg['_cb_trades_since_reset'] = 0
-                log(f"[CIRCUIT BREAKER] Active: win_rate={win_rate:.2%} (min {min_wr:.2%}), pf={profit_factor:.2f} (min {min_pf:.2f})", level='warning')
-                return True, f"win_rate={win_rate:.2f}, pf={profit_factor:.2f}"
-        except Exception:
-            return False, ''
-        return False, ''
+    # (extracted to bot/circuit_breaker.py — road-to-10 #066 batch 5)
+    from bot.circuit_breaker import is_active as _circuit_breaker_active
 
     if m in open_trades:
         # Allow overwrite if existing position is dust (stale entry with near-zero value)

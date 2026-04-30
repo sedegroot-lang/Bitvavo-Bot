@@ -187,3 +187,4 @@
 | 2026-04-30 | #066 fase 2 monoliet shrink batch 1+2: trade_repair + path_utils + close_trade extracted, trailing_bot.py 4908→4449 (-9.4%), 806 tests groen | Copilot |
 | 2026-04-30 | #066 fase 2 monoliet shrink batch 3: maintenance + ai_regime extracted, trailing_bot.py 4449→4335 (-11.7% totaal), 806 tests groen | Copilot |
 | 2026-04-30 | #066 fase 2 monoliet shrink batch 4: market_helpers + event_hooks_adapter extracted, trailing_bot.py 4335→4206 (-14.3% totaal), 806 tests groen | Copilot |
+| 2026-04-30 | #066 fase 2 monoliet shrink batch 5: circuit_breaker + auto_sync_manager extracted, trailing_bot.py 4206→4126 (-15.9% totaal), 806 tests groen | Copilot |
