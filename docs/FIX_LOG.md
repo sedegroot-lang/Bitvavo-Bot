@@ -5,6 +5,31 @@
 
 ---
 
+## #068 — Scan throughput: only 8/30 markets evaluated per cycle, scan_age 28 min (2026-05-01)
+
+### Symptom
+User: *"waarom worden er iedere keer maar zo weinig markten gescand en staat er laatste scan 28m geleden"*. Heartbeat showed `evaluated=2/30`, `scan_age=28min`, threshold=64.985. Bot log showed per-market scan time ~25–36 s; `SCAN_WATCHDOG_SECONDS=300` aborted after market 8/30. Cycle time ballooned from expected ~25 s → 5+ min.
+
+### Root cause
+1. **`BITVAVO_CACHE_TTLS = {}` (empty)** in resolved config → `safe_call()` cache disabled → every `get_candles()`, `book()`, `tickerPrice()`, `ticker24h()` re-fetched from Bitvavo REST. Per market the scan loop calls `get_candles()` 4–6× (signal_strength 1m+5m, momentum filter, VWAP, MTF confluence, BTC cascade, block-reason logging) plus orderbook + ticker24h. With occasional SSL flake → 25–36 s per market.
+2. **`BLOCK_ENTRY_REGIMES` regime block was checked AFTER signal_strength** (line 2560), so when regime=BEARISH the bot still ran LSTM/HTF/VWAP/MTF for every market just to throw the result away. Wasted ~25 s × 30 markets per cycle.
+
+### Fix
+1. **Local config (`%LOCALAPPDATA%/BotConfig/bot_config_local.json`)**: added `BITVAVO_CACHE_TTLS = {candles:30, tickerPrice:5, book:10, ticker24h:60, balance:30, markets:300, assets:300}`. Hot-reloads automatically.
+2. **`trailing_bot.py` (around line 2429)**: moved `_REGIME_ENTRY_BLOCKED` check to top of per-market loop (immediately after `[SCAN] Evaluating ...` log). Skips momentum filter, signal_strength, ML ensemble, HTF, VWAP, MTF, OBI, correlation shield when regime blocks all entries anyway.
+
+### Verification
+- Live log showed BCH-EUR scan dropped from 28s → 7s the moment cache TTLs hot-reloaded.
+- `python -c "from modules.config import load_config; print(load_config()['BITVAVO_CACHE_TTLS'])"` confirms cache config picked up.
+- `get_errors` on `trailing_bot.py` → no errors.
+- Commit `46122f0` pushed to `main`.
+
+### Lesson
+- **Always set `BITVAVO_CACHE_TTLS`** in local config — without it, the per-call cache layer in `bot/api.py::safe_call()` silently no-ops because `cache_ttls.get(key, 0.0) = 0.0`. Sane defaults: candles 30s, tickerPrice 5s, book 10s, ticker24h 60s, balance 30s.
+- **Check cheap gating flags FIRST** in per-market scan loops. Regime / cooldown / blacklist must short-circuit before expensive ML inference, HTF candle fetches, or orderbook calls.
+
+---
+
 ## #067 — Telegram bot overhaul: noise control + 14 new commands + enriched trade alerts (2026-05-01)
 
 ### Symptom
