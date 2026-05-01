@@ -3,7 +3,7 @@
      - Static assets: cache-first
      - API calls: network-first with stale-fallback
 */
-const VERSION = 'bitvavo-dash-v2-2026.04.25.1';
+const VERSION = 'bitvavo-dash-v2-2026.05.01.1';
 const STATIC_CACHE = 'static-' + VERSION;
 const RUNTIME_CACHE = 'runtime-' + VERSION;
 const STATIC_ASSETS = ['/', '/index.html', '/styles.css', '/styles-v2.css', '/app.js', '/manifest.webmanifest'];
