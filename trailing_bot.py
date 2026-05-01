@@ -2427,7 +2427,14 @@ async def bot_loop():
                 
                 # ALWAYS log which market we're evaluating to track hangs
                 log(f"[SCAN] Evaluating {m} ({markets_evaluated}/{len(MARKETS) - markets_skipped})...", level='info')
-                
+
+                # ── EARLY EXIT: regime blocks ALL entries → skip heavy ML/HTF/etc ──
+                # Saves ~25s per market when regime (e.g. BEARISH) blocks all buys anyway.
+                if CONFIG.get('_REGIME_ENTRY_BLOCKED'):
+                    log(f"[REGIME] {m}: Entry blocked by BLOCK_ENTRY_REGIMES policy (early-skip)", level='info')
+                    markets_skipped += 1
+                    continue
+
                 # Momentum filter: Skip markets with strong negative momentum
                 try:
                     candles_momentum = get_candles(m, '1m', 20)
