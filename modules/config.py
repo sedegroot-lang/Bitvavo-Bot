@@ -20,6 +20,7 @@ LOCAL_OVERRIDE_PATH = os.path.join(
 )
 
 # Runtime state keys — stored in data/bot_state.json, NOT in bot_config.json
+# Also includes secrets injected from .env that must never be persisted to disk.
 RUNTIME_STATE_KEYS = frozenset({
     'LAST_REINVEST_TS',
     'LAST_HEARTBEAT_TS',
@@ -33,6 +34,11 @@ RUNTIME_STATE_KEYS = frozenset({
     'SYNC_INTERVAL_SECONDS',
     'MIN_SCORE_TO_BUY',
     'OPERATOR_ID',
+    # Secrets — sourced from .env, never written to bot_config.json
+    'TELEGRAM_BOT_TOKEN',
+    'TELEGRAM_CHAT_ID',
+    'BITVAVO_API_KEY',
+    'BITVAVO_API_SECRET',
 })
 
 def _default_config() -> dict:
