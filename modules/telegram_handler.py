@@ -1,10 +1,12 @@
 """
 Telegram Handler voor Bitvavo Bot
-- Notificaties via Bot API
+- Notificaties via Bot API met dedupe + quiet-hours + severity-filter (TELEGRAM_NOTIFY_LEVEL)
 - Polling voor commands (geen extra library nodig)
-- Auto-alerts: buy, sell, stop-loss, errors
-- Commands: /start /help /status /log /trades /profit /stop /restart /update /set
-            /trailing /dca /grid /balance /config /orders /performance
+- Auto-alerts: buy, sell, stop-loss, errors (verrijkt met score/regime/peak/hold-time)
+- Commands: /start /help /status /today /week /positions /trades /orders /profit
+            /performance /balance /fees /risk /market /trailing /dca /grid
+            /regime /ai /why /top /config /set /pause /resume /quiet
+            /health /uptime /version /log /stop /restart /update
 """
 
 import json
@@ -130,20 +132,135 @@ def send_message(text: str, parse_mode: str = "HTML") -> bool:
 
 
 _TRADE_KEYWORDS = ("KOOP", "VERKOOP", "koop", "verkoop", "BUY", "SELL", "gekocht", "verkocht", "DCA", "partial tp")
+_CRITICAL_KEYWORDS = (
+    "CRITICAL", "WATCHDOG", "OOM", "DRAWDOWN", "CIRCUIT",
+    "portfolio drawdown", "daily loss", "kill switch", "KILL-SWITCH",
+)
 _ALERT_KEYWORDS = (
-    "ERROR", "CRITICAL", "STALE", "DRAWDOWN", "CIRCUIT",
-    "sync_removed", "API glitch", "stale buy_price", "RISK",
-    "portfolio drawdown", "daily loss", "WATCHDOG", "OOM",
+    "ERROR", "STALE", "sync_removed", "API glitch", "stale buy_price", "RISK",
     "\u26a0\ufe0f", "\ud83d\udd34", "\u2757",  # warning/red emoji
 )
 
+# ── Noise-control state (dedupe + burst-collapse + quiet-hours) ──
+_alert_dedupe: dict = {}     # key (normalized text) -> {ts, count}
+_alert_burst: dict = {}      # key -> list of recent timestamps for burst detection
+_quiet_override = False      # /quiet on overrules config quiet hours
+_DEFAULT_DEDUPE_S = 900      # 15 min — same alert not re-sent
+_BURST_WINDOW = 300          # 5 min window to count repeats
+_BURST_THRESHOLD = 5         # if >=5 same alerts in 5 min → collapsed summary instead
+
+
+def _normalize_for_dedupe(text: str) -> str:
+    """Strip numbers/timestamps so 'X at €1.23' and 'X at €1.45' dedupe to same key."""
+    import re
+    s = text.lower()
+    s = re.sub(r"[\d.,:€$+\-]+", "#", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s[:120]
+
+
+def _in_quiet_hours(cfg: dict) -> bool:
+    """True if current local time falls within configured quiet window."""
+    if _quiet_override:
+        return True
+    try:
+        start = str(cfg.get("TELEGRAM_QUIET_START", "")).strip()
+        end = str(cfg.get("TELEGRAM_QUIET_END", "")).strip()
+        if not start or not end:
+            return False
+        sh, sm = [int(x) for x in start.split(":")[:2]]
+        eh, em = [int(x) for x in end.split(":")[:2]]
+        now = time.localtime()
+        cur = now.tm_hour * 60 + now.tm_min
+        s_min = sh * 60 + sm
+        e_min = eh * 60 + em
+        if s_min <= e_min:
+            return s_min <= cur < e_min
+        # window crosses midnight (e.g. 22:00 → 07:00)
+        return cur >= s_min or cur < e_min
+    except Exception:
+        return False
+
+
+def _classify(text: str) -> str:
+    """Return 'trade' | 'critical' | 'alert' | 'info'."""
+    low = text.lower()
+    if any(kw.lower() in low for kw in _TRADE_KEYWORDS):
+        return "trade"
+    if any(kw.lower() in low for kw in _CRITICAL_KEYWORDS):
+        return "critical"
+    if any(kw.lower() in low for kw in _ALERT_KEYWORDS):
+        return "alert"
+    return "info"
+
+
 def notify(text: str) -> None:
-    """Forward trade events AND error/risk alerts to Telegram."""
-    _text_lower = text.lower()
-    if any(kw.lower() in _text_lower for kw in _TRADE_KEYWORDS):
+    """Forward trade events AND error/risk alerts to Telegram with dedupe + quiet-hours.
+
+    Severity ladder: trade > critical > alert > info.
+    Filtered by TELEGRAM_NOTIFY_LEVEL ('trades' | 'alerts' | 'verbose').
+      - 'trades'  → only buy/sell + critical
+      - 'alerts'  → trades + critical + alert  (default)
+      - 'verbose' → everything (also info)
+
+    Quiet hours suppress alert+info, but never trade or critical.
+    Repeats of the same normalized message within ALERT_DEDUPE_SECONDS are dropped.
+    Bursts (>=5 same alerts in 5 min) are collapsed into a single summary.
+    """
+    if not text:
+        return
+    cfg = _load_config()
+    level = str(cfg.get("TELEGRAM_NOTIFY_LEVEL", "alerts")).lower()
+    severity = _classify(text)
+
+    # Severity vs configured level filter
+    if level == "trades" and severity not in ("trade", "critical"):
+        return
+    if level == "alerts" and severity == "info":
+        return
+    # 'verbose' lets everything through
+
+    # Quiet hours — block alert+info but always allow trade+critical
+    if severity in ("alert", "info") and _in_quiet_hours(cfg):
+        return
+
+    now = time.time()
+    dedupe_s = int(cfg.get("ALERT_DEDUPE_SECONDS", _DEFAULT_DEDUPE_S))
+
+    # Dedupe + burst-collapse only for non-trade messages
+    if severity != "trade":
+        key = _normalize_for_dedupe(text)
+        last = _alert_dedupe.get(key)
+        if last and (now - last["ts"]) < dedupe_s:
+            last["count"] = last.get("count", 1) + 1
+            # Track for burst detection
+            burst = _alert_burst.setdefault(key, [])
+            burst.append(now)
+            burst[:] = [t for t in burst if now - t < _BURST_WINDOW]
+            if len(burst) == _BURST_THRESHOLD:  # exactly at threshold → send summary
+                send_message(
+                    f"🔁 <b>Burst:</b> {len(burst)}× zelfde alert in {_BURST_WINDOW//60} min\n"
+                    f"<code>{__import__('html').escape(text[:300])}</code>"
+                )
+            return  # silently dropped (within dedupe window)
+        _alert_dedupe[key] = {"ts": now, "count": 1}
+        _alert_burst[key] = [now]
+
+        # Cleanup stale dedupe entries (cap memory)
+        if len(_alert_dedupe) > 200:
+            cutoff = now - max(dedupe_s, 3600)
+            _alert_dedupe.clear()
+            _alert_dedupe.update({k: v for k, v in list(_alert_dedupe.items()) if v["ts"] > cutoff})
+
+    # Format prefix per severity
+    if severity == "trade":
         send_message(text)
-    elif any(kw.lower() in _text_lower for kw in _ALERT_KEYWORDS):
-        send_message(f"\u26a0\ufe0f ALERT:\n{text}")
+    elif severity == "critical":
+        send_message(f"🚨 <b>CRITICAL:</b>\n{text}")
+    elif severity == "alert":
+        send_message(f"⚠️ ALERT:\n{text}")
+    else:  # info (verbose mode)
+        send_message(f"ℹ️ {text}")
 
 
 # ──────────────────────────────────────────
@@ -343,6 +460,10 @@ ALLOWED_KEYS = {
     "BUDGET_RESERVATION.reserve_pct": float,
     "BUDGET_RESERVATION.min_reserve_eur": float,
     "BUDGET_RESERVATION.mode": str,
+    # Telegram noise/UX tuning
+    "TELEGRAM_NOTIFY_LEVEL": str,    # 'trades' | 'alerts' | 'verbose'
+    "TELEGRAM_QUIET_START": str,     # "HH:MM" — start quiet hours
+    "TELEGRAM_QUIET_END": str,       # "HH:MM" — end quiet hours
 }
 
 
@@ -1032,6 +1153,498 @@ def _get_market_text(symbol: str) -> str:
 
 
 # ──────────────────────────────────────────
+# /today, /week — period summaries
+# ──────────────────────────────────────────
+def _summarize_period(closed_trades: list, since_ts: float, label: str) -> str:
+    period = [t for t in closed_trades if float(t.get("timestamp") or 0) >= since_ts]
+    if not period:
+        return f"<b>📅 {label}</b>\nNog geen gesloten trades."
+    profits = [float(t.get("profit") or 0) for t in period]
+    wins = [p for p in profits if p > 0]
+    losses = [p for p in profits if p < 0]
+    total = sum(profits)
+    winr = len(wins) / len(profits) * 100 if profits else 0.0
+    avg_w = sum(wins) / len(wins) if wins else 0.0
+    avg_l = sum(losses) / len(losses) if losses else 0.0
+
+    # Top 3 by P&L
+    by_market: dict = {}
+    for t in period:
+        by_market.setdefault(t.get("market", "?"), []).append(float(t.get("profit") or 0))
+    top = sorted(by_market.items(), key=lambda kv: sum(kv[1]), reverse=True)[:3]
+
+    s = "+" if total >= 0 else ""
+    lines = [
+        f"<b>📅 {label}</b>",
+        f"Trades: {len(profits)}  |  Win rate: <b>{winr:.0f}%</b>",
+        f"P&amp;L: <b>{s}€{total:.2f}</b>",
+        f"Gem. winst: +€{avg_w:.2f}  |  Gem. verlies: €{avg_l:.2f}",
+    ]
+    if top:
+        lines.append("\n<b>🏆 Top:</b>")
+        for m, profs in top:
+            lines.append(f"  {m}: {'+' if sum(profs)>=0 else ''}€{sum(profs):.2f} ({len(profs)}×)")
+    return "\n".join(lines)
+
+
+def _get_today_text() -> str:
+    try:
+        d = json.loads(TRADE_LOG_PATH.read_text(encoding="utf-8"))
+        today = time.mktime(time.strptime(time.strftime("%Y-%m-%d"), "%Y-%m-%d"))
+        return _summarize_period(d.get("closed", []), today, "Vandaag")
+    except Exception as e:
+        return f"Today ophalen mislukt: {e}"
+
+
+def _get_week_text() -> str:
+    try:
+        d = json.loads(TRADE_LOG_PATH.read_text(encoding="utf-8"))
+        wk = time.time() - 7 * 86400
+        return _summarize_period(d.get("closed", []), wk, "Laatste 7 dagen")
+    except Exception as e:
+        return f"Week ophalen mislukt: {e}"
+
+
+# ──────────────────────────────────────────
+# /ai — Model status & metrics
+# ──────────────────────────────────────────
+def _get_ai_text() -> str:
+    try:
+        cfg = _load_config()
+        ai_on = cfg.get("AI_ENABLED", False)
+        sup_on = cfg.get("AI_SUPERVISOR_ENABLED", False)
+        lines = [
+            "<b>🤖 AI Status</b>",
+            f"AI: {'✅' if ai_on else '❌'}  |  Supervisor: {'✅' if sup_on else '❌'}",
+        ]
+        # Enhanced metrics
+        for path, label in [
+            (BASE_DIR / "ai" / "ai_model_metrics_enhanced.json", "Enhanced model"),
+            (BASE_DIR / "ai" / "ai_model_metrics.json", "Base model"),
+        ]:
+            if not path.exists():
+                continue
+            try:
+                m = json.loads(path.read_text(encoding="utf-8"))
+                trained_at = m.get("trained_at") or m.get("trained_ts") or 0
+                age_str = "?"
+                if trained_at:
+                    age_h = (time.time() - float(trained_at)) / 3600
+                    age_str = f"{age_h:.1f}u geleden" if age_h < 48 else f"{age_h/24:.1f}d geleden"
+                acc = m.get("test_accuracy") or m.get("accuracy")
+                auc = m.get("test_auc") or m.get("auc")
+                samples = m.get("samples_total") or m.get("n_samples")
+                lines.append(f"\n<b>{label}:</b>")
+                lines.append(f"  Getraind: {age_str}")
+                if samples:
+                    lines.append(f"  Samples: {samples}")
+                if acc is not None:
+                    lines.append(f"  Accuracy: {float(acc)*100:.1f}%")
+                if auc is not None:
+                    lines.append(f"  AUC: {float(auc):.3f}")
+            except Exception:
+                pass
+        # Recent suggestions
+        sug_path = BASE_DIR / "ai" / "ai_market_suggestions.json"
+        if sug_path.exists():
+            try:
+                doc = json.loads(sug_path.read_text(encoding="utf-8"))
+                pending = [s for s in doc.get("suggestions", []) if s.get("status") in (None, "pending")]
+                lines.append(f"\n<b>Pending suggestions:</b> {len(pending)}")
+                for s in pending[-3:]:
+                    lines.append(f"  · {s.get('market','?')}: {s.get('reason','?')[:60]}")
+            except Exception:
+                pass
+        return "\n".join(lines)
+    except Exception as e:
+        return f"AI info ophalen mislukt: {e}"
+
+
+# ──────────────────────────────────────────
+# /regime — Current market regime
+# ──────────────────────────────────────────
+def _get_regime_text() -> str:
+    try:
+        state_path = BASE_DIR / "data" / "bot_state.json"
+        if not state_path.exists():
+            return "❓ Geen regime data."
+        st = json.loads(state_path.read_text(encoding="utf-8"))
+        rr = st.get("_REGIME_RESULT", {})
+        ra = st.get("_REGIME_ADJ", {})
+        scan = st.get("LAST_SCAN_STATS", {})
+        regime = rr.get("regime", "?")
+        conf = float(rr.get("confidence", 0) or 0)
+        emoji = {"trending_up": "📈", "ranging": "↔️", "high_volatility": "⚡", "bearish": "📉"}.get(regime, "❓")
+        lines = [
+            "<b>🌍 Markt Regime</b>",
+            f"{emoji} <b>{regime}</b>  (confidence {conf*100:.1f}%)",
+        ]
+        if ra:
+            lines.append(f"\n<b>Regime adjustments:</b>")
+            lines.append(f"  Position size mult: ×{ra.get('base_amount_mult',1):.2f}")
+            lines.append(f"  Max-trades mult: ×{ra.get('max_trades_mult',1):.2f}")
+            lines.append(f"  Min-score adj: +{ra.get('min_score_adj',0):.1f}")
+            lines.append(f"  SL mult: ×{ra.get('sl_mult',1):.2f}")
+            lines.append(f"  Grid: {'⏸️ pauze' if ra.get('grid_pause') else '▶️ actief'}")
+            lines.append(f"  DCA: {'✅' if ra.get('dca_enabled') else '❌'}")
+            desc = ra.get("description")
+            if desc:
+                lines.append(f"\n<i>{desc}</i>")
+        if scan:
+            lines.append(
+                f"\n<b>Laatste scan:</b> {scan.get('evaluated',0)}/{scan.get('total_markets',0)} markten "
+                f"geëvalueerd, {scan.get('passed_min_score',0)} pass min-score "
+                f"(drempel {scan.get('min_score_threshold','?')})"
+            )
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Regime ophalen mislukt: {e}"
+
+
+# ──────────────────────────────────────────
+# /pause /resume — Halt new entries
+# ──────────────────────────────────────────
+_PAUSE_STATE_FILE = BASE_DIR / "data" / "telegram_pause_state.json"
+
+
+def _pause_entries() -> str:
+    """Tijdelijk geen nieuwe entries: zet MIN_SCORE_TO_BUY = 999.
+
+    Bewaart oude waarde in telegram_pause_state.json zodat /resume het kan herstellen.
+    Bestaande open trades blijven gewoon trailing/managed.
+    """
+    try:
+        cfg = _load_config()
+        prev = float(cfg.get("MIN_SCORE_TO_BUY", 7.0))
+        if prev >= 999:
+            return "⏸️ Bot stond al op pauze (MIN_SCORE_TO_BUY ≥ 999)."
+        _PAUSE_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _PAUSE_STATE_FILE.write_text(json.dumps({"prev_min_score": prev, "ts": time.time()}), encoding="utf-8")
+        _save_local_override("MIN_SCORE_TO_BUY", 999.0)
+        return (
+            f"⏸️ <b>Entries gepauzeerd.</b>\n"
+            f"MIN_SCORE_TO_BUY: {prev} → 999\n"
+            f"Open trades worden gewoon getrailed/beheerd.\n"
+            f"Gebruik <code>/resume</code> om te hervatten."
+        )
+    except Exception as e:
+        return f"❌ Pause mislukt: {e}"
+
+
+def _resume_entries() -> str:
+    try:
+        if not _PAUSE_STATE_FILE.exists():
+            return "▶️ Geen pauze-staat gevonden — niets te herstellen."
+        st = json.loads(_PAUSE_STATE_FILE.read_text(encoding="utf-8"))
+        prev = float(st.get("prev_min_score", 7.0))
+        prev = max(prev, 7.0)  # respect the 7.0 lock
+        _save_local_override("MIN_SCORE_TO_BUY", prev)
+        try:
+            _PAUSE_STATE_FILE.unlink()
+        except Exception:
+            pass
+        return f"▶️ <b>Entries hervat.</b>\nMIN_SCORE_TO_BUY teruggezet op {prev}."
+    except Exception as e:
+        return f"❌ Resume mislukt: {e}"
+
+
+# ──────────────────────────────────────────
+# /uptime, /version, /quiet
+# ──────────────────────────────────────────
+_PROCESS_START_TS = time.time()
+
+
+def _get_uptime_text() -> str:
+    try:
+        secs = time.time() - _PROCESS_START_TS
+        if secs < 3600:
+            up = f"{secs/60:.1f} min"
+        elif secs < 86400:
+            up = f"{secs/3600:.2f} uur"
+        else:
+            up = f"{secs/86400:.2f} dagen"
+        # Last heartbeat from bot_state
+        hb_str = "?"
+        try:
+            st = json.loads((BASE_DIR / "data" / "bot_state.json").read_text(encoding="utf-8"))
+            hb = float(st.get("LAST_HEARTBEAT_TS", 0) or 0)
+            if hb:
+                age = time.time() - hb
+                hb_str = f"{age:.0f}s geleden" if age < 120 else f"{age/60:.1f} min geleden"
+        except Exception:
+            pass
+        return f"<b>⏱ Uptime</b>\nTelegram-handler: {up}\nLaatste bot-heartbeat: {hb_str}"
+    except Exception as e:
+        return f"Uptime mislukt: {e}"
+
+
+def _get_version_text() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "log", "-1", "--pretty=format:%h %s (%ar)"],
+            cwd=str(BASE_DIR), capture_output=True, text=True, timeout=5,
+        )
+        commit = (result.stdout or "").strip() or "(geen git info)"
+        branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=str(BASE_DIR), capture_output=True, text=True, timeout=5,
+        ).stdout.strip() or "?"
+        return f"<b>📦 Versie</b>\nBranch: <code>{branch}</code>\nCommit: <code>{commit}</code>"
+    except Exception as e:
+        return f"Version mislukt: {e}"
+
+
+def _set_quiet(arg: str) -> str:
+    global _quiet_override
+    a = (arg or "").strip().lower()
+    if a in ("on", "aan", "1", "true", "ja"):
+        _quiet_override = True
+        return "🔕 Quiet mode <b>aan</b> — alleen trade + critical alerts. Gebruik <code>/quiet off</code> om te stoppen."
+    if a in ("off", "uit", "0", "false", "nee"):
+        _quiet_override = False
+        return "🔔 Quiet mode <b>uit</b> — normale alerts hervat."
+    return f"Quiet override: {'aan' if _quiet_override else 'uit'}\nGebruik <code>/quiet on</code> of <code>/quiet off</code>."
+
+
+# ──────────────────────────────────────────
+# /why <market> — Why was this trade opened?
+# ──────────────────────────────────────────
+def _get_why_text(symbol: str) -> str:
+    try:
+        market = symbol.upper() if "-" in symbol else f"{symbol.upper()}-EUR"
+        d = json.loads(TRADE_LOG_PATH.read_text(encoding="utf-8"))
+        trade = d.get("open", {}).get(market)
+        source = "open trade"
+        if not trade:
+            # try recent closed
+            for t in reversed(d.get("closed", [])):
+                if t.get("market") == market:
+                    trade = t
+                    source = "laatste closed trade"
+                    break
+        if not trade:
+            return f"❌ Geen recente trade gevonden voor <b>{market}</b>."
+
+        score = trade.get("score")
+        regime = trade.get("opened_regime", "?")
+        rsi = trade.get("rsi_at_entry")
+        macd = trade.get("macd_at_entry")
+        vol = trade.get("volatility_at_entry")
+        vol24 = trade.get("volume_24h_eur")
+        bp = float(trade.get("buy_price") or 0)
+        opened = float(trade.get("opened_ts") or trade.get("timestamp") or 0)
+        opened_str = time.strftime("%d-%m %H:%M", time.localtime(opened)) if opened else "?"
+
+        regime_emoji = {
+            "trending_up": "📈", "ranging": "↔️", "high_volatility": "⚡",
+            "bearish": "📉", "aggressive": "🔥", "defensive": "🛡️",
+        }.get(regime, "❓")
+
+        lines = [
+            f"<b>💡 Waarom {market}?</b>  <i>({source})</i>",
+            f"Geopend: {opened_str} @ €{bp:.6g}",
+            "",
+        ]
+        if score is not None:
+            lines.append(f"📊 Score: <b>{float(score):.2f}</b>")
+        lines.append(f"{regime_emoji} Regime: {regime}")
+        if isinstance(rsi, (int, float)) and rsi:
+            rsi_v = float(rsi)
+            tag = "📉 oversold" if rsi_v < 30 else ("📈 overbought" if rsi_v > 70 else "neutraal")
+            lines.append(f"RSI@entry: {rsi_v:.1f} ({tag})")
+        if isinstance(macd, (int, float)):
+            lines.append(f"MACD@entry: {float(macd):+.6f}")
+        if isinstance(vol, (int, float)) and vol:
+            lines.append(f"Volatiliteit: {float(vol)*100:.2f}%")
+        if isinstance(vol24, (int, float)) and vol24:
+            lines.append(f"24h volume: €{float(vol24):,.0f}")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Why ophalen mislukt: {e}"
+
+
+# ──────────────────────────────────────────
+# /fees — Total fees paid
+# ──────────────────────────────────────────
+def _get_fees_text() -> str:
+    try:
+        d = json.loads(TRADE_LOG_PATH.read_text(encoding="utf-8"))
+        closed = d.get("closed", [])
+        if not closed:
+            return "💸 Nog geen fee data."
+        today_ts = time.mktime(time.strptime(time.strftime("%Y-%m-%d"), "%Y-%m-%d"))
+        wk_ts = time.time() - 7 * 86400
+
+        def fees_in(ts_min):
+            tot = 0.0
+            cnt = 0
+            for t in closed:
+                if float(t.get("timestamp") or 0) < ts_min:
+                    continue
+                f = float(t.get("buy_fee") or 0) + float(t.get("sell_fee") or 0)
+                if f == 0:
+                    # Estimate at 0.25% taker on both sides if not stored
+                    inv = float(t.get("invested_eur") or 0)
+                    sp = float(t.get("sell_price") or 0)
+                    am = float(t.get("amount") or 0)
+                    proceeds = sp * am
+                    f = (inv + proceeds) * 0.0025
+                tot += f
+                cnt += 1
+            return tot, cnt
+
+        f_today, n_today = fees_in(today_ts)
+        f_week, n_week = fees_in(wk_ts)
+        f_total = sum(
+            (float(t.get("buy_fee") or 0) + float(t.get("sell_fee") or 0))
+            or ((float(t.get("invested_eur") or 0) + float(t.get("sell_price") or 0) * float(t.get("amount") or 0)) * 0.0025)
+            for t in closed
+        )
+        return (
+            "<b>💸 Fee Overzicht</b>\n"
+            f"Vandaag: €{f_today:.2f} ({n_today} trades)\n"
+            f"7 dagen: €{f_week:.2f} ({n_week} trades)\n"
+            f"Totaal: €{f_total:.2f} ({len(closed)} trades)\n"
+            "<i>Geschat op 0.25% per zijde wanneer fee niet expliciet opgeslagen.</i>"
+        )
+    except Exception as e:
+        return f"Fees mislukt: {e}"
+
+
+# ──────────────────────────────────────────
+# /top — Top 5 movers from open positions + whitelist
+# ──────────────────────────────────────────
+def _get_top_text() -> str:
+    try:
+        cfg = _load_config()
+        d = json.loads(TRADE_LOG_PATH.read_text(encoding="utf-8"))
+        wl = cfg.get("WHITELIST_MARKETS", []) or []
+        markets = list(set(list(d.get("open", {}).keys()) + list(wl)))[:25]  # cap API calls
+        if not markets:
+            return "📈 Geen markten om te checken."
+
+        rows = []
+        try:
+            r = requests.get("https://api.bitvavo.com/v2/ticker/24h", timeout=8)
+            if r.ok:
+                data = r.json()
+                lookup = {row["market"]: row for row in data if isinstance(row, dict) and "market" in row}
+                for m in markets:
+                    row = lookup.get(m)
+                    if not row:
+                        continue
+                    try:
+                        change = float(row.get("priceChangePercentage", 0))
+                        rows.append((m, change, float(row.get("last", 0))))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        if not rows:
+            return "📈 Kon 24h data niet ophalen."
+        rows.sort(key=lambda x: x[1], reverse=True)
+        winners = rows[:5]
+        losers = rows[-5:][::-1]
+        lines = ["<b>📈 Top 24h movers (open + whitelist)</b>", "", "<b>🟢 Winners:</b>"]
+        for m, c, p in winners:
+            lines.append(f"  {m}: {c:+.2f}%  (€{p:.4g})")
+        lines.append("\n<b>🔴 Losers:</b>")
+        for m, c, p in losers:
+            lines.append(f"  {m}: {c:+.2f}%  (€{p:.4g})")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Top mislukt: {e}"
+
+
+# ──────────────────────────────────────────
+# /health — Quick health check
+# ──────────────────────────────────────────
+def _get_health_text() -> str:
+    try:
+        cfg = _load_config()
+        checks = []
+        # 1. Config sane
+        max_t = int(cfg.get("MAX_OPEN_TRADES", 0) or 0)
+        checks.append(("Config", max_t >= 3, f"MAX_OPEN_TRADES={max_t} (≥3 vereist)"))
+        # 2. Heartbeat fresh
+        hb_ok = False
+        hb_msg = "?"
+        try:
+            st = json.loads((BASE_DIR / "data" / "bot_state.json").read_text(encoding="utf-8"))
+            hb = float(st.get("LAST_HEARTBEAT_TS", 0) or 0)
+            if hb:
+                age = time.time() - hb
+                hb_ok = age < 300
+                hb_msg = f"{age:.0f}s geleden"
+        except Exception as e:
+            hb_msg = str(e)[:40]
+        checks.append(("Heartbeat", hb_ok, hb_msg))
+        # 3. Trade log readable
+        tl_ok = False
+        tl_msg = "missing"
+        try:
+            d = json.loads(TRADE_LOG_PATH.read_text(encoding="utf-8"))
+            tl_ok = True
+            tl_msg = f"{len(d.get('open', {}))} open / {len(d.get('closed', []))} closed"
+        except Exception as e:
+            tl_msg = str(e)[:40]
+        checks.append(("Trade log", tl_ok, tl_msg))
+        # 4. AI model present (if AI_ENABLED)
+        if cfg.get("AI_ENABLED"):
+            mp = BASE_DIR / "ai" / "ai_xgb_model_enhanced.json"
+            checks.append(("AI model", mp.exists(), str(mp.name) if mp.exists() else "ontbreekt"))
+        # 5. Recent errors in log
+        err_count = 0
+        try:
+            if LOG_PATH.exists():
+                with open(LOG_PATH, encoding="utf-8", errors="replace") as f:
+                    last = f.readlines()[-200:]
+                err_count = sum(1 for l in last if "ERROR" in l or "CRITICAL" in l)
+        except Exception:
+            pass
+        checks.append(("Errors laatste 200 log lines", err_count < 20, f"{err_count} fouten"))
+
+        lines = ["<b>🏥 Health Check</b>"]
+        for name, ok, msg in checks:
+            icon = "✅" if ok else "❌"
+            lines.append(f"{icon} {name}: {msg}")
+        all_ok = all(ok for _, ok, _ in checks)
+        lines.append(f"\n<b>Verdict: {'✅ Gezond' if all_ok else '⚠️ Aandacht nodig'}</b>")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Health check mislukt: {e}"
+
+
+# ──────────────────────────────────────────
+# /positions — compact one-liner per trade
+# ──────────────────────────────────────────
+def _get_positions_text() -> str:
+    try:
+        d = json.loads(TRADE_LOG_PATH.read_text(encoding="utf-8"))
+        opens = d.get("open", {})
+        if not opens:
+            return "📂 Geen open posities."
+        lines = ["<b>📂 Open posities (compact)</b>"]
+        total_pnl = 0.0
+        for market, t in opens.items():
+            bp = float(t.get("buy_price") or 0)
+            am = float(t.get("amount") or 0)
+            cp = _get_price(market)
+            pnl_pct = (cp - bp) / bp * 100 if bp > 0 and cp > 0 else 0
+            pnl = (cp - bp) * am if bp > 0 and cp > 0 else 0
+            total_pnl += pnl
+            icon = "🟢" if pnl_pct >= 0 else "🔴"
+            sign = "+" if pnl_pct >= 0 else ""
+            lines.append(f"{icon} {market}: {sign}{pnl_pct:.2f}% ({sign}€{pnl:.2f})")
+        s = "+" if total_pnl >= 0 else ""
+        lines.append(f"\n<b>Totaal P&amp;L: {s}€{total_pnl:.2f}</b>")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Positions mislukt: {e}"
+
+
+# ──────────────────────────────────────────
 # Command dispatcher
 # ──────────────────────────────────────────
 def _handle_command(text: str):
@@ -1042,36 +1655,60 @@ def _handle_command(text: str):
     if cmd in ("/start", "/help"):
         reply = (
             "🤖 <b>Bitvavo Bot — Commands</b>\n\n"
-            "<b>📊 Informatie:</b>\n"
-            "/status — Bot status overzicht\n"
-            "/trades — Open posities + live P&amp;L\n"
-            "/orders — Open orders (trailing only)\n"
-            "/profit — Winst vandaag / week / totaal\n"
+            "<b>📊 Snel overzicht:</b>\n"
+            "/status — Bot status\n"
+            "/today — P&amp;L vandaag\n"
+            "/week — P&amp;L 7 dagen\n"
+            "/positions — Compact open trades\n"
+            "/trades — Open posities + live P&amp;L (uitgebreid)\n"
+            "/profit — Vandaag / week / totaal\n"
             "/performance — Win rate &amp; statistieken\n"
-            "/balance — EUR balance &amp; budget\n"
-            "/risk — Risk management status\n"
-            "/market [coin] — Prijs check (bv. /market BTC)\n\n"
-            "<b>🎯 Strategieën:</b>\n"
-            "/trailing — Trailing stop details\n"
+            "/balance — EUR balance &amp; budget verdeling\n"
+            "/fees — Totaal aan fees betaald\n"
+            "/risk — Risk management status\n\n"
+            "<b>🎯 Strategie &amp; markt:</b>\n"
+            "/trailing — Trailing stop details per trade\n"
             "/dca — DCA status per trade\n"
             "/grid — Grid bot dashboard\n"
-            "/config — Huidige configuratie\n\n"
+            "/regime — Huidig marktregime + adjustments\n"
+            "/ai — AI model status &amp; metrics\n"
+            "/why [coin] — Waarom werd deze trade geopend\n"
+            "/top — Top 24h winners/losers\n"
+            "/market [coin] — Snelle prijscheck\n"
+            "/orders — Open orders (trailing only)\n\n"
             "<b>⚙️ Beheer:</b>\n"
+            "/config — Huidige configuratie\n"
             "/set KEY VALUE — Parameter aanpassen\n"
+            "/pause — Pauzeer nieuwe entries\n"
+            "/resume — Hervat entries\n"
+            "/quiet on|off — Mute non-critical alerts\n"
+            "/health — Snelle health check\n"
+            "/uptime — Telegram + bot heartbeat\n"
+            "/version — Git branch + commit\n"
             "/log [n] — Laatste n log regels (max 50)\n"
             "/stop — Bot stoppen\n"
             "/restart — Bot herstarten\n"
             "/update — git pull + herstart\n\n"
+            "<b>Tuning voor minder ruis:</b>\n"
+            "  <code>/set TELEGRAM_NOTIFY_LEVEL trades</code>  (alleen trade+critical)\n"
+            "  <code>/set TELEGRAM_QUIET_START 22:00</code>\n"
+            "  <code>/set TELEGRAM_QUIET_END 07:00</code>\n"
+            "  <code>/set ALERT_DEDUPE_SECONDS 1800</code>\n\n"
             "<b>Voorbeelden:</b>\n"
+            "  <code>/why BTC</code>  ·  <code>/market SOL</code>\n"
             "  <code>/set BASE_AMOUNT_EUR 15</code>\n"
-            "  <code>/set DCA_ENABLED true</code>\n"
-            "  <code>/set BUDGET_RESERVATION.trailing_pct 80</code>\n"
-            "  <code>/market SOL</code>"
+            "  <code>/set BUDGET_RESERVATION.trailing_pct 80</code>"
         )
     elif cmd == "/status":
         reply = _get_status_text()
     elif cmd == "/trades":
         reply = _get_trades_text()
+    elif cmd == "/positions":
+        reply = _get_positions_text()
+    elif cmd == "/today":
+        reply = _get_today_text()
+    elif cmd == "/week":
+        reply = _get_week_text()
     elif cmd == "/orders":
         reply = _get_orders_text()
     elif cmd == "/profit":
@@ -1080,16 +1717,41 @@ def _handle_command(text: str):
         reply = _get_performance_text()
     elif cmd == "/balance":
         reply = _get_balance_text()
+    elif cmd == "/fees":
+        reply = _get_fees_text()
     elif cmd == "/trailing":
         reply = _get_trailing_text()
     elif cmd == "/dca":
         reply = _get_dca_text()
     elif cmd == "/grid":
         reply = _get_grid_text()
+    elif cmd == "/regime":
+        reply = _get_regime_text()
+    elif cmd == "/ai":
+        reply = _get_ai_text()
     elif cmd == "/config":
         reply = _get_config_text()
     elif cmd == "/risk":
         reply = _get_risk_text()
+    elif cmd == "/health":
+        reply = _get_health_text()
+    elif cmd == "/uptime":
+        reply = _get_uptime_text()
+    elif cmd == "/version":
+        reply = _get_version_text()
+    elif cmd == "/top":
+        reply = _get_top_text()
+    elif cmd == "/why":
+        if len(parts) >= 2:
+            reply = _get_why_text(parts[1])
+        else:
+            reply = "❌ Gebruik: <code>/why BTC</code>"
+    elif cmd == "/quiet":
+        reply = _set_quiet(parts[1] if len(parts) >= 2 else "")
+    elif cmd == "/pause":
+        reply = _pause_entries()
+    elif cmd == "/resume":
+        reply = _resume_entries()
     elif cmd == "/market":
         if len(parts) >= 2:
             reply = _get_market_text(parts[1])
@@ -1148,31 +1810,98 @@ def _trade_watch_loop():
                     for market in current_open - _known_open:
                         trade = open_trades.get(market, {})
                         buy_price = float(trade.get("buy_price") or 0)
-                        invested = float(trade.get("invested_eur") or 0)
+                        invested = float(trade.get("invested_eur") or trade.get("initial_invested_eur") or 0)
                         if invested < 1.0:  # dust / stofpositie, geen echte koop
                             continue
+                        score = float(trade.get("score") or 0)
+                        regime = str(trade.get("opened_regime") or "?")
+                        rsi_e = trade.get("rsi_at_entry")
+                        macd_e = trade.get("macd_at_entry")
+                        amount = float(trade.get("amount") or 0)
+                        regime_emoji = {
+                            "trending_up": "📈", "ranging": "↔️",
+                            "high_volatility": "⚡", "bearish": "📉",
+                            "aggressive": "🔥", "defensive": "🛡️",
+                        }.get(regime, "❓")
+                        extras = []
+                        if score:
+                            extras.append(f"Score: <b>{score:.1f}</b>")
+                        extras.append(f"{regime_emoji} {regime}")
+                        if isinstance(rsi_e, (int, float)) and rsi_e:
+                            extras.append(f"RSI: {float(rsi_e):.0f}")
+                        if isinstance(macd_e, (int, float)):
+                            extras.append(f"MACD: {float(macd_e):+.4f}")
                         send_message(
                             f"🟢 <b>KOOP: {market}</b>\n"
-                            f"Prijs: €{buy_price:.4f}\n"
-                            f"Geïnvesteerd: €{invested:.2f}"
+                            f"Prijs: €{buy_price:.6g} | Bedrag: {amount:.4g}\n"
+                            f"Geïnvesteerd: <b>€{invested:.2f}</b>\n"
+                            + " · ".join(extras)
                         )
 
-                    # Nieuwe closes → verkoopmelding
+                    # Nieuwe closes → verkoopmelding (verrijkt)
                     if current_closed_count > _known_closed_count:
                         for trade in closed_trades[_known_closed_count:]:
                             market = trade.get("market", "?")
                             profit = float(trade.get("profit") or 0)
-                            reason = trade.get("reason", "?")
+                            profit_pct = float(trade.get("profit_pct") or 0)
+                            reason = str(trade.get("reason", "?"))
                             buy_price = float(trade.get("buy_price") or 0)
                             sell_price = float(trade.get("sell_price") or 0)
+                            highest_price = float(trade.get("highest_price") or 0)
+                            invested = float(trade.get("invested_eur") or trade.get("initial_invested_eur") or 0)
+                            opened_ts = float(trade.get("opened_ts") or trade.get("timestamp_open") or 0)
+                            closed_ts = float(trade.get("timestamp") or 0)
+                            dca = int(trade.get("dca_buys") or 0)
+                            ptp = float(trade.get("partial_tp_returned_eur") or 0)
                             sign = "+" if profit >= 0 else ""
+
+                            # Hold time
+                            hold_str = ""
+                            if opened_ts > 0 and closed_ts > opened_ts:
+                                secs = closed_ts - opened_ts
+                                if secs < 3600:
+                                    hold_str = f"⏱ {secs/60:.0f}m"
+                                elif secs < 86400:
+                                    hold_str = f"⏱ {secs/3600:.1f}u"
+                                else:
+                                    hold_str = f"⏱ {secs/86400:.1f}d"
+
+                            # Peak vs realised
+                            peak_str = ""
+                            if highest_price > 0 and buy_price > 0:
+                                peak_pct = (highest_price - buy_price) / buy_price * 100
+                                gap = peak_pct - profit_pct
+                                peak_str = f"📈 Peak: {peak_pct:+.2f}% (gaf {gap:.2f}% terug)"
+
+                            reason_label = {
+                                "trailing_stop": "🎯 Trailing stop",
+                                "trailing_tp": "🎯 Trailing TP",
+                                "stop_loss": "🛑 Stop-loss",
+                                "hard_sl": "🛑 Hard stop-loss",
+                                "saldo_error": "❗ Saldo error",
+                                "sync_removed": "❗ Sync removed",
+                                "manual": "👤 Handmatig",
+                            }.get(reason, f"📋 {reason}")
+
                             emoji = "✅" if profit > 0 else ("⚠️" if profit == 0 else "🔴")
-                            sl_tag = " 🛑 STOP-LOSS" if any(x in reason.lower() for x in ("stop", "sl", "hard")) else ""
-                            send_message(
-                                f"{emoji} <b>VERKOOP: {market}</b>{sl_tag}\n"
-                                f"Gekocht: €{buy_price:.4f} → Verkocht: €{sell_price:.4f}\n"
-                                f"Winst: {sign}€{profit:.2f} | Reden: {reason}"
-                            )
+                            extras = [f"Reden: {reason_label}"]
+                            if hold_str:
+                                extras.append(hold_str)
+                            if dca:
+                                extras.append(f"DCA: {dca}×")
+                            if ptp > 0:
+                                extras.append(f"Partial TP: €{ptp:.2f}")
+
+                            msg_lines = [
+                                f"{emoji} <b>VERKOOP: {market}</b>",
+                                f"€{buy_price:.6g} → €{sell_price:.6g}  ({sign}{profit_pct:.2f}%)",
+                                f"💰 P&amp;L: <b>{sign}€{profit:.2f}</b>"
+                                + (f"  /  €{invested:.2f} ingelegd" if invested > 0 else ""),
+                            ]
+                            if peak_str:
+                                msg_lines.append(peak_str)
+                            msg_lines.append(" · ".join(extras))
+                            send_message("\n".join(msg_lines))
 
                     _known_open = current_open
                     _known_closed_count = current_closed_count

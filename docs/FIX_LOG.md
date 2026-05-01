@@ -5,6 +5,52 @@
 
 ---
 
+## #067 — Telegram bot overhaul: noise control + 14 new commands + enriched trade alerts (2026-05-01)
+
+### Symptom
+User feedback: *"ik wil meer info, een betere log met minder ruis, meer commands, maak de beste telegram bot ooit"*. Bestaande `modules/telegram_handler.py` had:
+- Geen severity-gating → elke `notify()` werd verstuurd, ook routine info → log-overload.
+- Geen quiet hours → 's nachts spam.
+- Geen dedupe → identieke alerts (zelfde event, andere prijs/timestamp) bleven herhalen.
+- Trade alerts (BUY/SELL) bevatten alleen prijs+amount; geen score/regime/RSI/MACD/peak/hold-time.
+- Alleen 17 commands, geen `/today`, `/week`, `/positions`, `/regime`, `/ai`, `/why`, `/health`, `/uptime`, `/version`, `/top`, `/fees`, `/quiet`, `/pause`, `/resume`.
+
+### Fix
+1. **Severity ladder** in `modules/telegram_handler.py`:
+    - `_classify(text)` → `trade` (KOOP/VERKOOP/STOP-LOSS), `critical` (CIRCUIT/EMERG/CRASH/CONNECTION LOST/SHUTDOWN/SALDO ERROR), `alert` (ERROR/WARN/FAIL/RETRY), `info` (rest).
+    - `TELEGRAM_NOTIFY_LEVEL` config (`info|alert|trades|critical|off`) gate in `notify()`.
+2. **Quiet hours**: `_in_quiet_hours(cfg)` met `TELEGRAM_QUIET_START`/`TELEGRAM_QUIET_END` (HH:MM, lokale tijd). Tijdens quiet hours alleen `trade`/`critical`. Spans middernacht correct (22:00→07:00).
+3. **Dedupe**: `_normalize_for_dedupe()` strip-t timestamps/prijzen/getallen → key. Eerste keer in `ALERT_DEDUPE_SECONDS` (default 600s) doorgelaten; daarna geblokt. Op de 5e (`ALERT_BURST_THRESHOLD`) collapse naar één samenvatting "(×5 in 600s)".
+4. **Enriched BUY alert** (`_trade_watch_loop`): toont nu score, regime emoji (🚀 trending / ⚖️ neutraal / 🛡️ defensief), RSI@entry, MACD@entry, volatility%.
+5. **Enriched SELL alert**: hold-time (h/m), peak% retrace, dca count, partial_tp returned €, gemapte reason emoji (🎯 trailing / 🛑 stop_loss / ⚠️ saldo_error / 🧠 ai_exit / 🚪 manual / ⏰ time_stop).
+6. **14 nieuwe commands**: `/today` `/week` `/positions` `/fees` `/regime` `/ai` `/health` `/uptime` `/version` `/top` `/why <coin>` `/quiet on|off` `/pause` `/resume`.
+    - `/pause` schrijft `MIN_SCORE_TO_BUY=999` naar local override + saved prev in `data/telegram_pause_state.json`.
+    - `/resume` herstelt prev maar floored op 7.0 (respecteert MIN_SCORE_TO_BUY≥7 lock uit copilot-instructions §12).
+7. **`/help` heropbouwd**: 4 categorieën (Snel overzicht / Strategie & markt / Beheer / Tuning) met copy-paste tuning voorbeelden voor minder ruis.
+8. **Nieuwe ALLOWED_KEYS** in `_apply_set_command()`: `TELEGRAM_NOTIFY_LEVEL`, `TELEGRAM_QUIET_START`, `TELEGRAM_QUIET_END` (alle str). `ALERT_DEDUPE_SECONDS` was al toegestaan via int-pad.
+
+### Verification
+- Import smoke test: `from modules import telegram_handler` → OK.
+- 28 helpers gedetecteerd (`_get_*`, `_set_quiet`, `_pause_entries`, `_resume_entries`).
+- Per-helper smoke run (`_get_today_text`, `_get_week_text`, `_get_ai_text`, `_get_regime_text`, `_get_uptime_text`, `_get_version_text`, `_get_health_text`, `_get_positions_text`, `_get_fees_text`, `_get_why_text`) → alle returnen tekst (50–369 chars), geen exceptions.
+- `_classify()` correct: trade/critical/alert/info matches.
+- `_normalize_for_dedupe('ENJ-EUR price €1.23 at 10:45')` → `enj#eur price # at #` (timestamps + getallen weg).
+- `pytest -k telegram` → geen tests, geen regressies (807 deselected).
+- Geen syntax errors (`get_errors`).
+
+### Notes / How to use
+- Bot moet herstart worden voor live alerts → user kan `/restart` sturen of `python trailing_bot.py` herladen.
+- Tuning voor "minder ruis" (voorbeeld user-config):
+    - `/set TELEGRAM_NOTIFY_LEVEL trades` (alleen trade+critical)
+    - `/set TELEGRAM_QUIET_START 22:00` + `/set TELEGRAM_QUIET_END 07:00`
+    - `/set ALERT_DEDUPE_SECONDS 1800` (30 min)
+- `/why <coin>` is een placeholder die `score`/`opened_regime`/`rsi_at_entry`/`macd_at_entry` uit `open_trades[market]` toont — werkt direct want die fields worden al door `bot/orders_impl.py` gevuld bij entry.
+
+### Files Changed
+- `modules/telegram_handler.py` (~750 → ~1400 regels). Geen call-site changes elders.
+
+---
+
 ## #066 — Road-to-10 monolith shrink batch 1: trade_repair + path_utils extraction (2026-04-30)
 
 ### Symptom
