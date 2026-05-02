@@ -17,11 +17,33 @@ except ImportError:  # pragma: no cover - optional dependency
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _PID_DIR = _PROJECT_ROOT / "logs"
 _PID_DIR.mkdir(exist_ok=True)
+_AUDIT_LOG = _PID_DIR / "singleton_audit.log"
 _MUTEX_HANDLES: dict[str, int] = {}
 
 
 def _safe_name(name: str) -> str:
     return ''.join(ch if ch.isalnum() else '_' for ch in name)
+
+
+def _audit(script_name: str, event: str, **fields) -> None:
+    """Append a line to logs/singleton_audit.log. Best-effort, never raises."""
+    try:
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
+        pid = os.getpid()
+        ppid = os.getppid()
+        parent_cmd = ""
+        if psutil is not None:
+            try:
+                parent_cmd = " ".join(psutil.Process(ppid).cmdline())[:200]
+            except Exception:
+                parent_cmd = "<unavailable>"
+        extras = " ".join(f"{k}={v}" for k, v in fields.items())
+        line = f"{ts} script={script_name} pid={pid} ppid={ppid} event={event} {extras} parent_cmd={parent_cmd!r}\n"
+        with open(_AUDIT_LOG, 'a', encoding='utf-8') as fh:
+            fh.write(line)
+    except Exception:
+        pass
 
 
 def _pid_alive(pid: int) -> bool:
@@ -107,20 +129,29 @@ def _acquire_windows_mutex_or_exit(script_name: str, safe_name: str) -> None:
         handle = CreateMutexW(None, True, mutex_name)
         last_error = ctypes.get_last_error()
         if not handle:
-            return
+            # CreateMutexW failed entirely. Do NOT silently fall back to the
+            # weaker PID-file path — that path was the source of duplicate
+            # trailing_bot processes (FIX_LOG #070).
+            _audit(script_name, "mutex_null_handle", last_error=last_error)
+            print(f"[singleton] {script_name}: CreateMutexW returned NULL (err={last_error}), exiting.")
+            sys.exit(1)
         if last_error == 183:  # ERROR_ALREADY_EXISTS
             # Another process holds this mutex (Windows auto-releases on process exit)
             try:
                 kernel32.CloseHandle(handle)
             except Exception:
                 pass
+            _audit(script_name, "mutex_already_exists")
             print(f"[singleton] {script_name}: another instance holds the mutex, exiting.")
             sys.exit(1)
         _MUTEX_HANDLES[safe_name] = handle
+        _audit(script_name, "mutex_acquired")
         atexit.register(_cleanup_mutex, safe_name)
-    except Exception:
-        # Fall back to PID-file logic only
-        pass
+    except SystemExit:
+        raise
+    except Exception as e:
+        # Fall back to PID-file logic only (e.g. non-Windows or ctypes missing)
+        _audit(script_name, "mutex_exception", error=repr(e)[:120])
 
 
 def ensure_single_instance_or_exit(script_name: str | None = None, *, allow_claim: bool = False) -> None:
@@ -160,14 +191,27 @@ def ensure_single_instance_or_exit(script_name: str | None = None, *, allow_clai
                     existing = 0
                 if existing and existing != current_pid and _pid_alive(existing):
                     if allow_claim:
+                        _audit(script_name, "claim_attempt", existing_pid=existing)
                         _terminate_pid(existing)
                         time.sleep(0.5)
+                        # Verify the old PID actually died before continuing.
+                        # If it didn't, exit instead of running a duplicate.
+                        if _pid_alive(existing):
+                            _audit(script_name, "claim_failed_target_alive", existing_pid=existing)
+                            os.close(lock_fd)
+                            try:
+                                lock_path.unlink()
+                            except FileNotFoundError:
+                                pass
+                            print(f"[singleton] {script_name}: claim failed (PID {existing} still alive), exiting.")
+                            sys.exit(1)
                         continue
                     os.close(lock_fd)
                     try:
                         lock_path.unlink()
                     except FileNotFoundError:
                         pass
+                    _audit(script_name, "refused_existing_alive", existing_pid=existing)
                     print(f"[singleton] {script_name} draait al (PID {existing}).")
                     sys.exit(1)
                 if existing and not _pid_alive(existing):

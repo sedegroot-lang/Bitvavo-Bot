@@ -595,11 +595,30 @@ def monitor_loop():
             stderr_path = os.path.join(LOG_DIR, 'trailing_stderr.log')
 
             try:
+                # FIX_LOG #070: also check the singleton PID-file before tasklist
+                # match. tasklist-cmdmatch can race when a process is mid-start
+                # (Popen returned but command line not yet visible to WMI).
+                pidfile_path = os.path.join(os.path.dirname(__file__), '..', '..', 'logs', 'trailing_bot.py.pid')
+                pidfile_alive = False
+                try:
+                    if os.path.exists(pidfile_path):
+                        with open(pidfile_path, 'r', encoding='utf-8') as fh:
+                            pid_in_file = int((fh.read().strip() or '0'))
+                        if pid_in_file > 0:
+                            try:
+                                import psutil as _ps
+                                pidfile_alive = _ps.pid_exists(pid_in_file)
+                            except Exception:
+                                # Fallback: assume alive if we can't verify
+                                pidfile_alive = True
+                except Exception:
+                    pidfile_alive = False
+
                 existing_bots = _get_windows_pids_by_cmd_match('trailing_bot.py')
-                if existing_bots:
+                if existing_bots or pidfile_alive:
                     with open(MONITOR_LOG, 'a', encoding='utf-8') as mh:
-                        mh.write(f"{datetime.now(timezone.utc).isoformat()}Z - trailing_bot.py already running (PIDs: {existing_bots}), not starting another instance.\n")
-                    print(f"Monitor: trailing_bot.py already running (PIDs: {existing_bots}), not starting another instance.")
+                        mh.write(f"{datetime.now(timezone.utc).isoformat()}Z - trailing_bot.py already running (PIDs: {existing_bots}, pidfile_alive={pidfile_alive}), not starting another instance.\n")
+                    print(f"Monitor: trailing_bot.py already running (PIDs: {existing_bots}, pidfile_alive={pidfile_alive}), not starting another instance.")
                     time.sleep(backoff_base)
                     rc = 0
                 else:

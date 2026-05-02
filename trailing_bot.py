@@ -3982,7 +3982,11 @@ if __name__ == '__main__':
     # Single-instance check via shared helper (best-effort)
     try:
         from scripts.helpers.single_instance import ensure_single_instance_or_exit  # type: ignore[import]
-        ensure_single_instance_or_exit('trailing_bot.py', allow_claim=True)
+        # FIX_LOG #070: allow_claim was True, which let a second instance "steal"
+        # the slot via taskkill. When the old process ignored the kill (still
+        # in heavy imports), both kept running. Now: if a live instance holds
+        # the PID-file, exit instead of fighting it.
+        ensure_single_instance_or_exit('trailing_bot.py', allow_claim=False)
     except SystemExit as se:
         # Log the singleton guard exit so it's visible in bot_log
         log(f"🛑 Singleton guard: trailing_bot.py kan niet starten (exit code {se.code})", level='error')
