@@ -847,7 +847,9 @@ def _signal_status() -> Dict[str, Any]:
         open_count = len(open_trades) if isinstance(open_trades, dict) else 0
         eur_balance = float(hb.get("eur_balance") or 0)
         base_amount = float(cfg.get("BASE_AMOUNT_EUR", 12) or 12)
-        min_balance = float(cfg.get("MIN_BALANCE_RESERVE", 10) or 10)
+        # Default aligned with bot/orders_impl.py (5 EUR), not 10 — was source of
+        # "nodig €330" mismatch when bot would actually buy at €325.
+        min_balance = float(cfg.get("MIN_BALANCE_RESERVE", 5) or 5)
         pending_res = int(hb.get("pending_reservations") or 0)
         regime_blocking = (regime or "").lower() == "bearish" or regime_score_adj > 50
         effective_min_score = round(min_score_threshold + adaptive_bump, 2)
@@ -869,7 +871,10 @@ def _signal_status() -> Dict[str, Any]:
             warnings.append(f"Bijna max trades: {open_count}/{max_trades}")
         available = eur_balance - min_balance
         if available < base_amount:
-            blocks.append(f"Onvoldoende saldo: €{eur_balance:.2f} (nodig: €{base_amount + min_balance:.2f})")
+            blocks.append(
+                f"Onvoldoende saldo: €{eur_balance:.2f} "
+                f"(nodig €{base_amount:.2f} trade + €{min_balance:.2f} reserve = €{base_amount + min_balance:.2f})"
+            )
         elif available < base_amount * 2:
             warnings.append(f"Laag saldo: €{eur_balance:.2f} — slechts 1 trade-slot")
 
