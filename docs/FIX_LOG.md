@@ -5,6 +5,38 @@
 
 ---
 
+## #071 — DCA never triggers on synced positions: DCA_MIN_SCORE blocks score=0 trades (2026-05-03)
+
+### Symptom
+User: *"waarom wort er geen dca uuitgevoerd op ENJ?"*. ENJ-EUR was -7.5% under entry but `dca_buys=0`. Same for SUI/RENDER. `bot.log` showed: `DCA voor SUI-EUR overgeslagen: trade-score 0.00 < DCA_MIN_SCORE 12.00`.
+
+### Root cause
+1. `modules/trading_dca.py` lines 157-175 enforce a hard gate: `if trade.score < DCA_MIN_SCORE: skip`.
+2. Trades imported via `bot/sync.py` (positions held when bot was offline) get `score=0.0` because the entry score is unknown — there is no rescore-on-sync path.
+3. With `DCA_MIN_SCORE=12` (Road-to-10 #061 default) **all synced trades are permanently DCA-blocked**.
+4. Secondary: `DCA_AMOUNT_EUR=20` on a `BASE=320` trade = 6.25% — even if it triggered, cost-basis improvement would be -0.43% over the full 2-step ladder. Useless.
+
+### Fix
+Local config update (`%LOCALAPPDATA%/BotConfig/bot_config_local.json`, hot-reloaded next loop):
+- `DCA_MIN_SCORE`: 12 → **0** (gate disabled; synced trades can DCA)
+- `DCA_AMOUNT_EUR`: 20 → **80** (25% of BASE; meaningful averaging)
+- `DCA_MAX_BUYS`: 2 → **3** (drop coverage to -9%)
+- `DCA_DROP_PCT`: 0.025 → **0.03** (avoid triggering on noise)
+
+Math (normalised entry=1.0): full 3-step ladder with €80 DCAs at -3%/-6%/-9% → cost basis -2.69%, total per trade €560, max 4 trades = €2240 exposure (well within budget).
+
+### Verification
+- `load_config()` readback confirms all 4 keys live in CONFIG.
+- ENJ next DCA trigger now at `0.047774 × 0.97 = 0.046341` (current 0.044205 → already below first trigger, will fire on next loop).
+- Backup of pre-change local config saved as `bot_config_local.json.bak.<ts>`.
+
+### Lesson
+- A hard score gate on DCA assumes every open trade was opened by *this* bot in *this* session. False for synced positions — they have no score history.
+- **Architectural alternative** (not done now, candidate for future): rescore open trades each scan cycle and write back `trade['score']`, so DCA gates work uniformly. For now `DCA_MIN_SCORE=0` is the pragmatic fix.
+- Always sanity-check `DCA_AMOUNT_EUR / BASE_AMOUNT_EUR` ratio. Below ~15% the DCA is cosmetic.
+
+---
+
 ## #070 — Duplicate trailing_bot processes: weak singleton guard (2026-05-02)
 
 ### Symptom
