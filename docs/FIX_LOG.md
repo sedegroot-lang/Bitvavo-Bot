@@ -5,6 +5,42 @@
 
 ---
 
+## #072 — DCA Telegram showed "Bedrag €0.00" + phantom dca_buys on MAKER limit orders (2026-05-03)
+
+### Symptom
+User: *"📉 DCA Buy 1/2 | ENJ-EUR ... Bedrag: €0.00"*. Bot fired ENJ DCA at 08:15:27, broadcast a €0.00 amount on Telegram, then subsequent inspection showed `dca_buys=0` and `dca_events=[]` in `data/trade_log.json`. The pending limit order was sitting on Bitvavo at €0.044379 unfilled.
+
+### Root cause
+1. `bot/orders_impl.py is_order_success()` returns True for `status='new'` (limit order accepted, not yet filled). MAKER orders rest on the book — they are valid, just not filled yet.
+2. `modules/trading_dca.py` then read `buy_result['filledAmountQuote']` and **blindly overwrote** the fallback `actual_dca_eur=eur_amount` with `0.0` (the unfilled amount).
+3. Downstream:
+   - `core.trade_investment.add_dca(trade, 0.0)` returned silently with a warning → `invested_eur` did not grow.
+   - `core.dca_state.record_dca(amount_eur=0, tokens_bought=0)` recorded a zero-value event → `dca_buys=1` in memory.
+   - Telegram showed `Bedrag: €0.00`.
+4. Sync engine then ran (rederives DCA state from exchange order *fills*), saw no fill yet → reset `dca_buys=0` and wiped `dca_events`. Bot was poised to fire **another** DCA next loop → cascading limit orders.
+
+### Fix
+`modules/trading_dca.py` (both legacy and dynamic ladder paths, lines ~579 and ~777): only overwrite `actual_dca_eur`/`actual_dca_tokens` from the response when the parsed value is **> 0**. Otherwise keep the fallback (the EUR commit). This:
+- Telegram shows the committed amount (€80) instead of €0.00.
+- `invested_eur` is incremented optimistically by the commit.
+- Sync engine reconciles the actual filled amount once the limit fills (existing behaviour).
+- If the limit cancels/expires, the bot's order_cleanup logic will detect and the trade reconciliation rules will adjust.
+
+Also: cancelled the orphan limit order on Bitvavo (`bv.cancelOrder(market, orderId, operatorId='1')`) and cleared the stale per-trade `dca_amount_eur=20 / dca_drop_pct=0.025 / dca_max=2` baked into the 3 open trades from before FIX #071, so they now use the new globals (€80 / 3% / 3 max).
+
+### Verification
+- `get_errors` on `modules/trading_dca.py` → no errors.
+- `bv.ordersOpen({'market':'ENJ-EUR'})` → 0 open after cancel.
+- `data/trade_log.json` open trades all show `dca_amount_eur=None / dca_drop_pct=None / dca_max=None` → globals win.
+- Bot restarted, dashboard restarted, `/api/health` → ok=true / bot_online=true.
+
+### Lesson
+- **Never trust an exchange API response field equal to 0 as authoritative**. A returned `filledAmount=0` on a `status='new'` limit order means "accepted, awaiting fill" — not "no fill ever". Use `> 0` guards before overwriting commit values.
+- A naive "is_order_success" returning True for `status='new'` is fine for limit orders, but downstream code must distinguish *committed* from *filled*.
+- Per-trade DCA settings (`dca_amount_eur` etc.) baked into trades override globals. After a config change, sweep `data/trade_log.json` to clear stale per-trade overrides — otherwise the new global never takes effect for existing positions.
+
+---
+
 ## #071 — DCA never triggers on synced positions: DCA_MIN_SCORE blocks score=0 trades (2026-05-03)
 
 ### Symptom

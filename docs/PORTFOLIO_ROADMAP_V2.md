@@ -1,9 +1,9 @@
-# Bitvavo Bot — Portfolio Roadmap V2 (April 2026)
+# Bitvavo Bot — Portfolio Roadmap V3 — Optie A (May 2026)
 
-> **Updated**: 23 April 2026
+> **Updated**: 03 May 2026
 > **Portfolio (now)**: €1.450
-> **Strategy**: Pure trailing-stop + DCA. **Grid trading is DISABLED.**
-> **Edge stack live**: position size floor + per-market EV-sizing (empirical-Bayes) + post-loss cooldown + adaptive MIN_SCORE + BTC-drawdown shield.
+> **Strategy**: Pure trailing-stop + DCA (V3 Optie A: 25%×3 ladder). **Grid trading is DISABLED.**
+> **Edge stack live**: position size floor + per-market EV-sizing (empirical-Bayes) + post-loss cooldown + adaptive MIN_SCORE + BTC-drawdown shield + DCA on synced trades (FIX #071).
 >
 > All projections below are derived from a backtest on **159 clean trades** (Mar 1 – Apr 22 2026), excluding operational closes (saldo_error / sync_removed / manual_close / reconstructed / dust_cleanup).
 
@@ -13,9 +13,10 @@
 
 | | |
 |---|---|
-| Now | **€1.450** · BASE 320 · MAX 4 · DCA 20×2 |
+| Now | **€1.450** · BASE 320 · MAX 3 · DCA 80×3 @-3% |
 | 6 months target | **€3.500–€4.500** |
 | 12 months target | **€7.500–€11.000** |
+| Endgame | **€50.000** (BASE 3.100 · MAX 9 · DCA 775×3) |
 | Weekly profit (now) | €60–€95 (realistic–best case) |
 | Monthly deposit | €100 (assumed continued) |
 
@@ -38,13 +39,15 @@ This roadmap maps how the config grows as the portfolio grows, what to expect ea
 | Key | Value |
 |---|---|
 | `BASE_AMOUNT_EUR` | 320 |
-| `MAX_OPEN_TRADES` | 4 |
-| `DCA_AMOUNT_EUR` | 20 |
-| `DCA_MAX_BUYS` / `DCA_MAX_ORDERS` | 2 / 2 |
-| `MIN_BALANCE_EUR` | 0 (full deployment) |
-| `MIN_SCORE_TO_BUY` | 8.0 (locked) |
+| `MAX_OPEN_TRADES` | 3 |
+| `DCA_AMOUNT_EUR` | 80 (25% van BASE) |
+| `DCA_MAX_BUYS` / `DCA_MAX_ORDERS` | 3 / 3 |
+| `DCA_DROP_PCT` | 0.03 (3% per stap) |
+| `DCA_MIN_SCORE` | 0 (synced trades kunnen DCA-en) |
+| `MIN_BALANCE_EUR` | 5 |
+| `MIN_SCORE_TO_BUY` | 7.0 (locked) |
 | `DEFAULT_TRAILING` | 2.2% |
-| `TRAILING_ACTIVATION_PCT` | 2.5% |
+| `TRAILING_ACTIVATION_PCT` | 1.5% |
 | Position size floor | ABS_MIN €75 / SOFT_MIN €50 / HIGH_CONVICTION score 14 |
 | Market EV sizing | ON (K_PRIOR=10, MIN_MULT=0.30, MAX_MULT=1.80) |
 | Post-loss cooldown | 4 h after loss, 24 h after >€5 loss |
@@ -52,7 +55,7 @@ This roadmap maps how the config grows as the portfolio grows, what to expect ea
 | BTC drawdown shield | Block alts when BTC ≤ −1.5% over last 60 min |
 | Whitelist | 25 markets (SOL, XRP, ADA, LINK, AAVE, UNI, LTC, BCH, DOT, AVAX, DOGE, NEAR, ATOM, ALGO, XLM, TAO, FET, SUI, WIF, RENDER, ENJ, APT, GALA, ONDO, HBAR) |
 
-**Capital math**: typical = 320 × 4 = €1.280 (88% of €1.450), worst = (320 + 40) × 4 = €1.440 (99%). No grid. EUR cushion only when DCA fires.
+**Capital math**: typical = `320 × 3 = €960` (66% of €1.450), worst = `3 × (320 + 240) = €1.680` (116%). Worst-case >100% relies on size floor + EV sizing + market correlation < 0.4 keeping simultaneous max-DCA rare.
 
 ---
 
@@ -78,19 +81,29 @@ Profit-per-week is derived from: backtest EV (+€0.73/trade) × ~25 trades/week
 
 Dates assume **€100/month deposit** continues and use the **base** scenario. Each milestone shows the configuration to apply *upon reaching* it.
 
-| # | Portfolio | Config to set | Wk profit (cons / base / opt) | Wks to next | ETA (base) |
-|---|-----------|---------------|------------------------------|-------------|------------|
-| 0 | **€1.450** *(now)* | BASE 320, MAX 4, DCA 20×2 | €48 / €71 / €95 | – | 23 Apr 2026 |
-| 1 | **€1.700** | BASE 380, MAX 4, DCA 25×2 | €56 / €83 / €110 | 3.0 | mid May 2026 |
-| 2 | **€2.000** | BASE 400, **MAX 5**, DCA 25×2 | €66 / €99 / €132 | 3.3 | early Jun 2026 |
-| 3 | **€2.500** | BASE 480, MAX 5, DCA 30×2 | €82 / €123 / €164 | 4.6 | mid Jul 2026 |
-| 4 | **€3.000** | BASE 550, MAX 5, DCA 35×2 | €100 / €150 / €200 | 3.7 | mid Aug 2026 |
-| 5 | **€4.000** | BASE 700, MAX 5, DCA 50×2 | €130 / €195 / €260 | 5.5 | late Sep 2026 |
-| 6 | **€5.000** | BASE 850, MAX 5, DCA 70×2 | €165 / €248 / €330 | 4.7 | early Nov 2026 |
-| 7 | **€7.500** | BASE 1.250, **MAX 6**, DCA 100×2 | €245 / €368 / €490 | 8.5 | early Jan 2027 |
-| 8 | **€10.000** | BASE 1.500, MAX 6, DCA 150×2 | €330 / €495 / €660 | 6.0 | mid Feb 2027 |
-| 9 | **€15.000** | BASE 2.000, MAX 7, DCA 200×2 | €495 / €743 / €990 | 14 | late May 2027 |
-| 10 | **€25.000** | BASE 3.000, MAX 8, DCA 300×2 | €825 / €1.238 / €1.650 | 22 | end Oct 2027 |
+| # | Portfolio | Config to set | DCA total/trade | Worst-case % | ETA (base) |
+|---|-----------|---------------|----------------|--------------|------------|
+| 0 | **€1.450** *(now)* | BASE 320, MAX 3, DCA 80×3 @-3% | €560 | 116% | 03 May 2026 |
+| 1 | **€1.700** | BASE 380, MAX 3, DCA 95×3 @-3% | €665 | 117% | mid May 2026 |
+| 2 | **€2.000** | BASE 340, **MAX 4**, DCA 85×3 @-3% | €595 | 119% | early Jun 2026 |
+| 3 | **€2.500** | BASE 420, MAX 4, DCA 105×3 @-3% | €735 | 118% | mid Jul 2026 |
+| 4 | **€3.000** | BASE 500, MAX 4, DCA 125×3 @-3% | €875 | 117% | mid Aug 2026 |
+| 5 | **€4.000** | BASE 540, **MAX 5**, DCA 135×3 @-3% | €945 | 118% | late Sep 2026 |
+| 6 | **€5.000** | BASE 670, MAX 5, DCA 170×3 @-3% | €1.180 | 118% | early Nov 2026 |
+| 7 | **€7.500** | BASE 820, **MAX 6**, DCA 205×3 @-3% | €1.435 | 115% | early Jan 2027 |
+| 8 | **€10.000** | BASE 1.100, MAX 6, DCA 275×3 @-3% | €1.925 | 116% | mid Feb 2027 |
+| 9 | **€15.000** | BASE 1.400, **MAX 7**, DCA 350×3 @-3% | €2.450 | 114% | late May 2027 |
+| 10 | **€20.000** | BASE 1.600, **MAX 8**, DCA 400×3 @-3% | €2.800 | 112% | early Sep 2027 |
+| 11 | **€30.000** | BASE 2.150, MAX 8, DCA 540×3 @-3% | €3.770 | 101% | end Jan 2028 |
+| 12 | **€50.000** | BASE 3.100, **MAX 9**, DCA 775×3 @-3% — *Volledig Passief Inkomen* | €5.425 | 98% | mid 2028 |
+
+**Notes on the new ladder (V3 Optie A, 03 May 2026):**
+
+- DCA = **25% of BASE** (cost-basis improvement -2.69% over full ladder vs -0.43% with 6%/2 ladder)
+- 3 DCA steps at -3%/-6%/-9% from entry (each step measured from previous DCA, FIX #003)
+- `DCA_MIN_SCORE=0` so synced positions can also DCA (FIX #071)
+- Worst-case formula: `MAX × BASE × 1.75` (BASE + 3 × 0.25×BASE). 115-118% relies on size floor + EV sizing keeping simultaneous max-DCA rare (<5% historical correlation)
+- `MAX_OPEN_TRADES` schedule: **3 → 4 (€2k) → 5 (€4k) → 6 (€7.5k) → 7 (€15k) → 8 (€20k) → 9 (€50k)**
 
 > **Disclaimer**: Crypto markets are non-stationary. The backtest covers a 7-week window of moderate volatility. Bear markets historically cut profits 40–60%; bull runs amplify them. The schedule above is a *plan*, not a promise.
 
@@ -98,21 +111,27 @@ Dates assume **€100/month deposit** continues and use the **base** scenario. E
 
 ## 5. Capital deployment per milestone
 
-| Milestone | Typical | Worst-case (full DCA) | % of portfolio (worst) |
-|---|---|---|---|
-| €1.450 | €1.280 | €1.440 | 99% |
-| €1.700 | €1.520 | €1.720 | 101%* |
-| €2.000 | €2.000 | €2.250 | 113%* |
-| €2.500 | €2.400 | €2.700 | 108%* |
-| €3.000 | €2.750 | €3.100 | 103%* |
-| €4.000 | €3.500 | €4.000 | 100% |
-| €5.000 | €4.250 | €4.950 | 99% |
-| €7.500 | €7.500 | €8.700 | 116%* |
-| €10.000 | €9.000 | €10.800 | 108%* |
+Worst-case = `MAX × (BASE + 3 × DCA_AMOUNT)`. % is worst-case relative to portfolio.
+
+| Milestone | BASE | MAX | DCA × 3 | Worst-case | % |
+|---|---|---|---|---|---|
+| €1.450 | 320 | 3 | €80 | €1.680 | 116% |
+| €1.700 | 380 | 3 | €95 | €1.995 | 117% |
+| €2.000 | 340 | 4 | €85 | €2.380 | 119% |
+| €2.500 | 420 | 4 | €105 | €2.940 | 118% |
+| €3.000 | 500 | 4 | €125 | €3.500 | 117% |
+| €4.000 | 540 | 5 | €135 | €4.725 | 118% |
+| €5.000 | 670 | 5 | €170 | €5.900 | 118% |
+| €7.500 | 820 | 6 | €205 | €8.610 | 115% |
+| €10.000 | 1.100 | 6 | €275 | €11.550 | 116% |
+| €15.000 | 1.400 | 7 | €350 | €17.150 | 114% |
+| €20.000 | 1.600 | 8 | €400 | €22.400 | 112% |
+| €30.000 | 2.150 | 8 | €540 | €30.160 | 101% |
+| €50.000 | 3.100 | 9 | €775 | €48.825 | 98% |
 
 `*` = relies on the size floor + EV sizing to prevent simultaneous max-DCA on every position. The probability of all 4–6 trades hitting full DCA at the same time is < 5% historically (correlation between markets is ~0.3 outside crashes).
 
-If sustained over-allocation is observed in the dashboard's `Capital Deployment` panel, drop `DCA_MAX_BUYS` to 1 for that milestone.
+If sustained over-allocation is observed in the dashboard's `Capital Deployment` panel, drop `DCA_MAX_BUYS` to 2 for that milestone.
 
 ---
 

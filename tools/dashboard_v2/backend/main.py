@@ -1058,27 +1058,31 @@ def _roadmap() -> Dict[str, Any]:
     deposits_data = _read_json(CONFIG_DIR / "deposits.json", {}) or {}
     total_deposited = float(deposits_data.get("total_deposited_eur") or 0)
 
-    # Milestones (matches V1)
+    # Milestones (V3-Optie A: DCA 25% van BASE × 3 stappen @ -3% per stap; worst-case ~115%)
     milestones = [
         {"value": 465,   "label": "€465",    "action": "V1 Start (11 mrt 2026)", "icon": "✅", "star": False},
         {"value": 700,   "label": "€700",    "action": "V1: DCA Hybrid F_CONSERVATIEF", "icon": "✅", "star": False},
         {"value": 1000,  "label": "€1.000",  "action": "V1: Grid BTC aan", "icon": "✅", "star": False},
         {"value": 1240,  "label": "€1.240",  "action": "V2 START: BASE 150, 4 trades, DCA max 6", "icon": "✅", "star": False},
-        {"value": 1450,  "label": "€1.450",  "action": "V3: BASE 320, MAX 4, DCA 20×2 — full edge stack", "icon": "⭐", "star": True},
-        {"value": 1700,  "label": "€1.700",  "action": "BASE 380, MAX 4, DCA 25×2", "icon": "📍", "star": False},
-        {"value": 2000,  "label": "€2.000",  "action": "BASE 400, MAX 5, DCA 25×2", "icon": "⭐", "star": True},
-        {"value": 2500,  "label": "€2.500",  "action": "BASE 480, MAX 5, DCA 30×2", "icon": "📍", "star": False},
-        {"value": 3000,  "label": "€3.000",  "action": "BASE 550, MAX 5, DCA 35×2", "icon": "⭐", "star": True},
-        {"value": 4000,  "label": "€4.000",  "action": "BASE 700, MAX 5, DCA 50×2", "icon": "📍", "star": False},
-        {"value": 5000,  "label": "€5.000",  "action": "BASE 850, MAX 5, DCA 70×2", "icon": "⭐", "star": True},
-        {"value": 7500,  "label": "€7.500",  "action": "BASE 1.250, MAX 6, DCA 100×2", "icon": "📍", "star": False},
-        {"value": 10000, "label": "€10.000", "action": "BASE 1.500, MAX 6, DCA 150×2 — Passief Inkomen", "icon": "🏆", "star": True},
+        {"value": 1450,  "label": "€1.450",  "action": "V3 Optie A: BASE 320, MAX 3, DCA 80×3 @-3% — full edge stack", "icon": "⭐", "star": True},
+        {"value": 1700,  "label": "€1.700",  "action": "BASE 380, MAX 3, DCA 95×3 @-3%", "icon": "📍", "star": False},
+        {"value": 2000,  "label": "€2.000",  "action": "BASE 340, MAX 4, DCA 85×3 @-3%", "icon": "⭐", "star": True},
+        {"value": 2500,  "label": "€2.500",  "action": "BASE 420, MAX 4, DCA 105×3 @-3%", "icon": "📍", "star": False},
+        {"value": 3000,  "label": "€3.000",  "action": "BASE 500, MAX 4, DCA 125×3 @-3%", "icon": "⭐", "star": True},
+        {"value": 4000,  "label": "€4.000",  "action": "BASE 540, MAX 5, DCA 135×3 @-3%", "icon": "📍", "star": False},
+        {"value": 5000,  "label": "€5.000",  "action": "BASE 670, MAX 5, DCA 170×3 @-3%", "icon": "⭐", "star": True},
+        {"value": 7500,  "label": "€7.500",  "action": "BASE 820, MAX 6, DCA 205×3 @-3%", "icon": "📍", "star": False},
+        {"value": 10000, "label": "€10.000", "action": "BASE 1.100, MAX 6, DCA 275×3 @-3% — Passief Inkomen Lite", "icon": "🏆", "star": True},
+        {"value": 15000, "label": "€15.000", "action": "BASE 1.400, MAX 7, DCA 350×3 @-3%", "icon": "📍", "star": False},
+        {"value": 20000, "label": "€20.000", "action": "BASE 1.600, MAX 8, DCA 400×3 @-3%", "icon": "⭐", "star": True},
+        {"value": 30000, "label": "€30.000", "action": "BASE 2.150, MAX 8, DCA 540×3 @-3%", "icon": "📍", "star": False},
+        {"value": 50000, "label": "€50.000", "action": "BASE 3.100, MAX 9, DCA 775×3 @-3% — Volledig Passief Inkomen", "icon": "🏆", "star": True},
     ]
     current_idx = 0
     for i, m in enumerate(milestones):
         if current_value >= m["value"]:
             current_idx = i
-    progress_pct = min(100.0, max(0.0, (current_value / 10000.0) * 100))
+    progress_pct = min(100.0, max(0.0, (current_value / 50000.0) * 100))
 
     # Sparkline (last 30 days)
     sparkline: List[Dict[str, Any]] = []

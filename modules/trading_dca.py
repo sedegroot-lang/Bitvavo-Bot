@@ -573,15 +573,32 @@ class DCAManager:
                 self._record_dca_audit(market, trade, "fail", "order_failed", {"eur_amount": eur_amount, "price": current_price})
                 break
 
-            # CRITICAL: Extract ACTUAL invested EUR and tokens from DCA order response
-            actual_dca_eur = eur_amount  # Fallback
-            actual_dca_tokens = base_amount  # Fallback
+            # CRITICAL: Extract ACTUAL invested EUR and tokens from DCA order response.
+            # FIX #072: only overwrite the fallback when the response shows a real fill.
+            # MAKER (limit) orders return status='new' with filledAmountQuote='0' while
+            # resting on the book. Overwriting to 0 corrupts invested_eur and broadcasts
+            # "Bedrag €0.00" on Telegram. Sync engine reconciles dca_buys + invested_eur
+            # from the exchange order history once the limit fills.
+            actual_dca_eur = eur_amount  # Fallback (commit value)
+            actual_dca_tokens = base_amount  # Fallback (commit tokens)
             try:
                 if isinstance(buy_result, dict):
-                    if 'filledAmountQuote' in buy_result:
-                        actual_dca_eur = float(buy_result['filledAmountQuote'])
-                    if 'filledAmount' in buy_result:
-                        actual_dca_tokens = float(buy_result['filledAmount'])
+                    _fq = buy_result.get('filledAmountQuote')
+                    if _fq is not None:
+                        try:
+                            _fq_val = float(_fq)
+                            if _fq_val > 0:
+                                actual_dca_eur = _fq_val
+                        except Exception:
+                            pass
+                    _fa = buy_result.get('filledAmount')
+                    if _fa is not None:
+                        try:
+                            _fa_val = float(_fa)
+                            if _fa_val > 0:
+                                actual_dca_tokens = _fa_val
+                        except Exception:
+                            pass
             except Exception as e:
                 self._log(f"actual_dca_eur failed: {e}", level='error')
 
@@ -773,15 +790,28 @@ class DCAManager:
                 self._record_dca_audit(market, trade, "fail", "order_failed", {"eur_amount": eur_amount, "price": current_price})
                 break
 
-            # CRITICAL: Extract ACTUAL invested EUR and tokens from DCA order response
-            actual_dca_eur = eur_amount  # Fallback
-            actual_dca_tokens = base_amount  # Fallback
+            # CRITICAL: Extract ACTUAL invested EUR and tokens from DCA order response.
+            # FIX #072: see legacy DCA path above for rationale.
+            actual_dca_eur = eur_amount  # Fallback (commit value)
+            actual_dca_tokens = base_amount  # Fallback (commit tokens)
             try:
                 if isinstance(buy_result, dict):
-                    if 'filledAmountQuote' in buy_result:
-                        actual_dca_eur = float(buy_result['filledAmountQuote'])
-                    if 'filledAmount' in buy_result:
-                        actual_dca_tokens = float(buy_result['filledAmount'])
+                    _fq = buy_result.get('filledAmountQuote')
+                    if _fq is not None:
+                        try:
+                            _fq_val = float(_fq)
+                            if _fq_val > 0:
+                                actual_dca_eur = _fq_val
+                        except Exception:
+                            pass
+                    _fa = buy_result.get('filledAmount')
+                    if _fa is not None:
+                        try:
+                            _fa_val = float(_fa)
+                            if _fa_val > 0:
+                                actual_dca_tokens = _fa_val
+                        except Exception:
+                            pass
             except Exception as e:
                 self._log(f"actual_dca_eur failed: {e}", level='error')
 
