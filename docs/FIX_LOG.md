@@ -5,6 +5,47 @@
 
 ---
 
+## #073 — DCA limit-order: split GEPLAATST/GEVULD + pending tracking + cascading guard + auto-timeout (2026-05-03)
+
+### Symptom
+After FIX #072, the Telegram message still arrived **immediately** when a MAKER limit DCA was placed (status='new', filledAmountQuote=0). User: *"zit er ook een timer op de limit order dca? wat als die niet bereikt wordt, wordt die dan opnieuw geplaatst?"*. Two latent risks:
+1. Telegram fired "DCA Buy" before the order actually filled — misleading.
+2. Next bot loop (~25s later) saw the price still below the trigger and would attempt **another** DCA at the same level → cascading limit orders stacking on the book.
+3. `LIMIT_ORDER_TIMEOUT_SECONDS=None` and `bot/order_cleanup.py:cancel_open_buys_by_age()` skips any market that exists in `open_trades` → DCA limit orders would NEVER be auto-cancelled if they didn't fill.
+
+### Root cause
+`modules/trading_dca.py` had no concept of an in-flight pending order. After `place_buy()` succeeded it always:
+- recorded a DCA event (FIX #072 mitigated the €0 corruption but the event was still recorded as "filled"),
+- sent the Telegram alert,
+- mutated `dca_buys` / `invested_eur`.
+
+Next loop iteration would see `dca_buys` already incremented (good — no cascade for THAT level) BUT if the limit order then cancelled / expired externally, the bot had no way to detect or react. Conversely, if FIX #072 had been stricter and refused to record the event, the loop would have re-fired the same DCA every 25s.
+
+### Fix
+`modules/trading_dca.py` (both `_execute_fixed_dca` and `_execute_dynamic_dca` paths):
+
+1. **Pending-order stash**: when `place_buy()` returns a non-filled limit response (`status='new'`, `filledAmountQuote=0`), the trade dict gets `pending_dca_order_id`, `pending_dca_order_ts`, `pending_dca_order_eur`, `pending_dca_order_price`, `pending_dca_order_market`. `dca_buys` / `invested_eur` are **NOT** mutated.
+2. **Pre-place guard** (`_check_pending_dca_order`): at the top of every DCA loop, if a pending order exists, poll via `bitvavo.getOrder(market, oid)`:
+   - `status='new'` / `partiallyFilled` and not timed out → return (no new placement).
+   - `status='filled'` → record the actual fill (`add_dca` + `record_dca`), send "✅ GEVULD" Telegram, clear pending fields, continue.
+   - `status='cancelled'` / `'rejected'` / `'expired'` → if there's a partial fill, record it; clear pending fields.
+   - Order invisible (getOrder returns None and not in ordersOpen) → clear pending; sync engine will reconcile via `derive_cost_basis`.
+   - Age > `DCA_LIMIT_ORDER_TIMEOUT_SECONDS` (default 600s) → call `cancelOrder` with `operatorId` fallback chain (kw → dict → positional), record any partial, clear pending fields.
+3. **Telegram split**: limit-not-filled → `📥 DCA limit GEPLAATST {n}/{max} | Wacht op fill...`. Filled (immediate or via polling) → `✅ DCA Buy {n}/{max} GEVULD`.
+4. **No change to `bot/order_cleanup.py`**: intentional — its `if market in open_trades: continue` guard protects DCA orders. With FIX #073's internal 600s timeout, DCA orders are self-managed and don't need the global cleanup.
+
+### Verification
+- 9 new tests in `tests/test_dca_limit_order_tracking.py` — all pass: unfilled stash, fill recording on poll, no-cascade-while-pending, timeout-cancel, market-order immediate fill, externally-cancelled clear, partial-fill-on-cancel.
+- Updated 2 legacy mocks in `tests/test_trading_behaviors.py` (place_buy now requires explicit `status='filled'` + filled fields to be treated as filled).
+- **Full suite**: 815 passed, 3 skipped in 122.54s — no regressions.
+
+### Lesson
+- **Separate "order placed" from "order filled" events.** A success response with `orderId` only proves acceptance, not execution. For MAKER limit orders this distinction is essential.
+- Stash the pending orderId on the trade itself — the next loop iteration becomes the natural reconciler. No background thread or extra state file required.
+- Always provide an internal timeout for any limit order the bot places. Don't depend on the global `LIMIT_ORDER_TIMEOUT_SECONDS` cleanup loop because intentional skip rules may exclude your market.
+
+---
+
 ## #072 — DCA Telegram showed "Bedrag €0.00" + phantom dca_buys on MAKER limit orders (2026-05-03)
 
 ### Symptom

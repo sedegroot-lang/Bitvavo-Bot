@@ -25,7 +25,10 @@ def test_dca_fixed_updates_weighted_average():
 
     def place_buy(market: str, eur_amount: float, price: float, **kwargs) -> Dict[str, Any]:
         place_calls.append((market, eur_amount, price))
-        return {"orderId": "ok"}
+        # FIX #073: return a FILLED response so the new placed/filled split treats it as a market fill
+        return {"orderId": "ok", "status": "filled",
+                "filledAmount": str(eur_amount / price),
+                "filledAmountQuote": str(eur_amount)}
 
     ctx = DCAContext(
         config={"MAX_TOTAL_EXPOSURE_EUR": 100, "RSI_MIN_BUY": 30},
@@ -77,7 +80,10 @@ def test_dca_respects_exposure_headroom():
 
     def place_buy(market: str, eur_amount: float, price: float, **kwargs) -> Dict[str, Any]:
         place_calls.append((market, eur_amount, price))
-        return {"orderId": "ok"}
+        # FIX #073: filled response
+        return {"orderId": "ok", "status": "filled",
+                "filledAmount": str(eur_amount / price),
+                "filledAmountQuote": str(eur_amount)}
 
     ctx = DCAContext(
         config={"MAX_TOTAL_EXPOSURE_EUR": 100, "RSI_MIN_BUY": 30},

@@ -14,6 +14,40 @@ import numpy as np
 from modules.logging_utils import file_lock, locked_write_json
 
 
+# ─── FIX #073: DCA limit order tracking helpers ────────────────────
+# Bitvavo MAKER limit orders return status='new' with filledAmountQuote='0'
+# while resting on the orderbook. Until the order fills, we must NOT mutate
+# trade state (dca_buys, invested_eur) and NOT send "DCA Buy" Telegram.
+_OPEN_LIKE_STATUSES = {'new', 'open', 'partiallyfilled', 'partially filled'}
+_DEAD_STATUSES = {'cancelled', 'canceled', 'rejected', 'expired'}
+
+
+def _order_filled_status(buy_result: Any) -> Tuple[bool, float, float, str, str]:
+    """Inspect a place_buy() response.
+
+    Returns: (filled, filled_eur, filled_tokens, status, order_id)
+        filled       — True if status='filled' OR filledAmount > 0
+        filled_eur   — actual quote filled (0 for resting limit)
+        filled_tokens — actual base filled (0 for resting limit)
+        status       — lowercased status string
+        order_id     — orderId from response (empty string if missing)
+    """
+    if not isinstance(buy_result, dict):
+        return False, 0.0, 0.0, '', ''
+    status = str(buy_result.get('status', '')).lower().strip()
+    order_id = str(buy_result.get('orderId', '') or '')
+    try:
+        filled_eur = float(buy_result.get('filledAmountQuote', 0) or 0)
+    except (TypeError, ValueError):
+        filled_eur = 0.0
+    try:
+        filled_tokens = float(buy_result.get('filledAmount', 0) or 0)
+    except (TypeError, ValueError):
+        filled_tokens = 0.0
+    is_filled = (status == 'filled') or (filled_tokens > 0 and filled_eur > 0)
+    return is_filled, filled_eur, filled_tokens, status, order_id
+
+
 @dataclass
 class DCASettings:
     enabled: bool
@@ -498,6 +532,11 @@ class DCAManager:
         except Exception as e:
             self.ctx.log(f"[ERROR] DCA dd_penalty calculation failed: {e}")
 
+        # FIX #073: handle pending DCA limit-order from previous iteration first.
+        _pending_status = self._check_pending_dca_order(market, trade, settings)
+        if _pending_status in ('still_open', 'timed_out_cancelled', 'error'):
+            return  # do NOT place a new order while one is in flight or just cancelled
+
         buys_this_call = 0
         max_per_iter = int(settings.max_buys_per_iteration) if getattr(settings, 'max_buys_per_iteration', None) else settings.max_buys
         while trade.get("dca_buys", 0) < settings.max_buys and buys_this_call < max_per_iter:
@@ -573,34 +612,40 @@ class DCAManager:
                 self._record_dca_audit(market, trade, "fail", "order_failed", {"eur_amount": eur_amount, "price": current_price})
                 break
 
-            # CRITICAL: Extract ACTUAL invested EUR and tokens from DCA order response.
-            # FIX #072: only overwrite the fallback when the response shows a real fill.
-            # MAKER (limit) orders return status='new' with filledAmountQuote='0' while
-            # resting on the book. Overwriting to 0 corrupts invested_eur and broadcasts
-            # "Bedrag €0.00" on Telegram. Sync engine reconciles dca_buys + invested_eur
-            # from the exchange order history once the limit fills.
-            actual_dca_eur = eur_amount  # Fallback (commit value)
-            actual_dca_tokens = base_amount  # Fallback (commit tokens)
-            try:
-                if isinstance(buy_result, dict):
-                    _fq = buy_result.get('filledAmountQuote')
-                    if _fq is not None:
-                        try:
-                            _fq_val = float(_fq)
-                            if _fq_val > 0:
-                                actual_dca_eur = _fq_val
-                        except Exception:
-                            pass
-                    _fa = buy_result.get('filledAmount')
-                    if _fa is not None:
-                        try:
-                            _fa_val = float(_fa)
-                            if _fa_val > 0:
-                                actual_dca_tokens = _fa_val
-                        except Exception:
-                            pass
-            except Exception as e:
-                self._log(f"actual_dca_eur failed: {e}", level='error')
+            # FIX #073: detect MAKER limit order (status='new', filledAmountQuote=0).
+            # If not filled yet, stash orderId on trade so next iter can poll/cancel.
+            # Do NOT mutate dca_buys / invested_eur and do NOT send "DCA Buy" Telegram.
+            _filled, _fa_eur, _fa_tokens, _ord_status, _ord_id = _order_filled_status(buy_result)
+            if not _filled:
+                try:
+                    _limit_px = float(buy_result.get('price', current_price)) if isinstance(buy_result, dict) else float(current_price)
+                except Exception:
+                    _limit_px = float(current_price)
+                if _ord_id:
+                    self._stash_pending_dca(trade, market, _ord_id, eur_amount, _limit_px)
+                    self._send_dca_placed_alert(
+                        market, eur_amount, _limit_px,
+                        int(trade.get('dca_buys', 0)) + 1,
+                        int(settings.max_buys or 3),
+                    )
+                    self._record_dca_audit(market, trade, 'placed', 'limit_order_resting',
+                                           {'order_id': _ord_id, 'commit_eur': eur_amount,
+                                            'limit_price': _limit_px, 'status': _ord_status})
+                    ctx.save_trades()
+                else:
+                    self._record_dca_audit(market, trade, 'fail', 'placed_no_orderId_no_fill',
+                                           {'eur_amount': eur_amount, 'status': _ord_status})
+                # Release reservation: no actual exposure was added yet
+                try:
+                    if reservation_id is not None:
+                        self._release_reservation(reservation_id)
+                except Exception as e:
+                    self._log(f"_release_reservation failed: {e}", level='warning')
+                break  # do not attempt next ladder level until this resolves
+
+            # Order filled — proceed with ACTUAL fill amounts
+            actual_dca_eur = _fa_eur
+            actual_dca_tokens = _fa_tokens
 
             prev_amount = float(trade.get("amount", 0.0))
             new_amount = prev_amount + float(actual_dca_tokens)
@@ -644,13 +689,13 @@ class DCAManager:
             log(
                 f"DCA buy {trade['dca_buys']} voor {market} op {current_price:.6f} (EUR {eur_amount:.2f})"
             )
-            # Telegram notification for DCA buy
+            # Telegram notification for DCA buy (FILLED — see FIX #073)
             try:
                 if ctx.send_alert:
                     _inv = float(trade.get('invested_eur', 0))
                     _avg = float(trade.get('buy_price', current_price))
                     ctx.send_alert(
-                        f"\U0001f4c9 DCA Buy {new_dca_buys}/{dca_max_limit} | {market}\n"
+                        f"\u2705 DCA Buy {new_dca_buys}/{dca_max_limit} GEVULD | {market}\n"
                         f"Prijs: \u20ac{current_price:.4f} | Bedrag: \u20ac{actual_dca_eur:.2f}\n"
                         f"Totaal invested: \u20ac{_inv:.2f} | Gem. prijs: \u20ac{_avg:.4f}"
                     )
@@ -729,6 +774,11 @@ class DCAManager:
                 if not math.isclose(dca_drop_pct, settings.drop_pct):
                     log(f"DCA_DROP_PCT decreased to {dca_drop_pct:.3f} due to low volatility.")
 
+        # FIX #073: handle pending DCA limit-order from previous iteration first.
+        _pending_status = self._check_pending_dca_order(market, trade, settings)
+        if _pending_status in ('still_open', 'timed_out_cancelled', 'error'):
+            return  # do NOT place a new order while one is in flight or just cancelled
+
         buys_this_call = 0
         max_per_iter = int(settings.max_buys_per_iteration) if getattr(settings, 'max_buys_per_iteration', None) else dynamic_max_buys
         while trade.get("dca_buys", 0) < dynamic_max_buys and buys_this_call < max_per_iter:
@@ -790,30 +840,39 @@ class DCAManager:
                 self._record_dca_audit(market, trade, "fail", "order_failed", {"eur_amount": eur_amount, "price": current_price})
                 break
 
-            # CRITICAL: Extract ACTUAL invested EUR and tokens from DCA order response.
-            # FIX #072: see legacy DCA path above for rationale.
-            actual_dca_eur = eur_amount  # Fallback (commit value)
-            actual_dca_tokens = base_amount  # Fallback (commit tokens)
-            try:
-                if isinstance(buy_result, dict):
-                    _fq = buy_result.get('filledAmountQuote')
-                    if _fq is not None:
-                        try:
-                            _fq_val = float(_fq)
-                            if _fq_val > 0:
-                                actual_dca_eur = _fq_val
-                        except Exception:
-                            pass
-                    _fa = buy_result.get('filledAmount')
-                    if _fa is not None:
-                        try:
-                            _fa_val = float(_fa)
-                            if _fa_val > 0:
-                                actual_dca_tokens = _fa_val
-                        except Exception:
-                            pass
-            except Exception as e:
-                self._log(f"actual_dca_eur failed: {e}", level='error')
+            # FIX #073: stash MAKER limit orders that haven't filled yet.
+            _filled, _fa_eur, _fa_tokens, _ord_status, _ord_id = _order_filled_status(buy_result)
+            if not _filled:
+                try:
+                    _limit_px = float(buy_result.get('price', current_price)) if isinstance(buy_result, dict) else float(current_price)
+                except Exception:
+                    _limit_px = float(current_price)
+                if _ord_id:
+                    self._stash_pending_dca(trade, market, _ord_id, eur_amount, _limit_px)
+                    self._send_dca_placed_alert(
+                        market, eur_amount, _limit_px,
+                        int(trade.get('dca_buys', 0)) + 1,
+                        int(settings.max_buys or 3),
+                    )
+                    self._record_dca_audit(market, trade, 'placed', 'limit_order_resting',
+                                           {'order_id': _ord_id, 'commit_eur': eur_amount,
+                                            'limit_price': _limit_px, 'status': _ord_status,
+                                            'path': 'dynamic'})
+                    ctx.save_trades()
+                else:
+                    self._record_dca_audit(market, trade, 'fail', 'placed_no_orderId_no_fill',
+                                           {'eur_amount': eur_amount, 'status': _ord_status,
+                                            'path': 'dynamic'})
+                try:
+                    if reservation_id is not None:
+                        self._release_reservation(reservation_id)
+                except Exception as e:
+                    self._log(f"_release_reservation failed: {e}", level='warning')
+                break
+
+            # Order filled — proceed with ACTUAL fill amounts
+            actual_dca_eur = _fa_eur
+            actual_dca_tokens = _fa_tokens
 
             prev_amount = float(trade.get("amount", 0.0))
             new_amount = prev_amount + float(actual_dca_tokens)
@@ -857,13 +916,13 @@ class DCAManager:
             log(
                 f"DCA (dynamic) buy {trade['dca_buys']} voor {market} op {current_price:.6f} (EUR {eur_amount:.2f})"
             )
-            # Telegram notification for dynamic DCA buy
+            # Telegram notification for dynamic DCA buy (FILLED — see FIX #073)
             try:
                 if ctx.send_alert:
                     _inv = float(trade.get('invested_eur', 0))
                     _avg = float(trade.get('buy_price', current_price))
                     ctx.send_alert(
-                        f"\U0001f4c9 DCA Buy {new_dca_buys}/{dca_max_limit} | {market}\n"
+                        f"\u2705 DCA Buy {new_dca_buys}/{dca_max_limit} GEVULD | {market}\n"
                         f"Prijs: \u20ac{current_price:.4f} | Bedrag: \u20ac{actual_dca_eur:.2f}\n"
                         f"Totaal invested: \u20ac{_inv:.2f} | Gem. prijs: \u20ac{_avg:.4f}"
                     )
@@ -953,3 +1012,267 @@ class DCAManager:
                 self._save_reservations(filtered)
         except Exception as e:
             self._log(f"_load_reservations failed: {e}", level='warning')
+
+    # ──────────────────────────────────────────────────────────────
+    # FIX #073: pending DCA limit-order tracking
+    # ──────────────────────────────────────────────────────────────
+    def _clear_pending_dca(self, trade: Dict[str, Any]) -> None:
+        for k in (
+            'pending_dca_order_id',
+            'pending_dca_order_ts',
+            'pending_dca_order_eur',
+            'pending_dca_order_price',
+            'pending_dca_order_market',
+        ):
+            trade.pop(k, None)
+
+    def _stash_pending_dca(
+        self,
+        trade: Dict[str, Any],
+        market: str,
+        order_id: str,
+        commit_eur: float,
+        limit_price: float,
+    ) -> None:
+        trade['pending_dca_order_id'] = str(order_id)
+        trade['pending_dca_order_ts'] = float(time.time())
+        trade['pending_dca_order_eur'] = float(commit_eur)
+        trade['pending_dca_order_price'] = float(limit_price)
+        trade['pending_dca_order_market'] = market
+
+    def _cancel_order_safe(self, market: str, order_id: str) -> bool:
+        """Cancel via Bitvavo, retrying with operatorId fallback (errorCode 203)."""
+        ctx = self.ctx
+        op_id = self.ctx.config.get('BITVAVO_OPERATOR_ID') or '1'
+        try:
+            try:
+                ctx.bitvavo.cancelOrder(market, order_id, operatorId=str(op_id))
+                return True
+            except TypeError:
+                # python_bitvavo_api may accept operatorId as positional/dict
+                pass
+            try:
+                ctx.bitvavo.cancelOrder(market, order_id, {'operatorId': str(op_id)})
+                return True
+            except Exception:
+                pass
+            try:
+                ctx.bitvavo.cancelOrder(market, order_id)
+                return True
+            except Exception as e:
+                self._log(f"cancelOrder {market} {order_id} failed: {e}", level='warning')
+                return False
+        except Exception as e:
+            self._log(f"cancelOrder outer failure {market} {order_id}: {e}", level='warning')
+            return False
+
+    def _record_filled_dca(
+        self,
+        market: str,
+        trade: Dict[str, Any],
+        actual_eur: float,
+        actual_tokens: float,
+        fill_price: float,
+        settings: DCASettings,
+    ) -> int:
+        """Apply a confirmed DCA fill to the trade. Returns new dca_buys count."""
+        from core.trade_investment import add_dca as _ti_add_dca
+        from core.dca_state import record_dca as _ds_record
+
+        prev_amount = float(trade.get('amount', 0.0) or 0.0)
+        new_amount = prev_amount + float(actual_tokens)
+        if new_amount > 0:
+            prev_buy = float(trade.get('buy_price', fill_price) or fill_price)
+            trade['buy_price'] = (
+                (prev_buy * prev_amount) + (float(fill_price) * float(actual_tokens))
+            ) / new_amount
+        trade['amount'] = new_amount
+        _ti_add_dca(trade, float(actual_eur), source='dca_limit_fill')
+        dca_max_limit = int(settings.max_buys or 3)
+        st = _ds_record(
+            trade,
+            price=float(fill_price),
+            amount_eur=float(actual_eur),
+            tokens_bought=float(actual_tokens),
+            dca_max=dca_max_limit,
+            source='bot',
+            drop_pct=float(settings.drop_pct),
+            step_multiplier=float(settings.step_multiplier),
+        )
+        return int(st.dca_buys)
+
+    def _send_dca_filled_alert(
+        self,
+        market: str,
+        trade: Dict[str, Any],
+        actual_eur: float,
+        fill_price: float,
+        new_dca_buys: int,
+        dca_max_limit: int,
+    ) -> None:
+        try:
+            if not self.ctx.send_alert:
+                return
+            inv = float(trade.get('invested_eur', 0) or 0)
+            avg = float(trade.get('buy_price', fill_price) or fill_price)
+            self.ctx.send_alert(
+                f"\u2705 DCA Buy {new_dca_buys}/{dca_max_limit} GEVULD | {market}\n"
+                f"Prijs: \u20ac{fill_price:.4f} | Bedrag: \u20ac{actual_eur:.2f}\n"
+                f"Totaal invested: \u20ac{inv:.2f} | Gem. prijs: \u20ac{avg:.4f}"
+            )
+        except Exception as e:
+            self._log(f"DCA filled telegram failed: {e}", level='warning')
+
+    def _send_dca_placed_alert(
+        self,
+        market: str,
+        commit_eur: float,
+        limit_price: float,
+        next_level: int,
+        dca_max_limit: int,
+    ) -> None:
+        try:
+            if not self.ctx.send_alert:
+                return
+            self.ctx.send_alert(
+                f"\U0001f4e5 DCA limit GEPLAATST {next_level}/{dca_max_limit} | {market}\n"
+                f"Limit prijs: \u20ac{limit_price:.4f} | Bedrag: \u20ac{commit_eur:.2f}\n"
+                f"Wacht op fill..."
+            )
+        except Exception as e:
+            self._log(f"DCA placed telegram failed: {e}", level='warning')
+
+    def _check_pending_dca_order(
+        self,
+        market: str,
+        trade: Dict[str, Any],
+        settings: DCASettings,
+    ) -> str:
+        """Check the trade's stashed pending DCA limit order.
+
+        Returns one of:
+          'no_pending' — nothing stashed; placement may proceed
+          'still_open' — order still resting on book within timeout; CALLER MUST RETURN
+          'timed_out_cancelled' — stale order was cancelled; CALLER MUST RETURN (wait next loop)
+          'filled' — order filled and applied to trade; CALLER MAY CONTINUE to next level
+          'cleared' — order is dead/cancelled/rejected; cleared, placement may proceed
+          'error' — couldn't determine status; CALLER MUST RETURN (be conservative)
+        """
+        ctx = self.ctx
+        order_id = str(trade.get('pending_dca_order_id', '') or '')
+        if not order_id:
+            return 'no_pending'
+
+        try:
+            order = ctx.safe_call(ctx.bitvavo.getOrder, market, order_id)
+        except Exception as e:
+            self._log(f"getOrder {market} {order_id} failed: {e}", level='warning')
+            order = None
+
+        # Fall-back: if getOrder fails (None), try ordersOpen scan
+        if not order:
+            try:
+                open_orders = ctx.safe_call(ctx.bitvavo.ordersOpen, {'market': market}) or []
+                match = next((o for o in open_orders if str(o.get('orderId', '')) == order_id), None)
+                if match is not None:
+                    order = match
+            except Exception:
+                pass
+
+        if not order:
+            # Order not visible anywhere — could be filled+gone or dead. Be conservative:
+            # treat as cleared so we don't get stuck. derive_cost_basis() in sync engine
+            # will reconcile the actual fill from order history on its next pass.
+            self._record_dca_audit(market, trade, 'info', 'pending_order_invisible_cleared',
+                                   {'order_id': order_id})
+            self._clear_pending_dca(trade)
+            return 'cleared'
+
+        status = str(order.get('status', '')).lower().strip()
+        try:
+            filled_eur = float(order.get('filledAmountQuote', 0) or 0)
+        except (TypeError, ValueError):
+            filled_eur = 0.0
+        try:
+            filled_tokens = float(order.get('filledAmount', 0) or 0)
+        except (TypeError, ValueError):
+            filled_tokens = 0.0
+        try:
+            limit_price = float(order.get('price', 0) or 0)
+        except (TypeError, ValueError):
+            limit_price = float(trade.get('pending_dca_order_price', 0) or 0)
+
+        if status == 'filled' or (filled_tokens > 0 and filled_eur > 0 and status not in _OPEN_LIKE_STATUSES):
+            fill_price = (filled_eur / filled_tokens) if filled_tokens > 0 else (limit_price or 0.0)
+            new_dca_buys = self._record_filled_dca(
+                market, trade, filled_eur, filled_tokens, fill_price, settings,
+            )
+            self._send_dca_filled_alert(
+                market, trade, filled_eur, fill_price, new_dca_buys, int(settings.max_buys or 3),
+            )
+            self._record_dca_audit(market, trade, 'executed', 'limit_filled',
+                                   {'order_id': order_id, 'filled_eur': filled_eur,
+                                    'filled_tokens': filled_tokens, 'fill_price': fill_price})
+            self._clear_pending_dca(trade)
+            ctx.save_trades()
+            return 'filled'
+
+        if status in _OPEN_LIKE_STATUSES:
+            try:
+                age = time.time() - float(trade.get('pending_dca_order_ts', 0) or 0)
+            except Exception:
+                age = 0.0
+            timeout = float(
+                ctx.config.get('DCA_LIMIT_ORDER_TIMEOUT_SECONDS',
+                               ctx.config.get('LIMIT_ORDER_TIMEOUT_SECONDS', 600)) or 600
+            )
+            if timeout > 0 and age > timeout:
+                cancelled = self._cancel_order_safe(market, order_id)
+                # Even if cancel call failed, partial fill may have happened — record any partial
+                if filled_tokens > 0 and filled_eur > 0:
+                    fill_price = filled_eur / filled_tokens
+                    new_dca_buys = self._record_filled_dca(
+                        market, trade, filled_eur, filled_tokens, fill_price, settings,
+                    )
+                    self._send_dca_filled_alert(
+                        market, trade, filled_eur, fill_price, new_dca_buys,
+                        int(settings.max_buys or 3),
+                    )
+                self._record_dca_audit(market, trade, 'cancel', 'limit_timeout',
+                                       {'order_id': order_id, 'age_s': age,
+                                        'timeout_s': timeout, 'cancel_ok': cancelled,
+                                        'partial_eur': filled_eur,
+                                        'partial_tokens': filled_tokens})
+                self._clear_pending_dca(trade)
+                ctx.save_trades()
+                return 'timed_out_cancelled'
+            self._record_dca_audit(market, trade, 'skip', 'pending_limit_order',
+                                   {'order_id': order_id, 'age_s': age,
+                                    'timeout_s': timeout, 'status': status})
+            return 'still_open'
+
+        if status in _DEAD_STATUSES:
+            # Cancelled/rejected/expired — apply any partial fill, then clear.
+            if filled_tokens > 0 and filled_eur > 0:
+                fill_price = filled_eur / filled_tokens
+                new_dca_buys = self._record_filled_dca(
+                    market, trade, filled_eur, filled_tokens, fill_price, settings,
+                )
+                self._send_dca_filled_alert(
+                    market, trade, filled_eur, fill_price, new_dca_buys,
+                    int(settings.max_buys or 3),
+                )
+                self._record_dca_audit(market, trade, 'executed', f'partial_fill_after_{status}',
+                                       {'order_id': order_id, 'filled_eur': filled_eur,
+                                        'filled_tokens': filled_tokens})
+            else:
+                self._record_dca_audit(market, trade, 'info', f'pending_{status}',
+                                       {'order_id': order_id})
+            self._clear_pending_dca(trade)
+            ctx.save_trades()
+            return 'cleared'
+
+        # Unknown status — conservative
+        self._record_dca_audit(market, trade, 'skip', 'unknown_pending_status',
+                               {'order_id': order_id, 'status': status})
+        return 'error'
