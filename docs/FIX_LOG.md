@@ -5,6 +5,66 @@
 
 ---
 
+## #074 — DCA pending limit-order: invisible-order branch dropped fills → 4 cascading DCAs on ENJ (2026-05-04)
+
+### Symptom
+ENJ-EUR fired **4 DCA orders** in ~30 minutes (max=3): €80 + €288 + €288 + €259 ≈ €915 extra spent on top of the €285 initial. Telegram delivered duplicate "DCA 1/3" notifications. After-state in `data/trade_log.json`:
+- `amount=26026.94 ENJ` (correct via sync engine)
+- `invested_eur=€365.35` (FOUT — actual ~€1201)
+- `dca_buys=0` (FOUT — should be 4)
+- `dca_events=[]` (empty — fills never recorded)
+
+### Root cause (regression from FIX #073)
+`modules/trading_dca.py:_check_pending_dca_order` had a fallback branch for when `bitvavo.getOrder()` returned `None` AND `bitvavo.ordersOpen()` did not contain the order:
+
+```python
+if not order:
+    self._record_dca_audit(... 'pending_order_invisible_cleared' ...)
+    self._clear_pending_dca(trade)
+    return 'cleared'
+```
+
+Bitvavo MAKER limit orders that have **filled** sometimes briefly disappear from both `getOrder()` and `ordersOpen()` (filled, removed from active book, history not yet served). The "be conservative, clear it" path silently dropped the fill: `dca_buys`/`dca_events` were never updated. The sync engine independently corrected `amount` from the exchange balance but `derive_cost_basis` does not touch `dca_buys`/`dca_events`, so the next DCA loop saw `dca_buys=0` and fired **another** DCA at level 1 (or whatever level the recomputed target hit). Repeat until price recovered above target.
+
+The €80 → €288 amount jump was a **separate config issue**: local config had both `DCA_AMOUNT_EUR=80` and `DCA_AMOUNT_RATIO=0.9` set; `trailing_bot.py:3724-3728` formula prefers ratio: `BASE_AMOUNT_EUR (320) × 0.9 = €288`. The first €80 came from a per-trade `dca_amount_eur` field saved earlier under different config.
+
+### Fix
+`modules/trading_dca.py:_check_pending_dca_order` invisible branch now invokes `core.dca_reconcile.reconcile_trade()` against Bitvavo's order history instead of clearing silently:
+
+```python
+if not order:
+    from core.dca_reconcile import reconcile_trade
+    before_count = len(trade.get('dca_events') or [])
+    rec = reconcile_trade(ctx.bitvavo, market, trade,
+                          dca_max=int(settings.max_buys or 3), dry_run=False)
+    after_count = len(trade.get('dca_events') or [])
+    if (after_count - before_count) > 0:
+        # missing fill recovered → record + clear pending
+        self._record_dca_audit(... 'pending_invisible_reconciled' ...)
+        self._clear_pending_dca(trade); ctx.save_trades()
+        return 'filled'
+    # genuinely never filled
+    self._record_dca_audit(... 'pending_order_invisible_no_fill_in_history' ...)
+    self._clear_pending_dca(trade); ctx.save_trades()
+    return 'cleared'
+```
+
+If reconcile itself raises, the pending stash is **kept** (returns `'error'`) so the next loop retries `getOrder()` rather than firing a duplicate DCA.
+
+### Manual repair
+`tmp/reconcile_enj.py` ran `reconcile_trade('ENJ-EUR', dca_max=3)` → recovered all 4 missing events from order history, set `invested_eur=€1201.80`, `dca_buys=4`, fixed `initial_invested_eur` to actual initial buy. Backup at `data/trade_log.json.bak.fix074.<ts>`.
+
+### Tests
+`tests/test_dca_limit_order_tracking.py::TestInvisiblePendingTriggersReconcile`:
+- `test_invisible_with_fill_in_history_records_event` — reconcile recovers fill → `dca_buys=1`, event added, pending cleared, no duplicate `place_buy`.
+- `test_invisible_with_no_history_clears_without_double_dca` — no history → cleared cleanly without bumping counts.
+- `test_invisible_reconcile_failure_keeps_pending_no_double_dca` — reconcile raises → pending preserved, **NO** duplicate DCA placed.
+
+### Lesson
+**Invisible ≠ never-filled.** When a tracked exchange order disappears, the truth lives in the order/trade history endpoint. Always reconcile from history before clearing local tracking, otherwise mutations done by other code paths (sync engine updating `amount` from balance) create silent desync that the next loop interprets as "no DCA done yet" and double-fires.
+
+---
+
 ## #073 — DCA limit-order: split GEPLAATST/GEVULD + pending tracking + cascading guard + auto-timeout (2026-05-03)
 
 ### Symptom

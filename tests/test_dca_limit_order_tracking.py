@@ -313,3 +313,122 @@ class TestPartialFillOnCancel:
         assert trade['invested_eur'] == pytest.approx(before_invested + 40.0)
         assert 'pending_dca_order_id' not in trade
         ctx.place_buy.assert_not_called()
+
+
+# ===========================================================================
+# Test 8 (FIX #074): Invisible pending order MUST trigger reconcile, not silent clear
+# ===========================================================================
+
+class TestInvisiblePendingTriggersReconcile:
+    """When getOrder() and ordersOpen both fail to find the pending limit order,
+    the previous (FIX #073) behaviour silently cleared the pending without
+    recording any fill. If the order had actually filled externally, dca_buys
+    stayed at 0 and the next loop fired ANOTHER DCA at the same level.
+
+    FIX #074: invisible pending must invoke core.dca_reconcile.reconcile_trade()
+    against Bitvavo's order history. Recovered fills are written to dca_events.
+    """
+
+    def test_invisible_with_fill_in_history_records_event(self, monkeypatch):
+        ctx = _make_ctx(get_order_resp=None)  # getOrder returns None
+        ctx.bitvavo.ordersOpen = MagicMock(return_value=[])  # not in open either
+        mgr = DCAManager(ctx)
+
+        trade = _make_trade()
+        trade['pending_dca_order_id'] = 'ORDER-LIMIT-INVISIBLE'
+        trade['pending_dca_order_ts'] = time.time() - 30
+        trade['pending_dca_order_eur'] = 80.0
+        trade['pending_dca_order_market'] = 'ENJ-EUR'
+
+        # Mock reconcile_trade to simulate finding the missing fill in history.
+        def fake_reconcile(bitvavo, market, t, dca_max=3, dry_run=False):
+            from types import SimpleNamespace
+            t.setdefault('dca_events', []).append({
+                'order_id': 'ORDER-LIMIT-INVISIBLE',
+                'amount_eur': 80.0, 'price': 0.044,
+                'tokens': 1818.18, 'ts': time.time(),
+                'source': 'reconcile',
+            })
+            t['dca_buys'] = int(t.get('dca_buys', 0) or 0) + 1
+            t['invested_eur'] = float(t.get('invested_eur', 0) or 0) + 80.0
+            return SimpleNamespace(
+                exchange_dca_count=1, bot_dca_count=0,
+                events_added=1, events_total=1,
+                amount_corrected=False, invested_corrected=True,
+                buy_price_corrected=False, repairs=['fake'],
+            )
+        monkeypatch.setattr('core.dca_reconcile.reconcile_trade', fake_reconcile)
+
+        # Use very-low last_dca_price + dca_next_price so the inner ladder loop
+        # does NOT fire a new DCA after reconcile returns 'filled'.
+        trade['dca_next_price'] = 0.02
+        trade['last_dca_price'] = 0.02
+        before_invested = trade['invested_eur']
+        mgr._execute_fixed_dca('ENJ-EUR', trade, 0.05, _make_settings(), 1.0)
+
+        # Reconcile recovered the fill
+        assert trade['dca_buys'] == 1, 'dca_buys must reflect recovered fill'
+        assert len(trade['dca_events']) == 1, 'event must be appended'
+        assert trade['invested_eur'] == pytest.approx(before_invested + 80.0)
+        # Pending cleared
+        assert 'pending_dca_order_id' not in trade
+        # No NEW DCA placed (we only had a price-above-target context)
+        ctx.place_buy.assert_not_called()
+
+    def test_invisible_with_no_history_clears_without_double_dca(self, monkeypatch):
+        """Order genuinely never filled: reconcile reports 0 events_added →
+        pending cleared, no dca_buys increment, no place_buy."""
+        ctx = _make_ctx(get_order_resp=None)
+        ctx.bitvavo.ordersOpen = MagicMock(return_value=[])
+        mgr = DCAManager(ctx)
+
+        trade = _make_trade()
+        trade['pending_dca_order_id'] = 'ORDER-LIMIT-GHOST'
+        trade['pending_dca_order_ts'] = time.time() - 30
+        trade['pending_dca_order_eur'] = 80.0
+        trade['pending_dca_order_market'] = 'ENJ-EUR'
+
+        def fake_reconcile_empty(bitvavo, market, t, dca_max=3, dry_run=False):
+            from types import SimpleNamespace
+            return SimpleNamespace(
+                exchange_dca_count=0, bot_dca_count=0,
+                events_added=0, events_total=0,
+                amount_corrected=False, invested_corrected=False,
+                buy_price_corrected=False, repairs=[],
+            )
+        monkeypatch.setattr('core.dca_reconcile.reconcile_trade', fake_reconcile_empty)
+
+        trade['dca_next_price'] = 0.02
+        trade['last_dca_price'] = 0.02
+        mgr._execute_fixed_dca('ENJ-EUR', trade, 0.05, _make_settings(), 1.0)
+
+        assert trade['dca_buys'] == 0, 'no fill recovered → dca_buys stays 0'
+        assert len(trade.get('dca_events') or []) == 0
+        assert 'pending_dca_order_id' not in trade
+        ctx.place_buy.assert_not_called()
+
+    def test_invisible_reconcile_failure_keeps_pending_no_double_dca(self, monkeypatch):
+        """If reconcile itself raises, the pending must stay (return 'error') so
+        the next loop retries — we must NEVER fall through to placing a new DCA."""
+        ctx = _make_ctx(get_order_resp=None)
+        ctx.bitvavo.ordersOpen = MagicMock(return_value=[])
+        mgr = DCAManager(ctx)
+
+        trade = _make_trade()
+        trade['pending_dca_order_id'] = 'ORDER-LIMIT-RECONCILE-CRASH'
+        trade['pending_dca_order_ts'] = time.time() - 30
+        trade['pending_dca_order_eur'] = 80.0
+        trade['pending_dca_order_market'] = 'ENJ-EUR'
+
+        def boom(*a, **kw):
+            raise RuntimeError('bitvavo trades() blew up')
+        monkeypatch.setattr('core.dca_reconcile.reconcile_trade', boom)
+
+        # Price below target — old buggy code would have placed a duplicate DCA here.
+        mgr._execute_fixed_dca('ENJ-EUR', trade, 0.040, _make_settings(), 1.0)
+
+        # Pending preserved (so next loop retries)
+        assert trade.get('pending_dca_order_id') == 'ORDER-LIMIT-RECONCILE-CRASH'
+        # No double DCA
+        ctx.place_buy.assert_not_called()
+        assert trade['dca_buys'] == 0

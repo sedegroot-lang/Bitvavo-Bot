@@ -1180,13 +1180,60 @@ class DCAManager:
                 pass
 
         if not order:
-            # Order not visible anywhere — could be filled+gone or dead. Be conservative:
-            # treat as cleared so we don't get stuck. derive_cost_basis() in sync engine
-            # will reconcile the actual fill from order history on its next pass.
-            self._record_dca_audit(market, trade, 'info', 'pending_order_invisible_cleared',
-                                   {'order_id': order_id})
-            self._clear_pending_dca(trade)
-            return 'cleared'
+            # Order not visible anywhere via getOrder() or ordersOpen. The order may
+            # have FILLED externally between our loops (Bitvavo MAKER limits sometimes
+            # disappear from getOrder() shortly after fill) or it may have been
+            # cancelled/rejected and dropped from history.
+            #
+            # FIX #074 (REGRESSION FROM #073):
+            # Old behaviour silently cleared the pending without ever recording the
+            # fill. Result: dca_buys / dca_events stayed at 0 while the position
+            # actually grew (sync engine updated amount/buy_price), so the next loop
+            # fired ANOTHER DCA at the same level. ENJ-EUR executed 4 DCAs (max=3)
+            # this way before price recovered.
+            #
+            # New behaviour: invoke dca_reconcile.reconcile_trade() against Bitvavo's
+            # order history. If a missing fill is recovered → 'filled'. Otherwise the
+            # order genuinely never filled → 'cleared'.
+            try:
+                from core.dca_reconcile import reconcile_trade  # local import to avoid cycles
+                before_count = len(trade.get('dca_events') or [])
+                rec = reconcile_trade(
+                    ctx.bitvavo, market, trade,
+                    dca_max=int(settings.max_buys or 3), dry_run=False,
+                )
+                after_count = len(trade.get('dca_events') or [])
+                events_added = max(0, after_count - before_count)
+                if events_added > 0:
+                    self._record_dca_audit(
+                        market, trade, 'executed', 'pending_invisible_reconciled',
+                        {'order_id': order_id, 'events_added': events_added,
+                         'events_total': after_count,
+                         'invested_corrected': rec.invested_corrected},
+                    )
+                    self._clear_pending_dca(trade)
+                    ctx.save_trades()
+                    return 'filled'
+                # No new events found in history — order really never filled.
+                self._record_dca_audit(
+                    market, trade, 'info', 'pending_order_invisible_no_fill_in_history',
+                    {'order_id': order_id},
+                )
+                self._clear_pending_dca(trade)
+                ctx.save_trades()
+                return 'cleared'
+            except Exception as exc:
+                # Reconcile itself failed. Be conservative: keep the pending stash so
+                # next loop retries getOrder() rather than firing a duplicate DCA.
+                self._log(
+                    f"reconcile after invisible pending {market} {order_id} failed: {exc}",
+                    level='warning',
+                )
+                self._record_dca_audit(
+                    market, trade, 'skip', 'pending_invisible_reconcile_failed',
+                    {'order_id': order_id, 'error': str(exc)[:200]},
+                )
+                return 'error'
 
         status = str(order.get('status', '')).lower().strip()
         try:
