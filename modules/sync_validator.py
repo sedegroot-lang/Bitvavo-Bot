@@ -419,47 +419,78 @@ class SyncValidator:
         
         # Actually apply additions
         try:
-            from modules.trade_store import load_snapshot, save_snapshot
-            trade_log = load_snapshot(str(self.trade_log_path))
-            
-            # Backup
-            backup_path = self.trade_log_path.parent / f"trade_log.json.bak.{int(time.time())}"
-            
-            # Add missing positions
-            if 'open' not in trade_log:
-                trade_log['open'] = {}
-            
-            timestamp = time.time()
-            for add in additions:
-                trade_log['open'][add['market']] = {
-                    'market': add['market'],
-                    'buy_price': add['price'],
-                    'highest_price': add['price'],
-                    'amount': add['amount'],
-                    'timestamp': timestamp,
-                    'tp_levels_done': [False, False],
-                    'dca_buys': 0,  # FIX #004: new synced position, no DCAs tracked yet
-                    'dca_max': dca_max_buys,  # FIX #004: use config value, never inflate
-                    'dca_next_price': add['price'] * (1 - dca_drop_pct),
-                    'tp_last_time': 0.0,
-                    'invested_eur': add['invested'],
-                    'initial_invested_eur': add.get('initial_invested_eur', add['invested']),
-                    'total_invested_eur': add.get('total_invested_eur', add['invested']),
-                    'opened_ts': timestamp,
-                    'trailing_activated': False,
-                    'activation_price': None,
-                    'highest_since_activation': None,
-                    'last_dca_price': add['price'],
-                    'synced_at': timestamp,  # DCA cooldown: skip DCA for 5 min after sync
-                }
-                self._log(f"Added missing position: {add['market']} - {add['amount']:.8f} @ €{add['price']:.4f}")
-            
-            # Save via trade_store (with validation + atomic write)
-            save_snapshot(trade_log, str(self.trade_log_path), backup_path=str(backup_path))
-            
-            self._log(f"✓ Added {len(additions)} missing positions (backup: {backup_path})")
-            return len(additions)
-            
+            return self._apply_additions(additions, dca_max_buys, dca_drop_pct)
         except Exception as e:
             self._log(f"Error adding missing positions: {e}", level='error')
             return 0
+
+    def _apply_additions(self, additions, dca_max_buys: int, dca_drop_pct: float) -> int:
+        """Persist a list of additions to trade_log.json. Extracted for testing
+        (FIX #075). Existing entries with reconciled DCA / trailing state are
+        merged, never overwritten."""
+        from modules.trade_store import load_snapshot, save_snapshot
+        trade_log = load_snapshot(str(self.trade_log_path))
+
+        backup_path = Path(self.trade_log_path).parent / f"trade_log.json.bak.{int(time.time())}"
+
+        if 'open' not in trade_log:
+            trade_log['open'] = {}
+
+        timestamp = time.time()
+        for add in additions:
+            mkt = add['market']
+            existing = trade_log['open'].get(mkt)
+            # FIX #075: NEVER overwrite an existing entry that already has tracked
+            # DCA history or trailing state. The previous behaviour wiped
+            # dca_events / dca_buys / trailing_activated / initial_invested_eur
+            # every time the validator decided ENJ-EUR was "missing" (e.g. due to
+            # transient read while trade_log.json was mid-write), causing the
+            # dashboard to show "DCA 0/3" and reconcile to keep re-running.
+            if isinstance(existing, dict):
+                has_dca_events = bool(existing.get('dca_events'))
+                has_dca_buys = int(existing.get('dca_buys', 0) or 0) > 0
+                has_initial = float(existing.get('initial_invested_eur', 0) or 0) > 0
+                if has_dca_events or has_dca_buys or has_initial:
+                    # Update only the volatile sync fields; keep DCA + trailing intact.
+                    existing['amount'] = add['amount']
+                    if not has_initial:
+                        existing.setdefault('buy_price', add['price'])
+                        existing.setdefault('invested_eur', add['invested'])
+                        existing.setdefault('initial_invested_eur', add.get('initial_invested_eur', add['invested']))
+                        existing.setdefault('total_invested_eur', add.get('total_invested_eur', add['invested']))
+                    existing['synced_at'] = timestamp
+                    self._log(
+                        f"Sync-merge for existing {mkt}: amount={add['amount']:.8f} "
+                        f"(kept dca_events={len(existing.get('dca_events') or [])}, "
+                        f"dca_buys={existing.get('dca_buys', 0)}, "
+                        f"trailing_activated={existing.get('trailing_activated', False)})",
+                    )
+                    continue
+            trade_log['open'][mkt] = {
+                'market': mkt,
+                'buy_price': add['price'],
+                'highest_price': add['price'],
+                'amount': add['amount'],
+                'timestamp': timestamp,
+                'tp_levels_done': [False, False],
+                'dca_buys': 0,  # FIX #004: new synced position, no DCAs tracked yet
+                'dca_max': dca_max_buys,  # FIX #004: use config value, never inflate
+                'dca_next_price': add['price'] * (1 - dca_drop_pct),
+                'tp_last_time': 0.0,
+                'invested_eur': add['invested'],
+                'initial_invested_eur': add.get('initial_invested_eur', add['invested']),
+                'total_invested_eur': add.get('total_invested_eur', add['invested']),
+                'opened_ts': timestamp,
+                'trailing_activated': False,
+                'activation_price': None,
+                'highest_since_activation': None,
+                'last_dca_price': add['price'],
+                'synced_at': timestamp,  # DCA cooldown: skip DCA for 5 min after sync
+            }
+            self._log(f"Added missing position: {mkt} - {add['amount']:.8f} @ €{add['price']:.4f}")
+
+        # Save via trade_store (with validation + atomic write)
+        save_snapshot(trade_log, str(self.trade_log_path), backup_path=str(backup_path))
+
+        self._log(f"✓ Added {len(additions)} missing positions (backup: {backup_path})")
+        return len(additions)

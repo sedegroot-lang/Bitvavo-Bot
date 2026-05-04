@@ -5,6 +5,65 @@
 
 ---
 
+## #075 — `sync_validator` add-missing wiped reconciled DCA + trailing state on every cycle (2026-05-04)
+
+### Symptom
+Dashboard for `ENJ-EUR` showed **"DCA 0/3"** even though the trade had been reconciled to 4 DCA events with `invested_eur=€1201.80`. Logs proved FIX #074's reconcile path ran successfully every ~10 minutes:
+
+```
+[08:32:31] RECONCILE [ENJ-EUR] DCA #1..#4 recovered, initial_invested_eur €1201.80 → €285.23
+[08:41:32] RECONCILE [ENJ-EUR] DCA #1..#4 recovered, initial_invested_eur €1201.80 → €285.23
+[08:50:20] RECONCILE [ENJ-EUR] DCA #1..#4 recovered, initial_invested_eur €1201.80 → €285.23
+```
+…but each time the next sync pass wiped the recovered state again.
+
+### Root cause
+`modules/sync_validator.py::auto_add_missing_positions` decided ENJ-EUR was "missing from `bot_positions`" at 07:55 (likely due to a transient read while `trade_log.json` was mid-write or a brief desync race). It then UNCONDITIONALLY **overwrote** the existing entry with a fresh dict:
+
+```python
+trade_log['open'][add['market']] = {
+    'dca_buys': 0,
+    'dca_events': []  # never present, so empty
+    'trailing_activated': False,
+    'highest_since_activation': None,
+    'initial_invested_eur': add.get('initial_invested_eur', invested),  # = total cost!
+    ...
+}
+```
+
+This wiped `dca_events`, `dca_buys`, `trailing_activated`, `highest_since_activation`, and corrupted `initial_invested_eur` (set to total cost basis = €1201.80 instead of the true initial €285.23). Every cycle: reconcile recovers → next sync wipes → repeat.
+
+### Fix
+`modules/sync_validator.py` extracted apply-loop into `_apply_additions(...)` and added a guard:
+
+```python
+existing = trade_log['open'].get(mkt)
+if isinstance(existing, dict):
+    has_dca_events = bool(existing.get('dca_events'))
+    has_dca_buys = int(existing.get('dca_buys', 0) or 0) > 0
+    has_initial = float(existing.get('initial_invested_eur', 0) or 0) > 0
+    if has_dca_events or has_dca_buys or has_initial:
+        # MERGE: only refresh amount + synced_at; keep DCA/trailing intact
+        existing['amount'] = add['amount']
+        existing['synced_at'] = timestamp
+        continue
+```
+
+Existing entries with any reconciled state are now MERGED (amount + synced_at refreshed), never overwritten. New entries (truly missing) still get the full default dict.
+
+### Tests
+`tests/test_sync_validator_preserves_dca.py`:
+- `test_existing_entry_with_dca_history_is_preserved` — ENJ entry with 4 events, `dca_buys=4`, `trailing_activated=True`, `initial_invested_eur=€285.23` survives an `_apply_additions` call that would normally inject `initial_invested_eur=€1201.80`.
+- `test_missing_entry_is_added_normally` — truly missing market still gets full default entry.
+
+### Manual repair
+Re-ran `tmp/reconcile_enj.py` → ENJ now has `dca_buys=5, dca_events=5, amount=27827.40, invested_eur=€1281.80` (one more DCA happened post-FIX #074).
+
+### Lesson
+**NEVER overwrite an existing trade entry from a sync/recovery path.** If the entry exists, MERGE only the volatile sync fields (amount, synced_at). Reconciled state (DCA history, trailing activation, immutable initial_invested_eur) must be treated as ground truth — wiping it forces every dependent invariant to drift. Sync paths should fail-soft (log + skip) rather than fail-destructive (overwrite).
+
+---
+
 ## #074 — DCA pending limit-order: invisible-order branch dropped fills → 4 cascading DCAs on ENJ (2026-05-04)
 
 ### Symptom
