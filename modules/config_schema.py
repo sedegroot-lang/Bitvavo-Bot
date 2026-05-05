@@ -42,7 +42,7 @@ _SCHEMA: Dict[str, Dict[str, Any]] = {
         "type": "float",
         "default": 7.0,
         "min": 0.0,
-        "max": 15.0,
+        "max": 30.0,
         "desc": "Min signal score to open trade",
     },
     "MIN_AVG_VOLUME_1M": {
