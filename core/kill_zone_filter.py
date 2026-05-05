@@ -19,7 +19,28 @@ from __future__ import annotations
 from typing import Any, Mapping, Optional, Tuple
 
 
-DEFAULT_BLACKLIST = ("USDC-EUR", "DOT-EUR", "ADA-EUR")
+# Mined from production data (870 closed trades, see tmp/backtest_all_ideas.py).
+# Markets where the bot historically loses money (Wilson lower bound win-rate <40%
+# OR negative average PnL with n>=15).
+DEFAULT_BLACKLIST = (
+    "USDC-EUR",  # 0/24 win-rate
+    "DOT-EUR",   # 16% / 61 trades / -€35
+    "ADA-EUR",   # 24% / 21 / -€17
+    "INJ-EUR",   # 29% / 21 / -€89
+    "SOL-EUR",   # 46% / 26 / -€30
+    "AVAX-EUR",  # 48% / 23 / -€10
+    "XRP-EUR",   # 54% / 37 / -€13
+    "ZEUS-EUR",  # 42% / 19 — outlier risk (1 mega-winner skews stats)
+)
+
+# Markets with structural high win-rate (Wilson lower bound >=70% AND profitable).
+# These get a score boost so they're more likely to be picked by the entry scanner.
+DEFAULT_WHITELIST = (
+    "WIF-EUR",      # 100% / 95 trades / +€552
+    "ACT-EUR",      # 97%  / 32 / +€28
+    "MOODENG-EUR",  # 92%  / 26 / +€38
+    "PTB-EUR",      # 91%  / 23 / +€68
+)
 
 
 def _as_float(v: Any, default: float = 0.0) -> float:
@@ -46,13 +67,24 @@ def is_kill_zone(
     if not bool(cfg.get("KILL_ZONE_ENABLED", True)):
         return False, ""
 
+    mkt_upper = market.upper() if isinstance(market, str) else ""
+
+    # Rule 0 — whitelist takes precedence (high-quality markets bypass all filters)
+    whitelist = cfg.get("KILL_ZONE_WHITELIST", DEFAULT_WHITELIST) or ()
+    try:
+        wl = tuple(str(m).upper() for m in whitelist)
+    except TypeError:
+        wl = DEFAULT_WHITELIST
+    if mkt_upper in wl:
+        return False, ""
+
     # Rule 1 — hard blacklist (free, always evaluated)
     blacklist = cfg.get("KILL_ZONE_MARKETS", DEFAULT_BLACKLIST) or ()
     try:
         bl = tuple(str(m).upper() for m in blacklist)
     except TypeError:
         bl = DEFAULT_BLACKLIST
-    if isinstance(market, str) and market.upper() in bl:
+    if mkt_upper in bl:
         return True, "kz_blacklist"
 
     feats = features or {}
@@ -107,3 +139,30 @@ def compute_features_from_candles(candles_1m) -> dict:
         return feats
     except Exception:
         return {}
+
+
+def whitelist_score_boost(
+    market: str,
+    config: Optional[Mapping[str, Any]] = None,
+) -> float:
+    """Return a score bonus to add for whitelisted high-potential markets.
+
+    Returns 0.0 if market not whitelisted, feature disabled, or input invalid.
+    Default boost = +2.0 (enough to push a borderline score over the 7.0
+    MIN_SCORE_TO_BUY threshold but not enough to bypass quality filters).
+    """
+    cfg = config or {}
+    if not bool(cfg.get("KILL_ZONE_ENABLED", True)):
+        return 0.0
+    if not bool(cfg.get("WHITELIST_BOOST_ENABLED", True)):
+        return 0.0
+    if not isinstance(market, str):
+        return 0.0
+    whitelist = cfg.get("KILL_ZONE_WHITELIST", DEFAULT_WHITELIST) or ()
+    try:
+        wl = tuple(str(m).upper() for m in whitelist)
+    except TypeError:
+        wl = DEFAULT_WHITELIST
+    if market.upper() not in wl:
+        return 0.0
+    return _as_float(cfg.get("WHITELIST_SCORE_BOOST", 2.0), 2.0)

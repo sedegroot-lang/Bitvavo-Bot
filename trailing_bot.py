@@ -2581,7 +2581,17 @@ async def bot_loop():
                             continue
                     except Exception as _cs_err:
                         log(f"[CORR_SHIELD] {m}: Check error: {_cs_err}", level='debug')
-                
+
+                # ── Whitelist score boost (FIX #079: high-potential markets get bonus)
+                try:
+                    from core.kill_zone_filter import whitelist_score_boost
+                    _wl_boost = whitelist_score_boost(m, CONFIG)
+                    if _wl_boost > 0:
+                        score += _wl_boost
+                        log(f"[WHITELIST] {m}: score boost +{_wl_boost:.1f} (now {score:.2f})", level='info')
+                except Exception as _wl_err:
+                    log(f"[WHITELIST] {m}: boost error: {_wl_err}", level='debug')
+
                 # Collect trade block reasons if score is below threshold
                 if score < min_score_threshold:
                     try:

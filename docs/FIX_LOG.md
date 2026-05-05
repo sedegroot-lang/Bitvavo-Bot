@@ -5,6 +5,41 @@
 
 ---
 
+## #079 — Whitelist support + extended blacklist + auto-blacklist learner (2026-05-05)
+
+### Context
+After Kill-Zone Filter (#078) shipped, user asked: "backtest al je ideeen, en we zijn nu alleen aan het blacklisten — niet aan het whitelisten. Misschien moet er soms een markt op de whitelist die veel potentie heeft."
+Backtested 6 ideas + 4 trailing-stop alternatives over 60d (22 markets, 1h candles) and 7-month archive (870 trades).
+
+### Backtest Findings
+- **Whitelist (Wilson lower bound, n>=15)**: WIF-EUR (87.4%), ACT-EUR (82.1%), MOODENG-EUR (78.9%), PTB-EUR (74.3%) → high-conviction markets
+- **Extended blacklist** (avg PnL <€-0.50 OR Wilson <40%): INJ-EUR, SOL-EUR, AVAX-EUR, XRP-EUR, ZEUS-EUR added
+- **Auto-blacklist learner sim**: blocking 5 worst markets recovers ~+€65 over 7 months (~+€9/mo)
+- **Trailing-stop alternatives REJECTED**: backtested CURRENT (€95.67), WIDER (€59.22), ATR_ADAPT (€58.81), HYBRID (€43.45) — current stepped trailing is optimal. The "132% upside missed" theory was misleading; alternatives gave back more in dips than they captured in winners.
+
+### Changes
+- `core/kill_zone_filter.py`:
+  - `DEFAULT_BLACKLIST` extended: USDC, DOT, ADA → + INJ, SOL, AVAX, XRP, ZEUS
+  - New `DEFAULT_WHITELIST = (WIF, ACT, MOODENG, PTB)`
+  - New Rule 0 in `is_kill_zone()`: whitelist precedence — bypasses ALL filters (incl. blacklist)
+  - New `whitelist_score_boost(market, config) -> float` returns +2.0 (configurable) for whitelisted markets, 0.0 otherwise
+  - New config keys: `KILL_ZONE_WHITELIST`, `WHITELIST_SCORE_BOOST`, `WHITELIST_BOOST_ENABLED`
+- `trailing_bot.py` (line ~2585, between `[CORR_SHIELD]` and `min_score_threshold` check): wired `whitelist_score_boost` — adds bonus to score BEFORE the MIN_SCORE_TO_BUY=7.0 floor (so high-potential markets clear threshold easier without lowering it globally).
+- `tests/test_kill_zone_filter.py`: 18 → 29 tests. New `TestWhitelist` (3) + `TestScoreBoost` (7) + updated `test_default_blacklist_constant`.
+- `scripts/auto_blacklist_learner.py` (NEW): periodic (cron-friendly) script. Reads `data/trade_archive.json`, computes per-market 60d rolling Wilson-bound stats. Suggests blacklist additions (Wilson <40% OR avg_pnl <-€0.50, n>=10), whitelist additions (Wilson >=70%, n>=15, profitable), and blacklist removals (recovered: Wilson >=55%). Default: dry-run. `--apply` writes to local config; `--notify` sends Telegram. USDC-EUR is in `PROTECTED_BLACKLIST` (never auto-removed). First run found LINK-EUR as new whitelist candidate (97% wr, n=35).
+- Local config (`%LOCALAPPDATA%/BotConfig/bot_config_local.json`): added new keys.
+
+### Verification
+- `pytest tests/test_kill_zone_filter.py -v` → 29/29 PASSED
+- Full suite: 849 passed, 3 skipped
+- Lint clean
+- MIN_SCORE_TO_BUY stays LOCKED at 7.0 (whitelist boost is additive, not a threshold lowering)
+
+### Lesson
+Blacklist alone leaves money on the table — high-potential markets deserve a small score boost (+2.0) so they reach the 7.0 floor more easily without globally lowering the bar. The auto-learner closes the feedback loop: bot trades → archive → learner suggests new blacklist/whitelist → human approves via `--apply`. Backtest BEFORE deploying ideas: trailing-stop tweaks looked great in theory ("132% upside!") but lost money in practice.
+
+---
+
 ## #078 — Kill-Zone Filter (anti-XGBoost veto layer) added (2026-05-05)
 
 ### Context

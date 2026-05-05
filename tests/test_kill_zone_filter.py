@@ -6,8 +6,10 @@ import pytest
 
 from core.kill_zone_filter import (
     DEFAULT_BLACKLIST,
+    DEFAULT_WHITELIST,
     compute_features_from_candles,
     is_kill_zone,
+    whitelist_score_boost,
 )
 
 
@@ -120,3 +122,70 @@ def test_default_blacklist_constant():
     assert "USDC-EUR" in DEFAULT_BLACKLIST
     assert "DOT-EUR" in DEFAULT_BLACKLIST
     assert "ADA-EUR" in DEFAULT_BLACKLIST
+    # Extended after backtest (FIX #079)
+    assert "INJ-EUR" in DEFAULT_BLACKLIST
+    assert "SOL-EUR" in DEFAULT_BLACKLIST
+
+
+def test_default_whitelist_constant():
+    assert "WIF-EUR" in DEFAULT_WHITELIST
+    assert "ACT-EUR" in DEFAULT_WHITELIST
+    assert "MOODENG-EUR" in DEFAULT_WHITELIST
+    assert "PTB-EUR" in DEFAULT_WHITELIST
+
+
+class TestWhitelist:
+    def test_whitelist_bypasses_all_rules(self):
+        # WIF-EUR is whitelisted: even with bad features it should pass
+        feats = {"rsi": 30.0, "volume_1m": 100.0, "price_to_sma": 5.0}
+        blocked, reason = is_kill_zone("WIF-EUR", feats, {})
+        assert blocked is False
+        assert reason == ""
+
+    def test_whitelist_takes_precedence_over_blacklist(self):
+        # If a market is on BOTH lists, whitelist wins
+        cfg = {
+            "KILL_ZONE_MARKETS": ["WIF-EUR"],
+            "KILL_ZONE_WHITELIST": ["WIF-EUR"],
+        }
+        blocked, _ = is_kill_zone("WIF-EUR", {}, cfg)
+        assert blocked is False
+
+    def test_custom_whitelist_overrides_default(self):
+        cfg = {"KILL_ZONE_WHITELIST": ["TRUMP-EUR"]}
+        # WIF no longer auto-pass
+        feats = {"rsi": 30.0, "volume_1m": 100.0}
+        b1, _ = is_kill_zone("WIF-EUR", feats, cfg)
+        # but TRUMP does
+        b2, _ = is_kill_zone("TRUMP-EUR", feats, cfg)
+        assert b1 is True  # gets blocked by RSI rule now
+        assert b2 is False
+
+
+class TestScoreBoost:
+    def test_whitelisted_market_gets_default_boost(self):
+        boost = whitelist_score_boost("WIF-EUR", {})
+        assert boost == 2.0
+
+    def test_non_whitelisted_market_gets_zero(self):
+        boost = whitelist_score_boost("BTC-EUR", {})
+        assert boost == 0.0
+
+    def test_custom_boost_value(self):
+        cfg = {"WHITELIST_SCORE_BOOST": 3.5}
+        assert whitelist_score_boost("WIF-EUR", cfg) == 3.5
+
+    def test_disabled_globally(self):
+        cfg = {"KILL_ZONE_ENABLED": False}
+        assert whitelist_score_boost("WIF-EUR", cfg) == 0.0
+
+    def test_disabled_boost_only(self):
+        cfg = {"WHITELIST_BOOST_ENABLED": False}
+        assert whitelist_score_boost("WIF-EUR", cfg) == 0.0
+
+    def test_invalid_market(self):
+        assert whitelist_score_boost(None, {}) == 0.0
+        assert whitelist_score_boost(123, {}) == 0.0
+
+    def test_case_insensitive(self):
+        assert whitelist_score_boost("wif-eur", {}) == 2.0
