@@ -527,6 +527,55 @@ def _start_daily_report_scheduler(check_interval_seconds: int = 60 * 60) -> None
 _hodl_scheduler_thread: Optional[threading.Thread] = None
 
 
+def _start_cold_tier_scheduler(interval_seconds: int = 4 * 60 * 60) -> None:
+    """Background thread: scan ~400 EUR markets every 4h and apply top-1 to WATCHLIST_MARKETS.
+
+    Runs `scripts/cold_tier_scanner.py --apply --n 1`. Writes only to local config,
+    so it cannot be reverted by OneDrive sync. Idempotent and silent on failure.
+    """
+    try:
+        import threading as _th
+        scanner = BASE_DIR / 'scripts' / 'cold_tier_scanner.py'
+        if not scanner.exists():
+            debug_log('cold_tier_scheduler: scanner script niet gevonden, overslaan')
+            return
+        log_path = START_BOT_LOG_DIR / 'cold_tier.log'
+
+        def _worker():
+            # First run after 5 min so the bot is fully up and quotas are warm.
+            time.sleep(5 * 60)
+            while True:
+                try:
+                    cmd = _script_command(str(scanner), '--apply', '--n', '1')
+                    proc = subprocess.run(
+                        cmd, cwd=str(BASE_DIR), capture_output=True, text=True,
+                        timeout=180, encoding='utf-8', errors='replace',
+                    )
+                    try:
+                        with open(log_path, 'a', encoding='utf-8') as lf:
+                            ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                            lf.write(f"[{ts}Z] cold_tier_scanner exit={proc.returncode}\n")
+                            tail = '\n'.join((proc.stdout or '').splitlines()[-15:])
+                            if tail:
+                                lf.write(tail + '\n')
+                            if proc.returncode != 0 and proc.stderr:
+                                lf.write(f"STDERR: {proc.stderr[:500]}\n")
+                    except Exception:
+                        pass
+                except Exception as exc:
+                    try:
+                        with open(log_path, 'a', encoding='utf-8') as lf:
+                            lf.write(f"[{datetime.datetime.now(datetime.timezone.utc).isoformat()}Z] cold_tier invocation failed: {exc}\n")
+                    except Exception:
+                        pass
+                time.sleep(interval_seconds)
+
+        t = _th.Thread(target=_worker, name='cold-tier-scheduler', daemon=True)
+        t.start()
+    except Exception:
+        return
+
+
 def _start_hodl_scheduler() -> None:
     """Launch the HODL/DCA scheduler loop if enabled in config."""
     global _hodl_scheduler_thread
@@ -1387,6 +1436,11 @@ def main() -> None:
         debug_log('main: hodl_scheduler gestart')
     except Exception:
         debug_log('main: kon hodl_scheduler niet starten')
+    try:
+        _start_cold_tier_scheduler()
+        debug_log('main: cold_tier_scheduler gestart (4h interval)')
+    except Exception:
+        debug_log('main: kon cold_tier_scheduler niet starten')
     last_housekeeping: Optional[float] = None
     try:
         while True:
