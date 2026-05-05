@@ -320,48 +320,56 @@ section {
 /* ── KPI grid ─────────────────────────────────────────────── */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+  grid-template-columns: 1.6fr repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
 }
+@media (max-width: 900px) { .kpi-grid { grid-template-columns: 1fr 1fr; } }
 .kpi {
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  padding: 14px 16px;
+  padding: 12px 14px;
   position: relative;
   overflow: hidden;
-  transition: border-color .15s, background .15s;
+  min-height: 88px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  transition: border-color .15s, transform .15s;
 }
-.kpi:hover { border-color: var(--line-strong); }
+.kpi:hover { border-color: var(--line-strong); transform: translateY(-1px); }
 .kpi.accent {
-  background: linear-gradient(135deg, rgba(124, 92, 255, 0.10), var(--bg-2) 60%);
-  border-color: rgba(124, 92, 255, 0.30);
+  background:
+    radial-gradient(ellipse at top right, rgba(124,92,255,0.20), transparent 60%),
+    linear-gradient(135deg, rgba(124, 92, 255, 0.10), var(--bg-2) 60%);
+  border-color: rgba(124, 92, 255, 0.35);
+  min-height: 110px;
+  grid-row: span 1;
 }
 .kpi.accent::before {
   content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
   background: linear-gradient(180deg, var(--accent), var(--pos));
 }
+.kpi.accent .kpi-value { font-size: 28px; }
 .kpi-label {
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--txt-faint);
-  letter-spacing: 0.10em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 600;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .kpi-value {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 600;
   font-family: var(--font-mono);
   letter-spacing: -0.01em;
-  line-height: 1.15;
+  line-height: 1.1;
   color: var(--txt);
 }
 .kpi-value.pos { color: var(--pos); }
 .kpi-value.neg { color: var(--neg); }
 .kpi-trend {
   font-size: 11px;
-  margin-top: 6px;
+  margin-top: 4px;
   color: var(--txt-muted);
   font-family: var(--font-mono);
   letter-spacing: 0.01em;
@@ -496,47 +504,54 @@ section {
 }
 
 /* ===================================================================
-   SIGNAL STATUS CARD (overview hero)
+   SIGNAL STATUS CARD (overview hero) — V3.1 always-visible layout
    =================================================================== */
 .sig-card {
   position: relative;
-  padding: 16px 18px;
-  overflow: hidden;
+  padding: 18px 20px 16px 24px;
+  /* no overflow:hidden — would clip the details list on narrow viewports */
 }
 .sig-card::before {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
   background: var(--txt-faint);
+  border-radius: 4px 0 0 4px;
 }
-.sig-card.sig-ok::before        { background: var(--pos); }
-.sig-card.sig-blocked::before   { background: var(--neg); }
+.sig-card.sig-ok::before        { background: var(--pos); box-shadow: 0 0 12px rgba(0,224,138,0.5); }
+.sig-card.sig-blocked::before   { background: var(--neg); box-shadow: 0 0 12px rgba(255,77,109,0.5); }
 .sig-card.sig-degraded::before  { background: var(--warn); }
 .sig-card.sig-info::before      { background: var(--info); }
 
+/* Header ROW: icon + label/message (left)  +  meta grid (right). Wraps on narrow. */
 .sig-head {
-  display: grid;
-  grid-template-columns: 36px 1fr auto;
-  gap: 14px;
-  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px 24px;
 }
 .sig-icon {
   font-size: 22px;
-  width: 36px; height: 36px;
+  width: 40px; height: 40px;
   display: flex; align-items: center; justify-content: center;
   background: var(--bg-3); border-radius: 50%;
   border: 1px solid var(--line);
+  flex-shrink: 0;
 }
-.sig-headline { min-width: 0; }
+.sig-headline { flex: 1 1 220px; min-width: 0; }
 .sig-label {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
+.sig-card.sig-ok      .sig-label { color: var(--pos); }
+.sig-card.sig-blocked .sig-label { color: var(--neg); }
+.sig-card.sig-degraded .sig-label { color: var(--warn); }
 .sig-message {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--txt-muted);
-  margin-top: 3px;
+  margin-top: 6px;
+  line-height: 1.5;
 }
 .sig-pill {
   font-size: 9.5px;
@@ -548,32 +563,53 @@ section {
   letter-spacing: 0.06em;
   font-weight: 600;
 }
+
+/* Meta as a compact 2-column grid that wraps on tiny viewports */
 .sig-meta {
-  display: flex; flex-direction: column; gap: 3px; min-width: 200px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(110px, 1fr));
+  gap: 6px 18px;
+  flex: 0 1 320px;
+  align-self: stretch;
+  padding: 10px 14px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
 }
 .sig-meta-row {
-  display: flex; justify-content: space-between;
-  font-size: 11px; font-family: var(--font-mono);
+  display: flex; flex-direction: column; gap: 2px;
 }
-.sig-meta-row .lbl { color: var(--txt-faint); text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
-.sig-meta-row .val { color: var(--txt); font-weight: 500; }
+.sig-meta-row .lbl {
+  color: var(--txt-faint); text-transform: uppercase;
+  letter-spacing: 0.10em; font-size: 9.5px; font-weight: 600;
+}
+.sig-meta-row .val {
+  color: var(--txt); font-weight: 600;
+  font-family: var(--font-mono); font-size: 13px;
+}
 
 .sig-details {
   list-style: none;
-  margin: 12px 0 0; padding: 10px 14px;
+  margin: 14px 0 0; padding: 10px 14px;
   background: var(--bg-1); border-radius: var(--r-sm);
   border: 1px solid var(--line-soft);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--txt-muted);
   line-height: 1.7;
 }
+.sig-details li { padding: 1px 0; }
 .sig-details li::before {
-  content: '⛌'; color: var(--neg); margin-right: 6px; font-size: 9px;
+  content: '×'; color: var(--neg); margin-right: 8px; font-weight: 700;
 }
 .sig-card.sig-ok .sig-details li::before { content: '✓'; color: var(--pos); }
+.sig-card.sig-degraded .sig-details li::before { content: '!'; color: var(--warn); }
 
 .sig-filters {
-  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px;
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px;
+  padding-top: 14px; border-top: 1px solid var(--line-soft);
+}
+@media (max-width: 720px) {
+  .sig-meta { flex: 1 1 100%; grid-template-columns: 1fr 1fr; }
 }
 .chip {
   font-size: 10.5px;
@@ -663,8 +699,32 @@ section {
 .tc-price .lbl .dot.entry { background: var(--info); }
 .tc-price .lbl .dot.live  { background: var(--pos); animation: pulse 2s infinite; }
 .tc-price .lbl .dot.stop  { background: var(--warn); }
-.tc-price .val { font-size: 12.5px; font-weight: 600; font-family: var(--font-mono); }
+.tc-price .val {
+  font-size: 13px; font-weight: 600; font-family: var(--font-mono);
+  border-radius: 3px; padding: 1px 4px; transition: background-color .35s ease, color .35s ease;
+}
 .tc-price .val.stop { color: var(--warn); }
+
+/* Live price flash (green up, red down) — driven by JS toggling .flash-up/.flash-down */
+.flash-up {
+  animation: flashUp 1.2s ease-out;
+}
+.flash-down {
+  animation: flashDown 1.2s ease-out;
+}
+@keyframes flashUp {
+  0%   { background-color: rgba(0, 224, 138, 0.45); color: var(--pos); }
+  60%  { background-color: rgba(0, 224, 138, 0.18); color: var(--pos); }
+  100% { background-color: transparent; color: var(--txt); }
+}
+@keyframes flashDown {
+  0%   { background-color: rgba(255, 77, 109, 0.45); color: var(--neg); }
+  60%  { background-color: rgba(255, 77, 109, 0.18); color: var(--neg); }
+  100% { background-color: transparent; color: var(--txt); }
+}
+.price-arrow { display: inline-block; font-size: 9px; margin-left: 4px; opacity: 0.85; }
+.price-arrow.up   { color: var(--pos); }
+.price-arrow.down { color: var(--neg); }
 
 .tc-row {
   display: grid; grid-template-columns: 80px 1fr 50px;

@@ -9,8 +9,8 @@
   <title>Bitvavo Bot — Command Center</title>
   <link rel="preconnect" href="https://rsms.me/" crossorigin>
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
-  <link rel="stylesheet" href="/styles.css?v=3" />
-  <link rel="stylesheet" href="/styles-v2.css?v=3" />
+  <link rel="stylesheet" href="/styles.css?v=4" />
+  <link rel="stylesheet" href="/styles-v2.css?v=4" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
 </head>
@@ -245,7 +245,15 @@
                   </div>
                   <div class="tc-price">
                     <div class="lbl"><span class="dot live"></span>Live</div>
-                    <div class="val" x-text="fmtPrice(tr.current_price)"></div>
+                    <div class="val"
+                         :class="priceFlash[tr.market] ? ('flash-' + priceFlash[tr.market].dir) : ''"
+                         :key="'p-' + tr.market + '-' + (priceFlash[tr.market]?.tick || 0)">
+                      <span x-text="fmtPrice(tr.current_price)"></span>
+                      <span class="price-arrow"
+                            :class="priceFlash[tr.market]?.dir"
+                            x-show="priceFlash[tr.market]"
+                            x-text="priceFlash[tr.market]?.dir === 'up' ? '\u25B2' : '\u25BC'"></span>
+                    </div>
                   </div>
                   <div class="tc-price">
                     <div class="lbl">
@@ -949,6 +957,6 @@
   <!-- Toast -->
   <div class="toast" :class="toast.error ? 'error' : ''" x-show="toast.show" x-transition x-text="toast.msg"></div>
 
-  <script src="/app.js?v=3"></script>
+  <script src="/app.js?v=4"></script>
 </body>
 </html>

@@ -43,6 +43,11 @@ function dash() {
     secondsAgo: 0,
     lastRefresh: 0,
     toast: { show: false, msg: '', error: false },
+    // Live price-flash state — keyed by market.
+    // _prevPrices stores the last seen current_price; priceFlash is reactive
+    // and toggled per refresh so the CSS animation re-triggers on each change.
+    _prevPrices: {},
+    priceFlash: {},   // market -> { dir: 'up'|'down', tick: number }
 
     currentTab() { return this.tabs.find(x => x.id === this.tab) || this.tabs[0]; },
 
@@ -150,6 +155,19 @@ function dash() {
         this.d   = d.deposits   || {};
         this.bh  = d.balance_history || {};
         this.sg  = d.signal_status || {};
+        // ---- Diff live prices to drive flash animations ----
+        const opens = (this.t && this.t.open) || [];
+        for (const tr of opens) {
+          const mk = tr.market;
+          if (!mk) continue;
+          const cur = +tr.current_price;
+          if (!isFinite(cur)) continue;
+          const prev = this._prevPrices[mk];
+          if (prev != null && cur !== prev) {
+            this.priceFlash[mk] = { dir: cur > prev ? 'up' : 'down', tick: Date.now() };
+          }
+          this._prevPrices[mk] = cur;
+        }
         // Markets is heavy — fetch separately on demand
         if (this.tab === 'markets' && !this.mk.markets) await this.loadMarkets();
         this.lastRefresh = Math.floor(Date.now() / 1000);
