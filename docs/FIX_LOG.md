@@ -5,6 +5,36 @@
 
 ---
 
+## #082 — Cold-Tier Auto-Discovery: bridge unknown markets → warm watchlist (2026-05-05)
+
+### Context
+User requested: "implementeer (a) de tiered-scanning verkennen". Existing tiered system has hot tier (`WHITELIST_MARKETS`, ~18 markets, scanned every 25s) and warm tier (`WATCHLIST_MARKETS`, micro-mode entries via `modules/watchlist_manager.py` with mature promote/demote logic). Gap: ~370 EUR markets on Bitvavo never get looked at because the warm tier only fills when AI explicitly queues markets — there is no proactive scanner of the cold tier.
+
+### Solution
+New `scripts/cold_tier_scanner.py` (cron-friendly, ~210 lines): one cheap public Bitvavo `ticker24h({})` call returns all ~428 EUR markets with last/volume/24h-change. A simple per-candidate heuristic ranks them:
+
+`score = log10(volume_eur) + |Δ24h|/5 − max(0,|Δ24h|−25)/5 − max(0,|Δ24h|−50)/5 − (5 if vol<floor)`
+
+Excludes everything already on whitelist/watchlist/kill-zone/blacklist (read from all 3 config layers). Default dry-run prints ranked top-10 + writes `tmp/cold_tier_proposals.json`. With `--apply` appends top-N (default 2) to `WATCHLIST_MARKETS` in **LOCAL config only** (`%LOCALAPPDATA%/BotConfig/bot_config_local.json`) — the existing `watchlist_manager` then handles micro-mode entries and promote/demote via its analytics-driven review.
+
+### Changes
+- `scripts/cold_tier_scanner.py` (NEW): scanner with `--apply`, `--n`, `--min-volume` flags. Reads excluded markets from all 3 config layers. Writes only to local config (avoids OneDrive revert bug in `watchlist_manager._write_config`).
+- `tests/test_cold_tier_scanner.py` (NEW): 11 tests across `TestScoring`, `TestRanking`, `TestApplyTopN`. All passing.
+
+### Verification
+- 11/11 tests PASSED.
+- Live dry-run: 428 EUR markets fetched, 31 excluded, 14 candidates passed €750k volume floor. Top-2: TON-EUR (+36.9%, €5.1M vol, score 11.71) and NOT-EUR (+27.9%, €1.7M vol, score 11.23).
+
+### Lesson
+Don't duplicate existing infra. `watchlist_manager.py` was already mature with promote/demote/review — the actual gap was ONE step earlier (cold→warm discovery). Building a second promotion engine would have been over-engineering. Also: scanner writes only to local override, never to `config/bot_config.json`, to avoid the latent OneDrive-revert bug in `watchlist_manager._write_config` (separate fix for another day).
+
+### Related
+- #081 Deep-Dip Hunter (companion edge for unusual market conditions).
+- `modules/watchlist_manager.py::queue_market_for_watchlist` — would be the canonical entrypoint, but has the OneDrive-write bug; cold scanner deliberately writes local-only.
+- Suggested cron: hourly, with `--apply --n 1` after 1 week of dry-run review.
+
+---
+
 ## #081 — Deep-Dip Hunter: catch -25%+ dumps that have stabilised (2026-05-05)
 
 ### Context
