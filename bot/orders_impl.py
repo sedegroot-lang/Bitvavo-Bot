@@ -118,6 +118,34 @@ def place_buy(market, eur_amount, entry_price, order_type=None, *, is_dca: bool 
     except Exception as e:
         log(f"Total exposure check failed: {e}", level="warning")
 
+    # 1c-1. Kill-Zone Filter (anti-XGBoost veto layer, FIX #077)
+    # Skip for DCA (existing position maintenance) and existing open trades
+    if not is_dca and market not in open_trades:
+        try:
+            from core.kill_zone_filter import (
+                compute_features_from_candles,
+                is_kill_zone,
+            )
+
+            kz_feats: dict = {}
+            try:
+                _candles = safe_call(bitvavo.candles, market, "1m", {"limit": 60})
+                if isinstance(_candles, list) and _candles:
+                    kz_feats = compute_features_from_candles(_candles)
+            except Exception:
+                kz_feats = {}
+            blocked, reason = is_kill_zone(market, kz_feats, CONFIG)
+            if blocked:
+                log(
+                    f"🚫 Kill-Zone blokkeert {market}: {reason} "
+                    f"(rsi={kz_feats.get('rsi')!s:.5}, vol={kz_feats.get('volume_1m')!s:.7}, "
+                    f"p/sma={kz_feats.get('price_to_sma')!s:.5})",
+                    level="warning",
+                )
+                return {"error": "kill_zone_block", "reason": reason}
+        except Exception as _kz_e:
+            log(f"Kill-Zone filter error (non-fatal): {_kz_e}", level="debug")
+
     # 1c-2. Budget reservation
     try:
         _budget_cfg = CONFIG.get("BUDGET_RESERVATION", {})

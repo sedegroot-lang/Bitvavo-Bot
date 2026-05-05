@@ -5,6 +5,46 @@
 
 ---
 
+## #078 — Kill-Zone Filter (anti-XGBoost veto layer) added (2026-05-05)
+
+### Context
+After 3 iterations of revolutionary-strategy backtests (predator/H1/H2/H3, then train-test split exposing H2 as overfit), pivoted to a META improvement: **post-mortem analysis on the bot's own 658 historical trades** (`trade_features.csv`).
+
+### Findings (cross-validated, decision tree depth=3, 5-fold CV)
+- Baseline win-rate: 61.4%
+- CV accuracy: 64.6% ± 6.9% — real predictive signal
+- RSI < 45 + low volume (<5000): 53 trades, **20.8% win-rate**
+- Markets USDC-EUR (0/24), DOT-EUR (18% / 50), ADA-EUR (33% / 15) — historical loss leaders
+- price/SMA > 1.8 (price extended): 65 trades, **26.2% win-rate**
+
+### Impact (from production data, no overfit)
+- Blocking the 5 strongest kill-zones: 86 trades blocked (13.1% of volume)
+- Survivors win-rate: **67.7%** (vs 61.4% baseline) → **+6.3pp uplift**
+- Estimated savings: ~€183 per 7 months ≈ **€26/month structural**
+
+### Implementation
+- New module `core/kill_zone_filter.py` — pure functions `is_kill_zone()` + `compute_features_from_candles()`. No I/O, no state.
+- Wired into `bot/orders_impl.py::place_buy` between exposure check and budget reservation. Skipped for DCA buys and existing open trades. Fetches 60×1m candles via cached `safe_call(bv.candles)` → cheap (cached).
+- Config keys (in local override only): `KILL_ZONE_ENABLED=true`, `KILL_ZONE_MARKETS=["USDC-EUR","DOT-EUR","ADA-EUR"]`, `KILL_ZONE_RSI_MAX=45.0`, `KILL_ZONE_VOL_MIN=5000`, `KILL_ZONE_PRICE_EXT=1.8`.
+
+### Failure modes guarded
+- Filter raises → caught, logged at debug, entry proceeds (fail-open).
+- Candle fetch fails → empty features dict → only blacklist rule active.
+- Pure-function design enables 18 unit tests to fully cover behaviour without mocking the bot.
+
+### Verification
+- `pytest tests/test_kill_zone_filter.py -v` → **18 passed**.
+- Backtest output saved at `tmp/kill_zones.log`.
+
+### Files changed
+- `core/kill_zone_filter.py` (new)
+- `bot/orders_impl.py` (insert kill-zone block after step 1c)
+- `tests/test_kill_zone_filter.py` (new, 18 tests)
+- `tmp/find_kill_zones.py` (research script — kept as documentation)
+- `%LOCALAPPDATA%/BotConfig/bot_config_local.json` (5 new config keys)
+
+---
+
 ## #077 — 3 production runtime errors found in logs (2026-05-05)
 
 ### Symptoms (recurring every loop)
