@@ -5,6 +5,34 @@
 
 ---
 
+## #077 — 3 production runtime errors found in logs (2026-05-05)
+
+### Symptoms (recurring every loop)
+1. `Reinvest logic faalde: '>' not supported between instances of 'str' and 'int'`
+2. `AIEngine: portfolio status error: 'str' object has no attribute 'get'`
+3. `Kon ..\data\ai_advanced_analysis.json niet schrijven: [Errno 2] No such file or directory: '..\data\ai_advanced_analysis.json.tmp'`
+
+### Root causes
+1. **Reinvest** (`bot/trade_lifecycle.py`): `t.get("timestamp", 0) > last_ts` — when trade timestamp loaded from JSON is an ISO string, the `>` comparison vs the int `LAST_REINVEST_TS` raises TypeError. Crashed on every reinvest tick → no reinvest ever ran.
+2. **AI portfolio status** (`modules/ai_engine.py` `get_portfolio_status`): iterated `balance` from Bitvavo without validating the response shape. On rate-limit/circuit-breaker fallback, the wrapper can return a dict (error envelope) or a list with non-dict items, exploding on `.get()`.
+3. **AI supervisor** (`ai/ai_supervisor.py`): hard-coded `os.path.join('..', 'data', ...)` for trade_log read and ai_advanced_analysis write — only worked when CWD == `ai/`. The whole module already defines `_PROJECT_ROOT`; these two call-sites were missed.
+
+### Fixes
+1. Added `_ts_to_float()` local that coerces numeric strings + ISO datetimes to float; both sides of the comparison now go through it. Profit also coerced via `float(... or 0)`.
+2. Added `isinstance(balance, list)` guard up-front + `isinstance(asset, dict)` per-iteration skip; defensive `or 0.0` on numeric extraction.
+3. Replaced both `os.path.join('..', 'data', ...)` with `os.path.join(_PROJECT_ROOT, 'data', ...)`.
+
+### Verification
+- 820 passed, 3 skipped (`pytest tests/ -q`).
+- Lint clean on changed files.
+
+### Files changed
+- `bot/trade_lifecycle.py` (reinvest block)
+- `modules/ai_engine.py` (`get_portfolio_status`)
+- `ai/ai_supervisor.py` (lines 1445, 1467)
+
+---
+
 ## #076 — Bot-opened trades lost score/regime/RSI/MACD metadata after sync re-adopt (2026-05-05)
 
 ### Symptom

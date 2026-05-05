@@ -224,7 +224,7 @@ def calculate_position_size(
         # Global Kelly (fallback)
         all_closed = _stats_cache.get("closed", [])
         if len(all_closed) >= MIN_TRADES_GLOBAL:
-            global_stats = _per_coin_stats(all_closed).get("_global_", None)
+            # Perf fix: removed unused _per_coin_stats(all_closed) call (computed then discarded).
             # Calculate global stats manually
             wins, losses = [], []
             for t in all_closed:

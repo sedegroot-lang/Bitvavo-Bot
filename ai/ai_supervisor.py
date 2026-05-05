@@ -1442,7 +1442,7 @@ def run_loop(sleep_sec=300):
                     engine = AIEngine()
                     
                     # Load trade history
-                    trade_log = _safe_load_json(os.path.join('..', 'data', 'trade_log.json'), {'closed_trades': []})
+                    trade_log = _safe_load_json(os.path.join(_PROJECT_ROOT, 'data', 'trade_log.json'), {'closed_trades': []})
                     closed_trades = trade_log.get('closed_trades', [])
                     
                     # Run advanced recommendations
@@ -1464,7 +1464,7 @@ def run_loop(sleep_sec=300):
                                 log(f"  {pred['market']}: {prob:.1f}% ({pred['confidence']} confidence)", level='info')
                         
                         # Save advanced analysis
-                        write_json_compat(os.path.join('..', 'data', 'ai_advanced_analysis.json'), advanced)
+                        write_json_compat(os.path.join(_PROJECT_ROOT, 'data', 'ai_advanced_analysis.json'), advanced)
                 except Exception as e:
                     log(f"Advanced AI analysis error: {e}", level='warning')
 

@@ -163,10 +163,22 @@ def save_trades(force: bool = False):
     # --- Reinvest logic ---
     try:
         if S.REINVEST_ENABLED:
-            last_ts = CONFIG.get("LAST_REINVEST_TS", 0)
+            # FIX: timestamps in trade_log can be ISO strings or numeric; coerce both
+            # sides to float to avoid "'>' not supported between instances of 'str' and 'int'".
+            def _ts_to_float(v):
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    try:
+                        from datetime import datetime
+                        return datetime.fromisoformat(str(v).replace("Z", "+00:00")).timestamp()
+                    except Exception:
+                        return 0.0
+
+            last_ts = _ts_to_float(CONFIG.get("LAST_REINVEST_TS", 0))
             valid_trades = [t for t in all_trades if isinstance(t, dict)]
-            recent_trades = [t for t in valid_trades if t.get("timestamp", 0) > last_ts]
-            recent_profit = sum(t.get("profit", 0) for t in recent_trades)
+            recent_trades = [t for t in valid_trades if _ts_to_float(t.get("timestamp", 0)) > last_ts]
+            recent_profit = sum(float(t.get("profit", 0) or 0) for t in recent_trades)
             recent_count = len(recent_trades)
             if recent_count >= S.REINVEST_MIN_TRADES and recent_profit >= S.REINVEST_MIN_PROFIT:
                 proposed_add = recent_profit * S.REINVEST_PORTION

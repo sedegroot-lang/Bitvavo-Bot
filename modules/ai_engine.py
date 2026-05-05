@@ -490,10 +490,18 @@ class AIEngine:
             total_eur = 0.0
             positions = []
 
+            # FIX: balance() may return a dict (error response) or a list containing
+            # non-dict entries on rate-limit/circuit-breaker fallback. Guard against
+            # "'str' object has no attribute 'get'" by validating the structure.
+            if not isinstance(balance, list):
+                return {"error": "balance API returned non-list response"}
+
             for asset in balance:
+                if not isinstance(asset, dict):
+                    continue
                 symbol = asset.get("symbol", "")
-                available = float(asset.get("available", 0.0))
-                in_order = float(asset.get("inOrder", 0.0))
+                available = float(asset.get("available", 0.0) or 0.0)
+                in_order = float(asset.get("inOrder", 0.0) or 0.0)
                 total = available + in_order
 
                 if total < 1e-8:
