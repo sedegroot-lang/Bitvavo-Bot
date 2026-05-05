@@ -48,6 +48,8 @@ function dash() {
     // and toggled per refresh so the CSS animation re-triggers on each change.
     _prevPrices: {},
     priceFlash: {},   // market -> { dir: 'up'|'down', tick: number }
+    _refreshing: false,
+    _refreshFailStreak: 0,
     theme: (typeof localStorage !== 'undefined' && localStorage.getItem('bvb_theme')) || 'dark',
 
     toggleTheme() {
@@ -141,15 +143,24 @@ function dash() {
       document.documentElement.setAttribute('data-theme', this.theme);
       if ('serviceWorker' in navigator) { try { await navigator.serviceWorker.register('/sw.js'); } catch {} }
       await this.refresh();
-      this.refreshTimer = setInterval(() => this.refresh(), 2000);
+      // 5s poll: /api/all is heavy (200KB+, can take several seconds).
+      // Use 5s and let the in-flight guard drop overlapping calls.
+      this.refreshTimer = setInterval(() => this.refresh(), 5000);
       setInterval(() => { this.secondsAgo = Math.floor(Date.now() / 1000) - this.lastRefresh; }, 1000);
     },
 
     async refresh() {
+      // Prevent overlapping calls: /api/all can take 5-10s on cold runs.
+      if (this._refreshing) return;
+      this._refreshing = true;
       try {
-        const res = await fetch('/api/all', { cache: 'no-store' });
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(() => ctrl.abort(), 30000);
+        const res = await fetch('/api/all', { cache: 'no-store', signal: ctrl.signal });
+        clearTimeout(timeoutId);
         if (!res.ok) throw new Error('http ' + res.status);
         const d = await res.json();
+        this._refreshFailStreak = 0;
         this.p   = d.portfolio  || {};
         this.t   = d.trades     || {};
         this.perf= d.performance|| {};
@@ -186,7 +197,13 @@ function dash() {
         this.renderCharts();
       } catch (e) {
         console.warn('refresh failed', e);
-        this.flash('Verbinding mislukt — retry bezig…', true);
+        this._refreshFailStreak += 1;
+        // Only surface a toast after 5 consecutive failures (~25s of silence).
+        if (this._refreshFailStreak === 5) {
+          this.flash('Verbinding traag of mislukt — retry op de achtergrond', true);
+        }
+      } finally {
+        this._refreshing = false;
       }
     },
 
