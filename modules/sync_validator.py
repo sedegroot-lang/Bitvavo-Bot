@@ -151,9 +151,42 @@ class SyncValidator:
         Remove phantom positions (bot has, Bitvavo doesn't).
         Returns number of fixes applied.
         Skips grid-managed assets to avoid conflicts.
+
+        SAFETY (FIX #083): Defensively abort if the Bitvavo balance fetch returns
+        empty or suspiciously small results compared to bot positions. A transient
+        API failure must NEVER trigger mass deletion of real positions
+        (bot historically deleted ENJ + RENDER as "phantoms" while user actually
+        held both — see tmp/recover_positions.py recovery script).
         """
         bitvavo_balances = self.get_bitvavo_balances()
         bot_positions = self.get_bot_positions()
+
+        # SAFETY GATE 1: empty balances usually = API failure, never delete
+        if not bitvavo_balances:
+            self._log(
+                "⛔ ABORT phantom-fix: Bitvavo balances empty (likely API hiccup). "
+                "Refusing to delete any positions.",
+                level="error",
+            )
+            return 0
+
+        # SAFETY GATE 2: cross-check with a SECOND independent fetch. If the two
+        # snapshots disagree on which symbols exist, an API call returned partial
+        # data — abort to prevent deleting real positions.
+        try:
+            verify_balances = self.get_bitvavo_balances()
+        except Exception:
+            verify_balances = {}
+        if not verify_balances:
+            self._log(
+                "⛔ ABORT phantom-fix: verification balance fetch empty. "
+                "Refusing to delete any positions.",
+                level="error",
+            )
+            return 0
+        # Symbols that disappeared between the two fetches are NOT trustworthy as
+        # phantoms (transient hiccup). Drop them from the candidate set by union-ing.
+        bitvavo_balances = {**verify_balances, **bitvavo_balances}
 
         # Skip grid-managed assets
         grid_assets = set()
@@ -190,6 +223,19 @@ class SyncValidator:
 
         if not fixes:
             self._log("No phantom positions to fix")
+            return 0
+
+        # SAFETY GATE 3: never delete > 50% of bot positions in one go. If bot has
+        # 5 positions and we suddenly want to delete 4, that's a sync bug, not
+        # reality. Abort and require manual intervention.
+        non_skipped = [s for s in bot_positions if s not in skip_assets]
+        if non_skipped and len(fixes) >= max(2, int(0.5 * len(non_skipped) + 0.999)):
+            self._log(
+                f"⛔ ABORT phantom-fix: would delete {len(fixes)}/{len(non_skipped)} "
+                f"non-skipped positions ({[f['market'] for f in fixes]}). "
+                "This looks like a sync bug, not reality. Manual review required.",
+                level="error",
+            )
             return 0
 
         if dry_run:

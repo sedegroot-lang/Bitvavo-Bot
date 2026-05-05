@@ -5,6 +5,46 @@
 
 ---
 
+## #083 — Phantom-fix nuked real positions on transient API hiccup (2026-05-05)
+
+### Context
+At bot restart 15:48, the startup `SyncValidator.auto_fix_phantom_positions()` deleted **ENJ-EUR** AND **RENDER-EUR** from `data/trade_log.json` even though the user still held both on Bitvavo (14,558 ENJ + 196 RENDER). RENDER had perfectly clean sync — no mismatch, no desync — yet still got wiped. Combined with NOT-EUR being created via SWAP from ENJ (which also looked like an amount mismatch on ENJ), the user was left with **3 untracked positions worth €1545** (ENJ €619, NOT €612, RENDER €313): bot had no view of them, no trailing stop, no exit logic.
+
+### Root Cause
+`auto_fix_phantom_positions` calls `get_bitvavo_balances()` once and trusts the result. If that call returns an empty dict (transient API hiccup, rate-limit, network blip, partial response), then EVERY bot position appears phantom because `if symbol not in bitvavo_balances` is True for everything. The function then deletes them all.
+
+There were zero safety gates: no empty-result check, no second-fetch verification, no max-deletion threshold.
+
+### Solution (3 defensive gates in `modules/sync_validator.py`)
+1. **Gate 1 — empty fetch**: if first `get_bitvavo_balances()` returns `{}` → log error, return 0 (delete nothing).
+2. **Gate 2 — second-fetch verification**: do a second independent fetch; if it's empty → abort. If both succeed but disagree on which symbols exist, **union** the symbol sets so a transient miss in one fetch can't mark a real position as phantom.
+3. **Gate 3 — majority threshold**: if the candidate-deletion list would remove ≥ 50% of non-skipped bot positions, that's a sync bug not reality → abort and require manual review.
+
+### Recovery (separate one-off script)
+`tmp/recover_positions.py --apply` re-imports the 3 untracked positions into `trade_log.json` with derived cost basis:
+- ENJ-EUR: €0.045344 from 7 historic buy fills (€660 cost)
+- NOT-EUR: €0.000461 derived from ENJ→NOT swap (14593.89 ENJ × €0.045344 = €661.75 cost)
+- RENDER-EUR: €1.573830 from 1 historic buy fill (€310 cost)
+
+### Changes
+- `modules/sync_validator.py` (auto_fix_phantom_positions): 3 safety gates added (~35 LOC).
+- `tests/test_sync_validator_phantom_safety.py` (NEW): 4 regression tests covering empty-fetch abort, majority-threshold abort, single-genuine-phantom happy path, and partial-fetch union behaviour. All passing.
+- `tmp/recover_positions.py` (one-off): re-imports the 3 lost positions.
+
+### Verification
+- 6/6 tests pass (4 new + 2 existing sync_validator tests).
+- `data/trade_log.json` now has ENJ-EUR, NOT-EUR, RENDER-EUR with correct cost basis.
+- Backup of pre-recovery trade_log saved to `data/trade_log.json.recovery_backup_<ts>`.
+
+### Lesson
+Never delete persistent state based on a single API call. Any irreversible operation triggered by external state must:
+(a) verify the input is non-empty/non-degraded,
+(b) cross-check via a second independent fetch,
+(c) refuse to act if the proposed change is unreasonably large.
+This is the same defensive pattern as FIX_LOG #001's "always derive from full order history" rule applied to deletion logic.
+
+---
+
 ## #082 — Cold-Tier Auto-Discovery: bridge unknown markets → warm watchlist (2026-05-05)
 
 ### Context
