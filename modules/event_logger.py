@@ -7,6 +7,7 @@ Usage:
     from modules.event_logger import log_event
     log_event("trade_open", market="BTC-EUR", price=43000.0, score=8.5)
 """
+
 from __future__ import annotations
 
 import json

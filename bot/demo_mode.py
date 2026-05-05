@@ -12,6 +12,7 @@ fixtures are obvious.
 
 This module is intentionally tiny and dependency-free.
 """
+
 from __future__ import annotations
 
 import json

@@ -4,6 +4,7 @@
 Extracted from trailing_bot.py to reduce monolith size.
 All shared state accessed via ``bot.shared.state``.
 """
+
 from __future__ import annotations
 
 import time
@@ -14,10 +15,12 @@ from typing import Any, Dict, List, Optional, Tuple
 def _get_state():
     """Lazy import to avoid circular imports at module load time."""
     from bot.shared import state
+
     return state
 
 
 # ─── Trade-value helpers ────────────────────────────────────────────
+
 
 def resolve_dust_threshold(override: Optional[float] = None) -> Optional[float]:
     S = _get_state()
@@ -38,15 +41,15 @@ def compute_trade_value_eur(
     price_cache: Optional[Dict[str, Optional[float]]] = None,
 ) -> Tuple[Optional[float], Optional[float]]:
     S = _get_state()
-    from bot.helpers import safe_mul, coerce_positive_float
+    from bot.helpers import coerce_positive_float, safe_mul
 
     if not isinstance(trade, dict):
         return None, None
     try:
-        amount = float(trade.get('amount', 0.0) or 0.0)
+        amount = float(trade.get("amount", 0.0) or 0.0)
     except Exception:
         amount = 0.0
-    invested_val = coerce_positive_float(trade.get('invested_eur'))
+    invested_val = coerce_positive_float(trade.get("invested_eur"))
     cache = price_cache if price_cache is not None else None
     if amount <= 0:
         return invested_val, None
@@ -59,7 +62,7 @@ def compute_trade_value_eur(
             cache[market] = price
     resolved_price = price
     if resolved_price is None:
-        fallback = coerce_positive_float(trade.get('buy_price') or trade.get('entry_price'))
+        fallback = coerce_positive_float(trade.get("buy_price") or trade.get("entry_price"))
         if fallback is not None:
             resolved_price = fallback
             if cache is not None:
@@ -88,6 +91,7 @@ def iter_trade_values(price_cache: Optional[Dict[str, Optional[float]]] = None):
 
 
 # ─── Counting helpers ───────────────────────────────────────────────
+
 
 def count_active_open_trades(
     threshold: Optional[float] = None,
@@ -138,19 +142,20 @@ def estimate_max_eur_per_trade() -> Optional[float]:
 def estimate_max_total_eur() -> Optional[float]:
     S = _get_state()
     try:
-        return float(S.CONFIG.get('MAX_TOTAL_EXPOSURE_EUR', S.MAX_TOTAL_EXPOSURE_EUR))
+        return float(S.CONFIG.get("MAX_TOTAL_EXPOSURE_EUR", S.MAX_TOTAL_EXPOSURE_EUR))
     except Exception:
         return None
 
 
 # ─── Analysis ───────────────────────────────────────────────────────
 
+
 def analyse_trades(trades) -> Tuple[float, float, float, float]:
     S = _get_state()
     try:
         if not trades:
             return 0.0, 0.0, 0.0, 0.0
-        profits = [float(t.get('profit', 0) or 0) for t in trades]
+        profits = [float(t.get("profit", 0) or 0) for t in trades]
         wins = [p for p in profits if p > 0]
         losses = [p for p in profits if p <= 0]
         win_ratio = (len(wins) / len(profits)) if profits else 0.0
@@ -159,11 +164,12 @@ def analyse_trades(trades) -> Tuple[float, float, float, float]:
         avg_profit = (sum(profits) / len(profits)) if profits else 0.0
         return float(win_ratio), float(avg_win), float(avg_loss), float(avg_profit)
     except Exception as e:
-        S.log(f"analyse_trades failed: {e}", level='error')
+        S.log(f"analyse_trades failed: {e}", level="error")
         return 0.0, 0.0, 0.0, 0.0
 
 
 # ─── Portfolio snapshot ─────────────────────────────────────────────
+
 
 def build_portfolio_snapshot() -> Dict[str, Any]:
     S = _get_state()
@@ -178,32 +184,32 @@ def build_portfolio_snapshot() -> Dict[str, Any]:
     for market, trade, exposure, price in iter_trade_values():
         if threshold is not None and exposure < threshold:
             try:
-                amount = float(trade.get('amount', 0.0) or 0.0)
+                amount = float(trade.get("amount", 0.0) or 0.0)
             except Exception:
                 amount = 0.0
             dust_trades[market] = {
-                'value_eur': exposure,
-                'amount': amount,
-                'buy_price': trade.get('buy_price'),
-                'current_price': price,
+                "value_eur": exposure,
+                "amount": amount,
+                "buy_price": trade.get("buy_price"),
+                "current_price": price,
             }
             continue
         total += exposure
         per_market[market] = exposure
-        base = market.split('-', 1)[0]
+        base = market.split("-", 1)[0]
         per_base[base] = per_base.get(base, 0.0) + exposure
         seg = segment_for_market(market, S.CONFIG)
         per_segment[seg] = per_segment.get(seg, 0.0) + exposure
     active_count = len(per_market)
     return {
-        'ts': int(time.time()),
-        'total_exposure_eur': total,
-        'open_trade_count': active_count,
-        'dust_trade_count': len(dust_trades),
-        'per_market': per_market,
-        'per_base': per_base,
-        'per_segment': per_segment,
-        'dust_trades': dust_trades,
+        "ts": int(time.time()),
+        "total_exposure_eur": total,
+        "open_trade_count": active_count,
+        "dust_trade_count": len(dust_trades),
+        "per_market": per_market,
+        "per_base": per_base,
+        "per_segment": per_segment,
+        "dust_trades": dust_trades,
     }
 
 
@@ -218,6 +224,7 @@ def write_portfolio_snapshot() -> Optional[Dict[str, Any]]:
 
 
 # ─── Account overview ───────────────────────────────────────────────
+
 
 def build_account_overview(
     *,
@@ -234,18 +241,18 @@ def build_account_overview(
             return None
 
     now = int(time.time())
-    updated_at = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat().replace('+00:00', 'Z')
+    updated_at = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
     open_value = None
     open_count = None
     snapshot_ts = None
     if isinstance(snapshot, dict):
-        open_value = _to_float(snapshot.get('total_exposure_eur'))
-        open_count_raw = snapshot.get('open_trade_count')
+        open_value = _to_float(snapshot.get("total_exposure_eur"))
+        open_count_raw = snapshot.get("open_trade_count")
         try:
             open_count = int(open_count_raw)
         except Exception:
             open_count = None
-        snapshot_ts = snapshot.get('ts')
+        snapshot_ts = snapshot.get("ts")
     if open_value is None:
         open_value = current_open_exposure_eur()
     if open_count is None:
@@ -262,21 +269,21 @@ def build_account_overview(
         for entry in balances:
             if not isinstance(entry, dict):
                 continue
-            symbol = str(entry.get('symbol') or '').upper().strip()
+            symbol = str(entry.get("symbol") or "").upper().strip()
             if not symbol:
                 continue
-            available = _to_float(entry.get('available'))
+            available = _to_float(entry.get("available"))
             if available is None:
-                available = _to_float(entry.get('balance'))
+                available = _to_float(entry.get("balance"))
             if available is None:
                 available = 0.0
-            in_order = _to_float(entry.get('inOrder'))
+            in_order = _to_float(entry.get("inOrder"))
             if in_order is None:
-                in_order = _to_float(entry.get('inorder'))
+                in_order = _to_float(entry.get("inorder"))
             if in_order is None:
                 in_order = 0.0
             total_amount = max(0.0, available + in_order)
-            if symbol == 'EUR':
+            if symbol == "EUR":
                 if eur_available is None:
                     eur_available = available
                 eur_in_orders = in_order
@@ -296,21 +303,21 @@ def build_account_overview(
                     conversion_failures.append(symbol)
 
     payload = {
-        'ts': now,
-        'updated_at': updated_at,
-        'snapshot_ts': snapshot_ts,
-        'eur_available': eur_available,
-        'eur_in_orders': eur_in_orders,
-        'open_trade_value_eur': open_value,
-        'open_trade_count': open_count,
-        'total_account_value_eur': total_account_value,
-        'sources': {
-            'balances': bool(balances),
-            'snapshot': snapshot is not None,
+        "ts": now,
+        "updated_at": updated_at,
+        "snapshot_ts": snapshot_ts,
+        "eur_available": eur_available,
+        "eur_in_orders": eur_in_orders,
+        "open_trade_value_eur": open_value,
+        "open_trade_count": open_count,
+        "total_account_value_eur": total_account_value,
+        "sources": {
+            "balances": bool(balances),
+            "snapshot": snapshot is not None,
         },
     }
     if conversion_failures:
-        payload['missing_conversion_symbols'] = conversion_failures
+        payload["missing_conversion_symbols"] = conversion_failures
     return payload
 
 

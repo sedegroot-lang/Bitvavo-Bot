@@ -74,21 +74,23 @@ class TradingSynchronizer:
         """Return set of active grid markets to exclude from trailing sync."""
         grid_markets: set = set()
         try:
-            grid_cfg = self.ctx.config.get('GRID_TRADING') or {}
-            if grid_cfg.get('enabled'):
+            grid_cfg = self.ctx.config.get("GRID_TRADING") or {}
+            if grid_cfg.get("enabled"):
                 import json as _json
+
                 _grid_states_path = os.path.join(
                     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                    'data', 'grid_states.json',
+                    "data",
+                    "grid_states.json",
                 )
                 if os.path.exists(_grid_states_path):
-                    with open(_grid_states_path, 'r', encoding='utf-8') as _gf:
+                    with open(_grid_states_path, "r", encoding="utf-8") as _gf:
                         _gs = _json.load(_gf)
                     for _gm, _gv in _gs.items():
-                        if isinstance(_gv, dict) and _gv.get('status') in ('running', 'paused', 'initialized'):
+                        if isinstance(_gv, dict) and _gv.get("status") in ("running", "paused", "initialized"):
                             grid_markets.add(_gm.upper())
         except Exception as exc:
-            self.ctx.log(f"Sync: failed to load grid markets: {exc}", level='warning')
+            self.ctx.log(f"Sync: failed to load grid markets: {exc}", level="warning")
         return grid_markets
 
     def sync_open_trades(
@@ -130,11 +132,7 @@ class TradingSynchronizer:
         markets_set: set[str]
         try:
             markets_list = safe_call(bitvavo.markets, {}) or []
-            markets_set = {
-                m.get("market")
-                for m in markets_list
-                if isinstance(m, dict) and m.get("market")
-            }
+            markets_set = {m.get("market") for m in markets_list if isinstance(m, dict) and m.get("market")}
         except Exception:
             markets_set = set()
 
@@ -156,7 +154,7 @@ class TradingSynchronizer:
         # Exclude grid-managed markets from trailing sync
         grid_markets = self._get_grid_markets()
         if grid_markets:
-            log(f"Sync: excluding grid markets from trailing sync: {grid_markets}", level='info')
+            log(f"Sync: excluding grid markets from trailing sync: {grid_markets}", level="info")
 
         open_markets: Dict[str, float] = {}
         for balance_entry in balances:
@@ -166,25 +164,21 @@ class TradingSynchronizer:
                 continue
             if "-" in symbol and symbol in markets_set:
                 if symbol.upper() in grid_markets:
-                    log(f"Sync: skipping grid asset {symbol} (managed by grid module)", level='info')
+                    log(f"Sync: skipping grid asset {symbol} (managed by grid module)", level="info")
                     continue
                 open_markets[symbol] = available
                 continue
             best = find_best_market(symbol)
             if best:
                 if best.upper() in grid_markets:
-                    log(f"Sync: skipping grid asset {best} (managed by grid module)", level='info')
+                    log(f"Sync: skipping grid asset {best} (managed by grid module)", level="info")
                     continue
                 open_markets[best] = open_markets.get(best, 0.0) + available
                 continue
-            alt = (
-                find_best_market(symbol.split()[0])
-                if " " in symbol
-                else None
-            )
+            alt = find_best_market(symbol.split()[0]) if " " in symbol else None
             if alt:
                 if alt.upper() in grid_markets:
-                    log(f"Sync: skipping grid asset {alt} (managed by grid module)", level='info')
+                    log(f"Sync: skipping grid asset {alt} (managed by grid module)", level="info")
                     continue
                 open_markets[alt] = open_markets.get(alt, 0.0) + available
 
@@ -225,25 +219,21 @@ class TradingSynchronizer:
         disable_sync_remove = ctx.config.get("DISABLE_SYNC_REMOVE", True)
 
         to_remove = [
-            market
-            for market in open_state.keys()
-            if market not in open_markets or open_markets.get(market, 0.0) <= 0
+            market for market in open_state.keys() if market not in open_markets or open_markets.get(market, 0.0) <= 0
         ]
 
         # API glitch protection: if ALL open_markets are empty but we have
         # open_state entries, the API likely returned bad data — skip removal
         if to_remove and not open_markets and len(open_state) > 0:
             log(
-                "Sync: API returned empty balances but we have open trades — "
-                "skipping removal to prevent data loss",
+                "Sync: API returned empty balances but we have open trades — skipping removal to prevent data loss",
                 level="warning",
             )
             to_remove = []
 
         if disable_sync_remove and to_remove:
             log(
-                f"Sync: DISABLE_SYNC_REMOVE=true — skipping removal of "
-                f"{len(to_remove)} trades: {to_remove}",
+                f"Sync: DISABLE_SYNC_REMOVE=true — skipping removal of {len(to_remove)} trades: {to_remove}",
                 level="warning",
             )
             to_remove = []
@@ -285,7 +275,7 @@ class TradingSynchronizer:
                 closed_state = closed_state[-max_closed:]
 
         # Filter out dust positions below SYNC_DUST_VALUE_EUR before adopting
-        _dust_thr = float(ctx.config.get('SYNC_DUST_VALUE_EUR', 5.0))
+        _dust_thr = float(ctx.config.get("SYNC_DUST_VALUE_EUR", 5.0))
         missing = []
         for market, amount in open_markets.items():
             if market in open_state or amount <= 0:
@@ -293,24 +283,27 @@ class TradingSynchronizer:
             # EUR value check to prevent adopting dust positions
             _price = None
             try:
-                _price = float(ctx.safe_call(ctx.bitvavo.tickerPrice, {'market': market}).get('price', 0) or 0)
+                _price = float(ctx.safe_call(ctx.bitvavo.tickerPrice, {"market": market}).get("price", 0) or 0)
             except Exception:
                 pass
             if _price and _price > 0 and amount * _price < _dust_thr:
-                log(f"Sync: skip {market} — value €{amount * _price:.2f} below dust threshold €{_dust_thr:.0f}", level='info')
+                log(
+                    f"Sync: skip {market} — value €{amount * _price:.2f} below dust threshold €{_dust_thr:.0f}",
+                    level="info",
+                )
                 continue
             missing.append(market)
         try:
             max_trades = max(1, int(ctx.config.get("MAX_OPEN_TRADES", 5)))
             reserved = len(self._get_pending_markets())
             # Count only non-dust trades for capacity check
-            _dust_thr = float(ctx.config.get('DUST_TRADE_THRESHOLD_EUR', ctx.config.get('MIN_ORDER_EUR', 5.0)))
+            _dust_thr = float(ctx.config.get("DUST_TRADE_THRESHOLD_EUR", ctx.config.get("MIN_ORDER_EUR", 5.0)))
             _active_count = 0
             for _sm, _st in open_state.items():
                 if not isinstance(_st, dict):
                     continue
-                _sp = ctx.get_current_price(_sm) if hasattr(ctx, 'get_current_price') else None
-                _sa = float(_st.get('amount', 0) or 0)
+                _sp = ctx.get_current_price(_sm) if hasattr(ctx, "get_current_price") else None
+                _sa = float(_st.get("amount", 0) or 0)
                 if _sp and _sa > 0 and (float(_sp) * _sa) >= _dust_thr:
                     _active_count += 1
             room = max(0, max_trades - (_active_count + reserved))
@@ -335,13 +328,9 @@ class TradingSynchronizer:
                         break
                 if reconstructed:
                     if reconstructed.get("buy_price") is None:
-                        reconstructed["buy_price"] = (
-                            reconstructed.get("highest_price") or 0.0
-                        )
+                        reconstructed["buy_price"] = reconstructed.get("highest_price") or 0.0
                     if reconstructed.get("highest_price") is None:
-                        reconstructed["highest_price"] = (
-                            reconstructed.get("buy_price") or 0.0
-                        )
+                        reconstructed["highest_price"] = reconstructed.get("buy_price") or 0.0
                     open_state[market] = reconstructed
                     log(
                         f"Sync: reconstructed open trade for {market} from pending_saldo.json",
@@ -352,25 +341,26 @@ class TradingSynchronizer:
                     # Auto-discover: position exists on Bitvavo but not tracked locally
                     try:
                         from modules.cost_basis import derive_cost_basis
+
                         amount = open_markets.get(market, 0.0)
                         basis = derive_cost_basis(ctx.bitvavo, market, amount, tolerance=0.02)
-                        if basis and getattr(basis, 'avg_price', 0) > 0:
+                        if basis and getattr(basis, "avg_price", 0) > 0:
                             new_entry = {
-                                'market': market,
-                                'buy_price': float(basis.avg_price),
-                                'highest_price': float(basis.avg_price),
-                                'amount': amount,
-                                'invested_eur': float(basis.invested_eur),
-                                'initial_invested_eur': float(basis.invested_eur),
-                                'total_invested_eur': float(basis.invested_eur),
-                                'timestamp': time.time(),
-                                'opened_ts': float(basis.earliest_timestamp or time.time()),
-                                'partial_tp_returned_eur': 0.0,
-                                'dca_buys': 0,
-                                'dca_events': [],
-                                'score': 0.0,
-                                'volatility_at_entry': 0.0,
-                                'opened_regime': 'unknown',
+                                "market": market,
+                                "buy_price": float(basis.avg_price),
+                                "highest_price": float(basis.avg_price),
+                                "amount": amount,
+                                "invested_eur": float(basis.invested_eur),
+                                "initial_invested_eur": float(basis.invested_eur),
+                                "total_invested_eur": float(basis.invested_eur),
+                                "timestamp": time.time(),
+                                "opened_ts": float(basis.earliest_timestamp or time.time()),
+                                "partial_tp_returned_eur": 0.0,
+                                "dca_buys": 0,
+                                "dca_events": [],
+                                "score": 0.0,
+                                "volatility_at_entry": 0.0,
+                                "opened_regime": "unknown",
                             }
                             open_state[market] = new_entry
                             changes_made = True
@@ -401,8 +391,7 @@ class TradingSynchronizer:
             removed_by_filter = set(open_state.keys()) - set(filtered_state.keys())
             if removed_by_filter:
                 log(
-                    f"Sync: filter verwijderde {len(removed_by_filter)} trades niet in API: "
-                    f"{removed_by_filter}",
+                    f"Sync: filter verwijderde {len(removed_by_filter)} trades niet in API: {removed_by_filter}",
                     level="info",
                 )
             open_state = filtered_state
@@ -436,9 +425,8 @@ class TradingSynchronizer:
                 if pct_change > 0.001:
                     try:
                         from modules.cost_basis import derive_cost_basis
-                        _basis = derive_cost_basis(
-                            ctx.bitvavo, market, live_amount, tolerance=0.02
-                        )
+
+                        _basis = derive_cost_basis(ctx.bitvavo, market, live_amount, tolerance=0.02)
                         if _basis and getattr(_basis, "avg_price", 0) > 0:
                             old_inv = float(entry.get("invested_eur", 0) or 0)
                             entry["buy_price"] = float(_basis.avg_price)
@@ -449,14 +437,13 @@ class TradingSynchronizer:
                             log(
                                 f"Sync: amount changed for {market} "
                                 f"({current_amount:.6f} → {live_amount:.6f}, "
-                                f"{pct_change*100:.1f}%) — re-derived invested "
+                                f"{pct_change * 100:.1f}%) — re-derived invested "
                                 f"€{old_inv:.2f} → €{_basis.invested_eur:.2f}",
                                 level="warning",
                             )
                     except Exception as deriv_err:
                         log(
-                            f"Sync: derive_cost_basis failed for {market} "
-                            f"after amount change: {deriv_err}",
+                            f"Sync: derive_cost_basis failed for {market} after amount change: {deriv_err}",
                             level="error",
                         )
 
@@ -497,11 +484,7 @@ class TradingSynchronizer:
             log(f"Sync: unexpected error: {exc}", level="error")
             return open_trades, closed_trades
 
-        market_set = {
-            m.get("market")
-            for m in markets
-            if isinstance(m, dict) and m.get("market")
-        }
+        market_set = {m.get("market") for m in markets if isinstance(m, dict) and m.get("market")}
 
         # Filter out dust balances (< 0.0001) before saving - prevents log spam
         filtered_balances = []
@@ -518,8 +501,7 @@ class TradingSynchronizer:
             ctx.write_json_locked(ctx.sync_raw_balances_path, filtered_balances, indent=2)
             ctx.write_json_locked(ctx.sync_raw_markets_path, markets, indent=2)
             log(
-                "Sync: wrote raw balances to "
-                f"{ctx.sync_raw_balances_path} and markets to {ctx.sync_raw_markets_path}",
+                f"Sync: wrote raw balances to {ctx.sync_raw_balances_path} and markets to {ctx.sync_raw_markets_path}",
                 level="info",
             )
         except Exception as exc:
@@ -533,7 +515,7 @@ class TradingSynchronizer:
         # Exclude grid-managed markets from reconcile
         grid_markets = self._get_grid_markets()
         if grid_markets:
-            log(f"Sync: excluding grid markets from reconcile: {grid_markets}", level='info')
+            log(f"Sync: excluding grid markets from reconcile: {grid_markets}", level="info")
 
         positive_balances: List[Dict[str, Any]] = []
         live_open: Dict[str, Dict[str, Any]] = {}
@@ -543,21 +525,15 @@ class TradingSynchronizer:
                 continue
             market = f"{symbol}-EUR"
             if market.upper() in grid_markets:
-                log(f"Sync: skipping grid asset {market} (managed by grid module)", level='info')
+                log(f"Sync: skipping grid asset {market} (managed by grid module)", level="info")
                 continue
             try:
-                amount = float(
-                    balance_entry.get("available", 0)
-                    or balance_entry.get("balance", 0)
-                    or 0
-                )
+                amount = float(balance_entry.get("available", 0) or balance_entry.get("balance", 0) or 0)
             except Exception:
                 amount = 0.0
             if amount <= 0:
                 continue
-            positive_balances.append(
-                {"symbol": symbol, "market": market, "amount": amount}
-            )
+            positive_balances.append({"symbol": symbol, "market": market, "amount": amount})
             if market not in market_set:
                 alt_candidates = [
                     f"{symbol}-USDC",
@@ -625,16 +601,14 @@ class TradingSynchronizer:
         # API glitch protection: don't remove all trades if API returned empty
         if to_remove and not new_set and len(old_set) > 0:
             log(
-                "Sync: API returned empty balances but we have open trades — "
-                "skipping removal to prevent data loss",
+                "Sync: API returned empty balances but we have open trades — skipping removal to prevent data loss",
                 level="warning",
             )
             to_remove = set()
 
         if disable_sync_remove and to_remove:
             log(
-                f"Sync: DISABLE_SYNC_REMOVE=true — skipping removal of "
-                f"{len(to_remove)} trades: {to_remove}",
+                f"Sync: DISABLE_SYNC_REMOVE=true — skipping removal of {len(to_remove)} trades: {to_remove}",
                 level="warning",
             )
             to_remove = set()
@@ -666,9 +640,7 @@ class TradingSynchronizer:
                         saved_ts_val = float(saved_ts)
                     except (TypeError, ValueError):
                         saved_ts_val = 0.0
-                    if saved_ts_val and (
-                        cache_now - saved_ts_val
-                    ) > ctx.sync_removed_cache_max_age:
+                    if saved_ts_val and (cache_now - saved_ts_val) > ctx.sync_removed_cache_max_age:
                         continue
                     pruned_cache[key] = payload
                 removed_cache = pruned_cache
@@ -696,9 +668,7 @@ class TradingSynchronizer:
                         cached_ts_val = float(cached_ts)
                     except (TypeError, ValueError):
                         cached_ts_val = 0.0
-                    if cached_ts_val and (
-                        cache_now - cached_ts_val
-                    ) <= ctx.sync_removed_cache_max_age:
+                    if cached_ts_val and (cache_now - cached_ts_val) <= ctx.sync_removed_cache_max_age:
                         cached_buys = cache_entry.get("dca_buys")
                         if isinstance(cached_buys, (int, float)):
                             entry.setdefault("dca_buys", int(cached_buys))
@@ -717,12 +687,12 @@ class TradingSynchronizer:
                 # --- FIX #007b: enforce event-sourced DCA state after cache restore ---
                 try:
                     from core.dca_state import sync_derived_fields
+
                     sync_derived_fields(entry)
                 except Exception:
                     pass
                 log(
-                    f"Sync: added open trade {market} (amount={entry.get('amount')},"
-                    f" price={entry.get('buy_price')})",
+                    f"Sync: added open trade {market} (amount={entry.get('amount')}, price={entry.get('buy_price')})",
                     level="info",
                 )
 
@@ -793,17 +763,13 @@ class TradingSynchronizer:
                         saved_ts_val = float(saved_ts)
                     except (TypeError, ValueError):
                         saved_ts_val = cache_now
-                    if (
-                        cache_now - saved_ts_val
-                    ) > ctx.sync_removed_cache_max_age:
+                    if (cache_now - saved_ts_val) > ctx.sync_removed_cache_max_age:
                         continue
                     payload["saved_ts"] = saved_ts_val
                     cleaned_cache[key] = payload
                 removed_cache = cleaned_cache
             try:
-                ctx.write_json_locked(
-                    ctx.sync_removed_cache_path, removed_cache, indent=2
-                )
+                ctx.write_json_locked(ctx.sync_removed_cache_path, removed_cache, indent=2)
             except Exception as exc:
                 log(
                     f"Sync: kon {ctx.sync_removed_cache_path} niet bijwerken: {exc}",
@@ -823,16 +789,22 @@ class TradingSynchronizer:
     # ------------------------------------------------------------------
     def start_auto_sync(
         self,
-        state_provider: Callable[[], Tuple[
-            Dict[str, Dict[str, Any]],
-            List[Dict[str, Any]],
-            Dict[str, float],
-        ]],
-        state_consumer: Callable[[
-            Dict[str, Dict[str, Any]],
-            List[Dict[str, Any]],
-            Dict[str, float],
-        ], None],
+        state_provider: Callable[
+            [],
+            Tuple[
+                Dict[str, Dict[str, Any]],
+                List[Dict[str, Any]],
+                Dict[str, float],
+            ],
+        ],
+        state_consumer: Callable[
+            [
+                Dict[str, Dict[str, Any]],
+                List[Dict[str, Any]],
+                Dict[str, float],
+            ],
+            None,
+        ],
         *,
         interval: int = 60,
     ) -> threading.Thread:
@@ -846,11 +818,11 @@ class TradingSynchronizer:
                 try:
                     # Read dynamic config values each iteration
                     try:
-                        cfg_enabled = bool(self.ctx.config.get('SYNC_ENABLED', True))
+                        cfg_enabled = bool(self.ctx.config.get("SYNC_ENABLED", True))
                     except Exception:
                         cfg_enabled = True
                     try:
-                        cfg_interval = int(self.ctx.config.get('SYNC_INTERVAL_SECONDS', interval) or interval)
+                        cfg_interval = int(self.ctx.config.get("SYNC_INTERVAL_SECONDS", interval) or interval)
                         cfg_interval = max(5, cfg_interval)
                     except Exception:
                         cfg_interval = max(5, int(interval or 60))
@@ -869,7 +841,7 @@ class TradingSynchronizer:
                     self.ctx.log(f"Auto-sync loop error: {exc}", level="error")
                 # Sleep for the (possibly updated) configured interval
                 try:
-                    current_sleep = int(self.ctx.config.get('SYNC_INTERVAL_SECONDS', interval) or interval)
+                    current_sleep = int(self.ctx.config.get("SYNC_INTERVAL_SECONDS", interval) or interval)
                 except Exception:
                     current_sleep = max(5, int(interval or 60))
                 time.sleep(max(5, current_sleep))

@@ -13,6 +13,7 @@ Usage in extracted modules::
     state.CONFIG       # the config dict
     state.log(...)     # the log function
 """
+
 from __future__ import annotations
 
 import threading
@@ -43,13 +44,13 @@ class _SharedState:
     bitvavo: Any = None
 
     # ── Paths ───────────────────────────────────────────────
-    TRADE_LOG: Any = 'data/trade_log.json'
-    ARCHIVE_FILE: Any = 'data/trade_archive.json'
-    TRADE_PNL_HISTORY_FILE: str = 'data/trade_pnl_history.jsonl'
-    PORTFOLIO_SNAPSHOT_FILE: Any = 'data/portfolio_snapshot.json'
-    ACCOUNT_OVERVIEW_FILE: Any = 'data/account_overview.json'
-    HEARTBEAT_FILE: str = 'data/heartbeat.json'
-    AI_HEARTBEAT_FILE: str = 'data/ai_heartbeat.json'
+    TRADE_LOG: Any = "data/trade_log.json"
+    ARCHIVE_FILE: Any = "data/trade_archive.json"
+    TRADE_PNL_HISTORY_FILE: str = "data/trade_pnl_history.jsonl"
+    PORTFOLIO_SNAPSHOT_FILE: Any = "data/portfolio_snapshot.json"
+    ACCOUNT_OVERVIEW_FILE: Any = "data/account_overview.json"
+    HEARTBEAT_FILE: str = "data/heartbeat.json"
+    AI_HEARTBEAT_FILE: str = "data/ai_heartbeat.json"
 
     # ── Constants (populated from CONFIG at init) ───────────
     MAX_CLOSED: int = 500
@@ -59,7 +60,7 @@ class _SharedState:
     FEE_TAKER: float = 0.0025
     SLIPPAGE_PCT: float = 0.001
     MAX_SPREAD_PCT: float = 0.015
-    ORDER_TYPE: str = 'limit'
+    ORDER_TYPE: str = "limit"
     TRAILING_ACTIVATION_PCT: float = 0.025
     DEFAULT_TRAILING: float = 0.04
     SLEEP_SECONDS: int = 30
@@ -77,12 +78,12 @@ class _SharedState:
     REINVEST_CAP: float = 500.0
     LIVE_TRADING: bool = False
     TEST_MODE: bool = False
-    OPERATOR_ID: str = ''
+    OPERATOR_ID: str = ""
     DCA_MAX_BUYS: int = 3
     DCA_DROP_PCT: float = 0.05
     MAX_CLUSTER_TRADES_PER_BASE: int = 2
     MAX_CLUSTER_EXPOSURE_EUR: float = 100.0
-    MARKET_PERFORMANCE_FILE: str = 'data/market_metrics.json'
+    MARKET_PERFORMANCE_FILE: str = "data/market_metrics.json"
 
     # Last computed signal score for the next entry attempt; used by
     # bot.sizing_floor for the high-conviction bypass. Updated by the
@@ -127,7 +128,16 @@ class _SharedState:
     get_pending_bitvavo_orders: Callable = staticmethod(lambda: [])
     current_open_exposure_eur: Callable = staticmethod(lambda **kw: 0.0)
     is_watchlist_market: Callable = staticmethod(lambda m: False)
-    _get_watchlist_runtime_settings: Callable = staticmethod(lambda: {'enabled': False, 'mode': 'micro', 'paper_only': True, 'micro_trade_amount_eur': 5.0, 'max_parallel': 3, 'disable_dca': True})
+    _get_watchlist_runtime_settings: Callable = staticmethod(
+        lambda: {
+            "enabled": False,
+            "mode": "micro",
+            "paper_only": True,
+            "micro_trade_amount_eur": 5.0,
+            "max_parallel": 3,
+            "disable_dca": True,
+        }
+    )
     get_active_grid_markets: Callable = staticmethod(lambda: set())
     archive_trade: Callable = _noop
     _record_market_stats_for_close: Callable = _noop
@@ -157,7 +167,7 @@ class _SharedState:
 
     def __repr__(self) -> str:
         n_ot = len(self.open_trades) if self.open_trades else 0
-        return f'<SharedState trades={n_ot} bitvavo={"ok" if self.bitvavo else "N/A"}>'
+        return f"<SharedState trades={n_ot} bitvavo={'ok' if self.bitvavo else 'N/A'}>"
 
 
 # Singleton instance — imported by extracted modules

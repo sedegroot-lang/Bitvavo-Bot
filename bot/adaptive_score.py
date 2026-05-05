@@ -14,6 +14,7 @@ signals through, dramatically improving WR during slumps.
 
 The adjustment is *additive* on top of the configured base MIN_SCORE_TO_BUY.
 """
+
 from __future__ import annotations
 
 import threading
@@ -31,8 +32,7 @@ class AdaptiveScoreThreshold:
 
     def record_close(self, profit: float, ts: Optional[float] = None) -> None:
         with self._lock:
-            self._closes.append((float(ts if ts is not None else time.time()),
-                                 float(profit)))
+            self._closes.append((float(ts if ts is not None else time.time()), float(profit)))
 
     def _compute_state_locked(self) -> Tuple[int, float, int]:
         """Return (n, win_rate, current_loss_streak)."""
@@ -53,42 +53,46 @@ class AdaptiveScoreThreshold:
     def adjustment(self, *, cfg: Mapping | None = None) -> Tuple[float, str]:
         """Return (score_delta, reason). Positive delta = harder to enter."""
         cfg = cfg or {}
-        if not bool(cfg.get('ADAPTIVE_SCORE_ENABLED', True)):
-            return 0.0, 'disabled'
+        if not bool(cfg.get("ADAPTIVE_SCORE_ENABLED", True)):
+            return 0.0, "disabled"
 
         with self._lock:
             n, wr, streak = self._compute_state_locked()
 
         # Need at least N trades to act
-        min_n = int(cfg.get('ADAPTIVE_SCORE_MIN_HISTORY', 5))
+        min_n = int(cfg.get("ADAPTIVE_SCORE_MIN_HISTORY", 5))
         if n < min_n:
-            return 0.0, f'warmup ({n}/{min_n})'
+            return 0.0, f"warmup ({n}/{min_n})"
 
         # Loss-streak override (strongest signal)
-        streak_thr = int(cfg.get('ADAPTIVE_SCORE_LOSS_STREAK', 3))
-        streak_bump = float(cfg.get('ADAPTIVE_SCORE_STREAK_BUMP', 2.0))
+        streak_thr = int(cfg.get("ADAPTIVE_SCORE_LOSS_STREAK", 3))
+        streak_bump = float(cfg.get("ADAPTIVE_SCORE_STREAK_BUMP", 2.0))
         if streak >= streak_thr:
-            return streak_bump, f'loss_streak={streak}'
+            return streak_bump, f"loss_streak={streak}"
 
         # WR-based ladder
-        bump_low = float(cfg.get('ADAPTIVE_SCORE_BUMP_LOW_WR', 1.5))    # WR < 50%
-        bump_mid = float(cfg.get('ADAPTIVE_SCORE_BUMP_MID_WR', 0.5))    # WR 50-65%
-        relax_high = float(cfg.get('ADAPTIVE_SCORE_RELAX_HIGH_WR', -0.5))  # WR >= 80%
+        bump_low = float(cfg.get("ADAPTIVE_SCORE_BUMP_LOW_WR", 1.5))  # WR < 50%
+        bump_mid = float(cfg.get("ADAPTIVE_SCORE_BUMP_MID_WR", 0.5))  # WR 50-65%
+        relax_high = float(cfg.get("ADAPTIVE_SCORE_RELAX_HIGH_WR", -0.5))  # WR >= 80%
 
         if wr < 0.50:
-            return bump_low, f'rolling_wr={wr:.0%} (low)'
+            return bump_low, f"rolling_wr={wr:.0%} (low)"
         if wr < 0.65:
-            return bump_mid, f'rolling_wr={wr:.0%} (mid)'
+            return bump_mid, f"rolling_wr={wr:.0%} (mid)"
         if wr >= 0.80:
-            return relax_high, f'rolling_wr={wr:.0%} (high)'
-        return 0.0, f'rolling_wr={wr:.0%} (normal)'
+            return relax_high, f"rolling_wr={wr:.0%} (high)"
+        return 0.0, f"rolling_wr={wr:.0%} (normal)"
 
     def stats(self) -> dict:
         with self._lock:
             n, wr, streak = self._compute_state_locked()
-            return {'lookback': self._lookback, 'n': n,
-                    'rolling_wr': wr, 'loss_streak': streak,
-                    'recent_pnl': sum(p for _, p in self._closes)}
+            return {
+                "lookback": self._lookback,
+                "n": n,
+                "rolling_wr": wr,
+                "loss_streak": streak,
+                "recent_pnl": sum(p for _, p in self._closes),
+            }
 
 
 _instance: Optional[AdaptiveScoreThreshold] = None

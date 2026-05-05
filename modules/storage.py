@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from threading import RLock
 from typing import Iterable, List, Optional, Sequence
@@ -12,31 +13,31 @@ from typing import Iterable, List, Optional, Sequence
 from tinydb import TinyDB
 from tinydb.middlewares import CachingMiddleware
 from tinydb.storages import JSONStorage
-import time
+
 from modules.logging_utils import log
 
 # Windows inter-process mutex for file locking
-if sys.platform == 'win32':
+if sys.platform == "win32":
     import ctypes
     from ctypes import wintypes
-    
-    kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     CreateMutexW = kernel32.CreateMutexW
     CreateMutexW.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR]
     CreateMutexW.restype = wintypes.HANDLE
-    
+
     ReleaseMutex = kernel32.ReleaseMutex
     ReleaseMutex.argtypes = [wintypes.HANDLE]
     ReleaseMutex.restype = wintypes.BOOL
-    
+
     WaitForSingleObject = kernel32.WaitForSingleObject
     WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
     WaitForSingleObject.restype = wintypes.DWORD
-    
+
     CloseHandle = kernel32.CloseHandle
     CloseHandle.argtypes = [wintypes.HANDLE]
     CloseHandle.restype = wintypes.BOOL
-    
+
     WAIT_OBJECT_0 = 0
     WAIT_TIMEOUT = 0x00000102
     INFINITE = 0xFFFFFFFF
@@ -58,46 +59,46 @@ __all__ = [
 
 class FileMutex:
     """Windows inter-process file mutex for safe concurrent access."""
-    
+
     def __init__(self, name: str, timeout_ms: int = 5000):
         self.name = name
         self.timeout_ms = timeout_ms
         self.handle = None
-        
+
     def __enter__(self):
-        if sys.platform != 'win32' or CreateMutexW is None:
+        if sys.platform != "win32" or CreateMutexW is None:
             return self
-            
+
         # Create global mutex name (safe for Windows)
-        safe_name = self.name.replace('.', '_').replace('-', '_').replace('/', '_').replace('\\', '_')
+        safe_name = self.name.replace(".", "_").replace("-", "_").replace("/", "_").replace("\\", "_")
         mutex_name = f"Global\\BitvavoStorage_{safe_name}"
-        
+
         # Create or open the mutex
         self.handle = CreateMutexW(None, False, mutex_name)
         if not self.handle:
-            log(f"storage: failed to create mutex {mutex_name}", level='warning')
+            log(f"storage: failed to create mutex {mutex_name}", level="warning")
             return self
-            
+
         # Wait for mutex ownership (with timeout to prevent deadlock)
         result = WaitForSingleObject(self.handle, self.timeout_ms)
         if result != WAIT_OBJECT_0:
             if result == WAIT_TIMEOUT:
-                log(f"storage: mutex timeout for {self.name}", level='warning')
+                log(f"storage: mutex timeout for {self.name}", level="warning")
             else:
-                log(f"storage: failed to acquire mutex {self.name}, result={result}", level='warning')
-        
+                log(f"storage: failed to acquire mutex {self.name}, result={result}", level="warning")
+
         return self
-        
+
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if sys.platform != 'win32' or not self.handle:
+        if sys.platform != "win32" or not self.handle:
             return False
-            
+
         try:
             ReleaseMutex(self.handle)
             CloseHandle(self.handle)
         except Exception as e:
-            log(f"storage: error releasing mutex {self.name}: {e}", level='warning')
-        
+            log(f"storage: error releasing mutex {self.name}: {e}", level="warning")
+
         self.handle = None
         return False
 
@@ -125,7 +126,7 @@ class StorageManager:
             path.parent.mkdir(parents=True, exist_ok=True)
             try:
                 db = TinyDB(path, storage=CachingMiddleware(JSONStorage))
-            except json.JSONDecodeError as exc:
+            except json.JSONDecodeError:
                 # Corrupted TinyDB JSON file (partial write or stray bytes).
                 # Rotate the corrupted file and start with a fresh DB to
                 # avoid crashing writers that attempt to mirror JSON files.
@@ -133,9 +134,9 @@ class StorageManager:
                     ts = int(time.time())
                     corrupt_path = path.with_name(f"{path.name}.corrupt.{ts}")
                     path.replace(corrupt_path)
-                    log(f"storage: rotated corrupted tinydb file {path} -> {corrupt_path}", level='warning')
+                    log(f"storage: rotated corrupted tinydb file {path} -> {corrupt_path}", level="warning")
                 except Exception as e:
-                    log(f"storage: failed to rotate corrupted tinydb file {path}: {e}", level='warning')
+                    log(f"storage: failed to rotate corrupted tinydb file {path}: {e}", level="warning")
                 # Create a fresh DB file
                 db = TinyDB(path, storage=CachingMiddleware(JSONStorage))
             self._db_cache[key] = db
@@ -152,15 +153,13 @@ class StorageManager:
         tbl = self._table(name, table)
         return list(tbl.all())
 
-    def replace_all(
-        self, name: str, records: Sequence[dict], *, table: Optional[str] = None
-    ) -> None:
+    def replace_all(self, name: str, records: Sequence[dict], *, table: Optional[str] = None) -> None:
         if records is None:
             raise TypeError("records must be a sequence of dicts")
         payload = list(records)
         if any(not isinstance(item, dict) for item in payload):
             raise TypeError("records must contain dict instances")
-        
+
         # Use inter-process mutex to prevent concurrent writes from duplicate processes
         with FileMutex(name):
             db = self._get_db(name)
@@ -178,11 +177,11 @@ class StorageManager:
                         db.storage.flush()
                     return
                 except json.JSONDecodeError as exc:
-                    log(f"storage: JSON decode error while writing {name}: {exc}; attempt={attempt}", level='warning')
+                    log(f"storage: JSON decode error while writing {name}: {exc}; attempt={attempt}", level="warning")
                 except Exception as exc:
                     # Some TinyDB storage backends raise other exceptions on corrupt data;
                     # treat them the same as JSONDecodeError for robustness.
-                    log(f"storage: error while writing {name}: {exc}; attempt={attempt}", level='warning')
+                    log(f"storage: error while writing {name}: {exc}; attempt={attempt}", level="warning")
 
                 # If we get here, rotate the underlying tinydb file and recreate DB
                 try:
@@ -191,7 +190,7 @@ class StorageManager:
                     corrupt_path = path.with_name(f"{path.name}.corrupt.{ts}")
                     if path.exists():
                         path.replace(corrupt_path)
-                        log(f"storage: rotated corrupted tinydb file {path} -> {corrupt_path}", level='warning')
+                        log(f"storage: rotated corrupted tinydb file {path} -> {corrupt_path}", level="warning")
                     # Remove cached DB so a fresh instance will be created
                     with self._lock:
                         if name in self._db_cache:
@@ -203,16 +202,14 @@ class StorageManager:
                     db = self._get_db(name)
                     # loop will retry once more
                 except Exception as e:
-                    log(f"storage: failed to rotate tinydb file for {name}: {e}", level='warning')
+                    log(f"storage: failed to rotate tinydb file for {name}: {e}", level="warning")
                     return
 
-    def append_many(
-        self, name: str, records: Iterable[dict], *, table: Optional[str] = None
-    ) -> None:
+    def append_many(self, name: str, records: Iterable[dict], *, table: Optional[str] = None) -> None:
         payload = list(records)
         if any(not isinstance(item, dict) for item in payload):
             raise TypeError("records must contain dict instances")
-        
+
         # Use inter-process mutex to prevent concurrent writes
         with FileMutex(name):
             db = self._get_db(name)

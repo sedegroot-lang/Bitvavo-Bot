@@ -1,12 +1,12 @@
 """Portfolio diversification helpers for Golf 2 slow-loop workflows."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
-import math
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 from modules.json_compat import write_json_compat
 
@@ -55,9 +55,7 @@ class DiversificationRules:
         self.rebalance_threshold = float(self.rules.get("rebalance_threshold_pct", 0.05))
         self.auto_rebalance = bool(self.rules.get("auto_rebalance", False))
         self.sector_map = {
-            sym.upper(): sector
-            for sym, sector in (self.rules.get("sector_map") or {}).items()
-            if isinstance(sym, str)
+            sym.upper(): sector for sym, sector in (self.rules.get("sector_map") or {}).items() if isinstance(sym, str)
         }
         self.status_path = Path("data/diversification_status.json")
 
@@ -109,7 +107,9 @@ class DiversificationRules:
                 weight_pct = 0.0
             else:
                 weight_pct = eur / total_value
-            exposures.append(Exposure(market=market, eur=eur, sector=self._sector_for_market(market), weight_pct=weight_pct))
+            exposures.append(
+                Exposure(market=market, eur=eur, sector=self._sector_for_market(market), weight_pct=weight_pct)
+            )
         exposures.sort(key=lambda e: e.weight_pct, reverse=True)
         return per_market, exposures, total_value
 
@@ -185,12 +185,14 @@ class DiversificationRules:
                 over_pct = breach.get("weight_pct", 0.0) - self.max_asset_pct
                 if over_pct <= 0:
                     continue
-                targets.append({
-                    "action": "reduce",
-                    "market": market,
-                    "reduce_eur": max(0.0, over_pct * total),
-                    "reason": "asset_limit",
-                })
+                targets.append(
+                    {
+                        "action": "reduce",
+                        "market": market,
+                        "reduce_eur": max(0.0, over_pct * total),
+                        "reason": "asset_limit",
+                    }
+                )
             elif breach.get("type") == "sector":
                 sector = breach.get("sector")
                 over_pct = breach.get("weight_pct", 0.0) - self.max_sector_pct
@@ -201,12 +203,14 @@ class DiversificationRules:
                     continue
                 per_market = over_pct * total / len(affected)
                 for exp in affected:
-                    targets.append({
-                        "action": "reduce",
-                        "market": exp.market,
-                        "reduce_eur": max(0.0, per_market),
-                        "reason": f"sector_limit::{sector}",
-                    })
+                    targets.append(
+                        {
+                            "action": "reduce",
+                            "market": exp.market,
+                            "reduce_eur": max(0.0, per_market),
+                            "reason": f"sector_limit::{sector}",
+                        }
+                    )
         return targets
 
 

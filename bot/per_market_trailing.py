@@ -8,6 +8,7 @@ Lookup order:
 Pure helper — never raises. Returns dict with keys:
   trailing_activation_pct, base_trailing_pct, cost_buffer_pct.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, Mapping, Optional
@@ -59,7 +60,9 @@ def get_trailing_params(market: str, config: Optional[Mapping[str, Any]] = None)
         ov = overrides.get(market)
         if isinstance(ov, Mapping):
             return {
-                "trailing_activation_pct": _as_float(ov.get("trailing_activation_pct"), fallback["trailing_activation_pct"]),
+                "trailing_activation_pct": _as_float(
+                    ov.get("trailing_activation_pct"), fallback["trailing_activation_pct"]
+                ),
                 "base_trailing_pct": _as_float(ov.get("base_trailing_pct"), fallback["base_trailing_pct"]),
                 "cost_buffer_pct": _as_float(ov.get("cost_buffer_pct"), fallback["cost_buffer_pct"]),
             }

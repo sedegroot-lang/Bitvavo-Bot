@@ -3,6 +3,7 @@
 Pure / non-blocking. Reads from `bot.api.get_rate_limit_status()`.
 Designed to be called periodically by `bot.scheduler` (e.g. every 30s).
 """
+
 from __future__ import annotations
 
 import time
@@ -56,7 +57,7 @@ def check_and_alert(
         if (now - last) >= cooldown_sec and log_fn is not None:
             try:
                 log_fn(
-                    f"[RateLimit] {bucket} op {ratio*100:.0f}% van quota "
+                    f"[RateLimit] {bucket} op {ratio * 100:.0f}% van quota "
                     f"(used={info.get('used')}/{info.get('limit')} window={info.get('window')}s)",
                     level="warning",
                 )

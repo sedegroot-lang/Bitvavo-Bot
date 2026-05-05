@@ -6,8 +6,6 @@ Based on Easley, López de Prado & O'Hara (2012) — academic early crash detect
 
 from __future__ import annotations
 
-from typing import Any, Dict, Sequence
-
 from .base import SignalContext, SignalResult, _safe_cfg_float, _safe_cfg_int
 
 

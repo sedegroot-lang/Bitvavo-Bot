@@ -1,4 +1,5 @@
 """Event-driven hooks for pausing/resuming bot components."""
+
 from __future__ import annotations
 
 import csv
@@ -101,7 +102,7 @@ class EventState:
             processed_dir.mkdir(parents=True, exist_ok=True)
             path.rename(processed_dir / path.name)
         except Exception as exc:
-            log(f"[event_hooks] Kon bestand {path} niet verwerken: {exc}", level='error')
+            log(f"[event_hooks] Kon bestand {path} niet verwerken: {exc}", level="error")
 
     def _apply_record(self, rec: EventRecord) -> None:
         key = rec.market or "__global__"

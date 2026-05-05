@@ -2,7 +2,7 @@
 
 Builds a "volatility cone" from historical data across multiple time horizons.
 When realized vol falls outside the expected cone:
-- Below cone → vol expansion imminent → reduce entries  
+- Below cone → vol expansion imminent → reduce entries
 - Above cone → vol contraction expected → increase entries
 
 Based on: Natenberg, "Option Volatility" — volatility cone concept adapted to crypto spot trading.
@@ -52,17 +52,17 @@ def volatility_cone_signal(ctx: SignalContext) -> SignalResult:
     - Vol percentile > 85%: vol is abnormally high → contraction likely → bonus (buying the vol crush)
     - Vol percentile 30-70%: normal → neutral
     """
-    lookback = int(_safe_cfg(ctx.config, 'VOLCONE_LOOKBACK', 120))
-    short_window = int(_safe_cfg(ctx.config, 'VOLCONE_SHORT_WIN', 10))
-    medium_window = int(_safe_cfg(ctx.config, 'VOLCONE_MED_WIN', 30))
-    low_pct_threshold = _safe_cfg(ctx.config, 'VOLCONE_LOW_PCT', 0.15)
-    high_pct_threshold = _safe_cfg(ctx.config, 'VOLCONE_HIGH_PCT', 0.85)
-    low_penalty = _safe_cfg(ctx.config, 'VOLCONE_LOW_PENALTY', 0.5)
-    high_bonus = _safe_cfg(ctx.config, 'VOLCONE_HIGH_BONUS', 0.4)
+    lookback = int(_safe_cfg(ctx.config, "VOLCONE_LOOKBACK", 120))
+    short_window = int(_safe_cfg(ctx.config, "VOLCONE_SHORT_WIN", 10))
+    medium_window = int(_safe_cfg(ctx.config, "VOLCONE_MED_WIN", 30))
+    low_pct_threshold = _safe_cfg(ctx.config, "VOLCONE_LOW_PCT", 0.15)
+    high_pct_threshold = _safe_cfg(ctx.config, "VOLCONE_HIGH_PCT", 0.85)
+    low_penalty = _safe_cfg(ctx.config, "VOLCONE_LOW_PENALTY", 0.5)
+    high_bonus = _safe_cfg(ctx.config, "VOLCONE_HIGH_BONUS", 0.4)
 
     closes = ctx.closes_1m
     if len(closes) < lookback:
-        return SignalResult(name='vol_cone', reason='insufficient data')
+        return SignalResult(name="vol_cone", reason="insufficient data")
 
     # Compute log returns
     returns = []
@@ -71,7 +71,7 @@ def volatility_cone_signal(ctx: SignalContext) -> SignalResult:
             returns.append(math.log(closes[i] / closes[i - 1]))
 
     if len(returns) < lookback - 1:
-        return SignalResult(name='vol_cone', reason='insufficient returns')
+        return SignalResult(name="vol_cone", reason="insufficient returns")
 
     # Current realized vol at short window
     current_short = _realized_vol(returns, short_window)
@@ -81,39 +81,45 @@ def volatility_cone_signal(ctx: SignalContext) -> SignalResult:
     hist_vols = []
     step = max(1, short_window // 2)
     for i in range(short_window, len(returns) - short_window, step):
-        hv = _realized_vol(returns[i - short_window:i], short_window)
+        hv = _realized_vol(returns[i - short_window : i], short_window)
         if hv > 0:
             hist_vols.append(hv)
 
     if len(hist_vols) < 10:
-        return SignalResult(name='vol_cone', reason='insufficient history for cone')
+        return SignalResult(name="vol_cone", reason="insufficient history for cone")
 
     pct = _vol_percentile(current_short, hist_vols)
 
     details = {
-        'vol_short': round(current_short, 6),
-        'vol_medium': round(current_med, 6),
-        'vol_percentile': round(pct, 4),
-        'hist_samples': len(hist_vols),
+        "vol_short": round(current_short, 6),
+        "vol_medium": round(current_med, 6),
+        "vol_percentile": round(pct, 4),
+        "hist_samples": len(hist_vols),
     }
 
     if pct < low_pct_threshold:
         # Vol is abnormally low — expansion expected, risky entry
         return SignalResult(
-            name='vol_cone', score=-low_penalty, active=True,
-            reason=f'vol abnormally low (pct={pct:.2f}, expecting expansion)',
+            name="vol_cone",
+            score=-low_penalty,
+            active=True,
+            reason=f"vol abnormally low (pct={pct:.2f}, expecting expansion)",
             details=details,
         )
     elif pct > high_pct_threshold:
         # Vol is abnormally high — contraction expected, good entry (vol crush)
         return SignalResult(
-            name='vol_cone', score=high_bonus, active=True,
-            reason=f'vol abnormally high (pct={pct:.2f}, expecting contraction)',
+            name="vol_cone",
+            score=high_bonus,
+            active=True,
+            reason=f"vol abnormally high (pct={pct:.2f}, expecting contraction)",
             details=details,
         )
     else:
         return SignalResult(
-            name='vol_cone', score=0.0, active=False,
-            reason=f'vol normal (pct={pct:.2f})',
+            name="vol_cone",
+            score=0.0,
+            active=False,
+            reason=f"vol normal (pct={pct:.2f})",
             details=details,
         )

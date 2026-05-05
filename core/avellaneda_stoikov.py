@@ -28,12 +28,12 @@ from typing import Any, Dict, List, Tuple
 from modules.logging_utils import log
 
 # ── Default Parameters ──
-DEFAULT_GAMMA = 0.1          # Risk aversion (0.01=aggressive, 1.0=conservative)
-DEFAULT_KAPPA = 1.5          # Order fill intensity (higher = more aggressive)
-DEFAULT_TIME_HORIZON_H = 4   # Time horizon in hours
-MIN_SPREAD_PCT = 0.003       # Minimum 0.3% spread per side
-MAX_SPREAD_PCT = 0.05        # Maximum 5% spread per side
-INVENTORY_SKEW_MAX = 0.5     # Max inventory skew (50% of spread)
+DEFAULT_GAMMA = 0.1  # Risk aversion (0.01=aggressive, 1.0=conservative)
+DEFAULT_KAPPA = 1.5  # Order fill intensity (higher = more aggressive)
+DEFAULT_TIME_HORIZON_H = 4  # Time horizon in hours
+MIN_SPREAD_PCT = 0.003  # Minimum 0.3% spread per side
+MAX_SPREAD_PCT = 0.05  # Maximum 5% spread per side
+INVENTORY_SKEW_MAX = 0.5  # Max inventory skew (50% of spread)
 
 # Cache
 _vol_cache: Dict[str, Tuple[float, float]] = {}  # market → (vol, timestamp)
@@ -59,7 +59,7 @@ def _realized_volatility(candles: List[List], window: int = 20) -> float:
         return 0.0
 
     # Use most recent 'window' candles
-    recent = closes[-(window + 1):]
+    recent = closes[-(window + 1) :]
     log_returns = [math.log(recent[i] / recent[i - 1]) for i in range(1, len(recent)) if recent[i - 1] > 0]
 
     if not log_returns:
@@ -108,7 +108,7 @@ def calculate_optimal_spread(
     T = time_horizon_hours / 24.0  # Convert to fraction of day
 
     # A-S formula
-    term1 = gamma * (sigma ** 2) * T
+    term1 = gamma * (sigma**2) * T
     term2 = (2.0 / gamma) * math.log(1.0 + gamma / kappa)
     delta = term1 + term2
 
@@ -201,7 +201,9 @@ def calculate_dynamic_grid_levels(
         sell_budget_actual = min(sell_budget_needed, base_eur_value)
         # Determine how many sell levels can meet minimum order (€5)
         min_order = 5.0
-        affordable_sells = min(int(sell_budget_actual / min_order), levels_per_side) if sell_budget_actual >= min_order else 0
+        affordable_sells = (
+            min(int(sell_budget_actual / min_order), levels_per_side) if sell_budget_actual >= min_order else 0
+        )
         sell_count = affordable_sells
         if affordable_sells == 0:
             # Can't afford even one sell above minimum → full budget to buys
@@ -230,21 +232,25 @@ def calculate_dynamic_grid_levels(
         # Sell levels (above mid)
         sell_price = skewed_mid * (1.0 + level_spread * i / levels_per_side)
 
-        levels.append({
-            "price": round(buy_price, 8),
-            "side": "buy",
-            "amount_eur": round(amount_per_buy, 2),
-            "level_id": i - 1,
-            "spread_pct": round(level_spread * 100, 3),
-        })
-        if sells_placed < sell_count:
-            levels.append({
-                "price": round(sell_price, 8),
-                "side": "sell",
-                "amount_eur": round(amount_per_sell, 2),
-                "level_id": levels_per_side + i - 1,
+        levels.append(
+            {
+                "price": round(buy_price, 8),
+                "side": "buy",
+                "amount_eur": round(amount_per_buy, 2),
+                "level_id": i - 1,
                 "spread_pct": round(level_spread * 100, 3),
-            })
+            }
+        )
+        if sells_placed < sell_count:
+            levels.append(
+                {
+                    "price": round(sell_price, 8),
+                    "side": "sell",
+                    "amount_eur": round(amount_per_sell, 2),
+                    "level_id": levels_per_side + i - 1,
+                    "spread_pct": round(level_spread * 100, 3),
+                }
+            )
             sells_placed += 1
 
     # Sort by price

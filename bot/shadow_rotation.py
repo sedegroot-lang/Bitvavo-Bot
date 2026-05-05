@@ -22,6 +22,7 @@ Decision rule (conservative — same as docs/strategy advice):
 If a rotation is suggested, it gets logged to data/shadow_rotation.jsonl
 with full context. NEVER mutates state, NEVER places orders.
 """
+
 from __future__ import annotations
 
 import json
@@ -170,19 +171,21 @@ def evaluate(
             min_edge = max(0.0, pnl_pct) * edge_mult + fees
             if cand_expected < min_edge:
                 continue
-        suggestions.append({
-            "ts": now,
-            "candidate_market": cand.get("market", "?"),
-            "candidate_score": cand_score,
-            "candidate_expected_pct": cand_expected,
-            "close_market": market,
-            "close_pnl_pct": round(pnl_pct, 3),
-            "close_age_hours": round(age_h, 2),
-            "close_still_move_pct_6h": round(still_pct, 3) if still_pct >= 0 else None,
-            "fees_pct": fees,
-            "edge_mult": edge_mult,
-            "rule_version": 1,
-        })
+        suggestions.append(
+            {
+                "ts": now,
+                "candidate_market": cand.get("market", "?"),
+                "candidate_score": cand_score,
+                "candidate_expected_pct": cand_expected,
+                "close_market": market,
+                "close_pnl_pct": round(pnl_pct, 3),
+                "close_age_hours": round(age_h, 2),
+                "close_still_move_pct_6h": round(still_pct, 3) if still_pct >= 0 else None,
+                "fees_pct": fees,
+                "edge_mult": edge_mult,
+                "rule_version": 1,
+            }
+        )
 
     if suggestions:
         try:

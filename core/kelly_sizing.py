@@ -28,12 +28,12 @@ from typing import Any, Dict, List, Optional
 from modules.logging_utils import log
 
 # ── Defaults ──
-DEFAULT_KELLY_FRACTION = 0.5    # Half-Kelly (standard risk-adjusted approach)
-MIN_POSITION_EUR = 10.0         # Never go below €10
-MAX_POSITION_MULT = 2.5         # Never exceed 2.5x base amount
-MIN_TRADES_KELLY = 15           # Need 15+ trades per coin for reliable Kelly
-MIN_TRADES_GLOBAL = 30          # Global Kelly needs 30+ trades
-VOL_PARITY_LOOKBACK = 50        # Number of 1m candles for vol calculation
+DEFAULT_KELLY_FRACTION = 0.5  # Half-Kelly (standard risk-adjusted approach)
+MIN_POSITION_EUR = 10.0  # Never go below €10
+MAX_POSITION_MULT = 2.5  # Never exceed 2.5x base amount
+MIN_TRADES_KELLY = 15  # Need 15+ trades per coin for reliable Kelly
+MIN_TRADES_GLOBAL = 30  # Global Kelly needs 30+ trades
+VOL_PARITY_LOOKBACK = 50  # Number of 1m candles for vol calculation
 
 # Cache
 _stats_cache: Dict[str, Any] = {}
@@ -132,7 +132,7 @@ def _volatility_from_candles(candles: List[List], window: int = 20) -> float:
     if len(closes) < window + 1:
         return 0.0
 
-    recent = closes[-(window + 1):]
+    recent = closes[-(window + 1) :]
     log_returns = [math.log(recent[i] / recent[i - 1]) for i in range(1, len(recent)) if recent[i - 1] > 0]
 
     if not log_returns:
@@ -321,15 +321,15 @@ def get_sizing_summary(
         stats = per_coin.get(m, {})
         kelly_f = 0.0
         if stats and stats.get("n_trades", 0) >= MIN_TRADES_KELLY:
-            kelly_f = kelly_fraction_for_market(
-                stats["win_rate"], stats["win_loss_ratio"]
-            )
+            kelly_f = kelly_fraction_for_market(stats["win_rate"], stats["win_loss_ratio"])
 
         summary[m] = {
             "win_rate": stats.get("win_rate", 0.0),
             "n_trades": stats.get("n_trades", 0),
             "kelly_fraction": round(kelly_f, 4),
-            "suggested_amount": round(base_amount_eur * max(0.3, min(2.5, kelly_f * 5 + 0.5)), 2) if kelly_f > 0 else base_amount_eur,
+            "suggested_amount": round(base_amount_eur * max(0.3, min(2.5, kelly_f * 5 + 0.5)), 2)
+            if kelly_f > 0
+            else base_amount_eur,
         }
 
     return summary

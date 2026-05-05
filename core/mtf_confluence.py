@@ -8,6 +8,7 @@ Usage
     from core.mtf_confluence import mtf_score_bonus
     bonus, details = mtf_score_bonus(market, api_get_candles)
 """
+
 from __future__ import annotations
 
 import logging
@@ -27,6 +28,7 @@ _MTF_CACHE_TTL_SECS = 120  # 2 minutes — 15m candles change slowly
 # ---------------------------------------------------------------------------
 # Lightweight TA helpers (avoid heavy deps; works on plain float sequences)
 # ---------------------------------------------------------------------------
+
 
 def _sma(values: Sequence[float], period: int) -> Optional[float]:
     if len(values) < period:
@@ -48,7 +50,7 @@ def _ema(values: Sequence[float], period: int) -> Optional[float]:
 def _rsi(values: Sequence[float], period: int = 14) -> Optional[float]:
     if len(values) < period + 1:
         return None
-    deltas = np.diff(values[-period - 1:])
+    deltas = np.diff(values[-period - 1 :])
     gains = np.where(deltas > 0, deltas, 0.0)
     losses = np.where(deltas < 0, -deltas, 0.0)
     avg_gain = float(np.mean(gains)) if len(gains) else 0.0
@@ -76,9 +78,9 @@ def _adx(highs: Sequence[float], lows: Sequence[float], closes: Sequence[float],
     if n < period + 1:
         return None
     try:
-        h = np.array(highs[-period - 1:], dtype=np.float64)
-        l = np.array(lows[-period - 1:], dtype=np.float64)
-        c = np.array(closes[-period - 1:], dtype=np.float64)
+        h = np.array(highs[-period - 1 :], dtype=np.float64)
+        l = np.array(lows[-period - 1 :], dtype=np.float64)
+        c = np.array(closes[-period - 1 :], dtype=np.float64)
         tr = np.maximum(h[1:] - l[1:], np.maximum(np.abs(h[1:] - c[:-1]), np.abs(l[1:] - c[:-1])))
         up_move = h[1:] - h[:-1]
         dn_move = l[:-1] - l[1:]
@@ -101,6 +103,7 @@ def _adx(highs: Sequence[float], lows: Sequence[float], closes: Sequence[float],
 # ---------------------------------------------------------------------------
 # Timeframe analysis
 # ---------------------------------------------------------------------------
+
 
 def _analyse_timeframe(
     closes: Sequence[float],
@@ -193,7 +196,7 @@ GetCandlesFn = Callable[[str, str, int], Optional[List]]
 def _extract_closes(candles: List) -> List[float]:
     """Extract close prices from candle list."""
     try:
-        return [float(c[4]) if hasattr(c, '__getitem__') else float(c) for c in candles]
+        return [float(c[4]) if hasattr(c, "__getitem__") else float(c) for c in candles]
     except (IndexError, TypeError, ValueError):
         return []
 

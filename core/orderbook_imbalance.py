@@ -25,15 +25,15 @@ from typing import Any, Dict, List, Tuple
 from modules.logging_utils import log
 
 # ── Parameters ──
-BOOK_DEPTH = 25                  # Levels deep into the order book
-OBI_BULLISH_THRESHOLD = 0.65     # Bid-heavy → price likely rising
-OBI_BEARISH_THRESHOLD = 0.35     # Ask-heavy → price likely falling
-OBI_STRONG_BULLISH = 0.75        # Very strong bid pressure
-OBI_STRONG_BEARISH = 0.25        # Very strong ask pressure
+BOOK_DEPTH = 25  # Levels deep into the order book
+OBI_BULLISH_THRESHOLD = 0.65  # Bid-heavy → price likely rising
+OBI_BEARISH_THRESHOLD = 0.35  # Ask-heavy → price likely falling
+OBI_STRONG_BULLISH = 0.75  # Very strong bid pressure
+OBI_STRONG_BEARISH = 0.25  # Very strong ask pressure
 
 # Large wall detection
-WALL_SIZE_MULT = 5.0             # Must be 5x the average level size
-WALL_PROXIMITY_PCT = 0.02        # Within 2% of current price
+WALL_SIZE_MULT = 5.0  # Must be 5x the average level size
+WALL_PROXIMITY_PCT = 0.02  # Within 2% of current price
 
 # Cache
 _obi_cache: Dict[str, Tuple[float, float, Dict]] = {}  # market → (obi, ts, details)
@@ -116,24 +116,28 @@ def detect_walls(
         if size >= avg_bid_size * WALL_SIZE_MULT:
             distance_pct = (current_price - price) / current_price if current_price > 0 else 0
             if distance_pct <= WALL_PROXIMITY_PCT:
-                walls["support"].append({
-                    "price": price,
-                    "size_eur": round(price * size, 2),
-                    "distance_pct": round(distance_pct * 100, 3),
-                    "mult": round(size / avg_bid_size, 1),
-                })
+                walls["support"].append(
+                    {
+                        "price": price,
+                        "size_eur": round(price * size, 2),
+                        "distance_pct": round(distance_pct * 100, 3),
+                        "mult": round(size / avg_bid_size, 1),
+                    }
+                )
 
     # Detect ask walls (resistance)
     for price, size in asks[:levels]:
         if size >= avg_ask_size * WALL_SIZE_MULT:
             distance_pct = (price - current_price) / current_price if current_price > 0 else 0
             if distance_pct <= WALL_PROXIMITY_PCT:
-                walls["resistance"].append({
-                    "price": price,
-                    "size_eur": round(price * size, 2),
-                    "distance_pct": round(distance_pct * 100, 3),
-                    "mult": round(size / avg_ask_size, 1),
-                })
+                walls["resistance"].append(
+                    {
+                        "price": price,
+                        "size_eur": round(price * size, 2),
+                        "distance_pct": round(distance_pct * 100, 3),
+                        "mult": round(size / avg_ask_size, 1),
+                    }
+                )
 
     return walls
 
@@ -189,9 +193,15 @@ def analyze_orderbook(
 
     if not bids or not asks:
         return {
-            "obi": 0.5, "weighted_obi": 0.5, "signal": "no_data",
-            "score_modifier": 0.0, "should_delay_sell": False, "should_delay_buy": False,
-            "walls": {"support": [], "resistance": []}, "spread_pct": 0.0, "details": {},
+            "obi": 0.5,
+            "weighted_obi": 0.5,
+            "signal": "no_data",
+            "score_modifier": 0.0,
+            "should_delay_sell": False,
+            "should_delay_buy": False,
+            "walls": {"support": [], "resistance": []},
+            "spread_pct": 0.0,
+            "details": {},
         }
 
     # Calculate mid price and spread

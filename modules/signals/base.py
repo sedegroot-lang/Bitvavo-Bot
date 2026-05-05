@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Protocol, Sequence
+from typing import Any, Dict, List, Mapping, MutableMapping, Protocol, Sequence
 
 
 @dataclass(slots=True)

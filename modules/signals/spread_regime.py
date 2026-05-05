@@ -6,9 +6,6 @@ Wide spread = market maker uncertainty = higher reversal/crash risk.
 
 from __future__ import annotations
 
-import math
-from typing import Any, Dict, Sequence
-
 from .base import SignalContext, SignalResult, _safe_cfg_float, _safe_cfg_int
 
 
@@ -61,7 +58,11 @@ def spread_regime_signal(ctx: SignalContext) -> SignalResult:
             score=-penalty,
             active=True,
             reason=f"wide spread (z={z_score:.2f} > {z_threshold})",
-            details={"z_score": round(z_score, 4), "current_spread": round(current_spread, 6), "mean": round(mean_s, 6)},
+            details={
+                "z_score": round(z_score, 4),
+                "current_spread": round(current_spread, 6),
+                "mean": round(mean_s, 6),
+            },
         )
     elif z_score < -0.5:
         return SignalResult(
@@ -69,7 +70,11 @@ def spread_regime_signal(ctx: SignalContext) -> SignalResult:
             score=tight_bonus,
             active=True,
             reason=f"tight spread (z={z_score:.2f})",
-            details={"z_score": round(z_score, 4), "current_spread": round(current_spread, 6), "mean": round(mean_s, 6)},
+            details={
+                "z_score": round(z_score, 4),
+                "current_spread": round(current_spread, 6),
+                "mean": round(mean_s, 6),
+            },
         )
     else:
         return SignalResult(

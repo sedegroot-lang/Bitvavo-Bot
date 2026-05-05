@@ -27,20 +27,34 @@ BINANCE_PREMIUM_URL = "https://fapi.binance.com/fapi/v1/premiumIndex"
 
 # Bitvavo market → Binance perpetual symbol mapping
 MARKET_MAP = {
-    "BTC-EUR": "BTCUSDT", "ETH-EUR": "ETHUSDT", "SOL-EUR": "SOLUSDT",
-    "XRP-EUR": "XRPUSDT", "ADA-EUR": "ADAUSDT", "LINK-EUR": "LINKUSDT",
-    "AAVE-EUR": "AAVEUSDT", "UNI-EUR": "UNIUSDT", "LTC-EUR": "LTCUSDT",
-    "BCH-EUR": "BCHUSDT", "AVAX-EUR": "AVAXUSDT", "DOT-EUR": "DOTUSDT",
-    "RENDER-EUR": "RENDERUSDT", "FET-EUR": "FETUSDT", "INJ-EUR": "INJUSDT",
-    "OP-EUR": "OPUSDT", "APT-EUR": "APTUSDT", "HYPE-EUR": "HYPEUSDT",
-    "NEAR-EUR": "NEARUSDT", "SUI-EUR": "SUIUSDT", "DOGE-EUR": "DOGEUSDT",
+    "BTC-EUR": "BTCUSDT",
+    "ETH-EUR": "ETHUSDT",
+    "SOL-EUR": "SOLUSDT",
+    "XRP-EUR": "XRPUSDT",
+    "ADA-EUR": "ADAUSDT",
+    "LINK-EUR": "LINKUSDT",
+    "AAVE-EUR": "AAVEUSDT",
+    "UNI-EUR": "UNIUSDT",
+    "LTC-EUR": "LTCUSDT",
+    "BCH-EUR": "BCHUSDT",
+    "AVAX-EUR": "AVAXUSDT",
+    "DOT-EUR": "DOTUSDT",
+    "RENDER-EUR": "RENDERUSDT",
+    "FET-EUR": "FETUSDT",
+    "INJ-EUR": "INJUSDT",
+    "OP-EUR": "OPUSDT",
+    "APT-EUR": "APTUSDT",
+    "HYPE-EUR": "HYPEUSDT",
+    "NEAR-EUR": "NEARUSDT",
+    "SUI-EUR": "SUIUSDT",
+    "DOGE-EUR": "DOGEUSDT",
 }
 
 # Thresholds (in decimal, so 0.0005 = 0.05%)
-FUNDING_BULLISH_THRESHOLD = -0.0003    # Below this → short squeeze risk → bullish
-FUNDING_BEARISH_THRESHOLD = 0.0005     # Above this → overleveraged long → bearish
-FUNDING_EXTREME_BULLISH = -0.001       # Very negative → strong bullish signal
-FUNDING_EXTREME_BEARISH = 0.001        # Very positive → strong bearish signal
+FUNDING_BULLISH_THRESHOLD = -0.0003  # Below this → short squeeze risk → bullish
+FUNDING_BEARISH_THRESHOLD = 0.0005  # Above this → overleveraged long → bearish
+FUNDING_EXTREME_BULLISH = -0.001  # Very negative → strong bullish signal
+FUNDING_EXTREME_BEARISH = 0.001  # Very positive → strong bearish signal
 
 # Cache settings
 _cache: Dict[str, Tuple[float, float, str]] = {}  # symbol → (rate, timestamp, signal)
@@ -135,11 +149,11 @@ def get_market_signal(market: str) -> Dict[str, object]:
 
     # Score modifiers — added to signal_strength score
     modifiers = {
-        "strong_bullish": 2.0,     # Strong short squeeze → boost score
-        "bullish": 1.0,            # Mild bullish bias
-        "neutral": 0.0,            # No effect
-        "bearish": -1.5,           # Reduce score (less favorable entry)
-        "strong_bearish": -3.0,    # Strong penalty (overleveraged market)
+        "strong_bullish": 2.0,  # Strong short squeeze → boost score
+        "bullish": 1.0,  # Mild bullish bias
+        "neutral": 0.0,  # No effect
+        "bearish": -1.5,  # Reduce score (less favorable entry)
+        "strong_bearish": -3.0,  # Strong penalty (overleveraged market)
     }
 
     score_mod = modifiers.get(signal, 0.0)

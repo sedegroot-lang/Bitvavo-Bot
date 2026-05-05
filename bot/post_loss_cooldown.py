@@ -14,6 +14,7 @@ Re-entering after a WIN is fine. Hence a *conditional* cooldown.
 This module records every closed trade and gates entries on the same market
 during the cooldown window if the previous outcome was negative.
 """
+
 from __future__ import annotations
 
 import json
@@ -24,7 +25,7 @@ from pathlib import Path
 from typing import Dict, Mapping, Optional
 
 # Defaults — overridable via config
-DEFAULT_COOLDOWN_AFTER_LOSS_SEC = 4 * 3600   # 4 hours
+DEFAULT_COOLDOWN_AFTER_LOSS_SEC = 4 * 3600  # 4 hours
 DEFAULT_COOLDOWN_AFTER_BIG_LOSS_SEC = 24 * 3600  # 24h after >5 EUR loss
 DEFAULT_BIG_LOSS_THRESHOLD_EUR = 5.0
 
@@ -42,13 +43,12 @@ class PostLossCooldown:
         if not self._path or not self._path.exists():
             return
         try:
-            with open(self._path, 'r', encoding='utf-8') as f:
+            with open(self._path, "r", encoding="utf-8") as f:
                 raw = json.load(f)
             if isinstance(raw, dict):
                 with self._lock:
                     self._last_close = {
-                        str(k): {'ts': float(v.get('ts', 0)),
-                                 'profit': float(v.get('profit', 0))}
+                        str(k): {"ts": float(v.get("ts", 0)), "profit": float(v.get("profit", 0))}
                         for k, v in raw.items()
                         if isinstance(v, dict)
                     }
@@ -60,8 +60,8 @@ class PostLossCooldown:
             return
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self._path.with_suffix('.tmp')
-            with open(tmp, 'w', encoding='utf-8') as f:
+            tmp = self._path.with_suffix(".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(self._last_close, f, indent=2)
             os.replace(tmp, self._path)
         except Exception:
@@ -71,49 +71,46 @@ class PostLossCooldown:
     def record_close(self, market: str, profit: float, ts: Optional[float] = None) -> None:
         ts = float(ts if ts is not None else time.time())
         with self._lock:
-            self._last_close[market] = {'ts': ts, 'profit': float(profit)}
+            self._last_close[market] = {"ts": ts, "profit": float(profit)}
             self._dirty_count += 1
             if self._dirty_count >= 5:
                 self._save_locked()
                 self._dirty_count = 0
 
-    def is_blocked(self, market: str, *, cfg: Mapping | None = None,
-                   now: Optional[float] = None) -> tuple[bool, str]:
+    def is_blocked(self, market: str, *, cfg: Mapping | None = None, now: Optional[float] = None) -> tuple[bool, str]:
         """Return (blocked, reason). Only blocks after a LOSS."""
         cfg = cfg or {}
-        if not bool(cfg.get('POST_LOSS_COOLDOWN_ENABLED', True)):
-            return False, 'disabled'
+        if not bool(cfg.get("POST_LOSS_COOLDOWN_ENABLED", True)):
+            return False, "disabled"
 
         with self._lock:
             entry = self._last_close.get(market)
         if not entry:
-            return False, 'no_history'
+            return False, "no_history"
 
-        last_profit = float(entry.get('profit', 0))
+        last_profit = float(entry.get("profit", 0))
         if last_profit >= 0:
-            return False, 'last_was_win'
+            return False, "last_was_win"
 
         now = float(now if now is not None else time.time())
-        elapsed = now - float(entry.get('ts', 0))
+        elapsed = now - float(entry.get("ts", 0))
 
-        big_thr = float(cfg.get('POST_LOSS_BIG_LOSS_EUR', DEFAULT_BIG_LOSS_THRESHOLD_EUR))
+        big_thr = float(cfg.get("POST_LOSS_BIG_LOSS_EUR", DEFAULT_BIG_LOSS_THRESHOLD_EUR))
         if abs(last_profit) >= big_thr:
-            cooldown = float(cfg.get('POST_LOSS_BIG_COOLDOWN_SEC',
-                                     DEFAULT_COOLDOWN_AFTER_BIG_LOSS_SEC))
-            label = 'big_loss'
+            cooldown = float(cfg.get("POST_LOSS_BIG_COOLDOWN_SEC", DEFAULT_COOLDOWN_AFTER_BIG_LOSS_SEC))
+            label = "big_loss"
         else:
-            cooldown = float(cfg.get('POST_LOSS_COOLDOWN_SEC',
-                                     DEFAULT_COOLDOWN_AFTER_LOSS_SEC))
-            label = 'loss'
+            cooldown = float(cfg.get("POST_LOSS_COOLDOWN_SEC", DEFAULT_COOLDOWN_AFTER_LOSS_SEC))
+            label = "loss"
 
         if elapsed < cooldown:
             remaining_min = (cooldown - elapsed) / 60.0
-            return True, f'{label} {last_profit:+.2f}E, {remaining_min:.0f}min remaining'
-        return False, 'cooldown_elapsed'
+            return True, f"{label} {last_profit:+.2f}E, {remaining_min:.0f}min remaining"
+        return False, "cooldown_elapsed"
 
     def stats(self) -> dict:
         with self._lock:
-            return {'tracked_markets': len(self._last_close)}
+            return {"tracked_markets": len(self._last_close)}
 
     def force_save(self) -> None:
         with self._lock:

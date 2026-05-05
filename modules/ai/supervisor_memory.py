@@ -14,6 +14,7 @@ via `evaluate_pending_outcomes()` which can be called every few hours.
 
 Storage: data/bot_memory.json (user_id="ai_supervisor")
 """
+
 from __future__ import annotations
 
 import time
@@ -22,13 +23,14 @@ from typing import Any, Dict, List, Optional
 try:
     from modules.ai.bot_memory import get_memory
 except Exception:  # pragma: no cover
+
     def get_memory():  # type: ignore
         return None
 
 
 USER_ID = "ai_supervisor"
 SIMILAR_THRESHOLD = 0.20  # token-overlap score above which we count a "match"
-PENDING_GRACE_HOURS = 24    # don't evaluate outcome until this old
+PENDING_GRACE_HOURS = 24  # don't evaluate outcome until this old
 PENDING_MAX_AGE_HOURS = 96  # if still no clear outcome, mark "inconclusive"
 
 
@@ -47,9 +49,12 @@ def _score(md: Dict[str, Any]) -> float:
 
 def _direction(from_v: Any, to_v: Any) -> str:
     try:
-        a = float(from_v); b = float(to_v)
-        if b > a: return "up"
-        if b < a: return "down"
+        a = float(from_v)
+        b = float(to_v)
+        if b > a:
+            return "up"
+        if b < a:
+            return "down"
         return "flat"
     except Exception:
         return "set"
@@ -83,8 +88,8 @@ def log_suggestion(
             "direction": _direction(suggestion.get("from"), suggestion.get("to", suggestion.get("new_value"))),
             "regime": (snapshot or {}).get("regime", "unknown"),
             "applied": bool(applied),
-            "outcome": "pending",        # set later by evaluate_pending_outcomes
-            "outcome_score": None,       # +1 good, -1 bad, 0 neutral
+            "outcome": "pending",  # set later by evaluate_pending_outcomes
+            "outcome_score": None,  # +1 good, -1 bad, 0 neutral
             "snapshot": snapshot or {},
             "logged_at": _now(),
         }
@@ -241,10 +246,7 @@ def stats() -> Dict[str, Any]:
     if mem is None:
         return {"total": 0, "good": 0, "bad": 0, "pending": 0, "neutral": 0}
     try:
-        entries = [
-            e for e in mem.get_all(USER_ID)
-            if (e.get("metadata") or {}).get("category") == "ai_suggestion"
-        ]
+        entries = [e for e in mem.get_all(USER_ID) if (e.get("metadata") or {}).get("category") == "ai_suggestion"]
         good = sum(1 for e in entries if _score(e.get("metadata") or {}) > 0)
         bad = sum(1 for e in entries if _score(e.get("metadata") or {}) < 0)
         pending = sum(1 for e in entries if (e.get("metadata") or {}).get("outcome") == "pending")

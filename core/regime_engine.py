@@ -31,55 +31,55 @@ REGIME_BEARISH = "bearish"
 # ── Parameter Profiles per Regime ──
 REGIME_PROFILES: Dict[str, Dict[str, Any]] = {
     REGIME_TRENDING_UP: {
-        "trailing_pct_override": 0.03,       # Tighter trailing to ride trends
-        "base_amount_mult": 1.3,             # Bigger positions in trend
+        "trailing_pct_override": 0.03,  # Tighter trailing to ride trends
+        "base_amount_mult": 1.3,  # Bigger positions in trend
         "max_trades_mult": 1.0,
         "dca_enabled": True,
-        "dca_pyramid_up": True,              # Add on winners
-        "grid_pause": False,                 # Grid also profits in strong trends
-        "sl_mult": 1.2,                      # Wider SL to avoid stop-outs
-        "min_score_adj": -1.0,               # Lower entry threshold in uptrend
+        "dca_pyramid_up": True,  # Add on winners
+        "grid_pause": False,  # Grid also profits in strong trends
+        "sl_mult": 1.2,  # Wider SL to avoid stop-outs
+        "min_score_adj": -1.0,  # Lower entry threshold in uptrend
         "description": "Strong uptrend: max trailing, pyramid DCA, grid active",
     },
     REGIME_RANGING: {
-        "trailing_pct_override": None,       # Default trailing
-        "base_amount_mult": 0.8,             # Smaller trailing positions
+        "trailing_pct_override": None,  # Default trailing
+        "base_amount_mult": 0.8,  # Smaller trailing positions
         "max_trades_mult": 0.7,
         "dca_enabled": True,
         "dca_pyramid_up": False,
-        "grid_pause": False,                 # Grid thrives in range
-        "sl_mult": 0.8,                      # Tighter SL in range
-        "min_score_adj": 1.0,                # Higher threshold = pickier
+        "grid_pause": False,  # Grid thrives in range
+        "sl_mult": 0.8,  # Tighter SL in range
+        "min_score_adj": 1.0,  # Higher threshold = pickier
         "description": "Ranging: grid maximized, trailing minimal",
     },
     REGIME_HIGH_VOL: {
-        "trailing_pct_override": 0.025,      # Very tight trailing
-        "base_amount_mult": 0.6,             # Smaller positions
+        "trailing_pct_override": 0.025,  # Very tight trailing
+        "base_amount_mult": 0.6,  # Smaller positions
         "max_trades_mult": 0.5,
-        "dca_enabled": False,                # No DCA in chaos
+        "dca_enabled": False,  # No DCA in chaos
         "dca_pyramid_up": False,
-        "grid_pause": True,                  # Grid danger zone
-        "sl_mult": 0.7,                      # Tight SL
-        "min_score_adj": 3.0,                # Very picky entries
+        "grid_pause": True,  # Grid danger zone
+        "sl_mult": 0.7,  # Tight SL
+        "min_score_adj": 3.0,  # Very picky entries
         "description": "High volatility: reduced exposure, tight stops",
     },
     REGIME_BEARISH: {
         "trailing_pct_override": None,
-        "base_amount_mult": 0.0,             # NO new buys
+        "base_amount_mult": 0.0,  # NO new buys
         "max_trades_mult": 0.0,
-        "dca_enabled": True,                 # DCA for averaging down existing
+        "dca_enabled": True,  # DCA for averaging down existing
         "dca_pyramid_up": False,
         "grid_pause": True,
-        "sl_mult": 0.6,                      # Very tight SL
-        "min_score_adj": 99.0,               # Effectively blocks all buys
+        "sl_mult": 0.6,  # Very tight SL
+        "min_score_adj": 99.0,  # Effectively blocks all buys
         "description": "Bearish: all buys blocked, only sells + DCA averaging",
     },
 }
 
 # ── BOCPD Parameters ──
-_HAZARD_LAMBDA = 200         # Expected run length before changepoint (in candles)
-_MIN_RUN_LENGTH = 10         # Min samples before considering a regime change
-_CHANGEPOINT_THRESHOLD = 0.6 # Posterior probability threshold for regime shift
+_HAZARD_LAMBDA = 200  # Expected run length before changepoint (in candles)
+_MIN_RUN_LENGTH = 10  # Min samples before considering a regime change
+_CHANGEPOINT_THRESHOLD = 0.6  # Posterior probability threshold for regime shift
 
 # Cache
 _regime_cache: Dict[str, Any] = {}
@@ -104,7 +104,7 @@ def _rolling_stats(returns: List[float], window: int = 20) -> Tuple[List[float],
     means = []
     stds = []
     for i in range(window, len(returns)):
-        segment = returns[i - window:i]
+        segment = returns[i - window : i]
         mu = sum(segment) / len(segment)
         var = sum((x - mu) ** 2 for x in segment) / len(segment)
         means.append(mu)
@@ -116,7 +116,7 @@ def _gaussian_logpdf(x: float, mu: float, sigma: float) -> float:
     """Log PDF of normal distribution."""
     if sigma <= 0:
         sigma = 1e-8
-    return -0.5 * math.log(2 * math.pi * sigma ** 2) - (x - mu) ** 2 / (2 * sigma ** 2)
+    return -0.5 * math.log(2 * math.pi * sigma**2) - (x - mu) ** 2 / (2 * sigma**2)
 
 
 def _bocpd_changepoint_probability(returns: List[float]) -> List[float]:
@@ -138,8 +138,8 @@ def _bocpd_changepoint_probability(returns: List[float]) -> List[float]:
     seg_sq_sum = 0.0
     seg_count = 0
     # Prior statistics (from first few samples)
-    prior_mu = sum(returns[:min(5, n)]) / min(5, n)
-    prior_var = max(sum((r - prior_mu) ** 2 for r in returns[:min(5, n)]) / min(5, n), 1e-8)
+    prior_mu = sum(returns[: min(5, n)]) / min(5, n)
+    prior_var = max(sum((r - prior_mu) ** 2 for r in returns[: min(5, n)]) / min(5, n), 1e-8)
 
     for t in range(n):
         x = returns[t]
@@ -149,7 +149,7 @@ def _bocpd_changepoint_probability(returns: List[float]) -> List[float]:
 
         if seg_count >= _MIN_RUN_LENGTH:
             seg_mu = seg_sum / seg_count
-            seg_var = max(seg_sq_sum / seg_count - seg_mu ** 2, 1e-8)
+            seg_var = max(seg_sq_sum / seg_count - seg_mu**2, 1e-8)
 
             # Predictive probability under current run
             logp_run = _gaussian_logpdf(x, seg_mu, math.sqrt(seg_var))
@@ -193,8 +193,8 @@ def _classify_regime(
 
     # ── 1. Volatility analysis (1m returns) ──
     if returns_1m and len(returns_1m) >= 20:
-        recent_vol = math.sqrt(sum(r ** 2 for r in returns_1m[-20:]) / 20) * 100
-        baseline_vol = math.sqrt(sum(r ** 2 for r in returns_1m) / len(returns_1m)) * 100 if returns_1m else recent_vol
+        recent_vol = math.sqrt(sum(r**2 for r in returns_1m[-20:]) / 20) * 100
+        baseline_vol = math.sqrt(sum(r**2 for r in returns_1m) / len(returns_1m)) * 100 if returns_1m else recent_vol
         vol_ratio = recent_vol / baseline_vol if baseline_vol > 0 else 1.0
     else:
         recent_vol = 0.0

@@ -10,18 +10,19 @@ import os
 import time
 from typing import Any, Dict, List
 
-from modules.logging_utils import log
 from ai.ai_constants import SECTOR_DEFINITIONS
+from modules.logging_utils import log
 
 
 def _dbg(msg: str) -> None:
     """Debug-level log helper."""
-    log(msg, level='debug')
+    log(msg, level="debug")
 
 
 # ---------------------------------------------------------------------------
 # Sector helpers
 # ---------------------------------------------------------------------------
+
 
 def get_market_sector(market: str) -> str:
     """Returns the sector category for a given market."""
@@ -44,13 +45,15 @@ def calculate_portfolio_sectors(open_trades: dict) -> Dict[str, int]:
 # Market regime detection
 # ---------------------------------------------------------------------------
 
-def _fetch_btc_candles_for_regime(interval: str = '1h', limit: int = 48) -> list:
+
+def _fetch_btc_candles_for_regime(interval: str = "1h", limit: int = 48) -> list:
     """Fetch BTC-EUR candles from Bitvavo for forward-looking regime detection."""
     try:
         from utils import get_bitvavo_client
+
         client = get_bitvavo_client()
         if client:
-            candles = client.candles('BTC-EUR', interval, {'limit': limit})
+            candles = client.candles("BTC-EUR", interval, {"limit": limit})
             if isinstance(candles, list) and len(candles) >= 10:
                 return candles
     except Exception as e:
@@ -69,8 +72,8 @@ def detect_market_regime(closed_trades: list, cfg: dict) -> Dict[str, Any]:
     Falls back to pure backward if candles unavailable.
     """
     # === FORWARD-LOOKING: BTC candle analysis ===
-    btc_candles = _fetch_btc_candles_for_regime('1h', 48)
-    forward_scores = {'BULL': 0.0, 'BEAR': 0.0, 'SIDEWAYS': 0.0}
+    btc_candles = _fetch_btc_candles_for_regime("1h", 48)
+    forward_scores = {"BULL": 0.0, "BEAR": 0.0, "SIDEWAYS": 0.0}
     forward_indicators = {}
     has_forward = False
 
@@ -103,46 +106,46 @@ def detect_market_regime(closed_trades: list, cfg: dict) -> Dict[str, Any]:
             std_ret = (sum((r - avg_ret) ** 2 for r in returns) / len(returns)) ** 0.5 if returns else 0
 
             forward_indicators = {
-                'sma_ratio': round(sma_ratio, 4),
-                'momentum': round(momentum, 4),
-                'higher_highs': hh_count,
-                'lower_lows': ll_count,
-                'volatility': round(std_ret * 100, 2),
-                'btc_price': closes[-1],
+                "sma_ratio": round(sma_ratio, 4),
+                "momentum": round(momentum, 4),
+                "higher_highs": hh_count,
+                "lower_lows": ll_count,
+                "volatility": round(std_ret * 100, 2),
+                "btc_price": closes[-1],
             }
 
             # BULL signals
             if sma_ratio > 0.005:
-                forward_scores['BULL'] += 0.3
+                forward_scores["BULL"] += 0.3
             if momentum > 0.02:
-                forward_scores['BULL'] += 0.3
+                forward_scores["BULL"] += 0.3
             if hh_count >= 6:
-                forward_scores['BULL'] += 0.2
+                forward_scores["BULL"] += 0.2
             if avg_ret > 0.001:
-                forward_scores['BULL'] += 0.2
+                forward_scores["BULL"] += 0.2
 
             # BEAR signals
             if sma_ratio < -0.005:
-                forward_scores['BEAR'] += 0.3
+                forward_scores["BEAR"] += 0.3
             if momentum < -0.02:
-                forward_scores['BEAR'] += 0.3
+                forward_scores["BEAR"] += 0.3
             if ll_count >= 6:
-                forward_scores['BEAR'] += 0.2
+                forward_scores["BEAR"] += 0.2
             if avg_ret < -0.001:
-                forward_scores['BEAR'] += 0.2
+                forward_scores["BEAR"] += 0.2
 
             # SIDEWAYS signals
             if abs(sma_ratio) <= 0.005:
-                forward_scores['SIDEWAYS'] += 0.3
+                forward_scores["SIDEWAYS"] += 0.3
             if abs(momentum) <= 0.01:
-                forward_scores['SIDEWAYS'] += 0.2
+                forward_scores["SIDEWAYS"] += 0.2
             if std_ret > 0.015:
-                forward_scores['SIDEWAYS'] += 0.3
+                forward_scores["SIDEWAYS"] += 0.3
             if 3 <= hh_count <= 6:
-                forward_scores['SIDEWAYS'] += 0.2
+                forward_scores["SIDEWAYS"] += 0.2
 
     # === BACKWARD-LOOKING: trade history ===
-    backward_scores = {'BULL': 0.0, 'BEAR': 0.0, 'SIDEWAYS': 0.0}
+    backward_scores = {"BULL": 0.0, "BEAR": 0.0, "SIDEWAYS": 0.0}
     backward_indicators = {}
 
     if len(closed_trades) >= 20:
@@ -166,31 +169,31 @@ def detect_market_regime(closed_trades: list, cfg: dict) -> Dict[str, Any]:
         avg_pnl = sum(pnls) / len(pnls) if pnls else 0
 
         backward_indicators = {
-            'win_rate': round(recent_wr, 3),
-            'wr_trend': round(wr_trend, 3),
-            'avg_pnl': round(avg_pnl, 2),
+            "win_rate": round(recent_wr, 3),
+            "wr_trend": round(wr_trend, 3),
+            "avg_pnl": round(avg_pnl, 2),
         }
 
         if recent_wr > 0.55:
-            backward_scores['BULL'] += 0.3
+            backward_scores["BULL"] += 0.3
         if wr_trend > 0.05:
-            backward_scores['BULL'] += 0.2
+            backward_scores["BULL"] += 0.2
         if avg_pnl > 1:
-            backward_scores['BULL'] += 0.3
+            backward_scores["BULL"] += 0.3
 
         if recent_wr < 0.45:
-            backward_scores['BEAR'] += 0.3
+            backward_scores["BEAR"] += 0.3
         if wr_trend < -0.05:
-            backward_scores['BEAR'] += 0.2
+            backward_scores["BEAR"] += 0.2
         if avg_pnl < -1:
-            backward_scores['BEAR'] += 0.3
+            backward_scores["BEAR"] += 0.3
 
         if 0.45 <= recent_wr <= 0.55:
-            backward_scores['SIDEWAYS'] += 0.3
+            backward_scores["SIDEWAYS"] += 0.3
         if abs(wr_trend) < 0.05:
-            backward_scores['SIDEWAYS'] += 0.2
+            backward_scores["SIDEWAYS"] += 0.2
         if abs(avg_pnl) < 1:
-            backward_scores['SIDEWAYS'] += 0.2
+            backward_scores["SIDEWAYS"] += 0.2
     elif len(closed_trades) < 20 and not has_forward:
         return {"regime": "SIDEWAYS", "confidence": 0.5, "indicators": {}, "source": "insufficient_data"}
 
@@ -203,7 +206,7 @@ def detect_market_regime(closed_trades: list, cfg: dict) -> Dict[str, Any]:
         bw = 1.0
 
     combined = {}
-    for regime in ('BULL', 'BEAR', 'SIDEWAYS'):
+    for regime in ("BULL", "BEAR", "SIDEWAYS"):
         combined[regime] = forward_scores.get(regime, 0) * fw + backward_scores.get(regime, 0) * bw
 
     regime = max(combined, key=combined.get)  # type: ignore[arg-type]
@@ -212,7 +215,7 @@ def detect_market_regime(closed_trades: list, cfg: dict) -> Dict[str, Any]:
     indicators = {}
     indicators.update(backward_indicators)
     if forward_indicators:
-        indicators['forward'] = forward_indicators
+        indicators["forward"] = forward_indicators
 
     return {
         "regime": regime,
@@ -226,6 +229,7 @@ def detect_market_regime(closed_trades: list, cfg: dict) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Coin statistics
 # ---------------------------------------------------------------------------
+
 
 def get_coin_statistics(closed_trades: list) -> Dict[str, Any]:
     """Per-coin performance statistics."""
@@ -251,6 +255,7 @@ def get_coin_statistics(closed_trades: list) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Risk metrics
 # ---------------------------------------------------------------------------
+
 
 def calculate_risk_metrics(closed_trades: list, cfg: dict) -> Dict[str, Any]:
     """Advanced risk metrics: drawdown, consecutive losses, volatility."""
@@ -309,6 +314,7 @@ def calculate_risk_metrics(closed_trades: list, cfg: dict) -> Dict[str, Any]:
 # Full market scanner
 # ---------------------------------------------------------------------------
 
+
 def scan_all_markets_for_opportunities(cfg: dict, closed_trades: list) -> Dict[str, Any]:
     """Scan ALL available Bitvavo EUR markets for trading opportunities."""
     all_markets: List[str] = []
@@ -316,6 +322,7 @@ def scan_all_markets_for_opportunities(cfg: dict, closed_trades: list) -> Dict[s
     # Method 1: Try Bitvavo API
     try:
         from utils import get_bitvavo_client
+
         client = get_bitvavo_client()
         if client:
             markets_data = client.markets({})
@@ -337,10 +344,29 @@ def scan_all_markets_for_opportunities(cfg: dict, closed_trades: list) -> Dict[s
     # Method 3: Ultimate fallback
     if not all_markets:
         all_markets = [
-            "BTC-EUR", "ETH-EUR", "SOL-EUR", "BNB-EUR", "AVAX-EUR", "LINK-EUR",
-            "POL-EUR", "ATOM-EUR", "DOT-EUR", "UNI-EUR", "AAVE-EUR", "ARB-EUR",
-            "OP-EUR", "INJ-EUR", "SNX-EUR", "XRP-EUR", "LTC-EUR", "ALGO-EUR",
-            "NEAR-EUR", "GRT-EUR", "LDO-EUR", "GMX-EUR", "CRV-EUR",
+            "BTC-EUR",
+            "ETH-EUR",
+            "SOL-EUR",
+            "BNB-EUR",
+            "AVAX-EUR",
+            "LINK-EUR",
+            "POL-EUR",
+            "ATOM-EUR",
+            "DOT-EUR",
+            "UNI-EUR",
+            "AAVE-EUR",
+            "ARB-EUR",
+            "OP-EUR",
+            "INJ-EUR",
+            "SNX-EUR",
+            "XRP-EUR",
+            "LTC-EUR",
+            "ALGO-EUR",
+            "NEAR-EUR",
+            "GRT-EUR",
+            "LDO-EUR",
+            "GMX-EUR",
+            "CRV-EUR",
         ]
         log(f"[MARKET-SCAN] Using fallback list: {len(all_markets)} markets", level="warning")
 
@@ -353,24 +379,41 @@ def scan_all_markets_for_opportunities(cfg: dict, closed_trades: list) -> Dict[s
         if market in coin_stats:
             stats = coin_stats[market]
             if stats["trades"] >= 8 and stats["win_rate"] < 0.35 and stats["avg_pnl"] < -2:
-                recommended_remove.append({
-                    "market": market,
-                    "reason": f"Poor performer: WR={stats['win_rate']:.0%}, avg PnL=€{stats['avg_pnl']:.1f}",
-                    "win_rate": stats["win_rate"],
-                    "avg_pnl": stats["avg_pnl"],
-                    "trades": stats["trades"],
-                })
+                recommended_remove.append(
+                    {
+                        "market": market,
+                        "reason": f"Poor performer: WR={stats['win_rate']:.0%}, avg PnL=€{stats['avg_pnl']:.1f}",
+                        "win_rate": stats["win_rate"],
+                        "avg_pnl": stats["avg_pnl"],
+                        "trades": stats["trades"],
+                    }
+                )
 
     # Markets to potentially add
     available_markets = [m for m in all_markets if m not in current_whitelist]
 
     layer1_markets = [
-        "XRP-EUR", "ADA-EUR", "LTC-EUR", "ALGO-EUR", "NEAR-EUR",
-        "EGLD-EUR", "FLOW-EUR", "TRX-EUR", "XTZ-EUR", "EOS-EUR",
+        "XRP-EUR",
+        "ADA-EUR",
+        "LTC-EUR",
+        "ALGO-EUR",
+        "NEAR-EUR",
+        "EGLD-EUR",
+        "FLOW-EUR",
+        "TRX-EUR",
+        "XTZ-EUR",
+        "EOS-EUR",
     ]
     defi_markets = [
-        "LDO-EUR", "GMX-EUR", "CRV-EUR", "1INCH-EUR", "COMP-EUR",
-        "YFI-EUR", "BAL-EUR", "SUSHI-EUR", "CAKE-EUR",
+        "LDO-EUR",
+        "GMX-EUR",
+        "CRV-EUR",
+        "1INCH-EUR",
+        "COMP-EUR",
+        "YFI-EUR",
+        "BAL-EUR",
+        "SUSHI-EUR",
+        "CAKE-EUR",
     ]
     layer2_markets = ["POL-EUR", "IMX-EUR", "LRC-EUR", "METIS-EUR"]
 
@@ -408,12 +451,14 @@ def scan_all_markets_for_opportunities(cfg: dict, closed_trades: list) -> Dict[s
 
     recommended_add: List[Dict[str, Any]] = []
     for market, info in priority_markets.items():
-        recommended_add.append({
-            "market": market,
-            "reason": info["reason"],
-            "priority": info["priority"],
-            "category": info["category"],
-        })
+        recommended_add.append(
+            {
+                "market": market,
+                "reason": info["reason"],
+                "priority": info["priority"],
+                "category": info["category"],
+            }
+        )
 
     priority_order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
     recommended_add.sort(key=lambda x: priority_order.get(x["priority"], 3))
@@ -421,6 +466,7 @@ def scan_all_markets_for_opportunities(cfg: dict, closed_trades: list) -> Dict[s
     # Annotate guardrail data
     try:
         from modules.ai_markets import evaluate_market_guardrails
+
         for rec in recommended_add:
             eval_result = evaluate_market_guardrails(rec["market"], cfg)
             rec["risk_score"] = eval_result.get("risk_score")

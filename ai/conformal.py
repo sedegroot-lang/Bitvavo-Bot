@@ -17,6 +17,7 @@ Public API:
 This module never raises if MAPIE is unavailable — `MAPIE_AVAILABLE = False`
 flag lets callers gracefully degrade.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -26,6 +27,7 @@ import numpy as np
 
 try:
     from mapie.classification import MapieClassifier  # type: ignore
+
     MAPIE_AVAILABLE = True
 except Exception:  # pragma: no cover — environments without MAPIE
     MapieClassifier = None  # type: ignore
@@ -39,8 +41,7 @@ class CalibratorBlob:
     classes_: List[int]
 
 
-def fit_conformal(model: Any, X_calib: np.ndarray, y_calib: np.ndarray,
-                  alpha: float = 0.1) -> Optional[CalibratorBlob]:
+def fit_conformal(model: Any, X_calib: np.ndarray, y_calib: np.ndarray, alpha: float = 0.1) -> Optional[CalibratorBlob]:
     """Wrap an already-fitted classifier with MAPIE's `cv="prefit"`.
 
     Returns None when MAPIE is not installed.
@@ -56,8 +57,7 @@ def fit_conformal(model: Any, X_calib: np.ndarray, y_calib: np.ndarray,
         return None
 
 
-def predict_with_interval(blob: Optional[CalibratorBlob], X: np.ndarray
-                          ) -> Tuple[np.ndarray, np.ndarray]:
+def predict_with_interval(blob: Optional[CalibratorBlob], X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Return (predictions, interval_width_per_sample).
 
     When the calibrator is missing, predictions come from the underlying
@@ -79,7 +79,10 @@ def save_calibrator(blob: Optional[CalibratorBlob], path: str) -> bool:
     if blob is None:
         return False
     try:
-        import os, pickle, tempfile
+        import os
+        import pickle
+        import tempfile
+
         os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
         fd, tmp = tempfile.mkstemp(prefix="conformal_", suffix=".pkl")
         try:
@@ -109,7 +112,9 @@ def load_calibrator(path: str = "models/conformal_calibrator.pkl") -> Optional[C
     if not MAPIE_AVAILABLE:
         return None
     try:
-        import os, pickle
+        import os
+        import pickle
+
         if not os.path.exists(path):
             return None
         with open(path, "rb") as fh:
@@ -123,8 +128,9 @@ def load_calibrator(path: str = "models/conformal_calibrator.pkl") -> Optional[C
         return None
 
 
-def enrich_ml_info(ml_info: dict, X: Optional[np.ndarray] = None,
-                   path: str = "models/conformal_calibrator.pkl") -> dict:
+def enrich_ml_info(
+    ml_info: dict, X: Optional[np.ndarray] = None, path: str = "models/conformal_calibrator.pkl"
+) -> dict:
     """Best-effort: attach `ml_conf_interval_width` and `ml_calibrated` flags.
 
     Never raises — silently no-ops when MAPIE/calibrator/X is absent so the
@@ -151,6 +157,11 @@ def enrich_ml_info(ml_info: dict, X: Optional[np.ndarray] = None,
 
 
 __all__ = [
-    "MAPIE_AVAILABLE", "CalibratorBlob", "fit_conformal", "predict_with_interval",
-    "save_calibrator", "load_calibrator", "enrich_ml_info",
+    "MAPIE_AVAILABLE",
+    "CalibratorBlob",
+    "fit_conformal",
+    "predict_with_interval",
+    "save_calibrator",
+    "load_calibrator",
+    "enrich_ml_info",
 ]

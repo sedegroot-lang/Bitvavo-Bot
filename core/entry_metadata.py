@@ -16,6 +16,7 @@ Entries older than ``MAX_AGE_DAYS`` are pruned on load.
 
 Thread-safe via module-level RLock.
 """
+
 from __future__ import annotations
 
 import json
@@ -26,19 +27,31 @@ from threading import RLock
 from typing import Any, Dict, Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_DATA_FILE = PROJECT_ROOT / 'data' / 'entry_metadata.json'
+_DATA_FILE = PROJECT_ROOT / "data" / "entry_metadata.json"
 _LOCK = RLock()
 _MAX_AGE_DAYS = 30
 
 # Fields we care about restoring after a sync re-adopt.
 _PRESERVED_FIELDS = (
-    'score', 'opened_regime', 'volatility_at_entry',
-    'rsi_at_entry', 'macd_at_entry', 'macd_line_at_entry', 'macd_signal_at_entry',
-    'sma_short_at_entry', 'sma_long_at_entry', 'ema20_at_entry',
-    'stochastic_at_entry', 'stochastic_k_at_entry',
-    'bb_upper_at_entry', 'bb_lower_at_entry', 'bb_position_at_entry',
-    'volume_avg_at_entry', 'volume_24h_eur',
-    'opened_ts', '_entry_source',
+    "score",
+    "opened_regime",
+    "volatility_at_entry",
+    "rsi_at_entry",
+    "macd_at_entry",
+    "macd_line_at_entry",
+    "macd_signal_at_entry",
+    "sma_short_at_entry",
+    "sma_long_at_entry",
+    "ema20_at_entry",
+    "stochastic_at_entry",
+    "stochastic_k_at_entry",
+    "bb_upper_at_entry",
+    "bb_lower_at_entry",
+    "bb_position_at_entry",
+    "volume_avg_at_entry",
+    "volume_24h_eur",
+    "opened_ts",
+    "_entry_source",
 )
 
 
@@ -46,13 +59,14 @@ def _load() -> Dict[str, Dict[str, Any]]:
     if not _DATA_FILE.exists():
         return {}
     try:
-        with _DATA_FILE.open('r', encoding='utf-8') as f:
+        with _DATA_FILE.open("r", encoding="utf-8") as f:
             data = json.load(f) or {}
         # Prune stale entries
         now = time.time()
         cutoff = now - _MAX_AGE_DAYS * 86400
-        return {m: rec for m, rec in data.items()
-                if isinstance(rec, dict) and float(rec.get('_recorded_ts', now)) > cutoff}
+        return {
+            m: rec for m, rec in data.items() if isinstance(rec, dict) and float(rec.get("_recorded_ts", now)) > cutoff
+        }
     except Exception:
         return {}
 
@@ -60,8 +74,8 @@ def _load() -> Dict[str, Dict[str, Any]]:
 def _save(data: Dict[str, Dict[str, Any]]) -> None:
     try:
         _DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-        tmp = _DATA_FILE.with_suffix('.json.tmp')
-        with tmp.open('w', encoding='utf-8') as f:
+        tmp = _DATA_FILE.with_suffix(".json.tmp")
+        with tmp.open("w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         os.replace(str(tmp), str(_DATA_FILE))
     except Exception:
@@ -72,7 +86,7 @@ def record(market: str, trade_dict: Dict[str, Any]) -> None:
     """Persist entry metadata for ``market`` from a freshly-opened trade dict."""
     if not market:
         return
-    rec: Dict[str, Any] = {'_recorded_ts': time.time()}
+    rec: Dict[str, Any] = {"_recorded_ts": time.time()}
     for field in _PRESERVED_FIELDS:
         if field in trade_dict and trade_dict[field] is not None:
             rec[field] = trade_dict[field]
@@ -123,13 +137,13 @@ def restore_into(market: str, trade: Dict[str, Any]) -> int:
         cur = trade.get(field)
         is_default = (
             cur is None
-            or (field == 'score' and float(cur or 0) == 0.0)
-            or (field == 'opened_regime' and cur in ('unknown', 'sync_attach', '', None))
-            or (field == 'volatility_at_entry' and float(cur or 0) == 0.0)
+            or (field == "score" and float(cur or 0) == 0.0)
+            or (field == "opened_regime" and cur in ("unknown", "sync_attach", "", None))
+            or (field == "volatility_at_entry" and float(cur or 0) == 0.0)
         )
         if is_default:
             trade[field] = cache[field]
             restored += 1
     if restored:
-        trade['_metadata_restored_from_cache'] = True
+        trade["_metadata_restored_from_cache"] = True
     return restored

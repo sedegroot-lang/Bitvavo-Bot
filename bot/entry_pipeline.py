@@ -29,10 +29,10 @@ from typing import Any, Dict, Optional
 class EntryDecision:
     market: str
     proceed: bool
-    reason: str = ''
+    reason: str = ""
     score: float = 0.0
     eur_amount: float = 0.0
-    order_type: str = 'auto'
+    order_type: str = "auto"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -46,18 +46,18 @@ def decide_order_type(config: Dict[str, Any], spread_pct: Optional[float] = None
         * `ORDER_TYPE='auto'` (default) → 'limit' when spread<0.1%, else 'market'
     """
     try:
-        if bool(config.get('LIMIT_ORDER_PREFER', False)):
-            return 'limit'
+        if bool(config.get("LIMIT_ORDER_PREFER", False)):
+            return "limit"
     except Exception:
         pass
-    ot = str(config.get('ORDER_TYPE', 'auto') or 'auto').lower()
-    if ot == 'limit':
-        return 'limit'
-    if ot == 'market':
-        return 'market'
+    ot = str(config.get("ORDER_TYPE", "auto") or "auto").lower()
+    if ot == "limit":
+        return "limit"
+    if ot == "market":
+        return "market"
     if spread_pct is not None and spread_pct < 0.001:
-        return 'limit'
-    return 'market'
+        return "limit"
+    return "market"
 
 
 def decide_entry(
@@ -80,22 +80,22 @@ def decide_entry(
         return EntryDecision(
             market=market,
             proceed=False,
-            reason=f'score_below_min({score:.2f}<{min_score:.2f})',
+            reason=f"score_below_min({score:.2f}<{min_score:.2f})",
             score=score,
         )
 
     if eur_amount <= 0:
-        return EntryDecision(market=market, proceed=False, reason='zero_eur', score=score)
+        return EntryDecision(market=market, proceed=False, reason="zero_eur", score=score)
 
     order_type = decide_order_type(config, spread_pct=spread_pct)
     return EntryDecision(
         market=market,
         proceed=True,
-        reason='ok',
+        reason="ok",
         score=score,
         eur_amount=eur_amount,
         order_type=order_type,
-        metadata={'spread_pct': spread_pct},
+        metadata={"spread_pct": spread_pct},
     )
 
 
@@ -112,7 +112,7 @@ def apply_decorrelation_filter(
     from config. When disabled or insufficient data, returns the input decision unchanged.
     """
     config = config or {}
-    if not bool(config.get('DECORRELATION_ENABLED', False)):
+    if not bool(config.get("DECORRELATION_ENABLED", False)):
         return decision
     if not decision.proceed:
         return decision
@@ -120,16 +120,16 @@ def apply_decorrelation_filter(
         from bot.decorrelation import is_decorrelated
     except Exception:
         return decision
-    max_corr = float(config.get('DECORRELATION_MAX_CORR', 0.7) or 0.7)
+    max_corr = float(config.get("DECORRELATION_MAX_CORR", 0.7) or 0.7)
     ok, corrs = is_decorrelated(candidate_closes, open_market_closes, max_corr=max_corr)
     if ok:
-        decision.metadata['correlations'] = corrs
+        decision.metadata["correlations"] = corrs
         return decision
-    worst = max(corrs.items(), key=lambda kv: abs(kv[1])) if corrs else ('?', 0.0)
+    worst = max(corrs.items(), key=lambda kv: abs(kv[1])) if corrs else ("?", 0.0)
     return EntryDecision(
         market=decision.market,
         proceed=False,
-        reason=f'too_correlated_with_{worst[0]}({worst[1]:.2f}>{max_corr})',
+        reason=f"too_correlated_with_{worst[0]}({worst[1]:.2f}>{max_corr})",
         score=decision.score,
-        metadata={'correlations': corrs},
+        metadata={"correlations": corrs},
     )

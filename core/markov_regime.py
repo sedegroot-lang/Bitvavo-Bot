@@ -105,10 +105,7 @@ class MarkovRegimePredictor:
 
     def get_matrix(self) -> Dict[str, Dict[str, float]]:
         """Return the full transition probability matrix."""
-        return {
-            k: {k2: round(v2, 3) for k2, v2 in v.items()}
-            for k, v in self._compute_probs().items()
-        }
+        return {k: {k2: round(v2, 3) for k2, v2 in v.items()} for k, v in self._compute_probs().items()}
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -125,6 +122,7 @@ class MarkovRegimePredictor:
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(self.to_dict(), f, indent=2)
             import os
+
             os.replace(str(tmp), str(p))
         except Exception:
             pass

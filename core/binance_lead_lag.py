@@ -24,12 +24,24 @@ BINANCE_TICKER_URL = "https://api.binance.com/api/v3/ticker/price"
 
 # Bitvavo market → Binance spot symbol
 SYMBOL_MAP = {
-    "BTC-EUR": "BTCUSDT", "ETH-EUR": "ETHUSDT", "SOL-EUR": "SOLUSDT",
-    "XRP-EUR": "XRPUSDT", "ADA-EUR": "ADAUSDT", "LINK-EUR": "LINKUSDT",
-    "AAVE-EUR": "AAVEUSDT", "UNI-EUR": "UNIUSDT", "LTC-EUR": "LTCUSDT",
-    "BCH-EUR": "BCHUSDT", "AVAX-EUR": "AVAXUSDT", "RENDER-EUR": "RENDERUSDT",
-    "FET-EUR": "FETUSDT", "INJ-EUR": "INJUSDT", "APT-EUR": "APTUSDT",
-    "OP-EUR": "OPUSDT", "NEAR-EUR": "NEARUSDT", "DOT-EUR": "DOTUSDT",
+    "BTC-EUR": "BTCUSDT",
+    "ETH-EUR": "ETHUSDT",
+    "SOL-EUR": "SOLUSDT",
+    "XRP-EUR": "XRPUSDT",
+    "ADA-EUR": "ADAUSDT",
+    "LINK-EUR": "LINKUSDT",
+    "AAVE-EUR": "AAVEUSDT",
+    "UNI-EUR": "UNIUSDT",
+    "LTC-EUR": "LTCUSDT",
+    "BCH-EUR": "BCHUSDT",
+    "AVAX-EUR": "AVAXUSDT",
+    "RENDER-EUR": "RENDERUSDT",
+    "FET-EUR": "FETUSDT",
+    "INJ-EUR": "INJUSDT",
+    "APT-EUR": "APTUSDT",
+    "OP-EUR": "OPUSDT",
+    "NEAR-EUR": "NEARUSDT",
+    "DOT-EUR": "DOTUSDT",
 }
 
 # EUR/USD approximate rate (updated periodically)
@@ -99,9 +111,7 @@ def get_binance_price_eur(market: str) -> Optional[float]:
         _price_history[symbol].append((now, price_usd))
         # Trim old entries
         cutoff = now - _HISTORY_WINDOW
-        _price_history[symbol] = [
-            (ts, p) for ts, p in _price_history[symbol] if ts > cutoff
-        ][-_MAX_HISTORY:]
+        _price_history[symbol] = [(ts, p) for ts, p in _price_history[symbol] if ts > cutoff][-_MAX_HISTORY:]
 
         return price_usd / _update_eurusd()
     except (ValueError, TypeError):
@@ -132,13 +142,23 @@ def detect_lead_signal(market: str, bitvavo_price: float) -> Dict[str, object]:
         else:
             data = _fetch_json(f"{BINANCE_TICKER_URL}?symbol={symbol}")
             if not data or "price" not in data:
-                return {"direction": "unknown", "binance_trend_pct": 0.0, "should_delay_sell": False, "should_delay_buy": False}
+                return {
+                    "direction": "unknown",
+                    "binance_trend_pct": 0.0,
+                    "should_delay_sell": False,
+                    "should_delay_buy": False,
+                }
             binance_usd = float(data["price"])
             _price_cache[symbol] = (binance_usd, now)
     else:
         data = _fetch_json(f"{BINANCE_TICKER_URL}?symbol={symbol}")
         if not data or "price" not in data:
-            return {"direction": "unknown", "binance_trend_pct": 0.0, "should_delay_sell": False, "should_delay_buy": False}
+            return {
+                "direction": "unknown",
+                "binance_trend_pct": 0.0,
+                "should_delay_sell": False,
+                "should_delay_buy": False,
+            }
         binance_usd = float(data["price"])
         _price_cache[symbol] = (binance_usd, now)
 
@@ -147,9 +167,7 @@ def detect_lead_signal(market: str, bitvavo_price: float) -> Dict[str, object]:
         _price_history[symbol] = []
     _price_history[symbol].append((now, binance_usd))
     cutoff = now - _HISTORY_WINDOW
-    _price_history[symbol] = [
-        (ts, p) for ts, p in _price_history[symbol] if ts > cutoff
-    ][-_MAX_HISTORY:]
+    _price_history[symbol] = [(ts, p) for ts, p in _price_history[symbol] if ts > cutoff][-_MAX_HISTORY:]
 
     # Calculate Binance short-term trend (last 60 seconds)
     binance_trend = 0.0

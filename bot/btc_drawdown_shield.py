@@ -7,6 +7,7 @@ and blocks new alt entries if BTC has fallen below a threshold.
 
 Stateless — caller provides BTC candles. Cheap to evaluate (last-N closes).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,9 +21,9 @@ class BTCShieldResult:
     reason: str
 
 
-def evaluate(btc_candles_5m: Sequence[Sequence] | None,
-             *, cfg: Mapping | None = None,
-             market: str = "") -> BTCShieldResult:
+def evaluate(
+    btc_candles_5m: Sequence[Sequence] | None, *, cfg: Mapping | None = None, market: str = ""
+) -> BTCShieldResult:
     """Block alt entries when BTC has dropped below threshold.
 
     Args:
@@ -36,33 +37,30 @@ def evaluate(btc_candles_5m: Sequence[Sequence] | None,
         market: Market being evaluated (for logging). BTC itself is exempt.
     """
     cfg = cfg or {}
-    if not bool(cfg.get('BTC_DRAWDOWN_SHIELD_ENABLED', True)):
-        return BTCShieldResult(False, 0.0, 'disabled')
+    if not bool(cfg.get("BTC_DRAWDOWN_SHIELD_ENABLED", True)):
+        return BTCShieldResult(False, 0.0, "disabled")
 
-    if market.upper().startswith('BTC-'):
-        return BTCShieldResult(False, 0.0, 'is_btc')
+    if market.upper().startswith("BTC-"):
+        return BTCShieldResult(False, 0.0, "is_btc")
 
     if not btc_candles_5m or len(btc_candles_5m) < 3:
-        return BTCShieldResult(False, 0.0, 'no_data')
+        return BTCShieldResult(False, 0.0, "no_data")
 
-    lookback = int(cfg.get('BTC_DRAWDOWN_LOOKBACK_5M', 12))
-    threshold = float(cfg.get('BTC_DRAWDOWN_THRESHOLD_PCT', -1.5))
+    lookback = int(cfg.get("BTC_DRAWDOWN_LOOKBACK_5M", 12))
+    threshold = float(cfg.get("BTC_DRAWDOWN_THRESHOLD_PCT", -1.5))
 
-    candles = btc_candles_5m[-(lookback + 1):]
+    candles = btc_candles_5m[-(lookback + 1) :]
     try:
         # Bitvavo format: index 4 = close
         first_close = float(candles[0][4])
         last_close = float(candles[-1][4])
     except (IndexError, ValueError, TypeError):
-        return BTCShieldResult(False, 0.0, 'parse_error')
+        return BTCShieldResult(False, 0.0, "parse_error")
 
     if first_close <= 0:
-        return BTCShieldResult(False, 0.0, 'invalid_price')
+        return BTCShieldResult(False, 0.0, "invalid_price")
 
     ret_pct = (last_close - first_close) / first_close * 100.0
     if ret_pct <= threshold:
-        return BTCShieldResult(
-            True, ret_pct,
-            f'BTC {ret_pct:+.2f}% over last {lookback*5}m <= {threshold:+.2f}%'
-        )
-    return BTCShieldResult(False, ret_pct, f'BTC {ret_pct:+.2f}% (ok)')
+        return BTCShieldResult(True, ret_pct, f"BTC {ret_pct:+.2f}% over last {lookback * 5}m <= {threshold:+.2f}%")
+    return BTCShieldResult(False, ret_pct, f"BTC {ret_pct:+.2f}% (ok)")

@@ -18,10 +18,10 @@ Rules:
 NOTE: DCA buys are exempt — they extend an existing position and the
 total invested is what matters, not the size of the individual add.
 """
+
 from __future__ import annotations
 
 from typing import Optional
-
 
 # Backtest-derived defaults; overridable via CONFIG keys
 DEFAULT_ABS_MIN_POSITION_EUR = 75.0
@@ -64,18 +64,17 @@ def enforce_size_floor(
         return float(proposed_eur)
 
     cfg = cfg or {}
-    abs_min = _cfg_float(cfg, 'POSITION_SIZE_ABS_MIN_EUR', DEFAULT_ABS_MIN_POSITION_EUR)
-    soft_min = _cfg_float(cfg, 'POSITION_SIZE_SOFT_MIN_EUR', DEFAULT_SOFT_MIN_POSITION_EUR)
-    conviction_score = _cfg_float(cfg, 'POSITION_SIZE_HIGH_CONVICTION_SCORE',
-                                  DEFAULT_HIGH_CONVICTION_SCORE)
+    abs_min = _cfg_float(cfg, "POSITION_SIZE_ABS_MIN_EUR", DEFAULT_ABS_MIN_POSITION_EUR)
+    soft_min = _cfg_float(cfg, "POSITION_SIZE_SOFT_MIN_EUR", DEFAULT_SOFT_MIN_POSITION_EUR)
+    conviction_score = _cfg_float(cfg, "POSITION_SIZE_HIGH_CONVICTION_SCORE", DEFAULT_HIGH_CONVICTION_SCORE)
 
-    enabled = bool(cfg.get('POSITION_SIZE_FLOOR_ENABLED', True))
+    enabled = bool(cfg.get("POSITION_SIZE_FLOOR_ENABLED", True))
     if not enabled:
         return float(proposed_eur)
 
     proposed = float(proposed_eur)
 
-    def _log(msg: str, level: str = 'info') -> None:
+    def _log(msg: str, level: str = "info") -> None:
         if log is not None:
             try:
                 log(msg, level=level)
@@ -83,19 +82,22 @@ def enforce_size_floor(
                 pass
 
     if proposed < soft_min:
-        _log(f"[SIZE-FLOOR] {market} {proposed:.2f} EUR < soft_min {soft_min:.0f} → abort", 'info')
+        _log(f"[SIZE-FLOOR] {market} {proposed:.2f} EUR < soft_min {soft_min:.0f} → abort", "info")
         return None
 
     if proposed < abs_min:
         if score >= conviction_score:
-            _log(f"[SIZE-FLOOR] {market} high-conviction score={score:.1f}, allow {proposed:.2f} EUR", 'info')
+            _log(f"[SIZE-FLOOR] {market} high-conviction score={score:.1f}, allow {proposed:.2f} EUR", "info")
             return proposed
         # Try to bump up
         bumped = abs_min
         if eur_balance >= bumped * 1.05:
-            _log(f"[SIZE-FLOOR] {market} bump {proposed:.2f} → {bumped:.2f} EUR", 'info')
+            _log(f"[SIZE-FLOOR] {market} bump {proposed:.2f} → {bumped:.2f} EUR", "info")
             return bumped
-        _log(f"[SIZE-FLOOR] {market} {proposed:.2f} < abs_min {abs_min:.0f}, balance {eur_balance:.2f} insufficient → abort", 'info')
+        _log(
+            f"[SIZE-FLOOR] {market} {proposed:.2f} < abs_min {abs_min:.0f}, balance {eur_balance:.2f} insufficient → abort",
+            "info",
+        )
         return None
 
     return proposed

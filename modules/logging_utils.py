@@ -1,28 +1,28 @@
-﻿import logging
-import os
 import json
+import logging
+import os
+import sys
 import threading
 import time
 import uuid
-from logging.handlers import RotatingFileHandler
-import sys
-from typing import Optional, Dict, Any
-from datetime import datetime, timezone
 from contextvars import ContextVar
+from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
+from typing import Any, Dict, Optional
 
 # Global re-entrant file lock that can be imported by other modules
 file_lock = threading.RLock()
 
 # Context variable for correlation IDs (thread-safe)
-_correlation_id: ContextVar[str] = ContextVar('correlation_id', default='')
+_correlation_id: ContextVar[str] = ContextVar("correlation_id", default="")
 
 
 def get_correlation_id() -> str:
     """Get current correlation ID for request tracing."""
-    return _correlation_id.get() or ''
+    return _correlation_id.get() or ""
 
 
-def set_correlation_id(correlation_id: str = '') -> str:
+def set_correlation_id(correlation_id: str = "") -> str:
     """Set correlation ID for current context. Returns the ID set."""
     if not correlation_id:
         correlation_id = str(uuid.uuid4())[:8]
@@ -32,38 +32,41 @@ def set_correlation_id(correlation_id: str = '') -> str:
 
 def clear_correlation_id() -> None:
     """Clear correlation ID after request completes."""
-    _correlation_id.set('')
+    _correlation_id.set("")
+
 
 # Read minimal config early if available without importing modules.config to avoid circular import
 def _read_config_path():
     here = os.path.dirname(__file__)
-    return os.path.join(here, '..', 'config', 'bot_config.json')
+    return os.path.join(here, "..", "config", "bot_config.json")
+
 
 def _load_log_settings():
     cfg = {}
     try:
-        with open(_read_config_path(), encoding='utf-8') as f:
+        with open(_read_config_path(), encoding="utf-8") as f:
             data = json.load(f)
         if isinstance(data, dict):
             cfg = data
     except Exception:
         cfg = {}
     return {
-        'LOG_FILE': cfg.get('LOG_FILE', os.path.join('logs', 'bot_log.txt')),
-        'LOG_LEVEL': cfg.get('LOG_LEVEL', 'INFO'),
-        'LOG_MAX_BYTES': int(cfg.get('LOG_MAX_BYTES', 2*1024*1024)),
-        'LOG_BACKUP_COUNT': int(cfg.get('LOG_BACKUP_COUNT', 5)),
-        'LOG_JSON_FORMAT': cfg.get('LOG_JSON_FORMAT', False),
-        'LOG_JSON_FILE': cfg.get('LOG_JSON_FILE', os.path.join('logs', 'bot_log.jsonl')),
+        "LOG_FILE": cfg.get("LOG_FILE", os.path.join("logs", "bot_log.txt")),
+        "LOG_LEVEL": cfg.get("LOG_LEVEL", "INFO"),
+        "LOG_MAX_BYTES": int(cfg.get("LOG_MAX_BYTES", 2 * 1024 * 1024)),
+        "LOG_BACKUP_COUNT": int(cfg.get("LOG_BACKUP_COUNT", 5)),
+        "LOG_JSON_FORMAT": cfg.get("LOG_JSON_FORMAT", False),
+        "LOG_JSON_FILE": cfg.get("LOG_JSON_FILE", os.path.join("logs", "bot_log.jsonl")),
     }
 
+
 _LOG_SETTINGS = _load_log_settings()
-LOG_FILE = _LOG_SETTINGS['LOG_FILE']
-LOG_LEVEL = _LOG_SETTINGS['LOG_LEVEL']
-LOG_MAX_BYTES = _LOG_SETTINGS['LOG_MAX_BYTES']
-LOG_BACKUP_COUNT = _LOG_SETTINGS['LOG_BACKUP_COUNT']
-LOG_JSON_FORMAT = _LOG_SETTINGS['LOG_JSON_FORMAT']
-LOG_JSON_FILE = _LOG_SETTINGS['LOG_JSON_FILE']
+LOG_FILE = _LOG_SETTINGS["LOG_FILE"]
+LOG_LEVEL = _LOG_SETTINGS["LOG_LEVEL"]
+LOG_MAX_BYTES = _LOG_SETTINGS["LOG_MAX_BYTES"]
+LOG_BACKUP_COUNT = _LOG_SETTINGS["LOG_BACKUP_COUNT"]
+LOG_JSON_FORMAT = _LOG_SETTINGS["LOG_JSON_FORMAT"]
+LOG_JSON_FILE = _LOG_SETTINGS["LOG_JSON_FILE"]
 
 # Ensure log directory exists if a path is provided
 try:
@@ -72,6 +75,7 @@ try:
         os.makedirs(log_dir, exist_ok=True)
 except Exception:
     pass
+
 
 class SafeRotatingFileHandler(RotatingFileHandler):
     """RotatingFileHandler that tolerates Windows file locks (e.g. OneDrive)."""
@@ -95,7 +99,7 @@ class SafeRotatingFileHandler(RotatingFileHandler):
                         os.remove(fallback)
                 except Exception:
                     pass
-                with open(fallback, 'a', encoding=self.encoding or 'utf-8') as fh:
+                with open(fallback, "a", encoding=self.encoding or "utf-8") as fh:
                     ts = datetime.utcnow().isoformat()
                     fh.write(f"{ts} WARNING rotation skipped for {self.baseFilename}: {exc}\n")
             except Exception:
@@ -110,19 +114,19 @@ class SafeRotatingFileHandler(RotatingFileHandler):
 
 
 stream_handler = logging.StreamHandler(sys.stdout)
-stream_handler.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s'))
+stream_handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s"))
 try:
-    stream_handler.stream.reconfigure(encoding='utf-8')
+    stream_handler.stream.reconfigure(encoding="utf-8")
 except Exception:
     pass
 file_handler = SafeRotatingFileHandler(
     LOG_FILE,
     maxBytes=LOG_MAX_BYTES,
     backupCount=LOG_BACKUP_COUNT,
-    encoding='utf-8',
+    encoding="utf-8",
     delay=True,
 )
-file_handler.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s'))
+file_handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s"))
 logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO), handlers=[file_handler, stream_handler])
 
 # Optional JSON log handler for structured logging
@@ -136,7 +140,7 @@ if LOG_JSON_FORMAT:
             LOG_JSON_FILE,
             maxBytes=LOG_MAX_BYTES,
             backupCount=LOG_BACKUP_COUNT,
-            encoding='utf-8',
+            encoding="utf-8",
             delay=True,
         )
     except Exception:
@@ -149,14 +153,14 @@ def _write_json_log(level: str, msg: str, extra: Optional[Dict[str, Any]] = None
         return
     try:
         entry = {
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-            'level': level.upper(),
-            'message': msg,
-            'correlation_id': get_correlation_id() or None,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": level.upper(),
+            "message": msg,
+            "correlation_id": get_correlation_id() or None,
         }
         if extra:
-            entry['extra'] = extra
-        line = json.dumps(entry, ensure_ascii=False) + '\n'
+            entry["extra"] = extra
+        line = json.dumps(entry, ensure_ascii=False) + "\n"
         with file_lock:
             _json_handler.stream = _json_handler._open() if _json_handler.stream is None else _json_handler.stream
             _json_handler.stream.write(line)
@@ -165,9 +169,9 @@ def _write_json_log(level: str, msg: str, extra: Optional[Dict[str, Any]] = None
         pass  # Don't fail on JSON logging errors
 
 
-def log(msg: str, level: str = 'info', extra: Optional[Dict[str, Any]] = None) -> None:
+def log(msg: str, level: str = "info", extra: Optional[Dict[str, Any]] = None) -> None:
     """Log message with optional structured data.
-    
+
     Args:
         msg: Log message
         level: Log level ('debug', 'info', 'warning', 'error')
@@ -178,21 +182,21 @@ def log(msg: str, level: str = 'info', extra: Optional[Dict[str, Any]] = None) -
     for secret in forbidden:
         if secret and secret in str(msg):
             msg = msg.replace(secret, "[REDACTED]")
-    
+
     # Add correlation ID to text message if present
     corr_id = get_correlation_id()
     display_msg = f"[{corr_id}] {msg}" if corr_id else msg
-    
+
     with file_lock:
-        if level == 'debug':
+        if level == "debug":
             logging.debug(display_msg)
-        elif level == 'warning':
+        elif level == "warning":
             logging.warning(display_msg)
-        elif level == 'error':
+        elif level == "error":
             logging.error(display_msg)
         else:
             logging.info(display_msg)
-    
+
     # Also write to JSON log if enabled
     if LOG_JSON_FORMAT:
         _write_json_log(level, msg, extra)
@@ -200,21 +204,22 @@ def log(msg: str, level: str = 'info', extra: Optional[Dict[str, Any]] = None) -
 
 def log_trade(market: str, action: str, **kwargs) -> None:
     """Log trade-related event with correlation tracking.
-    
+
     Args:
         market: Trading pair (e.g., 'BTC-EUR')
         action: Trade action ('BUY', 'SELL', 'DCA', 'SKIP', etc.)
         **kwargs: Additional structured data (price, amount, reason, etc.)
     """
-    extra = {'market': market, 'action': action, **kwargs}
+    extra = {"market": market, "action": action, **kwargs}
     msg = f"[TRADE] {action} {market}"
-    if 'price' in kwargs:
+    if "price" in kwargs:
         msg += f" @ {kwargs['price']}"
-    if 'amount' in kwargs:
+    if "amount" in kwargs:
         msg += f" x {kwargs['amount']}"
-    if 'reason' in kwargs:
+    if "reason" in kwargs:
         msg += f" ({kwargs['reason']})"
-    log(msg, level='info', extra=extra)
+    log(msg, level="info", extra=extra)
+
 
 # Utility: locked write to JSON file
 def locked_write_json(filename, data, *, indent: Optional[int] = 2):
@@ -225,7 +230,7 @@ def locked_write_json(filename, data, *, indent: Optional[int] = 2):
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=indent)
         except Exception as exc:
-            log(f"Kon {filename} niet schrijven: {exc}", level='error')
+            log(f"Kon {filename} niet schrijven: {exc}", level="error")
             try:
                 if os.path.exists(tmp):
                     os.remove(tmp)
@@ -240,12 +245,12 @@ def locked_write_json(filename, data, *, indent: Optional[int] = 2):
                 return
             except PermissionError as exc:
                 if attempt == max_attempts:
-                    log(f"Kon {filename} niet schrijven: {exc}", level='error')
+                    log(f"Kon {filename} niet schrijven: {exc}", level="error")
                     break
                 sleep_seconds = 0.2 * attempt
                 time.sleep(sleep_seconds)
             except Exception as exc:
-                log(f"Kon {filename} niet schrijven: {exc}", level='error')
+                log(f"Kon {filename} niet schrijven: {exc}", level="error")
                 break
         try:
             if os.path.exists(tmp):
@@ -253,15 +258,16 @@ def locked_write_json(filename, data, *, indent: Optional[int] = 2):
         except Exception:
             pass
 
+
 def reconfigure_logging():
     """Reload logging settings from config and update handlers at runtime."""
     global LOG_FILE, LOG_LEVEL, LOG_MAX_BYTES, LOG_BACKUP_COUNT, file_handler, _LOG_SETTINGS
     try:
         _LOG_SETTINGS = _load_log_settings()
-        LOG_FILE = _LOG_SETTINGS['LOG_FILE']
-        LOG_LEVEL = _LOG_SETTINGS['LOG_LEVEL']
-        LOG_MAX_BYTES = _LOG_SETTINGS['LOG_MAX_BYTES']
-        LOG_BACKUP_COUNT = _LOG_SETTINGS['LOG_BACKUP_COUNT']
+        LOG_FILE = _LOG_SETTINGS["LOG_FILE"]
+        LOG_LEVEL = _LOG_SETTINGS["LOG_LEVEL"]
+        LOG_MAX_BYTES = _LOG_SETTINGS["LOG_MAX_BYTES"]
+        LOG_BACKUP_COUNT = _LOG_SETTINGS["LOG_BACKUP_COUNT"]
         # Rebuild file handler
         for h in list(logging.getLogger().handlers):
             if isinstance(h, RotatingFileHandler):
@@ -280,12 +286,12 @@ def reconfigure_logging():
             LOG_FILE,
             maxBytes=LOG_MAX_BYTES,
             backupCount=LOG_BACKUP_COUNT,
-            encoding='utf-8',
+            encoding="utf-8",
             delay=True,
         )
-        file_handler.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s'))
+        file_handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s"))
         logging.getLogger().addHandler(file_handler)
         logging.getLogger().setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
-        log("Logging opnieuw geconfigureerd vanuit config.", level='debug')
+        log("Logging opnieuw geconfigureerd vanuit config.", level="debug")
     except Exception as e:
-        log(f"Herconfiguratie logging mislukt: {e}", level='error')
+        log(f"Herconfiguratie logging mislukt: {e}", level="error")

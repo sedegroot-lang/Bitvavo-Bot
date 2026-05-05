@@ -9,6 +9,7 @@ Usage:
     from ai.model_registry import register_model, latest_model_metadata
     register_model("ai/ai_xgb_model.json", n_train=2000, val_metric=0.62, ...)
 """
+
 from __future__ import annotations
 
 import json

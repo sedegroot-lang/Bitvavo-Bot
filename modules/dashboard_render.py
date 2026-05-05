@@ -6,11 +6,11 @@ independently.
 
 from __future__ import annotations
 
+import json
 import math
 import re
-from typing import Dict, Iterable, Tuple, List
-import json
 from pathlib import Path
+from typing import Dict, Iterable, List, Tuple
 
 # Local overrides (optional). File `data/icon_overrides.json` may contain a mapping
 # of market/base symbol -> direct icon URL (useful when official asset URLs are known).
@@ -18,94 +18,94 @@ _OVERRIDES_PATH = Path("data") / "icon_overrides.json"
 
 # Friendly symbol names to construct vendor-specific slugs (cryptologos, etc.).
 _SYMBOL_NAME_OVERRIDES: Dict[str, str] = {
-    'btc': 'bitcoin',
-    'eth': 'ethereum',
-    'sol': 'solana',
-    'xrp': 'xrp',
-    'link': 'chainlink',
-    'atom': 'cosmos',
-    'dot': 'polkadot',
-    'near': 'near-protocol',
-    'algo': 'algorand',
-    'aave': 'aave',
-    'ltc': 'litecoin',
-    'inj': 'injective',
-    'mira': 'mira',
-    'om': 'mantra',
-    'vet': 'vechain',
-    'cake': 'pancakeswap',
-    'uni': 'uniswap',
-    'snx': 'synthetix',
-    'mana': 'decentraland',
-    'arb': 'arbitrum',
-    'op': 'optimism',
-    'bnb': 'binance-coin',
-    'avax': 'avalanche',
-    'matic': 'polygon',
-    'ftm': 'fantom',
-    'ada': 'cardano',
-    'doge': 'dogecoin',
-    'shib': 'shiba-inu',
-    'xlm': 'stellar',
-    'etc': 'ethereum-classic',
-    'sand': 'the-sandbox',
-    'ape': 'apecoin',
-    'rune': 'thorchain',
-    'ldo': 'lido-dao',
-    'pyth': 'pyth-network',
-    'sei': 'sei',
-    'sui': 'sui',
-    'pepe': 'pepe',
-    'bonk': 'bonk',
-    'grt': 'the-graph',
-    'ens': 'ethereum-name-service',
-    'fil': 'filecoin',
-    'hnt': 'helium',
-    'rose': 'oasis-network',
-    'kas': 'kaspa',
+    "btc": "bitcoin",
+    "eth": "ethereum",
+    "sol": "solana",
+    "xrp": "xrp",
+    "link": "chainlink",
+    "atom": "cosmos",
+    "dot": "polkadot",
+    "near": "near-protocol",
+    "algo": "algorand",
+    "aave": "aave",
+    "ltc": "litecoin",
+    "inj": "injective",
+    "mira": "mira",
+    "om": "mantra",
+    "vet": "vechain",
+    "cake": "pancakeswap",
+    "uni": "uniswap",
+    "snx": "synthetix",
+    "mana": "decentraland",
+    "arb": "arbitrum",
+    "op": "optimism",
+    "bnb": "binance-coin",
+    "avax": "avalanche",
+    "matic": "polygon",
+    "ftm": "fantom",
+    "ada": "cardano",
+    "doge": "dogecoin",
+    "shib": "shiba-inu",
+    "xlm": "stellar",
+    "etc": "ethereum-classic",
+    "sand": "the-sandbox",
+    "ape": "apecoin",
+    "rune": "thorchain",
+    "ldo": "lido-dao",
+    "pyth": "pyth-network",
+    "sei": "sei",
+    "sui": "sui",
+    "pepe": "pepe",
+    "bonk": "bonk",
+    "grt": "the-graph",
+    "ens": "ethereum-name-service",
+    "fil": "filecoin",
+    "hnt": "helium",
+    "rose": "oasis-network",
+    "kas": "kaspa",
 }
 
 # CoinMarketCap numeric IDs for stable icon URLs (`https://s2.coinmarketcap.com/...`).
 _COINMARKETCAP_IDS: Dict[str, int] = {
-    'btc': 1,
-    'eth': 1027,
-    'sol': 5426,
-    'xrp': 52,
-    'link': 1975,
-    'atom': 3794,
-    'dot': 6636,
-    'near': 6535,
-    'algo': 4030,
-    'aave': 7278,
-    'ltc': 2,
-    'inj': 7226,
-    'om': 6536,
-    'vet': 3077,
-    'cake': 7186,
-    'uni': 7083,
-    'snx': 2586,
-    'mana': 1966,
-    'arb': 11841,
-    'op': 11840,
-    'bnb': 1839,
-    'avax': 5805,
-    'matic': 3890,
-    'ftm': 3513,
-    'ada': 2010,
-    'doge': 74,
-    'shib': 5994,
-    'xlm': 512,
-    'etc': 1321,
-    'sand': 6210,
-    'ape': 18876,
-    'rune': 4157,
-    'ldo': 8000,
-    'grt': 6719,
-    'ens': 13855,
-    'fil': 2280,
-    'hnt': 5665,
-    'rose': 7653,
-    'kas': 20396,
+    "btc": 1,
+    "eth": 1027,
+    "sol": 5426,
+    "xrp": 52,
+    "link": 1975,
+    "atom": 3794,
+    "dot": 6636,
+    "near": 6535,
+    "algo": 4030,
+    "aave": 7278,
+    "ltc": 2,
+    "inj": 7226,
+    "om": 6536,
+    "vet": 3077,
+    "cake": 7186,
+    "uni": 7083,
+    "snx": 2586,
+    "mana": 1966,
+    "arb": 11841,
+    "op": 11840,
+    "bnb": 1839,
+    "avax": 5805,
+    "matic": 3890,
+    "ftm": 3513,
+    "ada": 2010,
+    "doge": 74,
+    "shib": 5994,
+    "xlm": 512,
+    "etc": 1321,
+    "sand": 6210,
+    "ape": 18876,
+    "rune": 4157,
+    "ldo": 8000,
+    "grt": 6719,
+    "ens": 13855,
+    "fil": 2280,
+    "hnt": 5665,
+    "rose": 7653,
+    "kas": 20396,
 }
 
 _CRYPTOLOGOS_VERSION = "032"
@@ -186,13 +186,13 @@ _CARD_ID_PATTERN = re.compile(r"[^a-z0-9]+")
 
 def _normalize_symbol(market: str) -> str:
     try:
-        return (market.split('-')[0] or '').lower()
+        return (market.split("-")[0] or "").lower()
     except Exception:
-        return str(market or '').lower()
+        return str(market or "").lower()
 
 
 def _slugify_name(text: str) -> str:
-    return re.sub(r'[^a-z0-9]+', '-', str(text or '').lower()).strip('-') or 'unknown'
+    return re.sub(r"[^a-z0-9]+", "-", str(text or "").lower()).strip("-") or "unknown"
 
 
 def _cryptologos_slug(symbol: str) -> str | None:

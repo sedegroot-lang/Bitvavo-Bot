@@ -10,7 +10,7 @@ Based on: Higuchi (1988) "Approach to an irregular time series"
 
 from __future__ import annotations
 
-from typing import Any, Dict, MutableMapping, Sequence
+from typing import Any, MutableMapping, Sequence
 
 from .base import SignalContext, SignalResult
 
@@ -95,42 +95,50 @@ def fractal_dimension_signal(ctx: SignalContext) -> SignalResult:
     - D > 1.65: space-filling → mean reversion bonus (if RSI confirms)
     - D ≈ 1.45-1.55: pure random walk → penalty (don't trade noise)
     """
-    lookback = int(_safe_cfg(ctx.config, 'FRACTAL_LOOKBACK', 80))
-    trend_threshold = _safe_cfg(ctx.config, 'FRACTAL_TREND_D', 1.25)
-    random_low = _safe_cfg(ctx.config, 'FRACTAL_RANDOM_LOW', 1.40)
-    random_high = _safe_cfg(ctx.config, 'FRACTAL_RANDOM_HIGH', 1.60)
-    mr_threshold = _safe_cfg(ctx.config, 'FRACTAL_MR_D', 1.65)
-    trend_bonus = _safe_cfg(ctx.config, 'FRACTAL_TREND_BONUS', 0.8)
-    random_penalty = _safe_cfg(ctx.config, 'FRACTAL_RANDOM_PENALTY', 0.6)
-    mr_bonus = _safe_cfg(ctx.config, 'FRACTAL_MR_BONUS', 0.5)
+    lookback = int(_safe_cfg(ctx.config, "FRACTAL_LOOKBACK", 80))
+    trend_threshold = _safe_cfg(ctx.config, "FRACTAL_TREND_D", 1.25)
+    random_low = _safe_cfg(ctx.config, "FRACTAL_RANDOM_LOW", 1.40)
+    random_high = _safe_cfg(ctx.config, "FRACTAL_RANDOM_HIGH", 1.60)
+    mr_threshold = _safe_cfg(ctx.config, "FRACTAL_MR_D", 1.65)
+    trend_bonus = _safe_cfg(ctx.config, "FRACTAL_TREND_BONUS", 0.8)
+    random_penalty = _safe_cfg(ctx.config, "FRACTAL_RANDOM_PENALTY", 0.6)
+    mr_bonus = _safe_cfg(ctx.config, "FRACTAL_MR_BONUS", 0.5)
 
     closes = ctx.closes_1m
     if len(closes) < lookback:
-        return SignalResult(name='fractal_dim', reason='insufficient data')
+        return SignalResult(name="fractal_dim", reason="insufficient data")
 
     fd = _higuchi_fd(list(closes[-lookback:]), k_max=min(10, lookback // 4))
 
     if fd < trend_threshold:
         return SignalResult(
-            name='fractal_dim', score=trend_bonus, active=True,
-            reason=f'smooth trend (D={fd:.3f})',
-            details={'fractal_dimension': round(fd, 4), 'regime': 'trending'},
+            name="fractal_dim",
+            score=trend_bonus,
+            active=True,
+            reason=f"smooth trend (D={fd:.3f})",
+            details={"fractal_dimension": round(fd, 4), "regime": "trending"},
         )
     elif random_low <= fd <= random_high:
         return SignalResult(
-            name='fractal_dim', score=-random_penalty, active=True,
-            reason=f'random walk (D={fd:.3f})',
-            details={'fractal_dimension': round(fd, 4), 'regime': 'random'},
+            name="fractal_dim",
+            score=-random_penalty,
+            active=True,
+            reason=f"random walk (D={fd:.3f})",
+            details={"fractal_dimension": round(fd, 4), "regime": "random"},
         )
     elif fd > mr_threshold:
         return SignalResult(
-            name='fractal_dim', score=mr_bonus, active=True,
-            reason=f'mean-reversion regime (D={fd:.3f})',
-            details={'fractal_dimension': round(fd, 4), 'regime': 'mean_reversion'},
+            name="fractal_dim",
+            score=mr_bonus,
+            active=True,
+            reason=f"mean-reversion regime (D={fd:.3f})",
+            details={"fractal_dimension": round(fd, 4), "regime": "mean_reversion"},
         )
     else:
         return SignalResult(
-            name='fractal_dim', score=0.0, active=False,
-            reason=f'mixed (D={fd:.3f})',
-            details={'fractal_dimension': round(fd, 4), 'regime': 'mixed'},
+            name="fractal_dim",
+            score=0.0,
+            active=False,
+            reason=f"mixed (D={fd:.3f})",
+            details={"fractal_dimension": round(fd, 4), "regime": "mixed"},
         )

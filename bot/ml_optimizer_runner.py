@@ -3,6 +3,7 @@
 Run the ML optimizer at most once per configured interval. State is owned at
 module scope so the trailing_bot.py shim stays a one-liner.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -18,7 +19,7 @@ async def maybe_run() -> None:
     log = state.log
     cfg = state.CONFIG
     try:
-        interval = float(cfg.get('ML_OPTIMIZER_INTERVAL_SECONDS', 86400))
+        interval = float(cfg.get("ML_OPTIMIZER_INTERVAL_SECONDS", 86400))
     except Exception:
         interval = 86400.0
     if interval <= 0:
@@ -28,11 +29,12 @@ async def maybe_run() -> None:
         return
     try:
         from ai import ml_optimizer  # type: ignore
+
         try:
             log("Start ML-optimalisatie van parameters...")
         except Exception:
             pass
-        if hasattr(ml_optimizer, 'optimize_ml_parameters_async'):
+        if hasattr(ml_optimizer, "optimize_ml_parameters_async"):
             await ml_optimizer.optimize_ml_parameters_async()
         else:
             loop = asyncio.get_running_loop()
@@ -40,6 +42,6 @@ async def maybe_run() -> None:
         _LAST_RUN = now
     except Exception as exc:
         try:
-            log(f"ML-optimalisatie mislukt: {exc}", level='error')
+            log(f"ML-optimalisatie mislukt: {exc}", level="error")
         except Exception:
             pass

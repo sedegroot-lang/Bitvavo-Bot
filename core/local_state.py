@@ -12,6 +12,7 @@ Protected files:
   - data/bot_state.json  (runtime state: timestamps, flags)
   - data/trade_archive.json (historical closed trades)
 """
+
 from __future__ import annotations
 
 import json
@@ -24,9 +25,7 @@ from typing import Any, Dict, Optional
 _log = logging.getLogger("local_state")
 
 # Local state directory — OUTSIDE OneDrive, never synced/reverted
-LOCAL_STATE_DIR = Path(
-    os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
-) / 'BotConfig' / 'state'
+LOCAL_STATE_DIR = Path(os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))) / "BotConfig" / "state"
 
 
 def _ensure_dir() -> None:
@@ -53,9 +52,9 @@ def mirror_to_local(filename: str, data: Dict[str, Any]) -> None:
         local = _local_path(filename)
         # Stamp the data so we can compare freshness
         data_copy = dict(data)
-        data_copy['_save_ts'] = time.time()
-        tmp = str(local) + '.tmp'
-        with open(tmp, 'w', encoding='utf-8') as f:
+        data_copy["_save_ts"] = time.time()
+        tmp = str(local) + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data_copy, f, indent=2)
         os.replace(tmp, str(local))
     except Exception as exc:
@@ -70,7 +69,7 @@ def load_local(filename: str) -> Optional[Dict[str, Any]]:
     try:
         local = _local_path(filename)
         if local.exists():
-            with open(local, 'r', encoding='utf-8-sig') as f:
+            with open(local, "r", encoding="utf-8-sig") as f:
                 data = json.load(f)
             if isinstance(data, dict):
                 return data
@@ -101,16 +100,16 @@ def load_freshest(
     local_ts = 0.0
 
     if onedrive_data and isinstance(onedrive_data, dict):
-        od_ts = float(onedrive_data.get('_save_ts', 0) or 0)
+        od_ts = float(onedrive_data.get("_save_ts", 0) or 0)
 
     if local_data and isinstance(local_data, dict):
-        local_ts = float(local_data.get('_save_ts', 0) or 0)
+        local_ts = float(local_data.get("_save_ts", 0) or 0)
 
     # For trade_log.json: also compare data quality (number of open trades).
     # A newer file with 0 open trades should NOT beat an older file with real trades,
     # because OneDrive sync reverts can create a "newer" but empty file.
-    od_open_count = len((onedrive_data or {}).get('open', {}))
-    local_open_count = len((local_data or {}).get('open', {}))
+    od_open_count = len((onedrive_data or {}).get("open", {}))
+    local_open_count = len((local_data or {}).get("open", {}))
 
     # Pick the one with the highest _save_ts, but prefer more data when timestamps are close
     if local_ts > od_ts and local_data:
@@ -120,26 +119,30 @@ def load_freshest(
             _log.warning(
                 "local_state: LOCAL is newer for %s but has 0 open trades vs OneDrive %d "
                 "— using OneDrive (likely stale local mirror)",
-                filename, od_open_count,
+                filename,
+                od_open_count,
             )
             result = dict(onedrive_data)
-            result.pop('_save_ts', None)
+            result.pop("_save_ts", None)
             return result
         _log.info(
             "local_state: using LOCAL copy of %s (local_ts=%.0f > od_ts=%.0f, delta=%.0fs)",
-            filename, local_ts, od_ts, local_ts - od_ts,
+            filename,
+            local_ts,
+            od_ts,
+            local_ts - od_ts,
         )
         result = dict(local_data)
-        result.pop('_save_ts', None)
+        result.pop("_save_ts", None)
         return result
     elif onedrive_data and isinstance(onedrive_data, dict):
         result = dict(onedrive_data)
-        result.pop('_save_ts', None)
+        result.pop("_save_ts", None)
         return result
     elif local_data:
         # OneDrive has nothing, local has something
         result = dict(local_data)
-        result.pop('_save_ts', None)
+        result.pop("_save_ts", None)
         return result
 
     return {}
@@ -151,5 +154,5 @@ def stamp_data(data: Dict[str, Any]) -> Dict[str, Any]:
     This allows load_freshest() to compare ages even when
     the file was only written to OneDrive.
     """
-    data['_save_ts'] = time.time()
+    data["_save_ts"] = time.time()
     return data

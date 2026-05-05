@@ -52,6 +52,7 @@ def _load_config() -> dict:
     """Laad de volledige (3-laags) merged config zoals de bot die zelf gebruikt."""
     try:
         from modules.config import load_config as _real_load
+
         return _real_load()
     except Exception as e:
         logger.error(f"[Telegram] Config laden mislukt: {e}")
@@ -71,6 +72,7 @@ def _save_local_override(key: str, parsed_value) -> None:
     (bot config gebruikt lowercase children zoals 'enabled', 'trailing_pct').
     """
     from modules.config import LOCAL_OVERRIDE_PATH
+
     local_path = Path(LOCAL_OVERRIDE_PATH)
     try:
         local_overrides = json.loads(local_path.read_text(encoding="utf-8-sig")) if local_path.exists() else {}
@@ -118,11 +120,15 @@ def send_message(text: str, parse_mode: str = "HTML") -> bool:
         return False
     try:
         url = f"https://api.telegram.org/bot{_token}/sendMessage"
-        resp = requests.post(url, json={
-            "chat_id": _chat_id,
-            "text": text,
-            "parse_mode": parse_mode,
-        }, timeout=10)
+        resp = requests.post(
+            url,
+            json={
+                "chat_id": _chat_id,
+                "text": text,
+                "parse_mode": parse_mode,
+            },
+            timeout=10,
+        )
         if not resp.ok:
             logger.warning(f"[Telegram] sendMessage fout: {resp.text[:200]}")
         return resp.ok
@@ -133,26 +139,41 @@ def send_message(text: str, parse_mode: str = "HTML") -> bool:
 
 _TRADE_KEYWORDS = ("KOOP", "VERKOOP", "koop", "verkoop", "BUY", "SELL", "gekocht", "verkocht", "DCA", "partial tp")
 _CRITICAL_KEYWORDS = (
-    "CRITICAL", "WATCHDOG", "OOM", "DRAWDOWN", "CIRCUIT",
-    "portfolio drawdown", "daily loss", "kill switch", "KILL-SWITCH",
+    "CRITICAL",
+    "WATCHDOG",
+    "OOM",
+    "DRAWDOWN",
+    "CIRCUIT",
+    "portfolio drawdown",
+    "daily loss",
+    "kill switch",
+    "KILL-SWITCH",
 )
 _ALERT_KEYWORDS = (
-    "ERROR", "STALE", "sync_removed", "API glitch", "stale buy_price", "RISK",
-    "\u26a0\ufe0f", "\ud83d\udd34", "\u2757",  # warning/red emoji
+    "ERROR",
+    "STALE",
+    "sync_removed",
+    "API glitch",
+    "stale buy_price",
+    "RISK",
+    "\u26a0\ufe0f",
+    "\ud83d\udd34",
+    "\u2757",  # warning/red emoji
 )
 
 # ── Noise-control state (dedupe + burst-collapse + quiet-hours) ──
-_alert_dedupe: dict = {}     # key (normalized text) -> {ts, count}
-_alert_burst: dict = {}      # key -> list of recent timestamps for burst detection
-_quiet_override = False      # /quiet on overrules config quiet hours
-_DEFAULT_DEDUPE_S = 900      # 15 min — same alert not re-sent
-_BURST_WINDOW = 300          # 5 min window to count repeats
-_BURST_THRESHOLD = 5         # if >=5 same alerts in 5 min → collapsed summary instead
+_alert_dedupe: dict = {}  # key (normalized text) -> {ts, count}
+_alert_burst: dict = {}  # key -> list of recent timestamps for burst detection
+_quiet_override = False  # /quiet on overrules config quiet hours
+_DEFAULT_DEDUPE_S = 900  # 15 min — same alert not re-sent
+_BURST_WINDOW = 300  # 5 min window to count repeats
+_BURST_THRESHOLD = 5  # if >=5 same alerts in 5 min → collapsed summary instead
 
 
 def _normalize_for_dedupe(text: str) -> str:
     """Strip numbers/timestamps so 'X at €1.23' and 'X at €1.45' dedupe to same key."""
     import re
+
     s = text.lower()
     s = re.sub(r"[\d.,:€$+\-]+", "#", s)
     s = re.sub(r"\s+", " ", s).strip()
@@ -239,7 +260,7 @@ def notify(text: str) -> None:
             burst[:] = [t for t in burst if now - t < _BURST_WINDOW]
             if len(burst) == _BURST_THRESHOLD:  # exactly at threshold → send summary
                 send_message(
-                    f"🔁 <b>Burst:</b> {len(burst)}× zelfde alert in {_BURST_WINDOW//60} min\n"
+                    f"🔁 <b>Burst:</b> {len(burst)}× zelfde alert in {_BURST_WINDOW // 60} min\n"
                     f"<code>{__import__('html').escape(text[:300])}</code>"
                 )
             return  # silently dropped (within dedupe window)
@@ -314,8 +335,7 @@ def _get_status_text() -> str:
             f"🤖 AI: {'✅' if ai_enabled else '❌'}\n"
             f"📐 Grid: {'✅' if grid_on else '❌'}\n"
             f"📂 Open trades: {open_count}\n\n"
-            "<b>Laatste log:</b>\n"
-            + "\n".join(f"<code>{__import__('html').escape(l[-120:])}</code>" for l in lines)
+            "<b>Laatste log:</b>\n" + "\n".join(f"<code>{__import__('html').escape(l[-120:])}</code>" for l in lines)
         )
     except Exception as e:
         return f"Status ophalen mislukt: {e}"
@@ -357,8 +377,7 @@ def _get_trades_text() -> str:
             lines.append(
                 f"{emoji} <b>{market}</b>\n"
                 f"  Gekocht: €{buy_price:.4f} | Nu: €{current_price:.4f}\n"
-                f"  P&amp;L: {sign}{pnl_pct:.2f}% ({sign}€{pnl_eur:.2f})"
-                + (f" | DCA: {dca}x" if dca else "")
+                f"  P&amp;L: {sign}{pnl_pct:.2f}% ({sign}€{pnl_eur:.2f})" + (f" | DCA: {dca}x" if dca else "")
             )
 
         total_sign = "+" if total_pnl >= 0 else ""
@@ -407,8 +426,8 @@ def _get_profit_text() -> str:
             f"<b>Totaal</b> ({len(closed)} trades): {s(p_total)}€{p_total:.2f}\n\n"
             f"Winratio vandaag: {wins(today_trades)}/{len(today_trades) or 1}\n"
             f"Winratio totaal: {wins(closed)}/{len(closed)}\n\n"
-            f"🏆 Beste: <b>{best.get('market','?')}</b> +€{float(best.get('profit',0)):.2f}\n"
-            f"💀 Slechtste: <b>{worst.get('market','?')}</b> €{float(worst.get('profit',0)):.2f}"
+            f"🏆 Beste: <b>{best.get('market', '?')}</b> +€{float(best.get('profit', 0)):.2f}\n"
+            f"💀 Slechtste: <b>{worst.get('market', '?')}</b> €{float(worst.get('profit', 0)):.2f}"
         )
     except Exception as e:
         return f"Profit ophalen mislukt: {e}"
@@ -424,8 +443,7 @@ def _get_log_text(n: int = 20) -> str:
         with open(LOG_PATH, encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
         lines = [l.rstrip() for l in lines[-n:] if l.strip()]
-        return f"<b>📋 Laatste {len(lines)} log regels:</b>\n" + \
-               "\n".join(f"<code>{l[-120:]}</code>" for l in lines)
+        return f"<b>📋 Laatste {len(lines)} log regels:</b>\n" + "\n".join(f"<code>{l[-120:]}</code>" for l in lines)
     except Exception as e:
         return f"Log ophalen mislukt: {e}"
 
@@ -461,9 +479,9 @@ ALLOWED_KEYS = {
     "BUDGET_RESERVATION.min_reserve_eur": float,
     "BUDGET_RESERVATION.mode": str,
     # Telegram noise/UX tuning
-    "TELEGRAM_NOTIFY_LEVEL": str,    # 'trades' | 'alerts' | 'verbose'
-    "TELEGRAM_QUIET_START": str,     # "HH:MM" — start quiet hours
-    "TELEGRAM_QUIET_END": str,       # "HH:MM" — end quiet hours
+    "TELEGRAM_NOTIFY_LEVEL": str,  # 'trades' | 'alerts' | 'verbose'
+    "TELEGRAM_QUIET_START": str,  # "HH:MM" — start quiet hours
+    "TELEGRAM_QUIET_END": str,  # "HH:MM" — end quiet hours
 }
 
 
@@ -486,10 +504,8 @@ def _apply_set_command(key: str, value: str) -> str:
             break
 
     if matched_key is None:
-        return (
-            f"❌ Onbekende parameter: <code>{key}</code>\n\n"
-            "Toegestane parameters:\n"
-            + "\n".join(f"• <code>{k}</code>" for k in sorted(ALLOWED_KEYS))
+        return f"❌ Onbekende parameter: <code>{key}</code>\n\nToegestane parameters:\n" + "\n".join(
+            f"• <code>{k}</code>" for k in sorted(ALLOWED_KEYS)
         )
     try:
         typ = matched_typ
@@ -500,7 +516,6 @@ def _apply_set_command(key: str, value: str) -> str:
         else:
             parsed = typ(value)
         _save_local_override(matched_key, parsed)
-        from modules.config import LOCAL_OVERRIDE_PATH
         return (
             f"✅ <code>{matched_key}</code> = <code>{parsed}</code>\n"
             f"📁 Opgeslagen in: <code>%LOCALAPPDATA%/BotConfig/bot_config_local.json</code>\n"
@@ -510,16 +525,12 @@ def _apply_set_command(key: str, value: str) -> str:
         return f"❌ Fout bij instellen: {e}"
 
 
-
 # ──────────────────────────────────────────
 # /stop en /restart
 # ──────────────────────────────────────────
 def _stop_bot() -> str:
     try:
-        result = subprocess.run(
-            ["taskkill", "/F", "/IM", "python.exe"],
-            capture_output=True, text=True, timeout=10
-        )
+        result = subprocess.run(["taskkill", "/F", "/IM", "python.exe"], capture_output=True, text=True, timeout=10)
         return "🛑 <b>Bot gestopt.</b>\nAlle Python processen beëindigd."
     except Exception as e:
         return f"❌ Stop mislukt: {e}"
@@ -548,6 +559,7 @@ def _restart_bot() -> None:
     2) Start nieuw proces via PowerShell -SkipCleanup (geen taskkill)
     3) Kill alleen het huidige Python-proces tree
     """
+
     def _do():
         time.sleep(1)
         try:
@@ -558,8 +570,13 @@ def _restart_bot() -> None:
             #    (geen taskkill in ps1, zodat het nieuwe proces niet gedood wordt)
             ps1_path = str(START_PS1)
             cmd = [
-                "powershell", "-NoExit", "-ExecutionPolicy", "Bypass",
-                "-File", ps1_path, "-SkipCleanup",
+                "powershell",
+                "-NoExit",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                ps1_path,
+                "-SkipCleanup",
             ]
             subprocess.Popen(
                 cmd,
@@ -571,10 +588,12 @@ def _restart_bot() -> None:
             my_pid = os.getpid()
             subprocess.run(
                 ["taskkill", "/F", "/T", "/PID", str(my_pid)],
-                capture_output=True, timeout=10,
+                capture_output=True,
+                timeout=10,
             )
         except Exception as e:
             logger.error(f"[Telegram] Herstart mislukt: {e}")
+
     t = threading.Thread(target=_do, daemon=False)
     t.start()
 
@@ -585,6 +604,7 @@ def _git_pull_and_restart() -> None:
     Stuurt een Telegram-bericht met de uitvoer van git pull.
     Bij een fout wordt een foutmelding gestuurd en wordt NIET herstart.
     """
+
     def _do():
         time.sleep(1)
         try:
@@ -602,10 +622,7 @@ def _git_pull_and_restart() -> None:
                     "Bot wordt <b>niet</b> herstart."
                 )
                 return
-            send_message(
-                f"✅ <b>git pull geslaagd:</b>\n<pre>{output[:500]}</pre>\n"
-                "🔄 Bot wordt nu herstart…"
-            )
+            send_message(f"✅ <b>git pull geslaagd:</b>\n<pre>{output[:500]}</pre>\n🔄 Bot wordt nu herstart…")
             time.sleep(2)
             _restart_bot()
         except Exception as e:
@@ -632,7 +649,7 @@ def _get_trailing_text() -> str:
         levels = cfg.get("STEPPED_TRAILING_LEVELS", [])
 
         lines = [
-            f"<b>🎯 Trailing Stop Overzicht</b>\n",
+            "<b>🎯 Trailing Stop Overzicht</b>\n",
             f"Activatie: {activation_pct:.1f}% | Default trail: {default_trail:.1f}%\n",
         ]
 
@@ -666,8 +683,7 @@ def _get_trailing_text() -> str:
                 f"  Koop: €{bp:.4f} | Nu: €{cp:.4f}\n"
                 f"  P&amp;L: {sign}{profit_pct:.2f}% ({sign}€{pnl_eur:.2f})\n"
                 f"  Hoogste: €{hp:.4f} ({highest_pct:+.1f}%)\n"
-                f"  Trail: {trail_pct:.1f}%"
-                + (f" | Invested: €{invested:.2f}" if invested > 0 else "")
+                f"  Trail: {trail_pct:.1f}%" + (f" | Invested: €{invested:.2f}" if invested > 0 else "")
             )
 
         return "\n".join(lines)
@@ -692,7 +708,7 @@ def _get_dca_text() -> str:
         rsi_threshold = cfg.get("RSI_DCA_THRESHOLD", 35)
 
         lines = [
-            f"<b>💉 DCA Overzicht</b>\n",
+            "<b>💉 DCA Overzicht</b>\n",
             f"Status: {'✅ Aan' if dca_enabled else '❌ Uit'}\n"
             f"Max buys: {dca_max} | Drop: {dca_drop:.1f}%\n"
             f"Bedrag: €{dca_amount} | RSI drempel: {rsi_threshold}\n"
@@ -719,7 +735,11 @@ def _get_dca_text() -> str:
             lines.append(
                 f"\n{emoji} <b>{market}</b>\n"
                 f"  DCA: {dca_buys}/{dca_max_local}"
-                + (f" | Volgende @ €{next_price:.4f} ({drop_to_next:+.1f}%)" if dca_buys < dca_max_local and next_price > 0 else " (max bereikt)")
+                + (
+                    f" | Volgende @ €{next_price:.4f} ({drop_to_next:+.1f}%)"
+                    if dca_buys < dca_max_local and next_price > 0
+                    else " (max bereikt)"
+                )
             )
 
         # Show last DCA audit events
@@ -734,7 +754,9 @@ def _get_dca_text() -> str:
                         try:
                             ev = json.loads(al.strip())
                             ts = time.strftime("%H:%M", time.localtime(ev.get("ts", 0)))
-                            lines.append(f"  <code>{ts} {ev.get('market','?')} {ev.get('status','?')}: {ev.get('reason','?')}</code>")
+                            lines.append(
+                                f"  <code>{ts} {ev.get('market', '?')} {ev.get('status', '?')}: {ev.get('reason', '?')}</code>"
+                            )
                         except Exception:
                             pass
         except Exception:
@@ -755,10 +777,10 @@ def _get_grid_text() -> str:
         grid_enabled = gcfg.get("enabled", False)
 
         lines = [
-            f"<b>📐 Grid Bot Dashboard</b>\n",
+            "<b>📐 Grid Bot Dashboard</b>\n",
             f"Status: {'✅ Aan' if grid_enabled else '❌ Uit'}\n"
             f"Max grids: {gcfg.get('max_grids', 2)} | Per grid: €{gcfg.get('investment_per_grid', 65)}\n"
-            f"Levels: {gcfg.get('num_grids', 10)} | SL: {float(gcfg.get('stop_loss_pct', 0.08))*100:.0f}%\n",
+            f"Levels: {gcfg.get('num_grids', 10)} | SL: {float(gcfg.get('stop_loss_pct', 0.08)) * 100:.0f}%\n",
         ]
 
         if not GRID_STATES_PATH.exists():
@@ -795,10 +817,16 @@ def _get_grid_text() -> str:
 
             # Count open orders
             levels = state.get("levels", [])
-            placed_buys = sum(1 for l in levels if isinstance(l, dict) and l.get("status") == "placed" and l.get("side") == "buy")
-            placed_sells = sum(1 for l in levels if isinstance(l, dict) and l.get("status") == "placed" and l.get("side") == "sell")
+            placed_buys = sum(
+                1 for l in levels if isinstance(l, dict) and l.get("status") == "placed" and l.get("side") == "buy"
+            )
+            placed_sells = sum(
+                1 for l in levels if isinstance(l, dict) and l.get("status") == "placed" and l.get("side") == "sell"
+            )
 
-            status_icon = "🟢" if status == "running" else ("🟡" if status in ("initialized", "placing_orders") else "🔴")
+            status_icon = (
+                "🟢" if status == "running" else ("🟡" if status in ("initialized", "placing_orders") else "🔴")
+            )
             sign = "+" if profit >= 0 else ""
             in_range = "✅" if lower <= cp <= upper and cp > 0 else "⚠️"
 
@@ -812,7 +840,7 @@ def _get_grid_text() -> str:
 
         lines.append(
             f"\n<b>Grid totaal:</b> {total_trades} trades, "
-            f"{'+'if total_profit>=0 else ''}€{total_profit:.2f} profit, €{total_fees:.2f} fees"
+            f"{'+' if total_profit >= 0 else ''}€{total_profit:.2f} profit, €{total_fees:.2f} fees"
         )
         return "\n".join(lines)
     except Exception as e:
@@ -854,8 +882,7 @@ def _get_balance_text() -> str:
         d = json.loads(TRADE_LOG_PATH.read_text(encoding="utf-8"))
         open_trades = d.get("open", {})
         total_invested = sum(
-            float(t.get("invested_eur") or t.get("total_invested_eur") or 0)
-            for t in open_trades.values()
+            float(t.get("invested_eur") or t.get("total_invested_eur") or 0) for t in open_trades.values()
         )
 
         max_trades = int(cfg.get("MAX_OPEN_TRADES", 5))
@@ -923,8 +950,7 @@ def _get_orders_text() -> str:
             for market, bp, amt, invested, cp, pnl in trailing_orders:
                 sign = "+" if pnl >= 0 else ""
                 lines.append(
-                    f"{'🟢' if pnl >= 0 else '🔴'} <b>{market}</b>\n"
-                    f"  €{bp:.4f} → €{cp:.4f} | {sign}€{pnl:.2f}"
+                    f"{'🟢' if pnl >= 0 else '🔴'} <b>{market}</b>\n  €{bp:.4f} → €{cp:.4f} | {sign}€{pnl:.2f}"
                 )
 
         # Show grid order count separately
@@ -936,7 +962,9 @@ def _get_orders_text() -> str:
                     for m, state in gs.items():
                         if isinstance(state, dict):
                             levels = state.get("levels", [])
-                            grid_order_count += sum(1 for l in levels if isinstance(l, dict) and l.get("status") == "placed")
+                            grid_order_count += sum(
+                                1 for l in levels if isinstance(l, dict) and l.get("status") == "placed"
+                            )
                 except Exception:
                     pass
             lines.append(f"\n<i>Grid orders ({grid_order_count} stuks) staan in /grid</i>")
@@ -963,7 +991,7 @@ def _get_performance_text() -> str:
         win_rate = len(wins) / len(profits) * 100 if profits else 0
         avg_win = sum(wins) / len(wins) if wins else 0
         avg_loss = sum(losses) / len(losses) if losses else 0
-        profit_factor = sum(wins) / abs(sum(losses)) if losses and sum(losses) != 0 else float('inf')
+        profit_factor = sum(wins) / abs(sum(losses)) if losses and sum(losses) != 0 else float("inf")
 
         # Calculate streaks
         max_win_streak = 0
@@ -1009,7 +1037,7 @@ def _get_performance_text() -> str:
             f"Profit factor: <b>{profit_factor:.2f}</b>",
             f"\nGem. winst: +€{avg_win:.2f}",
             f"Gem. verlies: €{avg_loss:.2f}",
-            f"Totaal P&amp;L: <b>{'+'if total_profit>=0 else ''}€{total_profit:.2f}</b>",
+            f"Totaal P&amp;L: <b>{'+' if total_profit >= 0 else ''}€{total_profit:.2f}</b>",
             f"\nMax win streak: {max_win_streak}",
             f"Max loss streak: {max_loss_streak}",
             f"Gem. hold time: {avg_hold_h:.1f}u",
@@ -1047,14 +1075,14 @@ def _get_config_text() -> str:
             f"  Min score: {cfg.get('MIN_SCORE_TO_BUY', '?')}\n"
             f"  Sleep: {cfg.get('SLEEP_SECONDS', '?')}s\n"
             f"\n<b>Trailing:</b>\n"
-            f"  Default: {float(cfg.get('DEFAULT_TRAILING', 0.04))*100:.1f}%\n"
-            f"  Activatie: {float(cfg.get('TRAILING_ACTIVATION_PCT', 0.025))*100:.1f}%\n"
-            f"  Hard SL alt: {float(cfg.get('HARD_SL_ALT_PCT', 0.05))*100:.0f}%\n"
-            f"  Hard SL BTC/ETH: {float(cfg.get('HARD_SL_BTCETH_PCT', 0.03))*100:.0f}%\n"
+            f"  Default: {float(cfg.get('DEFAULT_TRAILING', 0.04)) * 100:.1f}%\n"
+            f"  Activatie: {float(cfg.get('TRAILING_ACTIVATION_PCT', 0.025)) * 100:.1f}%\n"
+            f"  Hard SL alt: {float(cfg.get('HARD_SL_ALT_PCT', 0.05)) * 100:.0f}%\n"
+            f"  Hard SL BTC/ETH: {float(cfg.get('HARD_SL_BTCETH_PCT', 0.03)) * 100:.0f}%\n"
             f"\n<b>DCA:</b>\n"
             f"  Enabled: {'✅' if cfg.get('DCA_ENABLED') else '❌'}\n"
             f"  Max buys: {cfg.get('DCA_MAX_BUYS', '?')}\n"
-            f"  Drop: {float(cfg.get('DCA_DROP_PCT', 0.025))*100:.1f}%\n"
+            f"  Drop: {float(cfg.get('DCA_DROP_PCT', 0.025)) * 100:.1f}%\n"
             f"  Bedrag: €{cfg.get('DCA_AMOUNT_EUR', '?')}\n"
             f"  Hybrid: {'✅' if cfg.get('DCA_HYBRID') else '❌'}\n"
             f"\n<b>Grid:</b>\n"
@@ -1107,12 +1135,12 @@ def _get_risk_text() -> str:
 
         return (
             "<b>🛡️ Risk Management</b>\n\n"
-            f"Dagelijks P&amp;L: {'+'if today_pnl>=0 else ''}€{today_pnl:.2f} / -€{max_daily_loss:.0f} limiet\n"
+            f"Dagelijks P&amp;L: {'+' if today_pnl >= 0 else ''}€{today_pnl:.2f} / -€{max_daily_loss:.0f} limiet\n"
             f"Circuit breaker: {cb_status}\n"
             f"Open risico: €{total_risk:.2f} (unrealized loss)\n"
             f"Max drawdown: {max_drawdown}%\n"
-            f"SL alt: {float(cfg.get('HARD_SL_ALT_PCT', 0.05))*100:.0f}%\n"
-            f"SL BTC/ETH: {float(cfg.get('HARD_SL_BTCETH_PCT', 0.03))*100:.0f}%"
+            f"SL alt: {float(cfg.get('HARD_SL_ALT_PCT', 0.05)) * 100:.0f}%\n"
+            f"SL BTC/ETH: {float(cfg.get('HARD_SL_BTCETH_PCT', 0.03)) * 100:.0f}%"
         )
     except Exception as e:
         return f"Risk info ophalen mislukt: {e}"
@@ -1142,12 +1170,7 @@ def _get_market_text(symbol: str) -> str:
         wl = cfg.get("WHITELIST_MARKETS", [])
         in_whitelist = "✅" if market in wl else "❌"
 
-        return (
-            f"<b>📈 {market}</b>\n"
-            f"Prijs: €{price:.4f}\n"
-            f"Whitelist: {in_whitelist}"
-            + trade_info
-        )
+        return f"<b>📈 {market}</b>\nPrijs: €{price:.4f}\nWhitelist: {in_whitelist}" + trade_info
     except Exception as e:
         return f"Market info ophalen mislukt: {e}"
 
@@ -1183,7 +1206,7 @@ def _summarize_period(closed_trades: list, since_ts: float, label: str) -> str:
     if top:
         lines.append("\n<b>🏆 Top:</b>")
         for m, profs in top:
-            lines.append(f"  {m}: {'+' if sum(profs)>=0 else ''}€{sum(profs):.2f} ({len(profs)}×)")
+            lines.append(f"  {m}: {'+' if sum(profs) >= 0 else ''}€{sum(profs):.2f} ({len(profs)}×)")
     return "\n".join(lines)
 
 
@@ -1230,7 +1253,7 @@ def _get_ai_text() -> str:
                 age_str = "?"
                 if trained_at:
                     age_h = (time.time() - float(trained_at)) / 3600
-                    age_str = f"{age_h:.1f}u geleden" if age_h < 48 else f"{age_h/24:.1f}d geleden"
+                    age_str = f"{age_h:.1f}u geleden" if age_h < 48 else f"{age_h / 24:.1f}d geleden"
                 acc = m.get("test_accuracy") or m.get("accuracy")
                 auc = m.get("test_auc") or m.get("auc")
                 samples = m.get("samples_total") or m.get("n_samples")
@@ -1239,7 +1262,7 @@ def _get_ai_text() -> str:
                 if samples:
                     lines.append(f"  Samples: {samples}")
                 if acc is not None:
-                    lines.append(f"  Accuracy: {float(acc)*100:.1f}%")
+                    lines.append(f"  Accuracy: {float(acc) * 100:.1f}%")
                 if auc is not None:
                     lines.append(f"  AUC: {float(auc):.3f}")
             except Exception:
@@ -1252,7 +1275,7 @@ def _get_ai_text() -> str:
                 pending = [s for s in doc.get("suggestions", []) if s.get("status") in (None, "pending")]
                 lines.append(f"\n<b>Pending suggestions:</b> {len(pending)}")
                 for s in pending[-3:]:
-                    lines.append(f"  · {s.get('market','?')}: {s.get('reason','?')[:60]}")
+                    lines.append(f"  · {s.get('market', '?')}: {s.get('reason', '?')[:60]}")
             except Exception:
                 pass
         return "\n".join(lines)
@@ -1277,14 +1300,14 @@ def _get_regime_text() -> str:
         emoji = {"trending_up": "📈", "ranging": "↔️", "high_volatility": "⚡", "bearish": "📉"}.get(regime, "❓")
         lines = [
             "<b>🌍 Markt Regime</b>",
-            f"{emoji} <b>{regime}</b>  (confidence {conf*100:.1f}%)",
+            f"{emoji} <b>{regime}</b>  (confidence {conf * 100:.1f}%)",
         ]
         if ra:
-            lines.append(f"\n<b>Regime adjustments:</b>")
-            lines.append(f"  Position size mult: ×{ra.get('base_amount_mult',1):.2f}")
-            lines.append(f"  Max-trades mult: ×{ra.get('max_trades_mult',1):.2f}")
-            lines.append(f"  Min-score adj: +{ra.get('min_score_adj',0):.1f}")
-            lines.append(f"  SL mult: ×{ra.get('sl_mult',1):.2f}")
+            lines.append("\n<b>Regime adjustments:</b>")
+            lines.append(f"  Position size mult: ×{ra.get('base_amount_mult', 1):.2f}")
+            lines.append(f"  Max-trades mult: ×{ra.get('max_trades_mult', 1):.2f}")
+            lines.append(f"  Min-score adj: +{ra.get('min_score_adj', 0):.1f}")
+            lines.append(f"  SL mult: ×{ra.get('sl_mult', 1):.2f}")
             lines.append(f"  Grid: {'⏸️ pauze' if ra.get('grid_pause') else '▶️ actief'}")
             lines.append(f"  DCA: {'✅' if ra.get('dca_enabled') else '❌'}")
             desc = ra.get("description")
@@ -1292,9 +1315,9 @@ def _get_regime_text() -> str:
                 lines.append(f"\n<i>{desc}</i>")
         if scan:
             lines.append(
-                f"\n<b>Laatste scan:</b> {scan.get('evaluated',0)}/{scan.get('total_markets',0)} markten "
-                f"geëvalueerd, {scan.get('passed_min_score',0)} pass min-score "
-                f"(drempel {scan.get('min_score_threshold','?')})"
+                f"\n<b>Laatste scan:</b> {scan.get('evaluated', 0)}/{scan.get('total_markets', 0)} markten "
+                f"geëvalueerd, {scan.get('passed_min_score', 0)} pass min-score "
+                f"(drempel {scan.get('min_score_threshold', '?')})"
             )
         return "\n".join(lines)
     except Exception as e:
@@ -1358,11 +1381,11 @@ def _get_uptime_text() -> str:
     try:
         secs = time.time() - _PROCESS_START_TS
         if secs < 3600:
-            up = f"{secs/60:.1f} min"
+            up = f"{secs / 60:.1f} min"
         elif secs < 86400:
-            up = f"{secs/3600:.2f} uur"
+            up = f"{secs / 3600:.2f} uur"
         else:
-            up = f"{secs/86400:.2f} dagen"
+            up = f"{secs / 86400:.2f} dagen"
         # Last heartbeat from bot_state
         hb_str = "?"
         try:
@@ -1370,7 +1393,7 @@ def _get_uptime_text() -> str:
             hb = float(st.get("LAST_HEARTBEAT_TS", 0) or 0)
             if hb:
                 age = time.time() - hb
-                hb_str = f"{age:.0f}s geleden" if age < 120 else f"{age/60:.1f} min geleden"
+                hb_str = f"{age:.0f}s geleden" if age < 120 else f"{age / 60:.1f} min geleden"
         except Exception:
             pass
         return f"<b>⏱ Uptime</b>\nTelegram-handler: {up}\nLaatste bot-heartbeat: {hb_str}"
@@ -1382,13 +1405,22 @@ def _get_version_text() -> str:
     try:
         result = subprocess.run(
             ["git", "log", "-1", "--pretty=format:%h %s (%ar)"],
-            cwd=str(BASE_DIR), capture_output=True, text=True, timeout=5,
+            cwd=str(BASE_DIR),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         commit = (result.stdout or "").strip() or "(geen git info)"
-        branch = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=str(BASE_DIR), capture_output=True, text=True, timeout=5,
-        ).stdout.strip() or "?"
+        branch = (
+            subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=str(BASE_DIR),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            ).stdout.strip()
+            or "?"
+        )
         return f"<b>📦 Versie</b>\nBranch: <code>{branch}</code>\nCommit: <code>{commit}</code>"
     except Exception as e:
         return f"Version mislukt: {e}"
@@ -1399,7 +1431,9 @@ def _set_quiet(arg: str) -> str:
     a = (arg or "").strip().lower()
     if a in ("on", "aan", "1", "true", "ja"):
         _quiet_override = True
-        return "🔕 Quiet mode <b>aan</b> — alleen trade + critical alerts. Gebruik <code>/quiet off</code> om te stoppen."
+        return (
+            "🔕 Quiet mode <b>aan</b> — alleen trade + critical alerts. Gebruik <code>/quiet off</code> om te stoppen."
+        )
     if a in ("off", "uit", "0", "false", "nee"):
         _quiet_override = False
         return "🔔 Quiet mode <b>uit</b> — normale alerts hervat."
@@ -1436,8 +1470,12 @@ def _get_why_text(symbol: str) -> str:
         opened_str = time.strftime("%d-%m %H:%M", time.localtime(opened)) if opened else "?"
 
         regime_emoji = {
-            "trending_up": "📈", "ranging": "↔️", "high_volatility": "⚡",
-            "bearish": "📉", "aggressive": "🔥", "defensive": "🛡️",
+            "trending_up": "📈",
+            "ranging": "↔️",
+            "high_volatility": "⚡",
+            "bearish": "📉",
+            "aggressive": "🔥",
+            "defensive": "🛡️",
         }.get(regime, "❓")
 
         lines = [
@@ -1455,7 +1493,7 @@ def _get_why_text(symbol: str) -> str:
         if isinstance(macd, (int, float)):
             lines.append(f"MACD@entry: {float(macd):+.6f}")
         if isinstance(vol, (int, float)) and vol:
-            lines.append(f"Volatiliteit: {float(vol)*100:.2f}%")
+            lines.append(f"Volatiliteit: {float(vol) * 100:.2f}%")
         if isinstance(vol24, (int, float)) and vol24:
             lines.append(f"24h volume: €{float(vol24):,.0f}")
         return "\n".join(lines)
@@ -1497,7 +1535,10 @@ def _get_fees_text() -> str:
         f_week, n_week = fees_in(wk_ts)
         f_total = sum(
             (float(t.get("buy_fee") or 0) + float(t.get("sell_fee") or 0))
-            or ((float(t.get("invested_eur") or 0) + float(t.get("sell_price") or 0) * float(t.get("amount") or 0)) * 0.0025)
+            or (
+                (float(t.get("invested_eur") or 0) + float(t.get("sell_price") or 0) * float(t.get("amount") or 0))
+                * 0.0025
+            )
             for t in closed
         )
         return (
@@ -1819,9 +1860,12 @@ def _trade_watch_loop():
                         macd_e = trade.get("macd_at_entry")
                         amount = float(trade.get("amount") or 0)
                         regime_emoji = {
-                            "trending_up": "📈", "ranging": "↔️",
-                            "high_volatility": "⚡", "bearish": "📉",
-                            "aggressive": "🔥", "defensive": "🛡️",
+                            "trending_up": "📈",
+                            "ranging": "↔️",
+                            "high_volatility": "⚡",
+                            "bearish": "📉",
+                            "aggressive": "🔥",
+                            "defensive": "🛡️",
                         }.get(regime, "❓")
                         extras = []
                         if score:
@@ -1834,8 +1878,7 @@ def _trade_watch_loop():
                         send_message(
                             f"🟢 <b>KOOP: {market}</b>\n"
                             f"Prijs: €{buy_price:.6g} | Bedrag: {amount:.4g}\n"
-                            f"Geïnvesteerd: <b>€{invested:.2f}</b>\n"
-                            + " · ".join(extras)
+                            f"Geïnvesteerd: <b>€{invested:.2f}</b>\n" + " · ".join(extras)
                         )
 
                     # Nieuwe closes → verkoopmelding (verrijkt)
@@ -1860,11 +1903,11 @@ def _trade_watch_loop():
                             if opened_ts > 0 and closed_ts > opened_ts:
                                 secs = closed_ts - opened_ts
                                 if secs < 3600:
-                                    hold_str = f"⏱ {secs/60:.0f}m"
+                                    hold_str = f"⏱ {secs / 60:.0f}m"
                                 elif secs < 86400:
-                                    hold_str = f"⏱ {secs/3600:.1f}u"
+                                    hold_str = f"⏱ {secs / 3600:.1f}u"
                                 else:
-                                    hold_str = f"⏱ {secs/86400:.1f}d"
+                                    hold_str = f"⏱ {secs / 86400:.1f}d"
 
                             # Peak vs realised
                             peak_str = ""
@@ -1929,11 +1972,15 @@ def _poll_loop():
 
     while True:
         try:
-            resp = requests.get(url, params={
-                "offset": _last_update_id + 1,
-                "timeout": 30,
-                "allowed_updates": ["message"],
-            }, timeout=40)
+            resp = requests.get(
+                url,
+                params={
+                    "offset": _last_update_id + 1,
+                    "timeout": 30,
+                    "allowed_updates": ["message"],
+                },
+                timeout=40,
+            )
 
             if not resp.ok:
                 time.sleep(5)

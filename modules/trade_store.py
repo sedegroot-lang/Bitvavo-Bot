@@ -7,27 +7,27 @@ import os
 from pathlib import Path
 from typing import Any, Dict
 
+from core.local_state import load_freshest, mirror_to_local, stamp_data
 from modules import storage
 from modules.logging_utils import locked_write_json, log
-from core.local_state import mirror_to_local, load_freshest, stamp_data
 
-TRADE_JSON_DEFAULT = 'trade_log.json'
-TRADE_DATASET = 'trade_log'
-TRADE_SNAPSHOT_TABLE = 'snapshot'
-TRADE_META_TABLE = 'meta'
-_META_KEY = 'meta'
+TRADE_JSON_DEFAULT = "trade_log.json"
+TRADE_DATASET = "trade_log"
+TRADE_SNAPSHOT_TABLE = "snapshot"
+TRADE_META_TABLE = "meta"
+_META_KEY = "meta"
 
 
 def _collect_file_meta(path: Path) -> Dict[str, Any]:
     try:
         stat = path.stat()
         return {
-            'key': _META_KEY,
-            'mtime': stat.st_mtime,
-            'size': stat.st_size,
+            "key": _META_KEY,
+            "mtime": stat.st_mtime,
+            "size": stat.st_size,
         }
     except FileNotFoundError:
-        return {'key': _META_KEY, 'mtime': 0.0, 'size': 0}
+        return {"key": _META_KEY, "mtime": 0.0, "size": 0}
 
 
 def _load_snapshot_table() -> Dict[str, Any]:
@@ -38,7 +38,7 @@ def _load_snapshot_table() -> Dict[str, Any]:
             if isinstance(last, dict):
                 return last
     except Exception as exc:
-        log(f"TradeStore: lezen snapshot uit TinyDB mislukt: {exc}", level='warning')
+        log(f"TradeStore: lezen snapshot uit TinyDB mislukt: {exc}", level="warning")
     return {}
 
 
@@ -47,11 +47,11 @@ def _load_meta() -> Dict[str, Any]:
         rows = storage.fetch_all(TRADE_DATASET, table=TRADE_META_TABLE)
         if rows:
             first = rows[-1]
-            if isinstance(first, dict) and first.get('key') == _META_KEY:
+            if isinstance(first, dict) and first.get("key") == _META_KEY:
                 return first
     except Exception:
         pass
-    return {'key': _META_KEY, 'mtime': 0.0, 'size': 0}
+    return {"key": _META_KEY, "mtime": 0.0, "size": 0}
 
 
 def _persist_snapshot(data: Dict[str, Any], meta: Dict[str, Any]) -> None:
@@ -59,7 +59,7 @@ def _persist_snapshot(data: Dict[str, Any], meta: Dict[str, Any]) -> None:
         storage.replace_all(TRADE_DATASET, [data], table=TRADE_SNAPSHOT_TABLE)
         storage.replace_all(TRADE_DATASET, [meta], table=TRADE_META_TABLE)
     except Exception as exc:
-        log(f"TradeStore: kon TinyDB snapshot niet opslaan: {exc}", level='warning')
+        log(f"TradeStore: kon TinyDB snapshot niet opslaan: {exc}", level="warning")
 
 
 def load_snapshot(json_path: str | os.PathLike[str] = TRADE_JSON_DEFAULT) -> Dict[str, Any]:
@@ -71,33 +71,35 @@ def load_snapshot(json_path: str | os.PathLike[str] = TRADE_JSON_DEFAULT) -> Dic
     meta = _load_meta()
     file_meta = _collect_file_meta(path)
     needs_refresh = not _load_snapshot_table() or (
-        abs(meta.get('mtime', 0.0) - file_meta.get('mtime', 0.0)) > 1e-6
-        or meta.get('size') != file_meta.get('size')
+        abs(meta.get("mtime", 0.0) - file_meta.get("mtime", 0.0)) > 1e-6 or meta.get("size") != file_meta.get("size")
     )
 
     if needs_refresh and path.exists():
         try:
             # Use utf-8-sig to automatically handle BOM if present
-            with path.open('r', encoding='utf-8-sig') as fh:
+            with path.open("r", encoding="utf-8-sig") as fh:
                 payload = json.load(fh)
             if isinstance(payload, dict):
                 json_doc = payload
                 meta = file_meta
                 _persist_snapshot(payload, meta)
         except Exception as exc:
-            log(f"TradeStore: JSON laden mislukt ({path}): {exc}", level='warning')
+            log(f"TradeStore: JSON laden mislukt ({path}): {exc}", level="warning")
 
     snapshot = _load_snapshot_table()
     if snapshot:
         # Compare with local copy — use the freshest one
         freshest = load_freshest(str(path), snapshot)
         if freshest:
-            local_ts = float(freshest.get('_save_ts', 0) or 0)
-            snap_ts = float(snapshot.get('_save_ts', 0) or 0)
+            local_ts = float(freshest.get("_save_ts", 0) or 0)
+            snap_ts = float(snapshot.get("_save_ts", 0) or 0)
             if local_ts > snap_ts + 1:
                 # Local copy is newer — OneDrive reverted the file
-                log(f"TradeStore: LOCAL copy is newer than OneDrive ({local_ts:.0f} > {snap_ts:.0f}) — using local", level='warning')
-                freshest.pop('_save_ts', None)
+                log(
+                    f"TradeStore: LOCAL copy is newer than OneDrive ({local_ts:.0f} > {snap_ts:.0f}) — using local",
+                    level="warning",
+                )
+                freshest.pop("_save_ts", None)
                 _persist_snapshot(freshest, file_meta)
                 return freshest
         return snapshot
@@ -105,7 +107,7 @@ def load_snapshot(json_path: str | os.PathLike[str] = TRADE_JSON_DEFAULT) -> Dic
     if json_doc is None and path.exists():
         try:
             # Use utf-8-sig to automatically handle BOM if present
-            with path.open('r', encoding='utf-8-sig') as fh:
+            with path.open("r", encoding="utf-8-sig") as fh:
                 payload = json.load(fh)
             if isinstance(payload, dict):
                 json_doc = payload
@@ -118,16 +120,16 @@ def load_snapshot(json_path: str | os.PathLike[str] = TRADE_JSON_DEFAULT) -> Dic
     # Last resort: try local copy
     local_only = load_freshest(str(path), None)
     if local_only:
-        log(f"TradeStore: OneDrive file missing, restored from local copy", level='warning')
-        local_only.pop('_save_ts', None)
+        log("TradeStore: OneDrive file missing, restored from local copy", level="warning")
+        local_only.pop("_save_ts", None)
         return local_only
 
-    return {'open': {}, 'closed': []}
+    return {"open": {}, "closed": []}
 
 
 def _validate_and_fix_trade_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and fix corrupted invested_eur/dca_buys before saving.
-    
+
     CRITICAL GUARD: This prevents corrupted data from derive_cost_basis() from being saved.
     Rules:
     - invested_eur must be > 0 (restore from initial_invested_eur if corrupted)
@@ -137,102 +139,115 @@ def _validate_and_fix_trade_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     if not isinstance(data, dict):
         return data
-    
-    open_trades = data.get('open', {})
+
+    open_trades = data.get("open", {})
     if not isinstance(open_trades, dict):
         return data
-    
+
     fixed_count = 0
     for market, trade in open_trades.items():
         if not isinstance(trade, dict):
             continue
-        
+
         # Rule 0: buy_price must be positive (prevents division-by-zero in profit calcs)
-        buy_price = float(trade.get('buy_price', 0) or 0)
+        buy_price = float(trade.get("buy_price", 0) or 0)
         if buy_price <= 0:
-            log(f"VALIDATION WARN [{market}]: buy_price={buy_price} is invalid (skipping trade validation)", level='warning')
+            log(
+                f"VALIDATION WARN [{market}]: buy_price={buy_price} is invalid (skipping trade validation)",
+                level="warning",
+            )
             continue
-        
+
         # Rule 0b: amount must be positive
-        amount = float(trade.get('amount', 0) or 0)
+        amount = float(trade.get("amount", 0) or 0)
         if amount <= 0:
-            log(f"VALIDATION WARN [{market}]: amount={amount} is invalid (skipping trade validation)", level='warning')
+            log(f"VALIDATION WARN [{market}]: amount={amount} is invalid (skipping trade validation)", level="warning")
             continue
-        
-        initial = float(trade.get('initial_invested_eur', 0) or 0)
-        invested = float(trade.get('invested_eur', 0) or 0)
-        total = float(trade.get('total_invested_eur', 0) or 0)
-        dca_buys = int(trade.get('dca_buys', 0) or 0)
-        dca_max = int(trade.get('dca_max', 3) or 3)
-        dca_events = trade.get('dca_events', [])
+
+        initial = float(trade.get("initial_invested_eur", 0) or 0)
+        invested = float(trade.get("invested_eur", 0) or 0)
+        total = float(trade.get("total_invested_eur", 0) or 0)
+        dca_buys = int(trade.get("dca_buys", 0) or 0)
+        dca_max = int(trade.get("dca_max", 3) or 3)
+        dca_events = trade.get("dca_events", [])
         actual_dca_count = len(dca_events) if isinstance(dca_events, list) else 0
-        
+
         needs_fix = False
-        
+
         # Rule 1: invested_eur must be positive
         if invested <= 0 and initial > 0:
-            log(f"VALIDATION FIX [{market}]: invested_eur={invested} -> {initial} (was negative/zero)", level='warning')
-            trade['invested_eur'] = initial
+            log(f"VALIDATION FIX [{market}]: invested_eur={invested} -> {initial} (was negative/zero)", level="warning")
+            trade["invested_eur"] = initial
             invested = initial
             needs_fix = True
-        
+
         # Rule 2: If NO dca_events AND no partial TPs, invested_eur MUST equal initial
         # After partial TPs, invested_eur is legitimately lower than initial
-        has_partial_tp = float(trade.get('partial_tp_returned_eur', 0) or 0) > 0
-        tp_flags = trade.get('tp_flags', trade.get('tp_levels_done', []))
+        has_partial_tp = float(trade.get("partial_tp_returned_eur", 0) or 0) > 0
+        tp_flags = trade.get("tp_flags", trade.get("tp_levels_done", []))
         has_tp_flags = isinstance(tp_flags, list) and any(tp_flags)
         if actual_dca_count == 0 and initial > 0 and not has_partial_tp and not has_tp_flags:
             if abs(invested - initial) > 0.01:
-                log(f"VALIDATION FIX [{market}]: invested_eur={invested:.2f} -> {initial:.2f} (no DCA/TP, must match initial)", level='warning')
-                trade['invested_eur'] = initial
+                log(
+                    f"VALIDATION FIX [{market}]: invested_eur={invested:.2f} -> {initial:.2f} (no DCA/TP, must match initial)",
+                    level="warning",
+                )
+                trade["invested_eur"] = initial
                 invested = initial
                 needs_fix = True
-        
+
         # Rule 3: total_invested_eur must be reasonable
         # total_invested_eur = initial + sum(dca_events), NEVER modified by partial TPs
         if actual_dca_count == 0 and initial > 0:
             if abs(total - initial) > 0.01:
-                log(f"VALIDATION FIX [{market}]: total_invested_eur={total:.2f} -> {initial:.2f} (no DCA events)", level='warning')
-                trade['total_invested_eur'] = initial
+                log(
+                    f"VALIDATION FIX [{market}]: total_invested_eur={total:.2f} -> {initial:.2f} (no DCA events)",
+                    level="warning",
+                )
+                trade["total_invested_eur"] = initial
                 needs_fix = True
         elif actual_dca_count > 0 and initial > 0:
             # Verify total = initial + sum of DCA amounts
             # NOTE: Only WARN, never auto-correct. initial_invested_eur may have been
             # set by sync engine (derive_cost_basis) which includes DCA costs already.
             # Auto-correcting would double-count DCA costs and cause massive phantom losses.
-            dca_sum = sum(float(e.get('amount_eur', 0) or 0) for e in dca_events if isinstance(e, dict))
+            dca_sum = sum(float(e.get("amount_eur", 0) or 0) for e in dca_events if isinstance(e, dict))
             expected_total = initial + dca_sum
             if dca_sum > 0 and abs(total - expected_total) > 0.50:
-                log(f"VALIDATION WARN [{market}]: total_invested_eur={total:.2f} != initial({initial:.2f}) + DCA({dca_sum:.2f}) = {expected_total:.2f} — NOT auto-correcting (initial may include synced DCA costs)", level='warning')
+                log(
+                    f"VALIDATION WARN [{market}]: total_invested_eur={total:.2f} != initial({initial:.2f}) + DCA({dca_sum:.2f}) = {expected_total:.2f} — NOT auto-correcting (initial may include synced DCA costs)",
+                    level="warning",
+                )
         # FIX #007: Use dca_state.sync_derived_fields() as SINGLE source of truth
         # for dca_buys ↔ dca_events consistency. Replaces manual Rule 4 logic.
         try:
             from core.dca_state import sync_derived_fields as _ds_sync
+
             _ds_state, _ds_repairs = _ds_sync(trade, dca_max)
             if _ds_repairs:
                 for _r in _ds_repairs:
-                    log(f"VALIDATION FIX [{market}]: (dca_state) {_r}", level='warning')
+                    log(f"VALIDATION FIX [{market}]: (dca_state) {_r}", level="warning")
                 needs_fix = True
         except Exception as _ds_err:
-            log(f"VALIDATION WARN [{market}]: dca_state sync failed: {_ds_err}", level='warning')
+            log(f"VALIDATION WARN [{market}]: dca_state sync failed: {_ds_err}", level="warning")
             # Fallback: basic consistency check
             if actual_dca_count == 0 and dca_buys > 0:
-                trade['dca_buys'] = 0
+                trade["dca_buys"] = 0
                 needs_fix = True
             elif dca_buys < actual_dca_count:
-                trade['dca_buys'] = actual_dca_count
+                trade["dca_buys"] = actual_dca_count
                 needs_fix = True
             # Cap dca_buys to dca_max to prevent over-DCA
-            if int(trade.get('dca_buys', 0)) > dca_max:
-                trade['dca_buys'] = dca_max
+            if int(trade.get("dca_buys", 0)) > dca_max:
+                trade["dca_buys"] = dca_max
                 needs_fix = True
-        
+
         if needs_fix:
             fixed_count += 1
-    
+
     if fixed_count > 0:
-        log(f"VALIDATION: Fixed {fixed_count} corrupted trades before save", level='warning')
-    
+        log(f"VALIDATION: Fixed {fixed_count} corrupted trades before save", level="warning")
+
     return data
 
 
@@ -246,7 +261,7 @@ def save_snapshot(
     """Write trade log data to JSON and TinyDB."""
 
     if not isinstance(data, dict):
-        raise TypeError('trade log snapshot must be a dict')
+        raise TypeError("trade log snapshot must be a dict")
 
     # CRITICAL: Validate and fix data before saving
     data = _validate_and_fix_trade_data(data)
@@ -257,9 +272,9 @@ def save_snapshot(
     if backup_file:
         try:
             if path.exists():
-                backup_file.write_text(path.read_text(encoding='utf-8'), encoding='utf-8')
+                backup_file.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
         except Exception as exc:
-            log(f"TradeStore: backup schrijven mislukt ({backup_file}): {exc}", level='warning')
+            log(f"TradeStore: backup schrijven mislukt ({backup_file}): {exc}", level="warning")
 
     # Stamp data with _save_ts so local_state can compare freshness
     stamp_data(data)
@@ -276,7 +291,7 @@ def touch_snapshot_timestamp(json_path: str | os.PathLike[str] = TRADE_JSON_DEFA
 
     path = Path(json_path)
     meta = _collect_file_meta(path)
-    _persist_snapshot(_load_snapshot_table() or {'open': {}, 'closed': []}, meta)
+    _persist_snapshot(_load_snapshot_table() or {"open": {}, "closed": []}, meta)
 
 
-__all__ = ['load_snapshot', 'save_snapshot', 'touch_snapshot_timestamp']
+__all__ = ["load_snapshot", "save_snapshot", "touch_snapshot_timestamp"]

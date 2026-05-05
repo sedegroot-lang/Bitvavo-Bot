@@ -26,7 +26,7 @@ from .base import (
     _safe_cfg_float,
     _safe_cfg_int,
 )
-from .indicators import rsi, zscore
+from .indicators import rsi
 
 
 def _vwap(
@@ -83,7 +83,7 @@ def _vwap_zscore(
 
     mean = sum(devs) / len(devs)
     var = sum((d - mean) ** 2 for d in devs) / len(devs)
-    std = var ** 0.5
+    std = var**0.5
     return (devs[-1] - mean) / std if std > 0 else 0.0
 
 
@@ -120,8 +120,6 @@ def mean_reversion_scalper_signal(ctx: SignalContext) -> SignalResult:
         vol_ratio = 0
 
     # 4. Bollinger Band position
-    from .indicators import sma as _sma
-    import numpy as np
     price = closes[-1] if closes else 0
     bb_window = 20
     below_bb = False
@@ -134,13 +132,17 @@ def mean_reversion_scalper_signal(ctx: SignalContext) -> SignalResult:
     # Check all conditions
     if z_val > z_entry:
         return SignalResult(
-            name="mr_scalper", active=False, reason="zscore_not_extreme",
+            name="mr_scalper",
+            active=False,
+            reason="zscore_not_extreme",
             details={"zscore": round(z_val, 3), "rsi": rsi_val, "vol_ratio": round(vol_ratio, 2)},
         )
 
     if rsi_gate > rsi_cap:
         return SignalResult(
-            name="mr_scalper", active=False, reason="rsi_too_high",
+            name="mr_scalper",
+            active=False,
+            reason="rsi_too_high",
             details={"zscore": round(z_val, 3), "rsi": rsi_val},
         )
 

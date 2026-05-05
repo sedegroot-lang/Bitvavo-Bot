@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
@@ -164,14 +163,14 @@ class LiquidationManager:
         log = ctx.log
 
         # Count only non-dust trades for capacity check
-        dust_thr = float(cfg.get('DUST_TRADE_THRESHOLD_EUR', cfg.get('MIN_ORDER_EUR', 5.0)))
+        dust_thr = float(cfg.get("DUST_TRADE_THRESHOLD_EUR", cfg.get("MIN_ORDER_EUR", 5.0)))
         current = 0
         if isinstance(open_trades, dict):
             for _m, _t in open_trades.items():
                 if not isinstance(_t, dict):
                     continue
                 _price = ctx.get_current_price(_m)
-                _amt = float(_t.get('amount', 0) or 0)
+                _amt = float(_t.get("amount", 0) or 0)
                 if _price and _amt > 0 and (float(_price) * _amt) >= dust_thr:
                     current += 1
         max_trades = int(cfg.get("MAX_OPEN_TRADES", 3))
@@ -209,27 +208,23 @@ class LiquidationManager:
                 break
             if amount <= 0:
                 continue
-            
+
             # PROTECTION: Don't auto-free positions that are in loss
             # Only free positions that are at least break-even (including ~0.5% for fees)
             min_profit_pct = float(cfg.get("AUTO_FREE_MIN_PROFIT_PCT", 0.005))  # Default 0.5% to cover fees
             if profit_pct < min_profit_pct:
                 log(
-                    f"Auto-free: skip {market} (waarde {value:.2f} EUR) - verlies {profit_pct*100:.2f}% < min {min_profit_pct*100:.1f}%",
+                    f"Auto-free: skip {market} (waarde {value:.2f} EUR) - verlies {profit_pct * 100:.2f}% < min {min_profit_pct * 100:.1f}%",
                     level="info",
                 )
                 continue
-            
+
             log(
-                f"Auto-free: probeer {market} (waarde {value:.2f} EUR, winst {profit_pct*100:.2f}%) te sluiten.",
+                f"Auto-free: probeer {market} (waarde {value:.2f} EUR, winst {profit_pct * 100:.2f}%) te sluiten.",
                 level="info",
             )
             sell_resp = ctx.place_sell(market, amount, sell_all=True)
-            sell_ok = (
-                isinstance(sell_resp, dict)
-                and not sell_resp.get('error')
-                and not sell_resp.get('errorCode')
-            )
+            sell_ok = isinstance(sell_resp, dict) and not sell_resp.get("error") and not sell_resp.get("errorCode")
             if sell_ok:
                 trade = open_trades.get(market, {})
                 sell_revenue = price * amount
@@ -262,7 +257,7 @@ class LiquidationManager:
                 open_trades.pop(market, None)
                 freed += 1
             else:
-                _err = sell_resp.get('error', 'unknown') if isinstance(sell_resp, dict) else str(sell_resp)
+                _err = sell_resp.get("error", "unknown") if isinstance(sell_resp, dict) else str(sell_resp)
                 log(
                     f"Auto-free: verkoop van {market} mislukt ({_err}), positie blijft open.",
                     level="warning",

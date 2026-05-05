@@ -93,13 +93,12 @@ def _rule_backend(ctx: SupervisorContext) -> SupervisorVerdict:
     #   wordt als marginaal beschouwd in de RSI danger-zone.
     try:
         from modules.config import CONFIG as _CFG
+
         _low_cutoff = float(_CFG.get("LLM_SUP_LOW_SCORE_CUTOFF", 11.0))
     except Exception:
         _low_cutoff = 11.0
     if 0 < ctx.score < _low_cutoff and 52 <= ctx.rsi <= 60:
-        reasons.append(
-            f"marginal score {ctx.score:.1f} (<{_low_cutoff:.1f}) + RSI {ctx.rsi:.1f} danger-zone"
-        )
+        reasons.append(f"marginal score {ctx.score:.1f} (<{_low_cutoff:.1f}) + RSI {ctx.rsi:.1f} danger-zone")
         risk_score += 0.55  # auto-veto
 
     # Aanvullende risk-bumpers (kunnen veto triggeren bij combinaties):
@@ -121,8 +120,10 @@ def _rule_backend(ctx: SupervisorContext) -> SupervisorVerdict:
 
     veto = risk_score >= 0.50
     confidence = min(0.95, max(0.05, risk_score))
-    derived_regime = ctx.regime if ctx.regime != "unknown" else (
-        "bearish" if ctx.macd < 0 else "bullish" if ctx.macd > 0.05 else "range"
+    derived_regime = (
+        ctx.regime
+        if ctx.regime != "unknown"
+        else ("bearish" if ctx.macd < 0 else "bullish" if ctx.macd > 0.05 else "range")
     )
     reasoning = "; ".join(reasons) if reasons else "no risk signals"
     return SupervisorVerdict(
@@ -178,7 +179,7 @@ def _ollama_backend(ctx: SupervisorContext) -> Optional[SupervisorVerdict]:
             reasoning=str(parsed.get("reasoning", ""))[:300],
             backend="ollama",
         )
-    except Exception as e:
+    except Exception:
         # Fail-open: bij Ollama-storing geen veto, return None zodat caller fallback doet
         return None
 

@@ -3,6 +3,7 @@
 Returns the set of markets currently active in grid trading so the trailing
 bot/HODL flows can exclude them.
 """
+
 from __future__ import annotations
 
 from bot.shared import state
@@ -18,25 +19,26 @@ def get_active_grid_markets() -> set:
     log = state.log
     grid_markets: set = set()
     try:
-        grid_cfg = state.CONFIG.get('GRID_TRADING') or {}
-        if not bool(grid_cfg.get('enabled', False)):
+        grid_cfg = state.CONFIG.get("GRID_TRADING") or {}
+        if not bool(grid_cfg.get("enabled", False)):
             return grid_markets
     except Exception:
         return grid_markets
     try:
         from modules.grid_trading import get_grid_manager  # type: ignore
+
         grid_manager = get_grid_manager()
         for grid_summary in grid_manager.get_all_grids_summary():
-            if grid_summary.get('status') in ('running', 'paused', 'initialized'):
-                grid_markets.add(grid_summary.get('market'))
+            if grid_summary.get("status") in ("running", "paused", "initialized"):
+                grid_markets.add(grid_summary.get("market"))
     except ImportError as e:
         try:
-            log(f"get_grid_manager failed: {e}", level='warning')
+            log(f"get_grid_manager failed: {e}", level="warning")
         except Exception:
             pass
     except Exception as e:
         try:
-            log(f"get_grid_manager failed: {e}", level='warning')
+            log(f"get_grid_manager failed: {e}", level="warning")
         except Exception:
             pass
     return grid_markets

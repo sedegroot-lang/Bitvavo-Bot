@@ -8,7 +8,7 @@ High entropy = chaos → signals are random noise.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Sequence
+from typing import Sequence
 
 from .base import SignalContext, SignalResult, _safe_cfg_float
 

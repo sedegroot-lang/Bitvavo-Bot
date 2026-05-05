@@ -9,6 +9,7 @@ Signalen worden verstuurd met vertraging (configurable) om front-running te voor
 Gebruik:
     from modules.signal_publisher import publish_buy, publish_sell, publish_dca, ...
 """
+
 from __future__ import annotations
 
 import json
@@ -90,12 +91,16 @@ def _send(text: str) -> bool:
 
     try:
         url = f"https://api.telegram.org/bot{_token}/sendMessage"
-        resp = requests.post(url, json={
-            "chat_id": _channel_id,
-            "text": text,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True,
-        }, timeout=10)
+        resp = requests.post(
+            url,
+            json={
+                "chat_id": _channel_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            },
+            timeout=10,
+        )
         _msg_timestamps.append(time.time())
         if not resp.ok:
             logger.warning(f"[SignalPublisher] Telegram error: {resp.text[:200]}")
@@ -108,9 +113,11 @@ def _send(text: str) -> bool:
 def _send_delayed(text: str) -> None:
     """Stuur signaal met optionele vertraging (in achtergrondthread)."""
     if _delay_seconds > 0:
+
         def _delayed():
             time.sleep(_delay_seconds)
             _send(text)
+
         thread = threading.Thread(target=_delayed, daemon=True)
         thread.start()
     else:
@@ -154,8 +161,10 @@ def publish_buy(
 
     if _include_regime and regime:
         regime_emoji = {
-            "trending_up": "📈", "ranging": "↔️",
-            "high_volatility": "⚡", "bearish": "📉",
+            "trending_up": "📈",
+            "ranging": "↔️",
+            "high_volatility": "⚡",
+            "bearish": "📉",
         }.get(regime, "❓")
         lines.append(f"{regime_emoji} Regime: {regime.replace('_', ' ').title()}")
 
@@ -291,14 +300,16 @@ def publish_regime_change(
         init()
 
     regime_emoji = {
-        "trending_up": "📈", "ranging": "↔️",
-        "high_volatility": "⚡", "bearish": "📉",
+        "trending_up": "📈",
+        "ranging": "↔️",
+        "high_volatility": "⚡",
+        "bearish": "📉",
     }
     old_e = regime_emoji.get(old_regime, "❓")
     new_e = regime_emoji.get(new_regime, "❓")
 
     lines = [
-        f"🔄 <b>REGIME WIJZIGING</b>",
+        "🔄 <b>REGIME WIJZIGING</b>",
         f"{old_e} {old_regime.replace('_', ' ').title()} → {new_e} {new_regime.replace('_', ' ').title()}",
         f"📊 Confidence: {confidence:.0%}",
     ]
@@ -339,8 +350,8 @@ def publish_daily_summary(
     wr = f"{wins / total_trades * 100:.0f}%" if total_trades > 0 else "N/A"
 
     lines = [
-        f"📊 <b>DAGELIJKS OVERZICHT</b>",
-        f"",
+        "📊 <b>DAGELIJKS OVERZICHT</b>",
+        "",
         f"{emoji} Resultaat: {sign}€{total_profit_eur:.2f}",
         f"📈 Trades: {total_trades} (W: {wins} / L: {losses})",
         f"🎯 Win ratio: {wr}",

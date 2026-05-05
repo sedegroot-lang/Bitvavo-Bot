@@ -25,12 +25,12 @@ from typing import Any, Dict, List, Tuple
 from modules.logging_utils import log
 
 # ── Parameters ──
-CORRELATION_WINDOW = 60         # Rolling window in candles (1m = 60 min = 1 hour)
-HIGH_CORR_THRESHOLD = 0.80      # Positions considered "highly correlated"
-CASCADE_CORR_THRESHOLD = 0.85   # Correlation level for cascade alert
-CASCADE_DRAWDOWN_PCT = -0.025   # Portfolio drawdown to trigger cascade (-2.5%)
-MAX_CORRELATED_POSITIONS = 3    # Max positions allowed with corr > threshold
-COOLDOWN_SECONDS = 1800         # 30 min cooldown after cascade alert
+CORRELATION_WINDOW = 60  # Rolling window in candles (1m = 60 min = 1 hour)
+HIGH_CORR_THRESHOLD = 0.80  # Positions considered "highly correlated"
+CASCADE_CORR_THRESHOLD = 0.85  # Correlation level for cascade alert
+CASCADE_DRAWDOWN_PCT = -0.025  # Portfolio drawdown to trigger cascade (-2.5%)
+MAX_CORRELATED_POSITIONS = 3  # Max positions allowed with corr > threshold
+COOLDOWN_SECONDS = 1800  # 30 min cooldown after cascade alert
 
 # State
 _correlation_cache: Dict[str, Any] = {}
@@ -340,8 +340,8 @@ def get_tightened_sl_pct(
     cascade_level: 'warning' | 'alert' | 'critical'
     """
     multipliers = {
-        "warning": 0.75,   # 25% tighter
-        "alert": 0.60,     # 40% tighter
+        "warning": 0.75,  # 25% tighter
+        "alert": 0.60,  # 40% tighter
         "critical": 0.50,  # 50% tighter (half the original SL distance)
     }
     mult = multipliers.get(cascade_level, 0.75)

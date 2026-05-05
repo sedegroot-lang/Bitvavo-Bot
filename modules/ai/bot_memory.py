@@ -22,6 +22,7 @@ The bot can now store and retrieve facts across restarts WITHOUT any
 external API or embedding model. Embedding-based recall can be added
 later by injecting an `embedder` callable.
 """
+
 from __future__ import annotations
 
 import json

@@ -11,7 +11,6 @@ Based on: Kyle (1985) "Continuous Auctions and Insider Trading" — adapted lamb
 
 from __future__ import annotations
 
-import math
 from typing import Any, MutableMapping, Sequence
 
 from .base import SignalContext, SignalResult
@@ -25,7 +24,7 @@ def _price_efficiency_ratio(closes: Sequence[float], window: int = 20) -> float:
     """
     if len(closes) < window + 1:
         return 0.5
-    w = list(closes[-(window + 1):])
+    w = list(closes[-(window + 1) :])
     net_change = abs(w[-1] - w[0])
     sum_abs = sum(abs(w[i + 1] - w[i]) for i in range(len(w) - 1))
     if sum_abs < 1e-12:
@@ -33,9 +32,7 @@ def _price_efficiency_ratio(closes: Sequence[float], window: int = 20) -> float:
     return net_change / sum_abs
 
 
-def _volume_weighted_acceleration(
-    closes: Sequence[float], volumes: Sequence[float], window: int = 20
-) -> float:
+def _volume_weighted_acceleration(closes: Sequence[float], volumes: Sequence[float], window: int = 20) -> float:
     """Volume-weighted price acceleration.
 
     Positive = accelerating upward (with volume confirmation)
@@ -71,7 +68,7 @@ def _tick_imbalance(closes: Sequence[float], window: int = 30) -> float:
     """
     if len(closes) < window + 1:
         return 0.0
-    w = list(closes[-(window + 1):])
+    w = list(closes[-(window + 1) :])
     up = 0
     down = 0
     for i in range(1, len(w)):
@@ -103,26 +100,26 @@ def microstructure_momentum_signal(ctx: SignalContext) -> SignalResult:
     High efficiency + positive acceleration + positive imbalance = strong hidden momentum → bonus.
     Low efficiency + negative acceleration + negative imbalance = distribution → penalty.
     """
-    window = int(_safe_cfg(ctx.config, 'MICRO_MOM_WINDOW', 30))
-    eff_threshold = _safe_cfg(ctx.config, 'MICRO_MOM_EFF_THRESHOLD', 0.55)
-    accel_threshold = _safe_cfg(ctx.config, 'MICRO_MOM_ACCEL_THRESHOLD', 0.0)
-    imbalance_threshold = _safe_cfg(ctx.config, 'MICRO_MOM_IMBALANCE_THRESHOLD', 0.15)
-    bonus = _safe_cfg(ctx.config, 'MICRO_MOM_BONUS', 0.7)
-    penalty = _safe_cfg(ctx.config, 'MICRO_MOM_PENALTY', 0.5)
+    window = int(_safe_cfg(ctx.config, "MICRO_MOM_WINDOW", 30))
+    eff_threshold = _safe_cfg(ctx.config, "MICRO_MOM_EFF_THRESHOLD", 0.55)
+    accel_threshold = _safe_cfg(ctx.config, "MICRO_MOM_ACCEL_THRESHOLD", 0.0)
+    imbalance_threshold = _safe_cfg(ctx.config, "MICRO_MOM_IMBALANCE_THRESHOLD", 0.15)
+    bonus = _safe_cfg(ctx.config, "MICRO_MOM_BONUS", 0.7)
+    penalty = _safe_cfg(ctx.config, "MICRO_MOM_PENALTY", 0.5)
 
     closes = ctx.closes_1m
     volumes = ctx.volumes_1m
     if len(closes) < window + 5:
-        return SignalResult(name='micro_momentum', reason='insufficient data')
+        return SignalResult(name="micro_momentum", reason="insufficient data")
 
     per = _price_efficiency_ratio(closes, window)
     vwa = _volume_weighted_acceleration(closes, volumes, window)
     ti = _tick_imbalance(closes, window)
 
     details = {
-        'efficiency_ratio': round(per, 4),
-        'vol_weighted_accel': round(vwa, 6),
-        'tick_imbalance': round(ti, 4),
+        "efficiency_ratio": round(per, 4),
+        "vol_weighted_accel": round(vwa, 6),
+        "tick_imbalance": round(ti, 4),
     }
 
     # Score composite: all three metrics must align
@@ -146,19 +143,25 @@ def microstructure_momentum_signal(ctx: SignalContext) -> SignalResult:
 
     if bullish_signals >= 2:
         return SignalResult(
-            name='micro_momentum', score=bonus, active=True,
-            reason=f'hidden bullish momentum (eff={per:.2f}, accel={vwa:.4f}, imb={ti:.2f})',
+            name="micro_momentum",
+            score=bonus,
+            active=True,
+            reason=f"hidden bullish momentum (eff={per:.2f}, accel={vwa:.4f}, imb={ti:.2f})",
             details=details,
         )
     elif bearish_signals >= 2:
         return SignalResult(
-            name='micro_momentum', score=-penalty, active=True,
-            reason=f'hidden distribution detected (eff={per:.2f}, accel={vwa:.4f}, imb={ti:.2f})',
+            name="micro_momentum",
+            score=-penalty,
+            active=True,
+            reason=f"hidden distribution detected (eff={per:.2f}, accel={vwa:.4f}, imb={ti:.2f})",
             details=details,
         )
     else:
         return SignalResult(
-            name='micro_momentum', score=0.0, active=False,
-            reason=f'mixed microstructure (eff={per:.2f})',
+            name="micro_momentum",
+            score=0.0,
+            active=False,
+            reason=f"mixed microstructure (eff={per:.2f})",
             details=details,
         )

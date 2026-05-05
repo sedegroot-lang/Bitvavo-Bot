@@ -25,13 +25,12 @@ Design notes:
   time-based exits, no loss sells). Better entries solve the stuck-trade
   problem at the source.
 """
+
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Sequence
-
-import math
-
 
 __all__ = [
     "EntryConfidenceResult",
@@ -44,6 +43,7 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # Result dataclass
 # ---------------------------------------------------------------------------
+
 
 @dataclass(slots=True)
 class EntryConfidenceResult:
@@ -66,6 +66,7 @@ class EntryConfidenceResult:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _safe_float(v: Any, default: float = 0.0) -> float:
     try:
@@ -141,6 +142,7 @@ def _correlation(a: Sequence[float], b: Sequence[float]) -> Optional[float]:
 # Pillar A — Multi-timeframe trend agreement
 # ---------------------------------------------------------------------------
 
+
 def _pillar_trend(closes_1m: Sequence[float]) -> tuple[float, str]:
     if len(closes_1m) < 60:
         return 0.5, "insufficient_data"
@@ -171,6 +173,7 @@ def _pillar_trend(closes_1m: Sequence[float]) -> tuple[float, str]:
 # Pillar B — Momentum quality (RSI sweet spots)
 # ---------------------------------------------------------------------------
 
+
 def _pillar_momentum(rsi: Optional[float], regime: str = "neutral") -> tuple[float, str]:
     if rsi is None:
         return 0.5, "rsi_missing"
@@ -199,6 +202,7 @@ def _pillar_momentum(rsi: Optional[float], regime: str = "neutral") -> tuple[flo
 # ---------------------------------------------------------------------------
 # Pillar C — Volume confirmation
 # ---------------------------------------------------------------------------
+
 
 def _pillar_volume(volumes_1m: Sequence[float]) -> tuple[float, str]:
     if not volumes_1m or len(volumes_1m) < 30:
@@ -233,6 +237,7 @@ def _pillar_volume(volumes_1m: Sequence[float]) -> tuple[float, str]:
 # Pillar D — Volatility opportunity
 # ---------------------------------------------------------------------------
 
+
 def _pillar_volatility(highs: Sequence[float], lows: Sequence[float], closes: Sequence[float]) -> tuple[float, str]:
     if len(closes) < 16:
         return 0.5, "vol_insufficient"
@@ -256,6 +261,7 @@ def _pillar_volatility(highs: Sequence[float], lows: Sequence[float], closes: Se
 # Pillar E — ML agreement
 # ---------------------------------------------------------------------------
 
+
 def _pillar_ml(ml_info: Optional[Mapping[str, Any]]) -> tuple[float, str]:
     if not ml_info:
         return 0.5, "ml_missing"
@@ -275,7 +281,10 @@ def _pillar_ml(ml_info: Optional[Mapping[str, Any]]) -> tuple[float, str]:
 # Pillar F — Cross-market correlation
 # ---------------------------------------------------------------------------
 
-def _pillar_cross(closes_1m: Sequence[float], open_market_closes: Optional[Mapping[str, Sequence[float]]]) -> tuple[float, str]:
+
+def _pillar_cross(
+    closes_1m: Sequence[float], open_market_closes: Optional[Mapping[str, Sequence[float]]]
+) -> tuple[float, str]:
     if not open_market_closes:
         return 1.0, "no_open_trades"
     if not closes_1m or len(closes_1m) < 20:
@@ -297,6 +306,7 @@ def _pillar_cross(closes_1m: Sequence[float], open_market_closes: Optional[Mappi
 # ---------------------------------------------------------------------------
 # Composite
 # ---------------------------------------------------------------------------
+
 
 def compute_entry_confidence(
     closes_1m: Sequence[float],
@@ -351,6 +361,7 @@ def compute_entry_confidence(
 # ---------------------------------------------------------------------------
 # Config helpers
 # ---------------------------------------------------------------------------
+
 
 def is_confidence_enabled(config: Mapping[str, Any]) -> bool:
     return bool(config.get("ENTRY_CONFIDENCE_ENABLED", False))

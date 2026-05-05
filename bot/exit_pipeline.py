@@ -52,8 +52,12 @@ def should_lock_breakeven(
     cur_pct = derive_unrealised_pct(buy_price, current_price)
 
     if high_pct < activation_pct:
-        return ExitDecision(market=market, action='hold', reason='not_enough_profit_seen',
-                            metadata={'high_pct': high_pct, 'cur_pct': cur_pct})
+        return ExitDecision(
+            market=market,
+            action="hold",
+            reason="not_enough_profit_seen",
+            metadata={"high_pct": high_pct, "cur_pct": cur_pct},
+        )
 
     # Retraced ≥ 50% of high
     retraced = cur_pct < (high_pct * 0.5)
@@ -62,13 +66,14 @@ def should_lock_breakeven(
         new_stop_pct = max(fee_buffer_pct, cur_pct - 0.3)  # tight trail just below current
         return ExitDecision(
             market=market,
-            action='lock_breakeven',
-            reason=f'retraced_50pct(high={high_pct:.2f}%,cur={cur_pct:.2f}%)',
+            action="lock_breakeven",
+            reason=f"retraced_50pct(high={high_pct:.2f}%,cur={cur_pct:.2f}%)",
             new_trailing_pct=new_stop_pct,
-            metadata={'high_pct': high_pct, 'cur_pct': cur_pct},
+            metadata={"high_pct": high_pct, "cur_pct": cur_pct},
         )
-    return ExitDecision(market=market, action='hold', reason='still_holding',
-                        metadata={'high_pct': high_pct, 'cur_pct': cur_pct})
+    return ExitDecision(
+        market=market, action="hold", reason="still_holding", metadata={"high_pct": high_pct, "cur_pct": cur_pct}
+    )
 
 
 def should_partial_tp(
@@ -83,13 +88,13 @@ def should_partial_tp(
     """Take partial profit when up ≥ target_pct AND no partial taken yet."""
     cur_pct = derive_unrealised_pct(buy_price, current_price)
     if partial_already_taken_pct > 0:
-        return ExitDecision(market=market, action='hold', reason='partial_already_taken')
+        return ExitDecision(market=market, action="hold", reason="partial_already_taken")
     if cur_pct < target_pct:
-        return ExitDecision(market=market, action='hold', reason=f'below_target({cur_pct:.2f}<{target_pct})')
+        return ExitDecision(market=market, action="hold", reason=f"below_target({cur_pct:.2f}<{target_pct})")
     return ExitDecision(
         market=market,
-        action='partial_tp',
-        reason=f'at_target({cur_pct:.2f}%)',
+        action="partial_tp",
+        reason=f"at_target({cur_pct:.2f}%)",
         sell_amount_pct=sell_fraction * 100,
-        metadata={'cur_pct': cur_pct},
+        metadata={"cur_pct": cur_pct},
     )

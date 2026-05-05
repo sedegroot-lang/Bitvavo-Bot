@@ -11,10 +11,10 @@ Usage:
     audit_log("DCA", "LINK-EUR", {"level": 1, "price": 7.00, "amount": 5.0})
     audit_log("STALE_FIX", "LINK-EUR", {"old_bp": 0.50, "new_bp": 7.73})
 """
+
 from __future__ import annotations
 
 import json
-import os
 import threading
 import time
 from pathlib import Path
@@ -29,10 +29,27 @@ _lock = threading.Lock()
 
 # Valid event types
 VALID_EVENTS = {
-    "BUY", "SELL", "DCA", "PYRAMID", "SL_HARD", "SL_TRAILING", "SL_DRAWDOWN",
-    "SL_MAX_AGE", "TP_PARTIAL", "TP_FULL", "SYNC_REMOVED", "SYNC_ADDED",
-    "STALE_FIX", "CONFIG_CHANGE", "CIRCUIT_BREAKER", "RESTART", "ERROR",
-    "DUST_SWEEP", "MANUAL_SELL", "GRID_BUY", "GRID_SELL",
+    "BUY",
+    "SELL",
+    "DCA",
+    "PYRAMID",
+    "SL_HARD",
+    "SL_TRAILING",
+    "SL_DRAWDOWN",
+    "SL_MAX_AGE",
+    "TP_PARTIAL",
+    "TP_FULL",
+    "SYNC_REMOVED",
+    "SYNC_ADDED",
+    "STALE_FIX",
+    "CONFIG_CHANGE",
+    "CIRCUIT_BREAKER",
+    "RESTART",
+    "ERROR",
+    "DUST_SWEEP",
+    "MANUAL_SELL",
+    "GRID_BUY",
+    "GRID_SELL",
 }
 
 

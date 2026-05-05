@@ -5,6 +5,7 @@ rolling spreads and generates entry/exit signals but does not place orders unles
 callers explicitly plug in an execution callback.  The goal is to pilot Golf 3
 hedge ideas without touching the main trading loop yet.
 """
+
 from __future__ import annotations
 
 import json
@@ -12,12 +13,12 @@ import math
 import statistics
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional
+from typing import Callable, Dict, List, Optional
 
-from modules.logging_utils import log
 from modules.bitvavo_client import get_bitvavo
+from modules.logging_utils import log
 
 # Types
 PriceFetcher = Callable[[str], Optional[float]]
@@ -99,9 +100,7 @@ class PairsArbitrageEngine:
         self.price_fetcher = price_fetcher or self._default_price_fetcher
         self.signal_executor = signal_executor
         self.pairs = self._load_pairs()
-        self.trackers: Dict[str, RollingSpread] = {
-            p.key: RollingSpread(self.spread_window) for p in self.pairs
-        }
+        self.trackers: Dict[str, RollingSpread] = {p.key: RollingSpread(self.spread_window) for p in self.pairs}
         self.states: Dict[str, PairState] = {p.key: PairState() for p in self.pairs}
 
     # ------------------------------------------------------------------
@@ -125,7 +124,9 @@ class PairsArbitrageEngine:
                     hedge_ratio=float(entry.get("hedge_ratio", self.settings.get("default_hedge_ratio", 1.0))),
                     z_entry=float(entry.get("z_entry", self.settings.get("default_z_entry", 2.0))),
                     z_exit=float(entry.get("z_exit", self.settings.get("default_z_exit", 0.5))),
-                    max_notional_eur=float(entry.get("max_notional_eur", self.settings.get("default_notional_cap_eur", 50.0))),
+                    max_notional_eur=float(
+                        entry.get("max_notional_eur", self.settings.get("default_notional_cap_eur", 50.0))
+                    ),
                     dry_run=bool(entry.get("dry_run", True)),
                     enabled=bool(entry.get("enabled", True)),
                 )
@@ -175,16 +176,13 @@ class PairsArbitrageEngine:
         try:
             payload = {
                 "ts": time.time(),
-                "pairs": {
-                    key: state.__dict__
-                    for key, state in self.states.items()
-                },
+                "pairs": {key: state.__dict__ for key, state in self.states.items()},
             }
             self.state_path.parent.mkdir(parents=True, exist_ok=True)
             self.state_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         except Exception as exc:
             log(f"[pairs] Kon state niet wegschrijven: {exc}", level="warning")
-    
+
     def _update_heartbeat(self) -> None:
         try:
             summary = {

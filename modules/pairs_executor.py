@@ -5,13 +5,14 @@ responsible for translating statistical signals into two coordinated Bitvavo
 orders (one per leg).  It purposely runs outside of the main trailing bot so it
 never touches ``trade_log.json`` nor the global heartbeat counters.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from modules.bitvavo_client import get_bitvavo, place_market_order
 from modules.json_compat import write_json_compat

@@ -10,7 +10,7 @@ Design: pure helpers, no I/O. Caller passes candle dicts; returns bool/score.
 from __future__ import annotations
 
 import math
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 
 def pearson_correlation(a: Sequence[float], b: Sequence[float]) -> Optional[float]:

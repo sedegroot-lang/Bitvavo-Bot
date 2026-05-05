@@ -2,6 +2,7 @@
 
 Extracted from trailing_bot.py (Fase 3, Phase 1).
 """
+
 from __future__ import annotations
 
 from typing import Any, Optional
@@ -15,9 +16,9 @@ def as_bool(value: Any, default: bool = False) -> bool:
         return default
     if isinstance(value, str):
         lowered = value.strip().lower()
-        if lowered in {'true', '1', 'yes', 'y', 'on'}:
+        if lowered in {"true", "1", "yes", "y", "on"}:
             return True
-        if lowered in {'false', '0', 'no', 'n', 'off'}:
+        if lowered in {"false", "0", "no", "n", "off"}:
             return False
     try:
         return bool(int(value))
@@ -73,6 +74,7 @@ def coerce_positive_float(value: Any) -> Optional[float]:
         return None
     try:
         import math
+
         if not math.isfinite(coerced):
             return None
     except Exception:

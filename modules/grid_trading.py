@@ -15,41 +15,46 @@ Usage from trailing_bot.py:
 """
 
 import json
-import os
-import time
 import math
+import os
 import statistics
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, field, asdict
-from decimal import Decimal, ROUND_DOWN
+import time
+from dataclasses import asdict, dataclass, field
+from decimal import ROUND_DOWN, Decimal
+from typing import Any, Dict, List, Optional, Tuple
 
 # Project imports
 try:
     from modules.json_compat import write_json_compat
     from modules.logging_utils import log
 except ImportError:
+
     def write_json_compat(path, data, **kwargs):
-        with open(path, 'w', encoding='utf-8') as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, **kwargs)
-    def log(msg, level='info'):
+
+    def log(msg, level="info"):
         print(f"[{level.upper()}] {msg}")
 
+
 # Fee constants
-MAKER_FEE_PCT = 0.0015   # 0.15% per side for limit orders
-TAKER_FEE_PCT = 0.0025   # 0.25% per side for market orders
+MAKER_FEE_PCT = 0.0015  # 0.15% per side for limit orders
+TAKER_FEE_PCT = 0.0025  # 0.25% per side for market orders
 MIN_GRID_SPACING_PCT = 0.005  # 0.50% minimum spacing (to exceed 2x maker fee)
 
 
 # ================= DATA CLASSES =================
 
+
 @dataclass
 class GridLevel:
     """Represents a single grid level with a real Bitvavo order."""
+
     level_id: int
     price: float
-    side: str               # 'buy' or 'sell'
-    amount: float           # base currency amount
-    status: str = 'pending' # 'pending', 'placed', 'filled', 'cancelled', 'error'
+    side: str  # 'buy' or 'sell'
+    amount: float  # base currency amount
+    status: str = "pending"  # 'pending', 'placed', 'filled', 'cancelled', 'error'
     order_id: Optional[str] = None
     filled_at: Optional[float] = None
     filled_price: Optional[float] = None
@@ -61,28 +66,30 @@ class GridLevel:
 @dataclass
 class GridConfig:
     """Configuration for a grid trading instance."""
+
     market: str
     lower_price: float
     upper_price: float
     num_grids: int = 10
     total_investment: float = 50.0
-    grid_mode: str = 'arithmetic'   # 'arithmetic' or 'geometric'
+    grid_mode: str = "arithmetic"  # 'arithmetic' or 'geometric'
     auto_rebalance: bool = True
-    stop_loss_pct: float = 0.15     # 15% stop loss
-    take_profit_pct: float = 0.20   # 20% take profit
-    trailing_tp_enabled: bool = False   # Enable trailing take-profit
+    stop_loss_pct: float = 0.15  # 15% stop loss
+    take_profit_pct: float = 0.20  # 20% take profit
+    trailing_tp_enabled: bool = False  # Enable trailing take-profit
     trailing_tp_callback_pct: float = 0.03  # 3% callback from peak profit
-    profit_compounding: bool = True     # Reinvest cycle profits into next orders
-    volatility_adaptive: bool = True    # Auto-adjust grid density to volatility
-    inventory_skew: bool = True         # Skew counter-order prices by inventory imbalance
+    profit_compounding: bool = True  # Reinvest cycle profits into next orders
+    volatility_adaptive: bool = True  # Auto-adjust grid density to volatility
+    inventory_skew: bool = True  # Skew counter-order prices by inventory imbalance
     enabled: bool = True
     created_at: float = field(default_factory=time.time)
-    auto_created: bool = False      # True if auto-selected by the bot
+    auto_created: bool = False  # True if auto-selected by the bot
 
 
 @dataclass
 class GridState:
     """Current state of a grid trading instance."""
+
     config: GridConfig
     levels: List[GridLevel] = field(default_factory=list)
     current_price: float = 0.0
@@ -90,20 +97,21 @@ class GridState:
     total_fees: float = 0.0
     total_trades: int = 0
     last_update: float = field(default_factory=time.time)
-    status: str = 'initializing'  # 'initializing', 'placing_orders', 'running', 'paused', 'stopped', 'error'
+    status: str = "initializing"  # 'initializing', 'placing_orders', 'running', 'paused', 'stopped', 'error'
     base_balance: float = 0.0
     quote_balance: float = 0.0
     rebalance_count: int = 0
     last_rebalance: Optional[float] = None
     last_order_check: float = 0.0
     error_count: int = 0
-    trailing_tp_peak: float = 0.0        # Highest profit seen (for trailing TP)
-    trailing_tp_active: bool = False     # Whether trailing TP has been activated
-    last_buy_fill_price: float = 0.0     # Actual fill price of last buy (for cost basis)
+    trailing_tp_peak: float = 0.0  # Highest profit seen (for trailing TP)
+    trailing_tp_active: bool = False  # Whether trailing TP has been activated
+    last_buy_fill_price: float = 0.0  # Actual fill price of last buy (for cost basis)
     price_ladder: List[float] = field(default_factory=list)  # Sorted grid price levels for counter-order placement
 
 
 # ================= GRID MANAGER =================
+
 
 class GridManager:
     """
@@ -117,8 +125,8 @@ class GridManager:
     5. Respect exposure limits and fee requirements
     """
 
-    GRID_STATE_FILE = 'data/grid_states.json'
-    GRID_FILLS_LOG = 'data/grid_fills_log.json'
+    GRID_STATE_FILE = "data/grid_states.json"
+    GRID_FILLS_LOG = "data/grid_fills_log.json"
     ORDER_CHECK_INTERVAL = 30  # seconds between order status checks
 
     def __init__(self, bitvavo_client=None, config: dict = None):
@@ -131,13 +139,14 @@ class GridManager:
 
     def _get_grid_config(self) -> dict:
         """Get GRID_TRADING config section from bot config."""
-        return self.bot_config.get('GRID_TRADING', {})
+        return self.bot_config.get("GRID_TRADING", {})
 
     def _get_api(self):
         """Lazy-load bot.api module for normalization functions."""
         if self._api_module is None:
             try:
                 import bot.api as api_mod
+
                 self._api_module = api_mod
             except ImportError:
                 self._api_module = None
@@ -151,7 +160,7 @@ class GridManager:
                 return api.safe_call(func, *args, **kwargs)
             return func(*args, **kwargs)
         except Exception as e:
-            log(f"[Grid] API call failed: {e}", level='error')
+            log(f"[Grid] API call failed: {e}", level="error")
             return None
 
     def _get_market_info(self, market: str) -> dict:
@@ -162,7 +171,7 @@ class GridManager:
         info = {}
         # Try bot.api first
         api = self._get_api()
-        if api and hasattr(api, 'get_market_info'):
+        if api and hasattr(api, "get_market_info"):
             try:
                 info = api.get_market_info(market) or {}
             except Exception:
@@ -171,10 +180,10 @@ class GridManager:
         # Fallback: fetch directly from our own bitvavo client
         if not info and self.bitvavo:
             try:
-                resp = self._safe_call(self.bitvavo.markets, {'market': market})
+                resp = self._safe_call(self.bitvavo.markets, {"market": market})
                 if isinstance(resp, list) and resp:
                     info = resp[0]
-                elif isinstance(resp, dict) and not resp.get('errorCode'):
+                elif isinstance(resp, dict) and not resp.get("errorCode"):
                     info = resp
             except Exception:
                 pass
@@ -187,7 +196,7 @@ class GridManager:
         """Normalize amount to valid precision for market."""
         # Try bot.api first (best source)
         api = self._get_api()
-        if api and hasattr(api, 'normalize_amount'):
+        if api and hasattr(api, "normalize_amount"):
             try:
                 result = api.normalize_amount(market, amount)
                 if result and result > 0:
@@ -198,7 +207,7 @@ class GridManager:
         # Fallback: use our own market info
         info = self._get_market_info(market)
         if info:
-            min_amt = info.get('minOrderInBaseAsset') or info.get('minOrderAmount')
+            min_amt = info.get("minOrderInBaseAsset") or info.get("minOrderAmount")
             if min_amt:
                 try:
                     d_amt = Decimal(str(amount))
@@ -208,13 +217,13 @@ class GridManager:
                 except Exception:
                     pass
 
-        return float(Decimal(str(amount)).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN))
+        return float(Decimal(str(amount)).quantize(Decimal("0.00000001"), rounding=ROUND_DOWN))
 
     def _normalize_price(self, market: str, price: float) -> float:
         """Normalize price to valid tick size for market."""
         # Try bot.api first
         api = self._get_api()
-        if api and hasattr(api, 'normalize_price'):
+        if api and hasattr(api, "normalize_price"):
             try:
                 result = api.normalize_price(market, price)
                 if result and result > 0:
@@ -225,55 +234,55 @@ class GridManager:
         # Fallback: use our own market info (tick size)
         info = self._get_market_info(market)
         if info:
-            tick_size = info.get('tickSize')
+            tick_size = info.get("tickSize")
             if tick_size:
                 try:
                     d_px = Decimal(str(price))
                     d_tick = Decimal(str(tick_size))
                     units = (d_px / d_tick).to_integral_value(rounding=ROUND_DOWN)
                     result = float(units * d_tick)
-                    log(f"[Grid] _normalize_price {market}: {price} -> {result} (tick={tick_size})", level='debug')
+                    log(f"[Grid] _normalize_price {market}: {price} -> {result} (tick={tick_size})", level="debug")
                     return result
                 except Exception as e:
-                    log(f"[Grid] Tick normalization failed {market}: {e}", level='warning')
+                    log(f"[Grid] Tick normalization failed {market}: {e}", level="warning")
 
         # Last resort: round to 2 decimals
-        return float(Decimal(str(price)).quantize(Decimal('0.01'), rounding=ROUND_DOWN))
+        return float(Decimal(str(price)).quantize(Decimal("0.01"), rounding=ROUND_DOWN))
 
     def _get_min_order_size(self, market: str) -> float:
         """Get minimum order size for market."""
         api = self._get_api()
-        if api and hasattr(api, 'get_min_order_size'):
+        if api and hasattr(api, "get_min_order_size"):
             return api.get_min_order_size(market)
         return 0.0
 
     def _get_current_price(self, market: str) -> Optional[float]:
         """Get current market price."""
         api = self._get_api()
-        if api and hasattr(api, 'get_current_price'):
+        if api and hasattr(api, "get_current_price"):
             return api.get_current_price(market, force_refresh=True)
         if self.bitvavo:
             try:
-                ticker = self._safe_call(self.bitvavo.tickerPrice, {'market': market})
-                if ticker and 'price' in ticker:
-                    return float(ticker['price'])
+                ticker = self._safe_call(self.bitvavo.tickerPrice, {"market": market})
+                if ticker and "price" in ticker:
+                    return float(ticker["price"])
             except Exception:
                 pass
         return None
 
-    def _get_candles(self, market: str, interval: str = '1h', limit: int = 48) -> list:
+    def _get_candles(self, market: str, interval: str = "1h", limit: int = 48) -> list:
         """Get OHLCV candles for volatility calculation."""
         api = self._get_api()
-        if api and hasattr(api, 'get_candles'):
+        if api and hasattr(api, "get_candles"):
             return api.get_candles(market, interval, limit) or []
         if self.bitvavo:
             try:
-                return self._safe_call(self.bitvavo.candles, market, interval, {'limit': limit}) or []
+                return self._safe_call(self.bitvavo.candles, market, interval, {"limit": limit}) or []
             except Exception:
                 pass
         return []
 
-    def _get_candles_safe(self, market: str, interval: str = '1m', limit: int = 100) -> list:
+    def _get_candles_safe(self, market: str, interval: str = "1m", limit: int = 100) -> list:
         """Get candles with error handling (returns [] on failure)."""
         try:
             return self._get_candles(market, interval, limit)
@@ -284,7 +293,7 @@ class GridManager:
         """Get available EUR balance via bot.api or direct bitvavo call."""
         # Try bot.api first (cached, preferred)
         api = self._get_api()
-        if api and hasattr(api, 'get_eur_balance'):
+        if api and hasattr(api, "get_eur_balance"):
             try:
                 bal = api.get_eur_balance(force_refresh=False)
                 if bal and bal > 0:
@@ -297,16 +306,16 @@ class GridManager:
                 balances = self._safe_call(self.bitvavo.balance, {})
                 if isinstance(balances, list):
                     for entry in balances:
-                        if isinstance(entry, dict) and entry.get('symbol') == 'EUR':
-                            return float(entry.get('available', 0.0))
+                        if isinstance(entry, dict) and entry.get("symbol") == "EUR":
+                            return float(entry.get("available", 0.0))
             except Exception as e:
-                log(f"[Grid] EUR balance fallback failed: {e}", level='warning')
+                log(f"[Grid] EUR balance fallback failed: {e}", level="warning")
         return 0.0
 
     def _get_total_eur_balance(self) -> float:
         """Get TOTAL EUR balance (available + inOrder) for dynamic budget calc."""
         api = self._get_api()
-        if api and hasattr(api, 'get_eur_balance'):
+        if api and hasattr(api, "get_eur_balance"):
             try:
                 avail = api.get_eur_balance(force_refresh=True) or 0.0
                 # Also get inOrder via balance API
@@ -314,8 +323,8 @@ class GridManager:
                     balances = self._safe_call(self.bitvavo.balance, {})
                     if isinstance(balances, list):
                         for entry in balances:
-                            if isinstance(entry, dict) and entry.get('symbol') == 'EUR':
-                                return float(entry.get('available', 0.0)) + float(entry.get('inOrder', 0.0))
+                            if isinstance(entry, dict) and entry.get("symbol") == "EUR":
+                                return float(entry.get("available", 0.0)) + float(entry.get("inOrder", 0.0))
                 return avail
             except Exception:
                 pass
@@ -324,10 +333,10 @@ class GridManager:
                 balances = self._safe_call(self.bitvavo.balance, {})
                 if isinstance(balances, list):
                     for entry in balances:
-                        if isinstance(entry, dict) and entry.get('symbol') == 'EUR':
-                            return float(entry.get('available', 0.0)) + float(entry.get('inOrder', 0.0))
+                        if isinstance(entry, dict) and entry.get("symbol") == "EUR":
+                            return float(entry.get("available", 0.0)) + float(entry.get("inOrder", 0.0))
             except Exception as e:
-                log(f"[Grid] Total EUR balance failed: {e}", level='warning')
+                log(f"[Grid] Total EUR balance failed: {e}", level="warning")
         return 0.0
 
     def _get_total_account_value(self) -> float:
@@ -342,12 +351,16 @@ class GridManager:
         # Method 1: Use bot.shared exposure function (preferred, includes open trades)
         try:
             from bot.shared import state as _shared
-            if hasattr(_shared, 'current_open_exposure_eur') and callable(_shared.current_open_exposure_eur):
+
+            if hasattr(_shared, "current_open_exposure_eur") and callable(_shared.current_open_exposure_eur):
                 exp = _shared.current_open_exposure_eur(include_dust=True)
                 if exp and exp > 0:
                     crypto_value = exp
-                    log(f"[Grid] Account value: EUR={eur_total:.2f} + crypto={crypto_value:.2f} "
-                        f"= {eur_total + crypto_value:.2f}", level='debug')
+                    log(
+                        f"[Grid] Account value: EUR={eur_total:.2f} + crypto={crypto_value:.2f} "
+                        f"= {eur_total + crypto_value:.2f}",
+                        level="debug",
+                    )
                     return eur_total + crypto_value
         except Exception:
             pass
@@ -360,11 +373,11 @@ class GridManager:
                     for entry in balances:
                         if not isinstance(entry, dict):
                             continue
-                        sym = entry.get('symbol', '')
-                        if sym == 'EUR':
+                        sym = entry.get("symbol", "")
+                        if sym == "EUR":
                             continue
-                        avail = float(entry.get('available', 0) or 0)
-                        in_order = float(entry.get('inOrder', 0) or 0)
+                        avail = float(entry.get("available", 0) or 0)
+                        in_order = float(entry.get("inOrder", 0) or 0)
                         total_coins = avail + in_order
                         if total_coins <= 0:
                             continue
@@ -373,12 +386,11 @@ class GridManager:
                         if price and price > 0:
                             crypto_value += total_coins * price
             except Exception as e:
-                log(f"[Grid] Crypto valuation failed: {e}", level='warning')
+                log(f"[Grid] Crypto valuation failed: {e}", level="warning")
 
         total = eur_total + crypto_value
         if total > 0:
-            log(f"[Grid] Account value: EUR={eur_total:.2f} + crypto={crypto_value:.2f} "
-                f"= {total:.2f}", level='debug')
+            log(f"[Grid] Account value: EUR={eur_total:.2f} + crypto={crypto_value:.2f} = {total:.2f}", level="debug")
         return total if total > 0 else eur_total
 
     # ==================== STATE PERSISTENCE ====================
@@ -387,47 +399,48 @@ class GridManager:
         """Load grid states from disk, comparing OneDrive vs local copy."""
         try:
             if os.path.exists(self.GRID_STATE_FILE):
-                with open(self.GRID_STATE_FILE, 'r', encoding='utf-8-sig') as f:
+                with open(self.GRID_STATE_FILE, "r", encoding="utf-8-sig") as f:
                     data = json.load(f)
                 # Use the freshest copy (local vs OneDrive)
                 try:
                     from core.local_state import load_freshest
+
                     freshest = load_freshest(self.GRID_STATE_FILE, data)
                     if freshest:
-                        freshest.pop('_save_ts', None)
+                        freshest.pop("_save_ts", None)
                         data = freshest
                 except Exception:
                     pass
 
                 for market, state_data in data.items():
-                    config_data = state_data.get('config', {})
-                    config = GridConfig(**{k: v for k, v in config_data.items()
-                                          if k in GridConfig.__dataclass_fields__})
+                    config_data = state_data.get("config", {})
+                    config = GridConfig(
+                        **{k: v for k, v in config_data.items() if k in GridConfig.__dataclass_fields__}
+                    )
 
                     levels = []
-                    for ld in state_data.get('levels', []):
-                        levels.append(GridLevel(**{k: v for k, v in ld.items()
-                                                   if k in GridLevel.__dataclass_fields__}))
+                    for ld in state_data.get("levels", []):
+                        levels.append(GridLevel(**{k: v for k, v in ld.items() if k in GridLevel.__dataclass_fields__}))
 
                     self.grids[market] = GridState(
                         config=config,
                         levels=levels,
-                        current_price=state_data.get('current_price', 0),
-                        total_profit=state_data.get('total_profit', 0),
-                        total_fees=state_data.get('total_fees', 0),
-                        total_trades=state_data.get('total_trades', 0),
-                        last_update=state_data.get('last_update', 0),
-                        status=state_data.get('status', 'stopped'),
-                        base_balance=state_data.get('base_balance', 0),
-                        quote_balance=state_data.get('quote_balance', 0),
-                        rebalance_count=state_data.get('rebalance_count', 0),
-                        last_rebalance=state_data.get('last_rebalance'),
-                        last_order_check=state_data.get('last_order_check', 0),
-                        error_count=state_data.get('error_count', 0),
-                        trailing_tp_peak=state_data.get('trailing_tp_peak', 0),
-                        trailing_tp_active=state_data.get('trailing_tp_active', False),
-                        last_buy_fill_price=state_data.get('last_buy_fill_price', 0.0),
-                        price_ladder=state_data.get('price_ladder', []),
+                        current_price=state_data.get("current_price", 0),
+                        total_profit=state_data.get("total_profit", 0),
+                        total_fees=state_data.get("total_fees", 0),
+                        total_trades=state_data.get("total_trades", 0),
+                        last_update=state_data.get("last_update", 0),
+                        status=state_data.get("status", "stopped"),
+                        base_balance=state_data.get("base_balance", 0),
+                        quote_balance=state_data.get("quote_balance", 0),
+                        rebalance_count=state_data.get("rebalance_count", 0),
+                        last_rebalance=state_data.get("last_rebalance"),
+                        last_order_check=state_data.get("last_order_check", 0),
+                        error_count=state_data.get("error_count", 0),
+                        trailing_tp_peak=state_data.get("trailing_tp_peak", 0),
+                        trailing_tp_active=state_data.get("trailing_tp_active", False),
+                        last_buy_fill_price=state_data.get("last_buy_fill_price", 0.0),
+                        price_ladder=state_data.get("price_ladder", []),
                     )
                     # Ensure price_ladder is populated (backfill from config if missing)
                     gs = self.grids[market]
@@ -439,16 +452,18 @@ class GridManager:
                     # Sync runtime config from bot_config to existing grids
                     # (in case settings were changed after grid creation)
                     gcfg = self._get_grid_config()
-                    if gcfg.get('enabled'):
+                    if gcfg.get("enabled"):
                         for market, state in self.grids.items():
                             cfg = state.config
-                            cfg.trailing_tp_enabled = bool(gcfg.get('trailing_tp_enabled', cfg.trailing_tp_enabled))
-                            cfg.trailing_tp_callback_pct = float(gcfg.get('trailing_tp_callback_pct', cfg.trailing_tp_callback_pct))
-                            cfg.take_profit_pct = float(gcfg.get('take_profit_pct', cfg.take_profit_pct))
-                            cfg.stop_loss_pct = float(gcfg.get('stop_loss_pct', cfg.stop_loss_pct))
-                            cfg.profit_compounding = bool(gcfg.get('profit_compounding', cfg.profit_compounding))
-                            cfg.volatility_adaptive = bool(gcfg.get('volatility_adaptive', cfg.volatility_adaptive))
-                            cfg.inventory_skew = bool(gcfg.get('inventory_skew', cfg.inventory_skew))
+                            cfg.trailing_tp_enabled = bool(gcfg.get("trailing_tp_enabled", cfg.trailing_tp_enabled))
+                            cfg.trailing_tp_callback_pct = float(
+                                gcfg.get("trailing_tp_callback_pct", cfg.trailing_tp_callback_pct)
+                            )
+                            cfg.take_profit_pct = float(gcfg.get("take_profit_pct", cfg.take_profit_pct))
+                            cfg.stop_loss_pct = float(gcfg.get("stop_loss_pct", cfg.stop_loss_pct))
+                            cfg.profit_compounding = bool(gcfg.get("profit_compounding", cfg.profit_compounding))
+                            cfg.volatility_adaptive = bool(gcfg.get("volatility_adaptive", cfg.volatility_adaptive))
+                            cfg.inventory_skew = bool(gcfg.get("inventory_skew", cfg.inventory_skew))
                         self._save_states()
                         log(f"[Grid] Synced runtime config to {len(self.grids)} grids")
 
@@ -460,11 +475,13 @@ class GridManager:
                             derived = self._derive_cost_from_exchange(market)
                             if derived > 0:
                                 state.last_buy_fill_price = derived
-                                log(f"[Grid] {market}: recovered cost basis {derived:.2f} "
-                                    f"from exchange (was lost)", level='warning')
+                                log(
+                                    f"[Grid] {market}: recovered cost basis {derived:.2f} from exchange (was lost)",
+                                    level="warning",
+                                )
                                 self._save_states()
         except Exception as e:
-            log(f"[Grid] Failed to load states: {e}", level='warning')
+            log(f"[Grid] Failed to load states: {e}", level="warning")
 
     def _save_states(self) -> None:
         """Save grid states to disk."""
@@ -472,36 +489,37 @@ class GridManager:
             data = {}
             for market, state in self.grids.items():
                 data[market] = {
-                    'config': asdict(state.config),
-                    'levels': [asdict(level) for level in state.levels],
-                    'current_price': state.current_price,
-                    'total_profit': state.total_profit,
-                    'total_fees': state.total_fees,
-                    'total_trades': state.total_trades,
-                    'last_update': state.last_update,
-                    'status': state.status,
-                    'base_balance': state.base_balance,
-                    'quote_balance': state.quote_balance,
-                    'rebalance_count': state.rebalance_count,
-                    'last_rebalance': state.last_rebalance,
-                    'last_order_check': state.last_order_check,
-                    'error_count': state.error_count,
-                    'trailing_tp_peak': state.trailing_tp_peak,
-                    'trailing_tp_active': state.trailing_tp_active,
-                    'last_buy_fill_price': state.last_buy_fill_price,
-                    'price_ladder': state.price_ladder,
+                    "config": asdict(state.config),
+                    "levels": [asdict(level) for level in state.levels],
+                    "current_price": state.current_price,
+                    "total_profit": state.total_profit,
+                    "total_fees": state.total_fees,
+                    "total_trades": state.total_trades,
+                    "last_update": state.last_update,
+                    "status": state.status,
+                    "base_balance": state.base_balance,
+                    "quote_balance": state.quote_balance,
+                    "rebalance_count": state.rebalance_count,
+                    "last_rebalance": state.last_rebalance,
+                    "last_order_check": state.last_order_check,
+                    "error_count": state.error_count,
+                    "trailing_tp_peak": state.trailing_tp_peak,
+                    "trailing_tp_active": state.trailing_tp_active,
+                    "last_buy_fill_price": state.last_buy_fill_price,
+                    "price_ladder": state.price_ladder,
                 }
 
-            os.makedirs(os.path.dirname(self.GRID_STATE_FILE) or '.', exist_ok=True)
+            os.makedirs(os.path.dirname(self.GRID_STATE_FILE) or ".", exist_ok=True)
             write_json_compat(self.GRID_STATE_FILE, data, indent=2)
             # Mirror to %LOCALAPPDATA% — safe from OneDrive reverts
             try:
                 from core.local_state import mirror_to_local
+
                 mirror_to_local(self.GRID_STATE_FILE, data)
             except Exception:
                 pass
         except Exception as e:
-            log(f"[Grid] Failed to save states: {e}", level='error')
+            log(f"[Grid] Failed to save states: {e}", level="error")
 
     def _derive_cost_from_exchange(self, market: str) -> float:
         """Query Bitvavo for the most recent buy fill price on this market.
@@ -511,42 +529,41 @@ class GridManager:
         no buy found or API fails.
         """
         try:
-            trades = self._safe_call(self.bitvavo.trades, market, {'limit': 20})
+            trades = self._safe_call(self.bitvavo.trades, market, {"limit": 20})
             if not trades or not isinstance(trades, list):
                 return 0.0
             for t in trades:
-                if isinstance(t, dict) and t.get('side') == 'buy':
-                    price = float(t.get('price', 0) or 0)
+                if isinstance(t, dict) and t.get("side") == "buy":
+                    price = float(t.get("price", 0) or 0)
                     if price > 0:
-                        log(f"[Grid] {market}: derived cost basis from exchange: "
-                            f"last buy @ {price:.2f}", level='info')
+                        log(f"[Grid] {market}: derived cost basis from exchange: last buy @ {price:.2f}", level="info")
                         return price
         except Exception as e:
-            log(f"[Grid] {market}: failed to derive cost from exchange: {e}",
-                level='warning')
+            log(f"[Grid] {market}: failed to derive cost from exchange: {e}", level="warning")
         return 0.0
 
-    def _log_fill(self, market: str, side: str, price: float, amount: float,
-                  fee: float, profit: float = 0.0, level_id: int = 0) -> None:
+    def _log_fill(
+        self, market: str, side: str, price: float, amount: float, fee: float, profit: float = 0.0, level_id: int = 0
+    ) -> None:
         """Append a filled grid order to the persistent fills log.
 
         This survives rebalances (which replace levels in grid_states.json).
         """
         entry = {
-            'market': market,
-            'side': side,
-            'price': price,
-            'amount': amount,
-            'value_eur': round(amount * price, 4),
-            'fee': round(fee, 4),
-            'profit': round(profit, 4),
-            'level_id': level_id,
-            'timestamp': time.time(),
+            "market": market,
+            "side": side,
+            "price": price,
+            "amount": amount,
+            "value_eur": round(amount * price, 4),
+            "fee": round(fee, 4),
+            "profit": round(profit, 4),
+            "level_id": level_id,
+            "timestamp": time.time(),
         }
         try:
             fills = []
             if os.path.exists(self.GRID_FILLS_LOG):
-                with open(self.GRID_FILLS_LOG, 'r', encoding='utf-8') as f:
+                with open(self.GRID_FILLS_LOG, "r", encoding="utf-8") as f:
                     fills = json.load(f)
                 if not isinstance(fills, list):
                     fills = []
@@ -556,18 +573,18 @@ class GridManager:
                 fills = fills[-500:]
             write_json_compat(self.GRID_FILLS_LOG, fills, indent=2)
         except Exception as e:
-            log(f"[Grid] Failed to log fill: {e}", level='warning')
+            log(f"[Grid] Failed to log fill: {e}", level="warning")
 
     def get_fills_history(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Return the last N grid fills from the persistent log, newest first."""
         try:
             if os.path.exists(self.GRID_FILLS_LOG):
-                with open(self.GRID_FILLS_LOG, 'r', encoding='utf-8') as f:
+                with open(self.GRID_FILLS_LOG, "r", encoding="utf-8") as f:
                     fills = json.load(f)
                 if isinstance(fills, list):
                     return list(reversed(fills[-limit:]))
         except Exception as e:
-            log(f"[Grid] Failed to read fills log: {e}", level='warning')
+            log(f"[Grid] Failed to read fills log: {e}", level="warning")
         return []
 
     # ==================== ORDER EXECUTION ====================
@@ -578,52 +595,54 @@ class GridManager:
         Returns order response dict or None on failure.
         """
         if not self.bitvavo:
-            log("[Grid] Cannot place order: no Bitvavo client", level='error')
+            log("[Grid] Cannot place order: no Bitvavo client", level="error")
             return None
 
         norm_amount = self._normalize_amount(market, amount)
         norm_price = self._normalize_price(market, price)
 
         if norm_amount <= 0:
-            log(f"[Grid] Amount normalized to 0 for {market}, skipping", level='warning')
+            log(f"[Grid] Amount normalized to 0 for {market}, skipping", level="warning")
             return None
 
         min_size = self._get_min_order_size(market)
         if min_size > 0 and norm_amount < min_size:
-            log(f"[Grid] Amount {norm_amount} < min {min_size} for {market}", level='warning')
+            log(f"[Grid] Amount {norm_amount} < min {min_size} for {market}", level="warning")
             return None
 
         # Check minimum order value (Bitvavo requires >= 5 EUR)
         # Use round() to avoid floating-point artefacts like 4.9999999 showing as "5.00"
         order_value = norm_amount * norm_price
         if round(order_value, 2) < 5.0:
-            log(f"[Grid] Order value {order_value:.4f} EUR < 5 EUR minimum for {market}", level='warning')
+            log(f"[Grid] Order value {order_value:.4f} EUR < 5 EUR minimum for {market}", level="warning")
             return None
 
         params = {
-            'amount': str(norm_amount),
-            'price': str(norm_price),
+            "amount": str(norm_amount),
+            "price": str(norm_price),
         }
 
         # Add operator ID if available
-        operator_id = self.bot_config.get('OPERATOR_ID')
+        operator_id = self.bot_config.get("OPERATOR_ID")
         if operator_id:
-            params['operatorId'] = str(operator_id)
+            params["operatorId"] = str(operator_id)
 
         try:
-            resp = self._safe_call(self.bitvavo.placeOrder, market, side, 'limit', params)
+            resp = self._safe_call(self.bitvavo.placeOrder, market, side, "limit", params)
 
-            if isinstance(resp, dict) and not resp.get('error') and not resp.get('errorCode'):
-                order_id = resp.get('orderId', '')
-                log(f"[Grid] {side.upper()} limit placed: {market} "
-                    f"{norm_amount} @ {norm_price} (id={order_id})", level='info')
+            if isinstance(resp, dict) and not resp.get("error") and not resp.get("errorCode"):
+                order_id = resp.get("orderId", "")
+                log(
+                    f"[Grid] {side.upper()} limit placed: {market} {norm_amount} @ {norm_price} (id={order_id})",
+                    level="info",
+                )
                 return resp
             else:
-                error_msg = str(resp.get('error', resp) if isinstance(resp, dict) else resp)
-                log(f"[Grid] Order failed {market} {side}: {error_msg}", level='error')
+                error_msg = str(resp.get("error", resp) if isinstance(resp, dict) else resp)
+                log(f"[Grid] Order failed {market} {side}: {error_msg}", level="error")
                 return None
         except Exception as e:
-            log(f"[Grid] Exception placing order {market} {side}: {e}", level='error')
+            log(f"[Grid] Exception placing order {market} {side}: {e}", level="error")
             return None
 
     def _cancel_order(self, market: str, order_id: str) -> bool:
@@ -631,19 +650,19 @@ class GridManager:
         if not self.bitvavo or not order_id:
             return False
         try:
-            operator_id = self.bot_config.get('OPERATOR_ID')
+            operator_id = self.bot_config.get("OPERATOR_ID")
             kwargs = {}
             if operator_id:
-                kwargs['operatorId'] = str(operator_id)
+                kwargs["operatorId"] = str(operator_id)
             resp = self._safe_call(self.bitvavo.cancelOrder, market, order_id, **kwargs)
-            if isinstance(resp, dict) and resp.get('orderId'):
-                log(f"[Grid] Cancelled order {order_id} for {market}", level='info')
+            if isinstance(resp, dict) and resp.get("orderId"):
+                log(f"[Grid] Cancelled order {order_id} for {market}", level="info")
                 return True
-            elif isinstance(resp, dict) and resp.get('errorCode'):
-                log(f"[Grid] Cancel order failed {market}/{order_id}: {resp.get('error')}", level='warning')
+            elif isinstance(resp, dict) and resp.get("errorCode"):
+                log(f"[Grid] Cancel order failed {market}/{order_id}: {resp.get('error')}", level="warning")
             return False
         except Exception as e:
-            log(f"[Grid] Cancel order failed {market}/{order_id}: {e}", level='warning')
+            log(f"[Grid] Cancel order failed {market}/{order_id}: {e}", level="warning")
             return False
 
     def _check_order_status(self, market: str, order_id: str) -> Optional[dict]:
@@ -654,7 +673,7 @@ class GridManager:
             resp = self._safe_call(self.bitvavo.getOrder, market, order_id)
             return resp if isinstance(resp, dict) else None
         except Exception as e:
-            log(f"[Grid] Order status check failed {market}/{order_id}: {e}", level='debug')
+            log(f"[Grid] Order status check failed {market}/{order_id}: {e}", level="debug")
             return None
 
     def _get_open_orders(self, market: str) -> list:
@@ -662,7 +681,7 @@ class GridManager:
         if not self.bitvavo:
             return []
         try:
-            resp = self._safe_call(self.bitvavo.ordersOpen, {'market': market})
+            resp = self._safe_call(self.bitvavo.ordersOpen, {"market": market})
             return resp if isinstance(resp, list) else []
         except Exception:
             return []
@@ -676,7 +695,7 @@ class GridManager:
         upper_price: float,
         num_grids: int = 10,
         total_investment: float = 50.0,
-        grid_mode: str = 'arithmetic',
+        grid_mode: str = "arithmetic",
         auto_rebalance: bool = True,
         stop_loss_pct: float = 0.15,
         take_profit_pct: float = 0.20,
@@ -689,7 +708,7 @@ class GridManager:
     ) -> Optional[GridState]:
         """Create a new grid trading configuration with calculated levels."""
         if lower_price >= upper_price:
-            log(f"[Grid] Invalid range: lower={lower_price} >= upper={upper_price}", level='error')
+            log(f"[Grid] Invalid range: lower={lower_price} >= upper={upper_price}", level="error")
             return None
 
         if num_grids < 3:
@@ -700,15 +719,21 @@ class GridManager:
         while num_grids > 3 and (total_investment / num_grids) < min_order_eur:
             num_grids -= 1
         if (total_investment / num_grids) < min_order_eur:
-            log(f"[Grid] Cannot create grid: {total_investment:.0f} EUR / {num_grids} grids "
-                f"= {total_investment/num_grids:.2f} EUR/level < {min_order_eur} EUR min", level='error')
+            log(
+                f"[Grid] Cannot create grid: {total_investment:.0f} EUR / {num_grids} grids "
+                f"= {total_investment / num_grids:.2f} EUR/level < {min_order_eur} EUR min",
+                level="error",
+            )
             return None
 
         # Verify grid spacing exceeds fees
         spacing_pct = (upper_price - lower_price) / lower_price / (num_grids - 1)
         if spacing_pct < MIN_GRID_SPACING_PCT:
-            log(f"[Grid] Grid spacing {spacing_pct*100:.2f}% < min {MIN_GRID_SPACING_PCT*100:.2f}%, "
-                f"reducing num_grids", level='warning')
+            log(
+                f"[Grid] Grid spacing {spacing_pct * 100:.2f}% < min {MIN_GRID_SPACING_PCT * 100:.2f}%, "
+                f"reducing num_grids",
+                level="warning",
+            )
             num_grids = max(3, int((upper_price - lower_price) / (lower_price * MIN_GRID_SPACING_PCT)) + 1)
 
         config = GridConfig(
@@ -732,19 +757,19 @@ class GridManager:
         # Get current price to determine buy/sell split
         current_price = self._get_current_price(market)
         if not current_price:
-            log(f"[Grid] Cannot get price for {market}", level='error')
+            log(f"[Grid] Cannot get price for {market}", level="error")
             return None
 
         levels = self._calculate_grid_levels(config, current_price)
         if not levels:
-            log(f"[Grid] No valid levels calculated for {market}", level='error')
+            log(f"[Grid] No valid levels calculated for {market}", level="error")
             return None
 
         state = GridState(
             config=config,
             levels=levels,
             current_price=current_price,
-            status='initialized',
+            status="initialized",
             quote_balance=total_investment,
             price_ladder=self._compute_full_ladder(config, market),
         )
@@ -752,8 +777,11 @@ class GridManager:
         self.grids[market] = state
         self._save_states()
 
-        log(f"[Grid] Created grid for {market}: {len(levels)} levels, "
-            f"{lower_price:.2f}-{upper_price:.2f}, investment={total_investment:.0f} EUR", level='info')
+        log(
+            f"[Grid] Created grid for {market}: {len(levels)} levels, "
+            f"{lower_price:.2f}-{upper_price:.2f}, investment={total_investment:.0f} EUR",
+            level="info",
+        )
 
         return state
 
@@ -764,17 +792,17 @@ class GridManager:
         n = config.num_grids
 
         # ── Check base asset balance for budget allocation ──
-        base_asset = config.market.split('-')[0]
+        base_asset = config.market.split("-")[0]
         base_balance = 0.0
         try:
-            bals = self._safe_call(self.bitvavo.balance, {'symbol': base_asset})
+            bals = self._safe_call(self.bitvavo.balance, {"symbol": base_asset})
             if isinstance(bals, list):
                 for b in bals:
-                    if isinstance(b, dict) and b.get('symbol') == base_asset:
-                        base_balance = float(b.get('available', 0) or 0)
+                    if isinstance(b, dict) and b.get("symbol") == base_asset:
+                        base_balance = float(b.get("available", 0) or 0)
                         break
             elif isinstance(bals, dict):
-                base_balance = float(bals.get('available', 0) or 0)
+                base_balance = float(bals.get("available", 0) or 0)
         except Exception:
             pass
         # EUR value of base asset we can actually place sell orders for
@@ -783,10 +811,11 @@ class GridManager:
         buy_only = base_eur_value < 5.0
 
         # ── Try Avellaneda-Stoikov dynamic spacing ──
-        if self.bot_config.get('AVELLANEDA_STOIKOV_GRID', True):
+        if self.bot_config.get("AVELLANEDA_STOIKOV_GRID", True):
             try:
                 from core.avellaneda_stoikov import calculate_dynamic_grid_levels
-                candles = self._get_candles_safe(config.market, '1m', 100)
+
+                candles = self._get_candles_safe(config.market, "1m", 100)
                 if candles and len(candles) >= 30:
                     as_result = calculate_dynamic_grid_levels(
                         current_price=current_price,
@@ -797,15 +826,15 @@ class GridManager:
                         buy_only=buy_only,
                         base_eur_value=base_eur_value,
                     )
-                    as_levels = as_result.get('levels', [])
+                    as_levels = as_result.get("levels", [])
                     if as_levels:
                         min_base = self._get_min_order_size(config.market)
                         for lvl in as_levels:
-                            norm_price = self._normalize_price(config.market, lvl['price'])
+                            norm_price = self._normalize_price(config.market, lvl["price"])
                             if norm_price <= 0:
                                 continue
-                            side = lvl['side']
-                            amount_eur = lvl['amount_eur']
+                            side = lvl["side"]
+                            amount_eur = lvl["amount_eur"]
                             # Skip levels below Bitvavo minimum order value
                             if amount_eur < 5.0:
                                 continue
@@ -815,22 +844,29 @@ class GridManager:
                                 continue
                             # Skip levels below Bitvavo minimum BASE amount
                             if min_base > 0 and norm_amount < min_base:
-                                log(f"[Grid A-S] Skipping {config.market} level: "
-                                    f"{norm_amount} < min {min_base}", level='debug')
+                                log(
+                                    f"[Grid A-S] Skipping {config.market} level: {norm_amount} < min {min_base}",
+                                    level="debug",
+                                )
                                 continue
-                            levels.append(GridLevel(
-                                level_id=lvl['level_id'],
-                                price=norm_price,
-                                side=side,
-                                amount=norm_amount,
-                            ))
+                            levels.append(
+                                GridLevel(
+                                    level_id=lvl["level_id"],
+                                    price=norm_price,
+                                    side=side,
+                                    amount=norm_amount,
+                                )
+                            )
                         if levels:
-                            log(f"[Grid A-S] {config.market}: Dynamic spacing, "
+                            log(
+                                f"[Grid A-S] {config.market}: Dynamic spacing, "
                                 f"spread={as_result.get('spread', 0) * 100:.3f}%, "
-                                f"{len(levels)} levels", level='info')
+                                f"{len(levels)} levels",
+                                level="info",
+                            )
                             return levels
             except Exception as e:
-                log(f"[Grid A-S] Fallback to static grid: {e}", level='debug')
+                log(f"[Grid A-S] Fallback to static grid: {e}", level="debug")
 
         # ── Enforce minimum order value before calculating levels ──
         min_order_eur = 5.50
@@ -845,16 +881,19 @@ class GridManager:
                 n -= 1
                 config.num_grids = n
             if (config.total_investment / n / current_price) < min_base:
-                log(f"[Grid] Cannot create levels for {config.market}: "
+                log(
+                    f"[Grid] Cannot create levels for {config.market}: "
                     f"investment {config.total_investment:.0f} EUR / {n} grids "
-                    f"= {config.total_investment/n/current_price:.8f} {config.market.split('-')[0]} "
-                    f"< min {min_base}", level='warning')
+                    f"= {config.total_investment / n / current_price:.8f} {config.market.split('-')[0]} "
+                    f"< min {min_base}",
+                    level="warning",
+                )
                 return []
 
         # ── Fallback: static arithmetic/geometric spacing ──
-        if config.grid_mode == 'geometric':
+        if config.grid_mode == "geometric":
             ratio = (config.upper_price / config.lower_price) ** (1 / (n - 1))
-            prices = [config.lower_price * (ratio ** i) for i in range(n)]
+            prices = [config.lower_price * (ratio**i) for i in range(n)]
         else:
             step = (config.upper_price - config.lower_price) / (n - 1)
             prices = [config.lower_price + step * i for i in range(n)]
@@ -869,8 +908,11 @@ class GridManager:
             amount_per_buy_eur = config.total_investment / buy_count
             amount_per_sell_eur = 0.0
             affordable_sells = 0
-            log(f"[Grid] {config.market}: buy-only mode, full budget to {buy_count} buy levels "
-                f"(EUR {amount_per_buy_eur:.2f}/level)", level='info')
+            log(
+                f"[Grid] {config.market}: buy-only mode, full budget to {buy_count} buy levels "
+                f"(EUR {amount_per_buy_eur:.2f}/level)",
+                level="info",
+            )
         elif sell_count > 0 and buy_count > 0:
             # Proportional: sell budget = what we can actually place (capped by base asset value)
             naive_per_level = config.total_investment / n
@@ -878,7 +920,9 @@ class GridManager:
             sell_budget_actual = min(sell_budget_needed, base_eur_value)
             # Determine how many sell levels can meet minimum order (€5)
             min_order_sell = 5.0
-            affordable_sells = min(int(sell_budget_actual / min_order_sell), sell_count) if sell_budget_actual >= min_order_sell else 0
+            affordable_sells = (
+                min(int(sell_budget_actual / min_order_sell), sell_count) if sell_budget_actual >= min_order_sell else 0
+            )
             if affordable_sells == 0:
                 # Can't place even one sell above minimum → full budget to buys
                 buy_budget = config.total_investment
@@ -889,10 +933,13 @@ class GridManager:
                 amount_per_buy_eur = buy_budget / buy_count
                 amount_per_sell_eur = sell_budget_actual / affordable_sells
             if affordable_sells < sell_count:
-                log(f"[Grid] {config.market}: proportional budget — {base_asset} balance "
+                log(
+                    f"[Grid] {config.market}: proportional budget — {base_asset} balance "
                     f"covers EUR {base_eur_value:.2f} of EUR {sell_budget_needed:.2f} sell budget, "
                     f"buy={buy_count}x EUR {amount_per_buy_eur:.2f}, "
-                    f"sell={affordable_sells}x EUR {amount_per_sell_eur:.2f}", level='info')
+                    f"sell={affordable_sells}x EUR {amount_per_sell_eur:.2f}",
+                    level="info",
+                )
         else:
             amount_per_buy_eur = config.total_investment / n
             amount_per_sell_eur = config.total_investment / n
@@ -904,14 +951,14 @@ class GridManager:
                 continue
 
             # Buy below current price, sell above
-            side = 'buy' if norm_price < current_price else 'sell'
+            side = "buy" if norm_price < current_price else "sell"
 
             # Skip sell levels beyond what we can afford
-            if side == 'sell' and sells_placed >= affordable_sells:
+            if side == "sell" and sells_placed >= affordable_sells:
                 continue
 
             # Convert EUR amount to base currency amount
-            amount_per_level_eur = amount_per_buy_eur if side == 'buy' else amount_per_sell_eur
+            amount_per_level_eur = amount_per_buy_eur if side == "buy" else amount_per_sell_eur
             amount = amount_per_level_eur / norm_price
             norm_amount = self._normalize_amount(config.market, amount)
 
@@ -921,17 +968,18 @@ class GridManager:
             # Skip levels below Bitvavo minimum BASE amount
             min_base = self._get_min_order_size(config.market)
             if min_base > 0 and norm_amount < min_base:
-                log(f"[Grid] Skipping {config.market} level: "
-                    f"{norm_amount} < min {min_base}", level='debug')
+                log(f"[Grid] Skipping {config.market} level: {norm_amount} < min {min_base}", level="debug")
                 continue
 
-            levels.append(GridLevel(
-                level_id=i,
-                price=norm_price,
-                side=side,
-                amount=norm_amount,
-            ))
-            if side == 'sell':
+            levels.append(
+                GridLevel(
+                    level_id=i,
+                    price=norm_price,
+                    side=side,
+                    amount=norm_amount,
+                )
+            )
+            if side == "sell":
                 sells_placed += 1
 
         return levels
@@ -941,24 +989,24 @@ class GridManager:
     def start_grid(self, market: str) -> bool:
         """Start grid: place all pending limit orders on Bitvavo."""
         if market not in self.grids:
-            log(f"[Grid] No grid found for {market}", level='warning')
+            log(f"[Grid] No grid found for {market}", level="warning")
             return False
 
         state = self.grids[market]
-        state.status = 'placing_orders'
+        state.status = "placing_orders"
 
         # Check base asset balance to decide which sells we can actually place
-        base_asset = market.split('-')[0]
+        base_asset = market.split("-")[0]
         base_balance = 0.0
         try:
-            bals = self._safe_call(self.bitvavo.balance, {'symbol': base_asset})
+            bals = self._safe_call(self.bitvavo.balance, {"symbol": base_asset})
             if isinstance(bals, list):
                 for b in bals:
-                    if isinstance(b, dict) and b.get('symbol') == base_asset:
-                        base_balance = float(b.get('available', 0) or 0)
+                    if isinstance(b, dict) and b.get("symbol") == base_asset:
+                        base_balance = float(b.get("available", 0) or 0)
                         break
             elif isinstance(bals, dict):
-                base_balance = float(bals.get('available', 0) or 0)
+                base_balance = float(bals.get("available", 0) or 0)
         except Exception:
             pass
 
@@ -971,8 +1019,7 @@ class GridManager:
             derived = self._derive_cost_from_exchange(market)
             if derived > 0:
                 state.last_buy_fill_price = derived
-                log(f"[Grid] start_grid {market}: recovered cost basis {derived:.2f} "
-                    f"from exchange", level='warning')
+                log(f"[Grid] start_grid {market}: recovered cost basis {derived:.2f} from exchange", level="warning")
 
         # Cost floor for sell orders — never sell below cost basis
         min_sell_price = 0.0
@@ -980,51 +1027,53 @@ class GridManager:
             min_sell_price = state.last_buy_fill_price * (1 + 2 * MAKER_FEE_PCT)
 
         for level in state.levels:
-            if level.status in ('pending', 'error'):
+            if level.status in ("pending", "error"):
                 # Skip sell orders if we don't hold enough base asset
-                if level.side == 'sell' and base_balance < level.amount * 0.99:
-                    level.status = 'cancelled'
-                    level.error_msg = f'No {base_asset} balance at startup; will be placed via counter-order'
+                if level.side == "sell" and base_balance < level.amount * 0.99:
+                    level.status = "cancelled"
+                    level.error_msg = f"No {base_asset} balance at startup; will be placed via counter-order"
                     skipped_sells += 1
                     continue
 
                 # Skip sell orders below cost basis
-                if level.side == 'sell' and min_sell_price > 0 and level.price < min_sell_price:
-                    level.status = 'cancelled'
-                    level.error_msg = (f'Below cost basis {state.last_buy_fill_price:.2f}; '
-                                       f'will be placed via counter-order')
+                if level.side == "sell" and min_sell_price > 0 and level.price < min_sell_price:
+                    level.status = "cancelled"
+                    level.error_msg = (
+                        f"Below cost basis {state.last_buy_fill_price:.2f}; will be placed via counter-order"
+                    )
                     skipped_sells += 1
-                    log(f"[Grid] start_grid {market}: skipping sell @ {level.price:.2f} "
-                        f"(below cost {state.last_buy_fill_price:.2f})", level='warning')
+                    log(
+                        f"[Grid] start_grid {market}: skipping sell @ {level.price:.2f} "
+                        f"(below cost {state.last_buy_fill_price:.2f})",
+                        level="warning",
+                    )
                     continue
 
-                resp = self._place_limit_order(
-                    market, level.side, level.amount, level.price
-                )
-                if resp and isinstance(resp, dict) and resp.get('orderId'):
-                    level.order_id = resp['orderId']
-                    level.status = 'placed'
+                resp = self._place_limit_order(market, level.side, level.amount, level.price)
+                if resp and isinstance(resp, dict) and resp.get("orderId"):
+                    level.order_id = resp["orderId"]
+                    level.status = "placed"
                     level.placed_at = time.time()
                     placed_count += 1
-                    if level.side == 'sell':
+                    if level.side == "sell":
                         base_balance -= level.amount
                 else:
-                    level.status = 'error'
-                    level.error_msg = str(resp)[:200] if resp else 'No response'
+                    level.status = "error"
+                    level.error_msg = str(resp)[:200] if resp else "No response"
                     error_count += 1
 
                 # Small delay between orders to respect rate limits
                 time.sleep(0.2)
 
         if skipped_sells:
-            log(f"[Grid] {market}: skipped {skipped_sells} sells (no {base_asset} balance)", level='info')
+            log(f"[Grid] {market}: skipped {skipped_sells} sells (no {base_asset} balance)", level="info")
 
         if placed_count > 0:
-            state.status = 'running'
-            log(f"[Grid] Started {market}: {placed_count} orders placed, {error_count} errors", level='info')
+            state.status = "running"
+            log(f"[Grid] Started {market}: {placed_count} orders placed, {error_count} errors", level="info")
         else:
-            state.status = 'error'
-            log(f"[Grid] Failed to start {market}: 0 orders placed", level='error')
+            state.status = "error"
+            log(f"[Grid] Failed to start {market}: 0 orders placed", level="error")
 
         state.last_update = time.time()
         self._save_states()
@@ -1039,14 +1088,14 @@ class GridManager:
 
         if cancel_orders:
             for level in state.levels:
-                if level.status == 'placed' and level.order_id:
+                if level.status == "placed" and level.order_id:
                     self._cancel_order(market, level.order_id)
-                    level.status = 'cancelled'
+                    level.status = "cancelled"
                     time.sleep(0.1)
 
-        state.status = 'stopped'
+        state.status = "stopped"
         self._save_states()
-        log(f"[Grid] Stopped grid for {market}", level='info')
+        log(f"[Grid] Stopped grid for {market}", level="info")
         return True
 
     def delete_grid(self, market: str) -> bool:
@@ -1055,7 +1104,7 @@ class GridManager:
         if market in self.grids:
             del self.grids[market]
             self._save_states()
-            log(f"[Grid] Deleted grid for {market}", level='info')
+            log(f"[Grid] Deleted grid for {market}", level="info")
             return True
         return False
 
@@ -1069,21 +1118,21 @@ class GridManager:
         - When a sell fills -> place a buy at next lower grid level
         """
         if market not in self.grids:
-            return {'error': 'Grid not found'}
+            return {"error": "Grid not found"}
 
         state = self.grids[market]
-        if state.status != 'running':
-            return {'status': state.status, 'actions': []}
+        if state.status != "running":
+            return {"status": state.status, "actions": []}
 
         # Rate limit order status checks
         now = time.time()
         if (now - state.last_order_check) < self.ORDER_CHECK_INTERVAL:
-            return {'status': 'running', 'actions': [], 'throttled': True}
+            return {"status": "running", "actions": [], "throttled": True}
         state.last_order_check = now
 
         current_price = self._get_current_price(market)
         if not current_price:
-            return {'error': 'Cannot get price'}
+            return {"error": "Cannot get price"}
 
         state.current_price = current_price
         state.last_update = now
@@ -1095,9 +1144,9 @@ class GridManager:
             mid_price = (config.lower_price + config.upper_price) / 2
             loss_pct = (mid_price - current_price) / mid_price
             if loss_pct >= config.stop_loss_pct:
-                actions.append({'type': 'stop_loss_triggered', 'loss_pct': round(loss_pct, 4)})
+                actions.append({"type": "stop_loss_triggered", "loss_pct": round(loss_pct, 4)})
                 self.stop_grid(market)
-                return {'status': 'stopped', 'actions': actions, 'reason': 'stop_loss'}
+                return {"status": "stopped", "actions": actions, "reason": "stop_loss"}
 
         # Check take profit (with optional trailing)
         if config.take_profit_pct and state.total_profit > 0:
@@ -1109,9 +1158,12 @@ class GridManager:
                     if not state.trailing_tp_active:
                         state.trailing_tp_active = True
                         state.trailing_tp_peak = state.total_profit
-                        log(f"[Grid] {market} trailing TP activated at {profit_pct*100:.1f}% ROI "
-                            f"(€{state.total_profit:.4f})", level='info')
-                        actions.append({'type': 'trailing_tp_activated', 'profit_pct': round(profit_pct, 4)})
+                        log(
+                            f"[Grid] {market} trailing TP activated at {profit_pct * 100:.1f}% ROI "
+                            f"(€{state.total_profit:.4f})",
+                            level="info",
+                        )
+                        actions.append({"type": "trailing_tp_activated", "profit_pct": round(profit_pct, 4)})
                     else:
                         # Update peak
                         if state.total_profit > state.trailing_tp_peak:
@@ -1121,22 +1173,27 @@ class GridManager:
                     # Check callback: did profit drop X% from peak?
                     callback = (state.trailing_tp_peak - state.total_profit) / state.trailing_tp_peak
                     if callback >= config.trailing_tp_callback_pct:
-                        actions.append({
-                            'type': 'trailing_tp_triggered',
-                            'peak_profit': round(state.trailing_tp_peak, 4),
-                            'exit_profit': round(state.total_profit, 4),
-                            'callback_pct': round(callback * 100, 2),
-                        })
-                        log(f"[Grid] {market} trailing TP triggered: peak €{state.trailing_tp_peak:.4f}, "
-                            f"exit €{state.total_profit:.4f}, callback {callback*100:.1f}%", level='info')
+                        actions.append(
+                            {
+                                "type": "trailing_tp_triggered",
+                                "peak_profit": round(state.trailing_tp_peak, 4),
+                                "exit_profit": round(state.total_profit, 4),
+                                "callback_pct": round(callback * 100, 2),
+                            }
+                        )
+                        log(
+                            f"[Grid] {market} trailing TP triggered: peak €{state.trailing_tp_peak:.4f}, "
+                            f"exit €{state.total_profit:.4f}, callback {callback * 100:.1f}%",
+                            level="info",
+                        )
                         self.stop_grid(market)
-                        return {'status': 'stopped', 'actions': actions, 'reason': 'trailing_take_profit'}
+                        return {"status": "stopped", "actions": actions, "reason": "trailing_take_profit"}
             else:
                 # Fixed TP: stop immediately at threshold
                 if profit_pct >= config.take_profit_pct:
-                    actions.append({'type': 'take_profit_triggered', 'profit_pct': round(profit_pct, 4)})
+                    actions.append({"type": "take_profit_triggered", "profit_pct": round(profit_pct, 4)})
                     self.stop_grid(market)
-                    return {'status': 'stopped', 'actions': actions, 'reason': 'take_profit'}
+                    return {"status": "stopped", "actions": actions, "reason": "take_profit"}
 
         # Check each placed order for fills
         # CRITICAL: snapshot the list to avoid infinite loop when counter-orders
@@ -1144,22 +1201,22 @@ class GridManager:
         fills_occurred = False
         levels_snapshot = list(state.levels)
         for level in levels_snapshot:
-            if level.status != 'placed' or not level.order_id:
+            if level.status != "placed" or not level.order_id:
                 continue
 
             order_info = self._check_order_status(market, level.order_id)
             if not order_info or not isinstance(order_info, dict):
                 continue
 
-            order_status = order_info.get('status', '').lower()
-            filled_amount = float(order_info.get('filledAmount', 0) or 0)
+            order_status = order_info.get("status", "").lower()
+            filled_amount = float(order_info.get("filledAmount", 0) or 0)
 
-            if order_status == 'filled' or (filled_amount > 0 and order_status in ('filled', 'canceled', 'cancelled')):
+            if order_status == "filled" or (filled_amount > 0 and order_status in ("filled", "canceled", "cancelled")):
                 # Order filled!
-                fill_price = float(order_info.get('price', level.price) or level.price)
+                fill_price = float(order_info.get("price", level.price) or level.price)
                 actual_amount = filled_amount if filled_amount > 0 else level.amount
 
-                level.status = 'filled'
+                level.status = "filled"
                 level.filled_at = now
                 level.filled_price = fill_price
                 state.total_trades += 1
@@ -1169,7 +1226,7 @@ class GridManager:
                 fee_eur = actual_amount * fill_price * MAKER_FEE_PCT
                 state.total_fees += fee_eur
 
-                if level.side == 'buy':
+                if level.side == "buy":
                     # Buy filled -> track balance and actual cost basis
                     state.base_balance += actual_amount
                     state.quote_balance -= actual_amount * fill_price + fee_eur
@@ -1187,23 +1244,28 @@ class GridManager:
                                 skew = min(0.003, (inv_ratio - 0.5) * 0.01)  # Max 0.3% skew
                                 sell_price = sell_price * (1 - skew)
                                 sell_price = self._normalize_price(market, sell_price)
-                                log(f"[Grid] {market} Inventory skew: sell lowered by {skew*100:.2f}% "
-                                    f"to reduce overweight (inv_ratio={inv_ratio:.2f})", level='debug')
+                                log(
+                                    f"[Grid] {market} Inventory skew: sell lowered by {skew * 100:.2f}% "
+                                    f"to reduce overweight (inv_ratio={inv_ratio:.2f})",
+                                    level="debug",
+                                )
 
                         profit_per_unit = sell_price - fill_price - (2 * fill_price * MAKER_FEE_PCT)
                         if profit_per_unit > 0:  # Only place if profitable after fees
-                            self._place_counter_order(state, market, 'sell', actual_amount, sell_price, level.level_id)
+                            self._place_counter_order(state, market, "sell", actual_amount, sell_price, level.level_id)
 
-                    actions.append({
-                        'type': 'buy_filled',
-                        'level': level.level_id,
-                        'price': fill_price,
-                        'amount': actual_amount,
-                        'fee': round(fee_eur, 4),
-                    })
-                    self._log_fill(market, 'buy', fill_price, actual_amount, fee_eur, level_id=level.level_id)
+                    actions.append(
+                        {
+                            "type": "buy_filled",
+                            "level": level.level_id,
+                            "price": fill_price,
+                            "amount": actual_amount,
+                            "fee": round(fee_eur, 4),
+                        }
+                    )
+                    self._log_fill(market, "buy", fill_price, actual_amount, fee_eur, level_id=level.level_id)
 
-                elif level.side == 'sell':
+                elif level.side == "sell":
                     # Sell filled -> track profit + balance
                     state.base_balance = max(0.0, state.base_balance - actual_amount)
                     state.quote_balance += actual_amount * fill_price - fee_eur
@@ -1224,8 +1286,7 @@ class GridManager:
                         compound_extra = 0.0
                         if config.profit_compounding and profit > 0:
                             compound_extra = profit * 0.5  # Reinvest 50% of cycle profit
-                            log(f"[Grid] {market} Compounding: +€{compound_extra:.4f} added to next buy",
-                                level='debug')
+                            log(f"[Grid] {market} Compounding: +€{compound_extra:.4f} added to next buy", level="debug")
 
                         base_eur = actual_amount * fill_price * 0.99 + compound_extra
 
@@ -1237,29 +1298,39 @@ class GridManager:
                                 skew = min(0.005, inv_ratio * 0.01)  # Max 0.5% skew
                                 buy_price = buy_price * (1 - skew)
                                 buy_price = self._normalize_price(market, buy_price)
-                                log(f"[Grid] {market} Inventory skew: buy lowered by {skew*100:.2f}% "
-                                    f"(inv_ratio={inv_ratio:.2f})", level='debug')
+                                log(
+                                    f"[Grid] {market} Inventory skew: buy lowered by {skew * 100:.2f}% "
+                                    f"(inv_ratio={inv_ratio:.2f})",
+                                    level="debug",
+                                )
 
                         buy_amount = base_eur / buy_price
                         buy_amount = self._normalize_amount(market, buy_amount)
                         if buy_amount > 0:
-                            self._place_counter_order(state, market, 'buy', buy_amount, buy_price, level.level_id)
+                            self._place_counter_order(state, market, "buy", buy_amount, buy_price, level.level_id)
 
-                    actions.append({
-                        'type': 'sell_filled',
-                        'level': level.level_id,
-                        'price': fill_price,
-                        'amount': actual_amount,
-                        'fee': round(fee_eur, 4),
-                        'profit': round(profit, 4),
-                    })
-                    self._log_fill(market, 'sell', fill_price, actual_amount, fee_eur, profit=profit, level_id=level.level_id)
+                    actions.append(
+                        {
+                            "type": "sell_filled",
+                            "level": level.level_id,
+                            "price": fill_price,
+                            "amount": actual_amount,
+                            "fee": round(fee_eur, 4),
+                            "profit": round(profit, 4),
+                        }
+                    )
+                    self._log_fill(
+                        market, "sell", fill_price, actual_amount, fee_eur, profit=profit, level_id=level.level_id
+                    )
 
-                log(f"[Grid] {market} {level.side.upper()} filled @ {fill_price:.2f} "
-                    f"(amount={actual_amount:.6f}, fee={fee_eur:.4f} EUR)", level='info')
+                log(
+                    f"[Grid] {market} {level.side.upper()} filled @ {fill_price:.2f} "
+                    f"(amount={actual_amount:.6f}, fee={fee_eur:.4f} EUR)",
+                    level="info",
+                )
 
-            elif order_status in ('canceled', 'cancelled', 'expired', 'rejected'):
-                level.status = 'cancelled'
+            elif order_status in ("canceled", "cancelled", "expired", "rejected"):
+                level.status = "cancelled"
                 level.error_msg = f"Order {order_status}"
 
         # Check if grid is out of range -> rebalance
@@ -1268,34 +1339,37 @@ class GridManager:
         if config.auto_rebalance and not fills_occurred:
             _rebal_margin = 1.005  # 0.5%
             if current_price < config.lower_price / _rebal_margin or current_price > config.upper_price * _rebal_margin:
-                log(f"[Grid] {market} price {current_price:.2f} outside range "
+                log(
+                    f"[Grid] {market} price {current_price:.2f} outside range "
                     f"[{config.lower_price:.2f}-{config.upper_price:.2f}], rebalancing...",
-                    level='info')
+                    level="info",
+                )
                 rebalance_result = self._rebalance_grid(market, current_price)
-                if rebalance_result.get('success'):
-                    actions.append({'type': 'rebalanced', **rebalance_result})
+                if rebalance_result.get("success"):
+                    actions.append({"type": "rebalanced", **rebalance_result})
                     # Notify via Telegram
                     try:
                         from notifier import send_telegram
+
                         send_telegram(
                             f"🔄 <b>Grid Rebalance: {market}</b>\n"
                             f"Prijs {current_price:.2f} buiten range\n"
-                            f"Oud: {rebalance_result.get('old_lower',0):.2f}-{rebalance_result.get('old_upper',0):.2f}\n"
-                            f"Nieuw: {rebalance_result.get('new_lower',0):.2f}-{rebalance_result.get('new_upper',0):.2f}\n"
-                            f"Orders: {rebalance_result.get('orders_placed',0)}"
+                            f"Oud: {rebalance_result.get('old_lower', 0):.2f}-{rebalance_result.get('old_upper', 0):.2f}\n"
+                            f"Nieuw: {rebalance_result.get('new_lower', 0):.2f}-{rebalance_result.get('new_upper', 0):.2f}\n"
+                            f"Orders: {rebalance_result.get('orders_placed', 0)}"
                         )
                     except Exception:
                         pass
 
         self._save_states()
-        return {'status': state.status, 'actions': actions}
+        return {"status": state.status, "actions": actions}
 
     def _compute_full_ladder(self, config: GridConfig, market: str) -> List[float]:
         """Compute the full grid price ladder from config (all levels, not just placed ones)."""
         n = max(3, config.num_grids)
-        if config.grid_mode == 'geometric' and config.upper_price > config.lower_price > 0 and n > 1:
+        if config.grid_mode == "geometric" and config.upper_price > config.lower_price > 0 and n > 1:
             ratio = (config.upper_price / config.lower_price) ** (1 / (n - 1))
-            prices = [config.lower_price * (ratio ** i) for i in range(n)]
+            prices = [config.lower_price * (ratio**i) for i in range(n)]
         else:
             step = (config.upper_price - config.lower_price) / max(1, n - 1)
             prices = [config.lower_price + step * i for i in range(n)]
@@ -1308,9 +1382,9 @@ class GridManager:
         # Derive from config
         config = state.config
         n = max(3, config.num_grids)
-        if config.grid_mode == 'geometric' and config.upper_price > config.lower_price > 0 and n > 1:
+        if config.grid_mode == "geometric" and config.upper_price > config.lower_price > 0 and n > 1:
             ratio = (config.upper_price / config.lower_price) ** (1 / (n - 1))
-            prices = [self._normalize_price(config.market, config.lower_price * (ratio ** i)) for i in range(n)]
+            prices = [self._normalize_price(config.market, config.lower_price * (ratio**i)) for i in range(n)]
         else:
             step = (config.upper_price - config.lower_price) / max(1, n - 1)
             prices = [self._normalize_price(config.market, config.lower_price + step * i) for i in range(n)]
@@ -1387,28 +1461,34 @@ class GridManager:
         # Use sell price as cost (assumes break-even minus fees)
         return sell_level.amount * sell_level.price
 
-    def _place_counter_order(self, state: GridState, market: str, side: str,
-                              amount: float, price: float, source_level_id: int) -> bool:
+    def _place_counter_order(
+        self, state: GridState, market: str, side: str, amount: float, price: float, source_level_id: int
+    ) -> bool:
         """Place a counter order (buy->sell or sell->buy) after a fill."""
         # Prevent duplicate counter-orders for the same source level
         for existing in state.levels:
-            if (existing.pair_level_id == source_level_id
-                    and existing.side == side
-                    and existing.status in ('placed', 'pending')):
-                log(f"[Grid] {market} Skipping duplicate counter {side} for level {source_level_id} "
-                    f"(already exists as level {existing.level_id})", level='debug')
+            if (
+                existing.pair_level_id == source_level_id
+                and existing.side == side
+                and existing.status in ("placed", "pending")
+            ):
+                log(
+                    f"[Grid] {market} Skipping duplicate counter {side} for level {source_level_id} "
+                    f"(already exists as level {existing.level_id})",
+                    level="debug",
+                )
                 return False
 
         resp = self._place_limit_order(market, side, amount, price)
-        if resp and isinstance(resp, dict) and resp.get('orderId'):
+        if resp and isinstance(resp, dict) and resp.get("orderId"):
             # Add new level to the grid
             new_level = GridLevel(
                 level_id=len(state.levels),
                 price=price,
                 side=side,
                 amount=amount,
-                status='placed',
-                order_id=resp['orderId'],
+                status="placed",
+                order_id=resp["orderId"],
                 placed_at=time.time(),
                 pair_level_id=source_level_id,
             )
@@ -1419,14 +1499,14 @@ class GridManager:
     def _rebalance_grid(self, market: str, current_price: float) -> Dict[str, Any]:
         """Cancel all orders and recreate grid centered on current price."""
         if market not in self.grids:
-            return {'success': False}
+            return {"success": False}
 
         state = self.grids[market]
         config = state.config
 
         # Cancel all placed orders
         for level in state.levels:
-            if level.status == 'placed' and level.order_id:
+            if level.status == "placed" and level.order_id:
                 self._cancel_order(market, level.order_id)
                 time.sleep(0.1)
 
@@ -1437,7 +1517,7 @@ class GridManager:
         new_upper = current_price * (1 + half_range_pct)
 
         if new_lower <= 0 or new_lower >= new_upper:
-            return {'success': False, 'error': 'Invalid range'}
+            return {"success": False, "error": "Invalid range"}
 
         old_lower = config.lower_price
         old_upper = config.upper_price
@@ -1448,8 +1528,10 @@ class GridManager:
         min_order_eur = 5.50
         while config.num_grids > 3 and (config.total_investment / config.num_grids) < min_order_eur:
             config.num_grids -= 1
-            log(f"[Grid] Rebalance {market}: reduced num_grids to {config.num_grids} "
-                f"(min order €{min_order_eur})", level='info')
+            log(
+                f"[Grid] Rebalance {market}: reduced num_grids to {config.num_grids} (min order €{min_order_eur})",
+                level="info",
+            )
 
         # Recalculate and place new levels
         new_levels = self._calculate_grid_levels(config, current_price)
@@ -1462,28 +1544,32 @@ class GridManager:
             derived = self._derive_cost_from_exchange(market)
             if derived > 0:
                 state.last_buy_fill_price = derived
-                log(f"[Grid] Rebalance {market}: recovered cost basis {derived:.2f} "
-                    f"from exchange", level='warning')
+                log(f"[Grid] Rebalance {market}: recovered cost basis {derived:.2f} from exchange", level="warning")
             else:
                 # Last resort: use current price as floor to avoid certain losses
                 state.last_buy_fill_price = current_price
-                log(f"[Grid] Rebalance {market}: using current price {current_price:.2f} "
-                    f"as cost basis (no exchange data)", level='warning')
+                log(
+                    f"[Grid] Rebalance {market}: using current price {current_price:.2f} "
+                    f"as cost basis (no exchange data)",
+                    level="warning",
+                )
 
         if state.last_buy_fill_price > 0 and state.base_balance > 0:
             min_sell_price = state.last_buy_fill_price * (1 + 2 * MAKER_FEE_PCT)  # Above cost+fees
             raised = 0
             for lvl in new_levels:
-                if lvl.side == 'sell' and lvl.price < min_sell_price:
+                if lvl.side == "sell" and lvl.price < min_sell_price:
                     old_p = lvl.price
                     lvl.price = self._normalize_price(market, min_sell_price)
                     raised += 1
-                    log(f"[Grid] Rebalance {market}: raised sell L{lvl.level_id} "
+                    log(
+                        f"[Grid] Rebalance {market}: raised sell L{lvl.level_id} "
                         f"€{old_p:.2f}→€{lvl.price:.2f} (above cost basis "
-                        f"€{state.last_buy_fill_price:.2f})", level='info')
+                        f"€{state.last_buy_fill_price:.2f})",
+                        level="info",
+                    )
             if raised:
-                log(f"[Grid] {market}: raised {raised} sell(s) above cost basis to prevent loss",
-                    level='info')
+                log(f"[Grid] {market}: raised {raised} sell(s) above cost basis to prevent loss", level="info")
 
         state.levels = new_levels
         state.price_ladder = self._compute_full_ladder(config, market)
@@ -1492,64 +1578,67 @@ class GridManager:
 
         # Place new orders — only place buys immediately; sells wait for
         # counter-order after a buy fills (we typically don't hold base asset)
-        base_asset = market.split('-')[0]
+        base_asset = market.split("-")[0]
         base_balance = 0.0
         try:
-            bals = self._safe_call(self.bitvavo.balance, {'symbol': base_asset})
+            bals = self._safe_call(self.bitvavo.balance, {"symbol": base_asset})
             if isinstance(bals, list):
                 for b in bals:
-                    if isinstance(b, dict) and b.get('symbol') == base_asset:
-                        base_balance = float(b.get('available', 0) or 0)
+                    if isinstance(b, dict) and b.get("symbol") == base_asset:
+                        base_balance = float(b.get("available", 0) or 0)
                         break
             elif isinstance(bals, dict):
-                base_balance = float(bals.get('available', 0) or 0)
+                base_balance = float(bals.get("available", 0) or 0)
         except Exception:
             pass
 
         placed = 0
         skipped_sells = 0
         for level in state.levels:
-            if level.status == 'pending':
+            if level.status == "pending":
                 # Skip sell orders if we don't hold enough base asset
-                if level.side == 'sell' and base_balance < level.amount * 0.99:
-                    level.status = 'cancelled'
-                    level.error_msg = f'No {base_asset} balance at rebalance; will be placed via counter-order'
+                if level.side == "sell" and base_balance < level.amount * 0.99:
+                    level.status = "cancelled"
+                    level.error_msg = f"No {base_asset} balance at rebalance; will be placed via counter-order"
                     skipped_sells += 1
                     continue
                 resp = self._place_limit_order(market, level.side, level.amount, level.price)
-                if resp and isinstance(resp, dict) and resp.get('orderId'):
-                    level.order_id = resp['orderId']
-                    level.status = 'placed'
+                if resp and isinstance(resp, dict) and resp.get("orderId"):
+                    level.order_id = resp["orderId"]
+                    level.status = "placed"
                     level.placed_at = time.time()
                     placed += 1
-                    if level.side == 'sell':
+                    if level.side == "sell":
                         base_balance -= level.amount  # Track remaining balance
                 else:
-                    level.status = 'error'
-                    level.error_msg = str(resp)[:200] if resp else 'No response'
+                    level.status = "error"
+                    level.error_msg = str(resp)[:200] if resp else "No response"
                 time.sleep(0.2)
 
         if skipped_sells:
-            log(f"[Grid] Rebalance {market}: skipped {skipped_sells} sells (no {base_asset} balance)", level='info')
+            log(f"[Grid] Rebalance {market}: skipped {skipped_sells} sells (no {base_asset} balance)", level="info")
 
-        log(f"[Grid] Rebalanced {market}: {old_lower:.2f}-{old_upper:.2f} -> "
-            f"{new_lower:.2f}-{new_upper:.2f} ({placed} orders placed)", level='info')
+        log(
+            f"[Grid] Rebalanced {market}: {old_lower:.2f}-{old_upper:.2f} -> "
+            f"{new_lower:.2f}-{new_upper:.2f} ({placed} orders placed)",
+            level="info",
+        )
 
         self._save_states()
         return {
-            'success': True,
-            'new_lower': round(new_lower, 2),
-            'new_upper': round(new_upper, 2),
-            'old_lower': round(old_lower, 2),
-            'old_upper': round(old_upper, 2),
-            'orders_placed': placed,
+            "success": True,
+            "new_lower": round(new_lower, 2),
+            "new_upper": round(new_upper, 2),
+            "old_lower": round(old_lower, 2),
+            "old_upper": round(old_upper, 2),
+            "orders_placed": placed,
         }
 
     # ==================== AUTO-MARKET SELECTION ====================
 
     def _calculate_volatility(self, market: str) -> Optional[float]:
         """Calculate recent volatility (std dev of hourly returns) for a market."""
-        candles = self._get_candles(market, '1h', 48)
+        candles = self._get_candles(market, "1h", 48)
         if not candles or len(candles) < 10:
             return None
 
@@ -1559,7 +1648,7 @@ class GridManager:
                 if isinstance(c, (list, tuple)) and len(c) >= 5:
                     closes.append(float(c[4]))  # Close price
                 elif isinstance(c, dict):
-                    closes.append(float(c.get('close', 0)))
+                    closes.append(float(c.get("close", 0)))
 
             if len(closes) < 10:
                 return None
@@ -1567,8 +1656,8 @@ class GridManager:
             # Calculate hourly returns
             returns = []
             for i in range(1, len(closes)):
-                if closes[i-1] > 0:
-                    returns.append((closes[i] - closes[i-1]) / closes[i-1])
+                if closes[i - 1] > 0:
+                    returns.append((closes[i] - closes[i - 1]) / closes[i - 1])
 
             if len(returns) < 5:
                 return None
@@ -1582,11 +1671,11 @@ class GridManager:
         if not self.bitvavo:
             return 0.0
         try:
-            ticker = self._safe_call(self.bitvavo.ticker24h, {'market': market})
+            ticker = self._safe_call(self.bitvavo.ticker24h, {"market": market})
             if isinstance(ticker, dict):
-                return float(ticker.get('volumeQuote', 0) or 0)
+                return float(ticker.get("volumeQuote", 0) or 0)
             elif isinstance(ticker, list) and len(ticker) > 0:
-                return float(ticker[0].get('volumeQuote', 0) or 0)
+                return float(ticker[0].get("volumeQuote", 0) or 0)
         except Exception:
             pass
         return 0.0
@@ -1597,22 +1686,23 @@ class GridManager:
         Optimized: batch-fetches 24h tickers in a single API call.
         """
         gcfg = self._get_grid_config()
-        excluded = set(gcfg.get('excluded_markets', []))
-        preferred = gcfg.get('preferred_markets', [])
-        min_volume = gcfg.get('min_volume_24h', 50000)
+        excluded = set(gcfg.get("excluded_markets", []))
+        preferred = gcfg.get("preferred_markets", [])
+        min_volume = gcfg.get("min_volume_24h", 50000)
 
         # Get existing grid markets
-        active_markets = set(m for m, s in self.grids.items()
-                            if s.status in ('running', 'placing_orders', 'initialized'))
+        active_markets = set(
+            m for m, s in self.grids.items() if s.status in ("running", "placing_orders", "initialized")
+        )
 
         # Also exclude markets used by trailing bot
         trailing_open = set()
         try:
-            trade_log_path = 'data/trade_log.json'
+            trade_log_path = "data/trade_log.json"
             if os.path.exists(trade_log_path):
-                with open(trade_log_path, 'r', encoding='utf-8') as f:
+                with open(trade_log_path, "r", encoding="utf-8") as f:
                     tl = json.load(f)
-                    ot = tl.get('open', {}) if isinstance(tl, dict) else {}
+                    ot = tl.get("open", {}) if isinstance(tl, dict) else {}
                     trailing_open = set(ot.keys())
         except Exception:
             pass
@@ -1622,14 +1712,14 @@ class GridManager:
         # as long as budget reservation is respected. Log for visibility.
         hodl_markets = set()
         try:
-            hodl_cfg = self.bot_config.get('HODL_SCHEDULER', {})
-            if hodl_cfg.get('enabled', False):
-                for sched in hodl_cfg.get('schedules', []):
-                    m = sched.get('market', '').upper()
-                    if m and not sched.get('dry_run', True):
+            hodl_cfg = self.bot_config.get("HODL_SCHEDULER", {})
+            if hodl_cfg.get("enabled", False):
+                for sched in hodl_cfg.get("schedules", []):
+                    m = sched.get("market", "").upper()
+                    if m and not sched.get("dry_run", True):
                         hodl_markets.add(m)
                 if hodl_markets:
-                    log(f"[Grid] HODL markets active: {hodl_markets} (coexists with grid)", level='info')
+                    log(f"[Grid] HODL markets active: {hodl_markets} (coexists with grid)", level="info")
         except Exception:
             pass
 
@@ -1639,29 +1729,43 @@ class GridManager:
             tickers = self._safe_call(self.bitvavo.ticker24h, {})
             if isinstance(tickers, list):
                 for t in tickers:
-                    if isinstance(t, dict) and t.get('market', '').endswith('-EUR'):
-                        all_tickers[t['market']] = {
-                            'price': float(t.get('last', 0) or 0),
-                            'volume': float(t.get('volumeQuote', 0) or 0),
+                    if isinstance(t, dict) and t.get("market", "").endswith("-EUR"):
+                        all_tickers[t["market"]] = {
+                            "price": float(t.get("last", 0) or 0),
+                            "volume": float(t.get("volumeQuote", 0) or 0),
                         }
         except Exception as e:
-            log(f"[Grid] Failed to fetch batch tickers: {e}", level='warning')
+            log(f"[Grid] Failed to fetch batch tickers: {e}", level="warning")
 
         candidates = []
 
         # Check preferred markets first, then defaults
         markets_to_check = list(preferred) if preferred else []
         default_markets = [
-            'BTC-EUR', 'ETH-EUR', 'XRP-EUR', 'SOL-EUR', 'ADA-EUR',
-            'DOGE-EUR', 'DOT-EUR', 'AVAX-EUR', 'LINK-EUR',
-            'ATOM-EUR', 'UNI-EUR', 'LTC-EUR', 'NEAR-EUR', 'ARB-EUR',
+            "BTC-EUR",
+            "ETH-EUR",
+            "XRP-EUR",
+            "SOL-EUR",
+            "ADA-EUR",
+            "DOGE-EUR",
+            "DOT-EUR",
+            "AVAX-EUR",
+            "LINK-EUR",
+            "ATOM-EUR",
+            "UNI-EUR",
+            "LTC-EUR",
+            "NEAR-EUR",
+            "ARB-EUR",
         ]
         for m in default_markets:
             if m not in markets_to_check:
                 markets_to_check.append(m)
 
-        log(f"[Grid] Market selection: checking {len(markets_to_check)} markets, "
-            f"excluding active={active_markets}, trailing={trailing_open}", level='info')
+        log(
+            f"[Grid] Market selection: checking {len(markets_to_check)} markets, "
+            f"excluding active={active_markets}, trailing={trailing_open}",
+            level="info",
+        )
 
         for market in markets_to_check:
             if market in excluded or market in active_markets or market in trailing_open:
@@ -1669,8 +1773,8 @@ class GridManager:
 
             # Use batch ticker data (fast) or fall back to individual call
             ticker_data = all_tickers.get(market, {})
-            price = ticker_data.get('price', 0)
-            volume = ticker_data.get('volume', 0)
+            price = ticker_data.get("price", 0)
+            volume = ticker_data.get("volume", 0)
 
             if not price:
                 price = self._get_current_price(market)
@@ -1714,21 +1818,23 @@ class GridManager:
             suggested_lower = price * (1 - range_pct / 2)
             suggested_upper = price * (1 + range_pct / 2)
 
-            candidates.append({
-                'market': market,
-                'price': price,
-                'volatility': vol,
-                'volume_24h': volume,
-                'score': composite_score,
-                'suggested_lower': suggested_lower,
-                'suggested_upper': suggested_upper,
-                'range_pct': range_pct,
-            })
+            candidates.append(
+                {
+                    "market": market,
+                    "price": price,
+                    "volatility": vol,
+                    "volume_24h": volume,
+                    "score": composite_score,
+                    "suggested_lower": suggested_lower,
+                    "suggested_upper": suggested_upper,
+                    "range_pct": range_pct,
+                }
+            )
 
             time.sleep(0.15)  # Rate limit
 
         # Sort by composite score
-        candidates.sort(key=lambda x: x['score'], reverse=True)
+        candidates.sort(key=lambda x: x["score"], reverse=True)
         return candidates[:max_grids]
 
     # ==================== FULL AUTO-MANAGE ====================
@@ -1745,15 +1851,15 @@ class GridManager:
         Returns summary of actions taken.
         """
         gcfg = self._get_grid_config()
-        if not gcfg.get('enabled', False):
-            return {'enabled': False}
+        if not gcfg.get("enabled", False):
+            return {"enabled": False}
 
         if not self.bitvavo:
-            return {'error': 'No Bitvavo client'}
+            return {"error": "No Bitvavo client"}
 
         # Check regime grid_pause: skip NEW grid creation but still manage existing
-        regime_adj = self.bot_config.get('_REGIME_ADJ', {})
-        grid_paused = bool(regime_adj.get('grid_pause', False))
+        regime_adj = self.bot_config.get("_REGIME_ADJ", {})
+        grid_paused = bool(regime_adj.get("grid_pause", False))
 
         results = {}
 
@@ -1761,128 +1867,139 @@ class GridManager:
         # This ensures config changes (like enabling trailing TP) apply to running grids
         for market, state in self.grids.items():
             cfg = state.config
-            cfg.trailing_tp_enabled = bool(gcfg.get('trailing_tp_enabled', cfg.trailing_tp_enabled))
-            cfg.trailing_tp_callback_pct = float(gcfg.get('trailing_tp_callback_pct', cfg.trailing_tp_callback_pct))
-            cfg.take_profit_pct = float(gcfg.get('take_profit_pct', cfg.take_profit_pct))
-            cfg.stop_loss_pct = float(gcfg.get('stop_loss_pct', cfg.stop_loss_pct))
-            cfg.profit_compounding = bool(gcfg.get('profit_compounding', cfg.profit_compounding))
-            cfg.volatility_adaptive = bool(gcfg.get('volatility_adaptive', cfg.volatility_adaptive))
-            cfg.inventory_skew = bool(gcfg.get('inventory_skew', cfg.inventory_skew))
+            cfg.trailing_tp_enabled = bool(gcfg.get("trailing_tp_enabled", cfg.trailing_tp_enabled))
+            cfg.trailing_tp_callback_pct = float(gcfg.get("trailing_tp_callback_pct", cfg.trailing_tp_callback_pct))
+            cfg.take_profit_pct = float(gcfg.get("take_profit_pct", cfg.take_profit_pct))
+            cfg.stop_loss_pct = float(gcfg.get("stop_loss_pct", cfg.stop_loss_pct))
+            cfg.profit_compounding = bool(gcfg.get("profit_compounding", cfg.profit_compounding))
+            cfg.volatility_adaptive = bool(gcfg.get("volatility_adaptive", cfg.volatility_adaptive))
+            cfg.inventory_skew = bool(gcfg.get("inventory_skew", cfg.inventory_skew))
 
         # Step 1: Auto-create grids if needed (skip when grid_paused by regime)
-        max_grids = int(gcfg.get('max_grids', 2))
-        active_count = sum(1 for s in self.grids.values()
-                          if s.status in ('running', 'placing_orders', 'initialized'))
+        max_grids = int(gcfg.get("max_grids", 2))
+        active_count = sum(1 for s in self.grids.values() if s.status in ("running", "placing_orders", "initialized"))
 
         if active_count < max_grids and not grid_paused:
-            results['auto_create'] = self._auto_create_grids(max_grids - active_count, gcfg)
+            results["auto_create"] = self._auto_create_grids(max_grids - active_count, gcfg)
         elif grid_paused and active_count < max_grids:
-            results['grid_paused'] = True
+            results["grid_paused"] = True
 
         # Step 2: Start any initialized grids
         for market, state in list(self.grids.items()):
-            if state.status == 'initialized':
+            if state.status == "initialized":
                 started = self.start_grid(market)
-                results[f'start_{market}'] = started
+                results[f"start_{market}"] = started
 
         # Step 2a: Auto-recover stopped/error grids that have trade history
         # These were likely stopped by zombie detection or temporary API issues
         for market, state in list(self.grids.items()):
-            if state.status in ('stopped', 'error') and state.config.enabled and state.total_trades > 0:
+            if state.status in ("stopped", "error") and state.config.enabled and state.total_trades > 0:
                 # Only retry if the grid was updated recently (last 24h) — not ancient stale grids
                 if (time.time() - state.last_update) < 86400:
-                    log(f"[Grid] Auto-recovering {market} (was {state.status}, "
+                    log(
+                        f"[Grid] Auto-recovering {market} (was {state.status}, "
                         f"{state.total_trades} trades, profit €{state.total_profit:.4f})",
-                        level='info')
+                        level="info",
+                    )
                     current_price = self._get_current_price(market)
                     if current_price and current_price > 0:
                         rebal = self._rebalance_grid(market, current_price)
-                        if rebal.get('success') and rebal.get('orders_placed', 0) > 0:
-                            state.status = 'running'
+                        if rebal.get("success") and rebal.get("orders_placed", 0) > 0:
+                            state.status = "running"
                             self._save_states()
-                            results[f'recover_{market}'] = rebal
-                            log(f"[Grid] {market} recovered: {rebal.get('orders_placed')} orders placed",
-                                level='info')
+                            results[f"recover_{market}"] = rebal
+                            log(f"[Grid] {market} recovered: {rebal.get('orders_placed')} orders placed", level="info")
                         else:
-                            log(f"[Grid] {market} recovery failed: {rebal}", level='warning')
+                            log(f"[Grid] {market} recovery failed: {rebal}", level="warning")
 
         # Step 2b: Retry pending/error/cancelled-sell levels in running grids
         for market, state in list(self.grids.items()):
-            if state.status == 'running':
+            if state.status == "running":
                 # Also retry cancelled sells when base balance may now be available
-                retry_levels = [l for l in state.levels if l.status in ('pending', 'error')]
-                cancelled_sells = [l for l in state.levels
-                                   if l.status == 'cancelled' and l.side == 'sell'
-                                   and l.error_msg and 'balance' in str(l.error_msg).lower()]
+                retry_levels = [l for l in state.levels if l.status in ("pending", "error")]
+                cancelled_sells = [
+                    l
+                    for l in state.levels
+                    if l.status == "cancelled"
+                    and l.side == "sell"
+                    and l.error_msg
+                    and "balance" in str(l.error_msg).lower()
+                ]
                 retry_levels.extend(cancelled_sells)
                 if retry_levels:
                     # Only retry buy orders OR sell orders we have sufficient coin balance for
-                    base_asset = market.split('-')[0]
+                    base_asset = market.split("-")[0]
                     base_balance = 0.0
                     try:
-                        bals = self._safe_call(self.bitvavo.balance, {'symbol': base_asset})
+                        bals = self._safe_call(self.bitvavo.balance, {"symbol": base_asset})
                         if isinstance(bals, list):
                             for b in bals:
-                                if isinstance(b, dict) and b.get('symbol') == base_asset:
-                                    base_balance = float(b.get('available', 0) or 0)
+                                if isinstance(b, dict) and b.get("symbol") == base_asset:
+                                    base_balance = float(b.get("available", 0) or 0)
                                     break
                         elif isinstance(bals, dict):
-                            base_balance = float(bals.get('available', 0) or 0)
+                            base_balance = float(bals.get("available", 0) or 0)
                     except Exception:
                         pass
-                    placeable = [l for l in retry_levels
-                                 if l.side == 'buy' or (l.side == 'sell' and base_balance >= l.amount * 0.99)]
+                    placeable = [
+                        l
+                        for l in retry_levels
+                        if l.side == "buy" or (l.side == "sell" and base_balance >= l.amount * 0.99)
+                    ]
                     skipped_sells = len(retry_levels) - len(placeable)
                     if skipped_sells:
-                        log(f"[Grid] Skipping {skipped_sells} sell retries for {market}: "
-                            f"insufficient {base_asset} balance ({base_balance:.6f})", level='info')
+                        log(
+                            f"[Grid] Skipping {skipped_sells} sell retries for {market}: "
+                            f"insufficient {base_asset} balance ({base_balance:.6f})",
+                            level="info",
+                        )
                         # Mark them as cancelled so they don't retry endlessly; counter-sells will be placed after buys fill
                         for l in retry_levels:
-                            if l.side == 'sell' and base_balance < l.amount * 0.99:
-                                l.status = 'cancelled'
-                                l.error_msg = f'No {base_asset} balance at startup; will be placed via counter-order'
+                            if l.side == "sell" and base_balance < l.amount * 0.99:
+                                l.status = "cancelled"
+                                l.error_msg = f"No {base_asset} balance at startup; will be placed via counter-order"
                         self._save_states()
                     if not placeable:
                         continue
-                    log(f"[Grid] Retrying {len(placeable)} pending/error levels for {market}", level='info')
+                    log(f"[Grid] Retrying {len(placeable)} pending/error levels for {market}", level="info")
                     retried = 0
                     for level in placeable:
                         resp = self._place_limit_order(market, level.side, level.amount, level.price)
-                        if resp and isinstance(resp, dict) and resp.get('orderId'):
-                            level.order_id = resp['orderId']
-                            level.status = 'placed'
+                        if resp and isinstance(resp, dict) and resp.get("orderId"):
+                            level.order_id = resp["orderId"]
+                            level.status = "placed"
                             level.placed_at = time.time()
                             level.error_msg = None
                             retried += 1
                         else:
-                            level.status = 'error'
-                            level.error_msg = str(resp)[:200] if resp else 'No response'
+                            level.status = "error"
+                            level.error_msg = str(resp)[:200] if resp else "No response"
                         time.sleep(0.2)
-                    log(f"[Grid] Retry result for {market}: {retried}/{len(placeable)} placed", level='info')
+                    log(f"[Grid] Retry result for {market}: {retried}/{len(placeable)} placed", level="info")
                     self._save_states()
                     if retried:
-                        results[f'retry_{market}'] = retried
+                        results[f"retry_{market}"] = retried
 
         # Step 3: Update all running grids
         fills_this_cycle = set()  # Markets that had fills — skip rebalance for these
         for market, state in list(self.grids.items()):
-            if state.status == 'running':
+            if state.status == "running":
                 update_result = self.update_grid(market)
-                if update_result.get('actions'):
-                    results[f'update_{market}'] = update_result
+                if update_result.get("actions"):
+                    results[f"update_{market}"] = update_result
                     # Track markets with fills to avoid rebalancing on same cycle
-                    for act in update_result.get('actions', []):
-                        if act.get('type') in ('buy_filled', 'sell_filled'):
+                    for act in update_result.get("actions", []):
+                        if act.get("type") in ("buy_filled", "sell_filled"):
                             fills_this_cycle.add(market)
 
         # Step 3b: Volatility-adaptive grid density
         # Auto-adjust num_grids if real-time volatility deviates >30% from grid creation
         # Cooldown: only check every 6 hours to prevent over-triggering
         vol_adapt_cooldown = 6 * 3600  # 6 hours
-        gcfg_va = self.bot_config.get('GRID_TRADING', {})
-        user_num_grids = int(gcfg_va.get('num_grids', 8))  # Original user-configured value
+        gcfg_va = self.bot_config.get("GRID_TRADING", {})
+        user_num_grids = int(gcfg_va.get("num_grids", 8))  # Original user-configured value
         for market, state in list(self.grids.items()):
-            if state.status != 'running':
+            if state.status != "running":
                 continue
             config = state.config
             if not config.volatility_adaptive:
@@ -1890,21 +2007,20 @@ class GridManager:
             # Skip rebalance if this market just had fills this cycle
             # (rebalancing right after a fill can create sells below cost basis)
             if market in fills_this_cycle:
-                log(f"[Grid] Skipping vol-adaptive for {market}: fills processed this cycle",
-                    level='debug')
+                log(f"[Grid] Skipping vol-adaptive for {market}: fills processed this cycle", level="debug")
                 continue
             # Cooldown check: skip if rebalanced recently
             if state.last_rebalance and (time.time() - state.last_rebalance) < vol_adapt_cooldown:
                 continue
             try:
                 from core.avellaneda_stoikov import get_volatility_adjusted_num_grids, should_widen_grid
-                candles = self._get_candles(market, '1h', 72)
+
+                candles = self._get_candles(market, "1h", 72)
                 if not candles or len(candles) < 24:
                     continue
                 # Use user-configured num_grids as base, cap max at 2× user value
                 vol_max_grids = min(20, user_num_grids * 2)
-                adjusted = get_volatility_adjusted_num_grids(user_num_grids, candles,
-                                                              max_grids=vol_max_grids)
+                adjusted = get_volatility_adjusted_num_grids(user_num_grids, candles, max_grids=vol_max_grids)
                 # Enforce minimum order value: never increase num_grids beyond affordable
                 min_order_eur = 5.50
                 max_affordable_grids = max(3, int(config.total_investment / min_order_eur))
@@ -1913,11 +2029,13 @@ class GridManager:
                 if abs(adjusted - config.num_grids) >= 2:
                     old_num = config.num_grids
                     config.num_grids = adjusted
-                    log(f"[Grid] Vol-adaptive: {market} num_grids {old_num}→{adjusted} "
-                        f"(volatility change detected)", level='info')
+                    log(
+                        f"[Grid] Vol-adaptive: {market} num_grids {old_num}→{adjusted} (volatility change detected)",
+                        level="info",
+                    )
                     rebal = self._rebalance_grid(market, state.current_price)
-                    if rebal.get('success'):
-                        results[f'vol_adapt_{market}'] = {'old': old_num, 'new': adjusted}
+                    if rebal.get("success"):
+                        results[f"vol_adapt_{market}"] = {"old": old_num, "new": adjusted}
                     continue  # Skip should_widen if we already adjusted
                 # Also check if grid spacing is too narrow for current vol
                 price_range_pct = 0.0
@@ -1929,155 +2047,192 @@ class GridManager:
                     widen, suggested = should_widen_grid(price_range_pct, candles)
                     if widen and config.num_grids > 3:
                         config.num_grids -= 1
-                        log(f"[Grid] Vol-adaptive: {market} spacing too narrow "
+                        log(
+                            f"[Grid] Vol-adaptive: {market} spacing too narrow "
                             f"({price_range_pct:.2f}% vs suggested {suggested:.2f}%), "
-                            f"reducing to {config.num_grids} grids", level='info')
+                            f"reducing to {config.num_grids} grids",
+                            level="info",
+                        )
                         rebal = self._rebalance_grid(market, state.current_price)
-                        if rebal.get('success'):
-                            results[f'vol_widen_{market}'] = config.num_grids
+                        if rebal.get("success"):
+                            results[f"vol_widen_{market}"] = config.num_grids
             except ImportError:
                 pass  # A-S module not available
             except Exception as e:
-                log(f"[Grid] Vol-adaptive check error for {market}: {e}", level='debug')
+                log(f"[Grid] Vol-adaptive check error for {market}: {e}", level="debug")
 
         # Step 3c: Scale-up grid investment if dynamic budget grew >25%
         try:
-            budget_cfg = self.bot_config.get('BUDGET_RESERVATION', {})
-            if budget_cfg.get('enabled') and budget_cfg.get('mode') == 'dynamic':
+            budget_cfg = self.bot_config.get("BUDGET_RESERVATION", {})
+            if budget_cfg.get("enabled") and budget_cfg.get("mode") == "dynamic":
                 total_eur = self._get_total_eur_balance()
-                grid_pct = float(budget_cfg.get('grid_pct', 25)) / 100.0
-                reserve_eur = float(budget_cfg.get('min_reserve_eur', 0))
+                grid_pct = float(budget_cfg.get("grid_pct", 25)) / 100.0
+                reserve_eur = float(budget_cfg.get("min_reserve_eur", 0))
                 grid_budget = max(0, (total_eur - reserve_eur) * grid_pct)
-                grid_profit = self.get_total_grid_profit() if budget_cfg.get('reinvest_grid_profits', True) else 0
+                grid_profit = self.get_total_grid_profit() if budget_cfg.get("reinvest_grid_profits", True) else 0
                 max_grid_investment = grid_budget + max(0, grid_profit)
                 new_per_grid = max_grid_investment / max(1, max_grids)
                 for market, state in list(self.grids.items()):
-                    if state.status != 'running':
+                    if state.status != "running":
                         continue
                     current_inv = float(state.config.total_investment or 0)
                     if current_inv > 0 and new_per_grid > current_inv * 1.25 and new_per_grid >= 30:
-                        log(f"[Grid] Budget meegegroeid: {market} €{current_inv:.0f}→€{new_per_grid:.0f}, herbalanceren", level='info')
+                        log(
+                            f"[Grid] Budget meegegroeid: {market} €{current_inv:.0f}→€{new_per_grid:.0f}, herbalanceren",
+                            level="info",
+                        )
                         state.config.total_investment = round(new_per_grid, 2)
                         rebalance_result = self._rebalance_grid(market, state.current_price)
-                        if rebalance_result.get('success'):
-                            results[f'budget_scale_{market}'] = round(new_per_grid, 2)
+                        if rebalance_result.get("success"):
+                            results[f"budget_scale_{market}"] = round(new_per_grid, 2)
         except Exception as e:
-            log(f"[Grid] Budget scale check fout: {e}", level='warning')
+            log(f"[Grid] Budget scale check fout: {e}", level="warning")
 
         # Step 4: Cleanup broken/stale grids
         cutoff = time.time() - 86400
         for market in list(self.grids.keys()):
             state = self.grids[market]
-            is_broken = (state.status in ('stopped', 'error', 'initialized', 'placing_orders')
-                         and state.total_trades == 0
-                         and all(l.status in ('pending', 'error', 'cancelled') for l in state.levels)
-                         and (time.time() - state.last_update) > 300)  # Give 5 min grace period
-            is_stale = (state.status in ('stopped', 'error') and state.last_update < cutoff)
+            is_broken = (
+                state.status in ("stopped", "error", "initialized", "placing_orders")
+                and state.total_trades == 0
+                and all(l.status in ("pending", "error", "cancelled") for l in state.levels)
+                and (time.time() - state.last_update) > 300
+            )  # Give 5 min grace period
+            is_stale = state.status in ("stopped", "error") and state.last_update < cutoff
             # Detect "zombie" grids: status=running but no active orders on exchange
             # IMPORTANT: Don't count cancelled sells that are waiting for counter-order
             # (these have 'balance' in their error_msg and are expected behavior)
             is_zombie = False
-            if state.status == 'running':
-                placed_levels = [l for l in state.levels if l.status == 'placed' and l.order_id]
+            if state.status == "running":
+                placed_levels = [l for l in state.levels if l.status == "placed" and l.order_id]
                 # Only count truly broken cancelled/error levels, not sells waiting for counter
-                real_cancelled = [l for l in state.levels
-                                  if l.status == 'cancelled'
-                                  and not (l.side == 'sell' and l.error_msg
-                                           and ('balance' in str(l.error_msg).lower()
-                                                or 'counter-order' in str(l.error_msg).lower()))]
-                error_levels = [l for l in state.levels if l.status == 'error']
+                real_cancelled = [
+                    l
+                    for l in state.levels
+                    if l.status == "cancelled"
+                    and not (
+                        l.side == "sell"
+                        and l.error_msg
+                        and ("balance" in str(l.error_msg).lower() or "counter-order" in str(l.error_msg).lower())
+                    )
+                ]
+                error_levels = [l for l in state.levels if l.status == "error"]
                 if len(placed_levels) == 0 and (len(real_cancelled) + len(error_levels)) > 0:
                     # Before declaring zombie, try to restart error levels once
                     if error_levels:
-                        log(f"[Grid] {market}: 0 placed orders with {len(error_levels)} errors, "
-                            f"attempting restart...", level='warning')
+                        log(
+                            f"[Grid] {market}: 0 placed orders with {len(error_levels)} errors, attempting restart...",
+                            level="warning",
+                        )
                         restarted = 0
                         for level in error_levels:
-                            if level.side == 'buy':  # Only retry buys
+                            if level.side == "buy":  # Only retry buys
                                 resp = self._place_limit_order(market, level.side, level.amount, level.price)
-                                if resp and isinstance(resp, dict) and resp.get('orderId'):
-                                    level.order_id = resp['orderId']
-                                    level.status = 'placed'
+                                if resp and isinstance(resp, dict) and resp.get("orderId"):
+                                    level.order_id = resp["orderId"]
+                                    level.status = "placed"
                                     level.placed_at = time.time()
                                     level.error_msg = None
                                     restarted += 1
                                 time.sleep(0.2)
                         if restarted > 0:
-                            log(f"[Grid] {market}: restarted {restarted} buy orders", level='info')
+                            log(f"[Grid] {market}: restarted {restarted} buy orders", level="info")
                             self._save_states()
                             continue  # Skip zombie detection, we just placed orders
 
                     is_zombie = True
-                    log(f"[Grid] Zombie grid detected: {market} (running but 0 placed orders, "
-                        f"{len(real_cancelled)} cancelled, {len(error_levels)} errors)", level='warning')
+                    log(
+                        f"[Grid] Zombie grid detected: {market} (running but 0 placed orders, "
+                        f"{len(real_cancelled)} cancelled, {len(error_levels)} errors)",
+                        level="warning",
+                    )
             if is_broken or is_stale or is_zombie:
-                kind = 'zombie' if is_zombie else 'broken' if is_broken else 'stale'
-                log(f"[Grid] {kind.capitalize()} grid {market} paused "
+                kind = "zombie" if is_zombie else "broken" if is_broken else "stale"
+                log(
+                    f"[Grid] {kind.capitalize()} grid {market} paused "
                     f"(status={state.status}, trades={state.total_trades}). "
-                    f"State preserved — use dashboard to restart or delete.", level='warning')
+                    f"State preserved — use dashboard to restart or delete.",
+                    level="warning",
+                )
                 # Pause, don't delete — preserves trade history and allows manual restart
                 self.stop_grid(market, cancel_orders=not is_zombie)
-                results[f'cleanup_{market}'] = 'paused'
+                results[f"cleanup_{market}"] = "paused"
 
         return results
 
     def _auto_create_grids(self, count: int, gcfg: dict) -> List[str]:
         """Auto-create grids for the best available markets."""
-        investment_per_grid = float(gcfg.get('investment_per_grid', 50))
-        num_grids = int(gcfg.get('num_grids', 8))
-        grid_mode = gcfg.get('grid_mode', 'arithmetic')
-        max_grids = int(gcfg.get('max_grids', 2))
+        investment_per_grid = float(gcfg.get("investment_per_grid", 50))
+        num_grids = int(gcfg.get("num_grids", 8))
+        grid_mode = gcfg.get("grid_mode", "arithmetic")
+        max_grids = int(gcfg.get("max_grids", 2))
 
         # Check EUR balance
         available_eur = self._get_eur_balance()
 
         # Budget reservation: dynamic or static mode
         # Use merged bot_config (includes local overrides) instead of reading raw file
-        budget_cfg = self.bot_config.get('BUDGET_RESERVATION', {})
-        if budget_cfg.get('enabled', False):
-            mode = budget_cfg.get('mode', 'static')
-            if mode == 'dynamic':
+        budget_cfg = self.bot_config.get("BUDGET_RESERVATION", {})
+        if budget_cfg.get("enabled", False):
+            mode = budget_cfg.get("mode", "static")
+            if mode == "dynamic":
                 # Dynamic: calculate grid budget as percentage of TOTAL ACCOUNT VALUE
                 # (EUR balance + all crypto positions valued in EUR)
                 total_eur = self._get_total_account_value()
-                grid_pct = float(budget_cfg.get('grid_pct', 40)) / 100.0
-                reserve_eur = float(budget_cfg.get('min_reserve_eur', 10))
+                grid_pct = float(budget_cfg.get("grid_pct", 40)) / 100.0
+                reserve_eur = float(budget_cfg.get("min_reserve_eur", 10))
                 grid_max_base = max(0, (total_eur - reserve_eur) * grid_pct)
-                grid_profit = self.get_total_grid_profit() if budget_cfg.get('reinvest_grid_profits', True) else 0
+                grid_profit = self.get_total_grid_profit() if budget_cfg.get("reinvest_grid_profits", True) else 0
                 max_grid_investment = grid_max_base + max(0, grid_profit)
                 # Auto-size investment_per_grid based on budget and max_grids
-                active_grid_count = len([s for s in self.grids.values()
-                                          if s.status in ('running', 'placing_orders', 'initialized')])
+                active_grid_count = len(
+                    [s for s in self.grids.values() if s.status in ("running", "placing_orders", "initialized")]
+                )
                 grids_to_fill = max(1, max_grids - active_grid_count)
                 auto_invest = max_grid_investment / max(1, max_grids)
                 if auto_invest >= 30:  # minimum viable per grid
                     investment_per_grid = round(auto_invest, 2)
-                log(f"[Grid] Dynamic budget: total_eur={total_eur:.2f}, grid_pct={grid_pct*100:.0f}%, "
+                log(
+                    f"[Grid] Dynamic budget: total_eur={total_eur:.2f}, grid_pct={grid_pct * 100:.0f}%, "
                     f"grid_budget={grid_max_base:.2f}, profit={grid_profit:.2f}, "
-                    f"effective={max_grid_investment:.2f}, per_grid={investment_per_grid:.2f}", level='info')
+                    f"effective={max_grid_investment:.2f}, per_grid={investment_per_grid:.2f}",
+                    level="info",
+                )
             else:
-                grid_max_base = float(budget_cfg.get('grid_bot_max_eur', 120))
-                grid_profit = self.get_total_grid_profit() if budget_cfg.get('reinvest_grid_profits', True) else 0
+                grid_max_base = float(budget_cfg.get("grid_bot_max_eur", 120))
+                grid_profit = self.get_total_grid_profit() if budget_cfg.get("reinvest_grid_profits", True) else 0
                 max_grid_investment = grid_max_base + max(0, grid_profit)
-                log(f"[Grid] Static budget: base={grid_max_base:.0f}, profit={grid_profit:.2f}, "
-                    f"effective_max={max_grid_investment:.2f}", level='info')
+                log(
+                    f"[Grid] Static budget: base={grid_max_base:.0f}, profit={grid_profit:.2f}, "
+                    f"effective_max={max_grid_investment:.2f}",
+                    level="info",
+                )
         else:
-            max_grid_investment = float(gcfg.get('max_total_investment', 100))
+            max_grid_investment = float(gcfg.get("max_total_investment", 100))
 
         # Already invested in grids
-        grid_invested = sum(s.config.total_investment for s in self.grids.values()
-                           if s.status in ('running', 'placing_orders', 'initialized'))
+        grid_invested = sum(
+            s.config.total_investment
+            for s in self.grids.values()
+            if s.status in ("running", "placing_orders", "initialized")
+        )
         remaining_budget = min(available_eur * 0.8, max_grid_investment - grid_invested)
         # Cap investment_per_grid to remaining budget to avoid rounding mismatch
         investment_per_grid = min(investment_per_grid, remaining_budget)
 
-        log(f"[Grid] Budget check: EUR={available_eur:.2f}, max_invest={max_grid_investment:.0f}, "
+        log(
+            f"[Grid] Budget check: EUR={available_eur:.2f}, max_invest={max_grid_investment:.0f}, "
             f"already_invested={grid_invested:.0f}, remaining={remaining_budget:.2f}, "
-            f"need={investment_per_grid:.0f}/grid", level='info')
+            f"need={investment_per_grid:.0f}/grid",
+            level="info",
+        )
 
         if remaining_budget < investment_per_grid:
-            log(f"[Grid] Insufficient budget for new grids: {remaining_budget:.2f} EUR available "
-                f"(need {investment_per_grid:.0f})", level='info')
+            log(
+                f"[Grid] Insufficient budget for new grids: {remaining_budget:.2f} EUR available "
+                f"(need {investment_per_grid:.0f})",
+                level="info",
+            )
             return []
 
         # Ensure each order is >= 5.50 EUR (Bitvavo min = 5 EUR + safety margin)
@@ -2085,11 +2240,17 @@ class GridManager:
         while num_grids > 3 and (investment_per_grid / num_grids) < min_order_value:
             num_grids -= 1
         if (investment_per_grid / num_grids) < min_order_value:
-            log(f"[Grid] Cannot create grids: investment {investment_per_grid:.0f} EUR / {num_grids} grids "
-                f"= {investment_per_grid/num_grids:.2f} EUR/order < {min_order_value} EUR min", level='warning')
+            log(
+                f"[Grid] Cannot create grids: investment {investment_per_grid:.0f} EUR / {num_grids} grids "
+                f"= {investment_per_grid / num_grids:.2f} EUR/order < {min_order_value} EUR min",
+                level="warning",
+            )
             return []
 
-        log(f"[Grid] Auto-create: budget {remaining_budget:.0f} EUR, {investment_per_grid:.0f}/grid, {num_grids} levels", level='info')
+        log(
+            f"[Grid] Auto-create: budget {remaining_budget:.0f} EUR, {investment_per_grid:.0f}/grid, {num_grids} levels",
+            level="info",
+        )
 
         # Select best markets
         candidates = self.auto_select_markets(max_grids=count)
@@ -2099,11 +2260,11 @@ class GridManager:
             if remaining_budget < investment_per_grid:
                 break
 
-            market = candidate['market']
+            market = candidate["market"]
             actual_investment = min(investment_per_grid, remaining_budget)
 
             # ── Enforce minimum BASE amount for this market ──
-            market_price = candidate.get('price', 0)
+            market_price = candidate.get("price", 0)
             if market_price > 0:
                 min_base = self._get_min_order_size(market)
                 effective_num = num_grids
@@ -2111,38 +2272,46 @@ class GridManager:
                     while effective_num > 3 and (actual_investment / effective_num / market_price) < min_base:
                         effective_num -= 1
                     if (actual_investment / effective_num / market_price) < min_base:
-                        log(f"[Grid] Skipping {market}: {actual_investment:.0f} EUR / {effective_num} grids "
-                            f"= {actual_investment/effective_num/market_price:.8f} < min {min_base}",
-                            level='warning')
+                        log(
+                            f"[Grid] Skipping {market}: {actual_investment:.0f} EUR / {effective_num} grids "
+                            f"= {actual_investment / effective_num / market_price:.8f} < min {min_base}",
+                            level="warning",
+                        )
                         continue
                     if effective_num != num_grids:
-                        log(f"[Grid] {market}: reduced grids {num_grids}→{effective_num} "
-                            f"for min base amount {min_base}", level='info')
+                        log(
+                            f"[Grid] {market}: reduced grids {num_grids}→{effective_num} "
+                            f"for min base amount {min_base}",
+                            level="info",
+                        )
 
             state = self.create_grid(
                 market=market,
-                lower_price=candidate['suggested_lower'],
-                upper_price=candidate['suggested_upper'],
+                lower_price=candidate["suggested_lower"],
+                upper_price=candidate["suggested_upper"],
                 num_grids=effective_num if market_price > 0 else num_grids,
                 total_investment=actual_investment,
                 grid_mode=grid_mode,
                 auto_rebalance=True,
-                stop_loss_pct=float(gcfg.get('stop_loss_pct', 0.15)),
-                take_profit_pct=float(gcfg.get('take_profit_pct', 0.20)),
-                trailing_tp_enabled=bool(gcfg.get('trailing_tp_enabled', True)),
-                trailing_tp_callback_pct=float(gcfg.get('trailing_tp_callback_pct', 0.03)),
-                profit_compounding=bool(gcfg.get('profit_compounding', True)),
-                volatility_adaptive=bool(gcfg.get('volatility_adaptive', True)),
-                inventory_skew=bool(gcfg.get('inventory_skew', True)),
+                stop_loss_pct=float(gcfg.get("stop_loss_pct", 0.15)),
+                take_profit_pct=float(gcfg.get("take_profit_pct", 0.20)),
+                trailing_tp_enabled=bool(gcfg.get("trailing_tp_enabled", True)),
+                trailing_tp_callback_pct=float(gcfg.get("trailing_tp_callback_pct", 0.03)),
+                profit_compounding=bool(gcfg.get("profit_compounding", True)),
+                volatility_adaptive=bool(gcfg.get("volatility_adaptive", True)),
+                inventory_skew=bool(gcfg.get("inventory_skew", True)),
                 auto_created=True,
             )
 
             if state:
                 created.append(market)
                 remaining_budget -= actual_investment
-                log(f"[Grid] Auto-created grid for {market}: "
+                log(
+                    f"[Grid] Auto-created grid for {market}: "
                     f"{candidate['suggested_lower']:.2f}-{candidate['suggested_upper']:.2f}, "
-                    f"{actual_investment:.0f} EUR investment", level='info')
+                    f"{actual_investment:.0f} EUR investment",
+                    level="info",
+                )
 
         return created
 
@@ -2156,49 +2325,51 @@ class GridManager:
         state = self.grids[market]
         config = state.config
 
-        filled_buys = sum(1 for l in state.levels if l.status == 'filled' and l.side == 'buy')
-        filled_sells = sum(1 for l in state.levels if l.status == 'filled' and l.side == 'sell')
-        placed_orders = sum(1 for l in state.levels if l.status == 'placed')
-        error_orders = sum(1 for l in state.levels if l.status == 'error')
+        filled_buys = sum(1 for l in state.levels if l.status == "filled" and l.side == "buy")
+        filled_sells = sum(1 for l in state.levels if l.status == "filled" and l.side == "sell")
+        placed_orders = sum(1 for l in state.levels if l.status == "placed")
+        error_orders = sum(1 for l in state.levels if l.status == "error")
 
         roi_pct = (state.total_profit / config.total_investment * 100) if config.total_investment > 0 else 0
 
         return {
-            'market': market,
-            'status': state.status,
-            'config': {
-                'lower_price': config.lower_price,
-                'upper_price': config.upper_price,
-                'num_grids': config.num_grids,
-                'total_investment': config.total_investment,
-                'grid_mode': config.grid_mode,
-                'auto_rebalance': config.auto_rebalance,
-                'auto_created': config.auto_created,
+            "market": market,
+            "status": state.status,
+            "config": {
+                "lower_price": config.lower_price,
+                "upper_price": config.upper_price,
+                "num_grids": config.num_grids,
+                "total_investment": config.total_investment,
+                "grid_mode": config.grid_mode,
+                "auto_rebalance": config.auto_rebalance,
+                "auto_created": config.auto_created,
             },
-            'current_price': state.current_price,
-            'in_range': config.lower_price <= state.current_price <= config.upper_price if state.current_price else False,
-            'total_profit': round(state.total_profit, 4),
-            'total_fees': round(state.total_fees, 4),
-            'net_profit': round(state.total_profit - state.total_fees, 4),
-            'roi_pct': round(roi_pct, 2),
-            'total_trades': state.total_trades,
-            'filled_buys': filled_buys,
-            'filled_sells': filled_sells,
-            'placed_orders': placed_orders,
-            'error_orders': error_orders,
-            'base_balance': state.base_balance,
-            'quote_balance': state.quote_balance,
-            'rebalance_count': state.rebalance_count,
-            'last_update': state.last_update,
-            'levels': [
+            "current_price": state.current_price,
+            "in_range": config.lower_price <= state.current_price <= config.upper_price
+            if state.current_price
+            else False,
+            "total_profit": round(state.total_profit, 4),
+            "total_fees": round(state.total_fees, 4),
+            "net_profit": round(state.total_profit - state.total_fees, 4),
+            "roi_pct": round(roi_pct, 2),
+            "total_trades": state.total_trades,
+            "filled_buys": filled_buys,
+            "filled_sells": filled_sells,
+            "placed_orders": placed_orders,
+            "error_orders": error_orders,
+            "base_balance": state.base_balance,
+            "quote_balance": state.quote_balance,
+            "rebalance_count": state.rebalance_count,
+            "last_update": state.last_update,
+            "levels": [
                 {
-                    'id': l.level_id,
-                    'price': l.price,
-                    'side': l.side,
-                    'amount': l.amount,
-                    'status': l.status,
-                    'order_id': l.order_id,
-                    'filled_price': l.filled_price,
+                    "id": l.level_id,
+                    "price": l.price,
+                    "side": l.side,
+                    "amount": l.amount,
+                    "status": l.status,
+                    "order_id": l.order_id,
+                    "filled_price": l.filled_price,
                 }
                 for l in state.levels
             ],
@@ -2210,46 +2381,50 @@ class GridManager:
         for market in self.grids:
             status = self.get_grid_status(market)
             if status:
-                summaries.append({
-                    'market': market,
-                    'status': status['status'],
-                    'profit': status['total_profit'],
-                    'net_profit': status['net_profit'],
-                    'roi_pct': status['roi_pct'],
-                    'trades': status['total_trades'],
-                    'in_range': status['in_range'],
-                    'investment': status['config']['total_investment'],
-                    'placed_orders': status['placed_orders'],
-                })
+                summaries.append(
+                    {
+                        "market": market,
+                        "status": status["status"],
+                        "profit": status["total_profit"],
+                        "net_profit": status["net_profit"],
+                        "roi_pct": status["roi_pct"],
+                        "trades": status["total_trades"],
+                        "in_range": status["in_range"],
+                        "investment": status["config"]["total_investment"],
+                        "placed_orders": status["placed_orders"],
+                    }
+                )
         return summaries
 
     def get_grid_order_ids(self) -> set:
         """Get set of all active grid order IDs (for conflict avoidance with trailing bot)."""
         order_ids = set()
         for state in self.grids.values():
-            if state.status in ('running', 'placing_orders', 'initialized'):
+            if state.status in ("running", "placing_orders", "initialized"):
                 for level in state.levels:
-                    if level.order_id and level.status == 'placed':
+                    if level.order_id and level.status == "placed":
                         order_ids.add(level.order_id)
         return order_ids
 
     def get_grid_markets(self) -> set:
         """Get set of all active grid markets (for conflict avoidance)."""
-        return set(m for m, s in self.grids.items()
-                   if s.status in ('running', 'placing_orders', 'initialized'))
+        return set(m for m, s in self.grids.items() if s.status in ("running", "placing_orders", "initialized"))
 
     def get_grid_assets(self) -> set:
         """Get set of base asset symbols used by active grids (e.g. {'ETH', 'BTC'})."""
         assets = set()
         for m, s in self.grids.items():
-            if s.status in ('running', 'placing_orders', 'initialized'):
-                assets.add(m.replace('-EUR', ''))
+            if s.status in ("running", "placing_orders", "initialized"):
+                assets.add(m.replace("-EUR", ""))
         return assets
 
     def get_total_grid_investment(self) -> float:
         """Get total EUR invested in active grids."""
-        return sum(s.config.total_investment for s in self.grids.values()
-                   if s.status in ('running', 'placing_orders', 'initialized'))
+        return sum(
+            s.config.total_investment
+            for s in self.grids.values()
+            if s.status in ("running", "placing_orders", "initialized")
+        )
 
     def get_total_grid_profit(self) -> float:
         """Get total profit from all grids."""
@@ -2257,6 +2432,7 @@ class GridManager:
 
 
 # ================= UTILITY FUNCTIONS =================
+
 
 def calculate_optimal_grid_range(
     current_price: float,
@@ -2286,12 +2462,12 @@ def estimate_grid_profit(
     max_profit_per_cycle = profit_per_grid * (num_grids // 2)
 
     return {
-        'grid_spacing_pct': grid_spacing_pct * 100,
-        'profit_per_grid_eur': round(profit_per_grid, 4),
-        'fee_per_round_trip': round(2 * fee_per_trade, 4),
-        'max_profit_per_cycle': round(max_profit_per_cycle, 4),
-        'estimated_total': round(max_profit_per_cycle * num_cycles, 4),
-        'estimated_roi_pct': round((max_profit_per_cycle * num_cycles / investment) * 100, 2) if investment > 0 else 0,
+        "grid_spacing_pct": grid_spacing_pct * 100,
+        "profit_per_grid_eur": round(profit_per_grid, 4),
+        "fee_per_round_trip": round(2 * fee_per_trade, 4),
+        "max_profit_per_cycle": round(max_profit_per_cycle, 4),
+        "estimated_total": round(max_profit_per_cycle * num_cycles, 4),
+        "estimated_roi_pct": round((max_profit_per_cycle * num_cycles / investment) * 100, 2) if investment > 0 else 0,
     }
 
 

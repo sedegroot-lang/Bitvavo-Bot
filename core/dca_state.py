@@ -33,16 +33,18 @@ Trade = Dict[str, Any]
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass(slots=True)
 class DCAEvent:
     """Immutable record of a single DCA buy."""
+
     event_id: str
-    timestamp: float        # time.time() epoch
-    price: float            # execution price per token
-    amount_eur: float       # EUR cost including fees
+    timestamp: float  # time.time() epoch
+    price: float  # execution price per token
+    amount_eur: float  # EUR cost including fees
     tokens_bought: float
-    dca_level: int          # 1-based level at time of execution
-    source: str = "bot"     # "bot" | "manual" | "pyramid" | "sync"
+    dca_level: int  # 1-based level at time of execution
+    source: str = "bot"  # "bot" | "manual" | "pyramid" | "sync"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -71,12 +73,13 @@ class DCAEvent:
 @dataclass(slots=True)
 class DCAState:
     """Read-only snapshot of DCA state computed from events."""
+
     events: List[DCAEvent]
-    dca_buys: int           # ALWAYS len(events)
-    total_dca_eur: float    # sum of all event costs
-    last_dca_price: float   # price of most recent event, or 0
-    last_dca_ts: float      # timestamp of most recent event, or 0
-    dca_max: int            # config-driven max
+    dca_buys: int  # ALWAYS len(events)
+    total_dca_eur: float  # sum of all event costs
+    last_dca_price: float  # price of most recent event, or 0
+    last_dca_ts: float  # timestamp of most recent event, or 0
+    dca_max: int  # config-driven max
 
     @property
     def has_events(self) -> bool:
@@ -94,6 +97,7 @@ class DCAState:
 # ---------------------------------------------------------------------------
 # Core functions
 # ---------------------------------------------------------------------------
+
 
 def compute_state(trade: Trade, dca_max: int) -> DCAState:
     """Derive DCA state from trade's dca_events list.
@@ -172,12 +176,17 @@ def record_dca(
 
     # Update dca_next_price using last_dca_price (FIX #003: prevents cascading)
     if drop_pct > 0 and new_state.last_dca_price > 0:
-        next_step = drop_pct * (step_multiplier ** new_state.dca_buys)
+        next_step = drop_pct * (step_multiplier**new_state.dca_buys)
         trade["dca_next_price"] = new_state.last_dca_price * (1 - next_step)
 
     _log.info(
         "[DCAState] record_dca level=%d price=%.6f eur=%.2f tokens=%.6f source=%s → dca_buys=%d",
-        level, price, amount_eur, tokens_bought, source, new_state.dca_buys,
+        level,
+        price,
+        amount_eur,
+        tokens_bought,
+        source,
+        new_state.dca_buys,
     )
 
     return new_state
@@ -204,18 +213,14 @@ def sync_derived_fields(trade: Trade, dca_max: int) -> Tuple[DCAState, List[str]
     stored_buys = int(trade.get("dca_buys", 0) or 0)
     effective_buys = max(state.dca_buys, stored_buys)
     if stored_buys != effective_buys:
-        repairs.append(
-            f"dca_buys {stored_buys} → {effective_buys} (from {len(state.events)} events)"
-        )
+        repairs.append(f"dca_buys {stored_buys} → {effective_buys} (from {len(state.events)} events)")
         trade["dca_buys"] = effective_buys
 
     # Sync last_dca_price
     if state.has_events:
         stored_ldp = float(trade.get("last_dca_price", 0) or 0)
         if abs(stored_ldp - state.last_dca_price) > 1e-8:
-            repairs.append(
-                f"last_dca_price {stored_ldp:.6f} → {state.last_dca_price:.6f}"
-            )
+            repairs.append(f"last_dca_price {stored_ldp:.6f} → {state.last_dca_price:.6f}")
             trade["last_dca_price"] = state.last_dca_price
 
     # Sync dca_max: only SET if trade has no dca_max yet (new trade).
@@ -240,9 +245,7 @@ def validate_events(trade: Trade, dca_max: int) -> List[str]:
     # Check stored dca_buys matches computed
     stored_buys = int(trade.get("dca_buys", 0) or 0)
     if stored_buys != state.dca_buys:
-        warnings.append(
-            f"dca_buys mismatch: stored={stored_buys}, computed={state.dca_buys}"
-        )
+        warnings.append(f"dca_buys mismatch: stored={stored_buys}, computed={state.dca_buys}")
 
     # Check for duplicate event_ids
     ids = [ev.event_id for ev in state.events]
@@ -258,9 +261,7 @@ def validate_events(trade: Trade, dca_max: int) -> List[str]:
     for i, ev in enumerate(state.events):
         expected_level = i + 1
         if ev.dca_level != expected_level:
-            warnings.append(
-                f"Event {i} has dca_level={ev.dca_level}, expected {expected_level}"
-            )
+            warnings.append(f"Event {i} has dca_level={ev.dca_level}, expected {expected_level}")
 
     # Check for zero/negative amounts
     for i, ev in enumerate(state.events):
@@ -297,7 +298,7 @@ def detect_untracked_buys(
     """
     # Build signature set from existing events for dedup
     existing_sigs: set = set()
-    for ev in (trade.get("dca_events") or []):
+    for ev in trade.get("dca_events") or []:
         # Signature: (rounded timestamp, rounded EUR)
         ts = round(float(ev.get("timestamp", 0) or 0), 0)
         eur = round(float(ev.get("amount_eur", 0) or 0), 2)

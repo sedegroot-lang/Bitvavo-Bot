@@ -9,15 +9,15 @@ from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
-
 # ---------------------------------------------------------------------------
 # Candle helpers
 # ---------------------------------------------------------------------------
 
+
 def close_prices(candles: Sequence) -> List[float]:
     """Extract close prices from candle arrays (index 4)."""
     prices: List[float] = []
-    for x in (candles or []):
+    for x in candles or []:
         try:
             if len(x) > 4:
                 prices.append(float(x[4]))
@@ -41,6 +41,7 @@ def volumes(candles: Sequence) -> List[float]:
 # ---------------------------------------------------------------------------
 # Moving averages
 # ---------------------------------------------------------------------------
+
 
 def sma(vals: Sequence[float], window: int) -> Optional[float]:
     """Simple moving average over the last *window* values."""
@@ -72,6 +73,7 @@ def ema_series(vals: Sequence[float], window: int) -> List[float]:
 # ---------------------------------------------------------------------------
 # Oscillators
 # ---------------------------------------------------------------------------
+
 
 def rsi(vals: Sequence[float], period: int = 14) -> Optional[float]:
     """Relative Strength Index."""
@@ -107,7 +109,7 @@ def macd(
         return None, None, None
     ef = ema_series(vals, fast)
     es = ema_series(vals, slow)
-    macd_line = [f - s for f, s in zip(ef[-len(es):], es)]
+    macd_line = [f - s for f, s in zip(ef[-len(es) :], es)]
     sig = ema_series(macd_line, signal)
     return macd_line[-1], sig[-1], macd_line[-1] - sig[-1]
 
@@ -115,6 +117,7 @@ def macd(
 # ---------------------------------------------------------------------------
 # Volatility
 # ---------------------------------------------------------------------------
+
 
 def bollinger_bands(
     vals: Sequence[float],
@@ -152,16 +155,14 @@ def atr(
     """Average True Range."""
     if len(h) < window + 1:
         return None
-    trs = [
-        max(h[i] - l[i], abs(h[i] - c[i - 1]), abs(l[i] - c[i - 1]))
-        for i in range(1, len(c))
-    ]
+    trs = [max(h[i] - l[i], abs(h[i] - c[i - 1]), abs(l[i] - c[i - 1])) for i in range(1, len(c))]
     return float(np.mean(trs[-window:]))
 
 
 # ---------------------------------------------------------------------------
 # Composite
 # ---------------------------------------------------------------------------
+
 
 def calculate_momentum_score(
     candles: Sequence,
@@ -181,11 +182,7 @@ def calculate_momentum_score(
             return 0
 
         roc_1 = (prices[-1] - prices[-2]) / prices[-2] if prices[-2] != 0 else 0
-        roc_5 = (
-            (prices[-1] - prices[-6]) / prices[-6]
-            if len(prices) >= 6 and prices[-6] != 0
-            else 0
-        )
+        roc_5 = (prices[-1] - prices[-6]) / prices[-6] if len(prices) >= 6 and prices[-6] != 0 else 0
 
         vols = _volumes if _volumes is not None else volumes(candles)
         if len(vols) >= 20:

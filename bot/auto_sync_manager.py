@@ -4,9 +4,8 @@ Owns its own module-level thread handle so the trailing_bot.py shim can be a
 one-liner. Reads synchronizer/trades_lock/open_trades/closed_trades/market_profits
 from `bot.shared.state`.
 """
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 from bot.shared import state
 
@@ -17,15 +16,15 @@ def start(*, interval: int = 60) -> None:
     """Start the auto-sync background thread (idempotent)."""
     global _auto_sync_thread
     log = state.log
-    synchronizer = getattr(state, 'synchronizer', None)
+    synchronizer = getattr(state, "synchronizer", None)
     if synchronizer is None:
         try:
-            log("Auto-sync niet gestart: synchronizer ontbreekt.", level='debug')
+            log("Auto-sync niet gestart: synchronizer ontbreekt.", level="debug")
         except Exception:
             pass
         return
     try:
-        cfg_interval = int(state.CONFIG.get('SYNC_INTERVAL_SECONDS', 60) or 60)
+        cfg_interval = int(state.CONFIG.get("SYNC_INTERVAL_SECONDS", 60) or 60)
     except Exception:
         cfg_interval = 60
     if interval <= 0:
@@ -62,6 +61,6 @@ def start(*, interval: int = 60) -> None:
         interval=interval,
     )
     try:
-        log(f"Auto-sync thread gestart (interval={interval}s).", level='info')
+        log(f"Auto-sync thread gestart (interval={interval}s).", level="info")
     except Exception:
         pass

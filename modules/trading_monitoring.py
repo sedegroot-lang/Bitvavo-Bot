@@ -7,7 +7,7 @@ import os
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Union
 
 from modules.metrics import MetricsCollector
 
@@ -50,7 +50,7 @@ class MonitoringManager:
         max_age_seconds: int = 300,
     ) -> threading.Thread:
         """Start a watchdog thread to clean up stale reservations.
-        
+
         Note: If using ReservationManager (callable), the manager handles
         auto-expiry internally, so this watchdog becomes a no-op monitor.
         """
@@ -73,9 +73,7 @@ class MonitoringManager:
                         # Legacy dict mode - clean up manually
                         now = time.time()
                         stale = [
-                            market
-                            for market, ts in list(reservations.items())
-                            if (now - float(ts)) > max_age_seconds
+                            market for market, ts in list(reservations.items()) if (now - float(ts)) > max_age_seconds
                         ]
                         for market in stale:
                             reservations.pop(market, None)
@@ -110,9 +108,11 @@ class MonitoringManager:
                         open_trades = open_trades_provider() or {}
                         if isinstance(open_trades, dict):
                             # Filter out dust trades: only count trades above threshold
-                            filtered_trades = {m: t for m, t in open_trades.items() 
-                                               if isinstance(t, dict) and 
-                                               float(t.get('invested_eur', 0) or 0) >= dust_threshold_eur}
+                            filtered_trades = {
+                                m: t
+                                for m, t in open_trades.items()
+                                if isinstance(t, dict) and float(t.get("invested_eur", 0) or 0) >= dust_threshold_eur
+                            }
                             open_len = len(filtered_trades)
                             open_len_including_dust = len(open_trades)
                             dust_count = open_len_including_dust - open_len
@@ -135,9 +135,12 @@ class MonitoringManager:
                             file_open = data.get("open", {})
                             if isinstance(file_open, dict):
                                 # Apply dust filter to fallback as well
-                                filtered_file = {m: t for m, t in file_open.items() 
-                                                 if isinstance(t, dict) and 
-                                                 float(t.get('invested_eur', 0) or 0) >= dust_threshold_eur}
+                                filtered_file = {
+                                    m: t
+                                    for m, t in file_open.items()
+                                    if isinstance(t, dict)
+                                    and float(t.get("invested_eur", 0) or 0) >= dust_threshold_eur
+                                }
                                 open_len = len(filtered_file)
                                 open_len_including_dust = len(file_open)
                                 dust_count = open_len_including_dust - open_len
@@ -204,7 +207,7 @@ class MonitoringManager:
                     except Exception:
                         payload["ai_status"] = {"online": False, "last_seen": None}
                         payload["ai_active"] = False  # Dashboard compatibility
-                    
+
                     # Bot is actively writing heartbeat, so it's online
                     payload["bot_active"] = True
 
@@ -273,52 +276,51 @@ class MonitoringManager:
                                 hf.write(line + "\n")
                         except Exception:
                             pass
-                        
+
                         # NIEUW: Schrijf ook complete Bitvavo balance history
                         # Dit logt totale account waarde (EUR + alle crypto in EUR)
                         try:
-                            balance_history_path = os.path.join(os.path.dirname(ctx.heartbeat_file), 'balance_history.jsonl')
-                            
+                            balance_history_path = os.path.join(
+                                os.path.dirname(ctx.heartbeat_file), "balance_history.jsonl"
+                            )
+
                             # Bereken totaal saldo
                             total_eur = 0.0
                             try:
                                 balances = ctx.safe_call(ctx.bitvavo.balance, {}) or []
                                 for bal in balances:
-                                    symbol = bal.get('symbol')
-                                    available = float(bal.get('available', 0) or 0)
-                                    in_order = float(bal.get('inOrder', 0) or 0)
+                                    symbol = bal.get("symbol")
+                                    available = float(bal.get("available", 0) or 0)
+                                    in_order = float(bal.get("inOrder", 0) or 0)
                                     total_amount = available + in_order
-                                    
+
                                     if total_amount > 0:
-                                        if symbol == 'EUR':
+                                        if symbol == "EUR":
                                             total_eur += total_amount
                                         else:
                                             # Converteer crypto naar EUR
                                             try:
                                                 market = f"{symbol}-EUR"
-                                                ticker = ctx.safe_call(ctx.bitvavo.tickerPrice, {'market': market})
-                                                if ticker and 'price' in ticker:
-                                                    price = float(ticker['price'])
+                                                ticker = ctx.safe_call(ctx.bitvavo.tickerPrice, {"market": market})
+                                                if ticker and "price" in ticker:
+                                                    price = float(ticker["price"])
                                                     total_eur += total_amount * price
                                             except Exception:
                                                 pass
                             except Exception:
                                 total_eur = 0.0
-                            
+
                             # Schrijf alleen als we een valide totaal hebben
                             if total_eur > 0:
                                 balance_line = json.dumps(
-                                    {
-                                        "ts": payload.get("ts"),
-                                        "total_eur": round(total_eur, 2)
-                                    },
+                                    {"ts": payload.get("ts"), "total_eur": round(total_eur, 2)},
                                     ensure_ascii=False,
                                 )
                                 with open(balance_history_path, "a", encoding="utf-8") as bf:
                                     bf.write(balance_line + "\n")
                         except Exception:
                             pass  # Balance history is optional, don't fail if it errors
-                        
+
                         log(
                             f"Heartbeat written to {ctx.heartbeat_file}: {payload}",
                             level="info",
@@ -352,12 +354,8 @@ class MonitoringManager:
                             except Exception as exc:
                                 log(f"Risk metrics ophalen mislukt: {exc}", level="warning")
                         if risk_metrics is not None:
-                            metrics_out["bot_global_drawdown_eur"] = float(
-                                risk_metrics.global_current_drawdown
-                            )
-                            metrics_out["bot_global_max_drawdown_eur"] = float(
-                                risk_metrics.global_max_drawdown
-                            )
+                            metrics_out["bot_global_drawdown_eur"] = float(risk_metrics.global_current_drawdown)
+                            metrics_out["bot_global_max_drawdown_eur"] = float(risk_metrics.global_max_drawdown)
                             metrics_out["bot_win_rate"] = float(risk_metrics.win_rate)
                             metrics_out["bot_trade_history"] = float(risk_metrics.sample_size)
                             for segment, seg_dd in (risk_metrics.segment_drawdowns or {}).items():
@@ -419,6 +417,7 @@ class MonitoringManager:
         def _alerts_enabled() -> bool:
             try:
                 from modules.config import CONFIG as _CFG
+
                 return bool(_CFG.get("HEARTBEAT_STALE_ALERT_ENABLED", True))
             except Exception:
                 return True
@@ -469,10 +468,7 @@ class MonitoringManager:
                         else:
                             now = time.time()
                             if now - last_alert_ts >= current_cooldown:
-                                msg = (
-                                    f"ALERT: heartbeat stale or missing (last_ts={ts}). "
-                                    "Bot may be down."
-                                )
+                                msg = f"ALERT: heartbeat stale or missing (last_ts={ts}). Bot may be down."
                                 if _alerts_enabled():
                                     send_alert(msg)
                                 else:

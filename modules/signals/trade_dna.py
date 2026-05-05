@@ -7,10 +7,9 @@ Builds a feature fingerprint of current market conditions and compares to a data
 from __future__ import annotations
 
 import json
-import math
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from .base import SignalContext, SignalResult, _safe_cfg_float, _safe_cfg_int
 
@@ -159,7 +158,7 @@ def trade_dna_signal(ctx: SignalContext) -> SignalResult:
 
     # Volatility proxy (return stdev)
     rets = [closes[i] / closes[i - 1] - 1 for i in range(max(1, len(closes) - 20), len(closes))]
-    vol_proxy = (sum(r ** 2 for r in rets) / max(len(rets), 1)) ** 0.5 if rets else 0
+    vol_proxy = (sum(r**2 for r in rets) / max(len(rets), 1)) ** 0.5 if rets else 0
 
     # MACD proxy
     if len(closes) >= 26:

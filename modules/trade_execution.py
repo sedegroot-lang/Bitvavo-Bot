@@ -11,6 +11,7 @@ Functions:
   - compute_trailing_stop: Calculate trailing stop price from config
   - compute_dca_next_price: Calculate next DCA trigger price
 """
+
 from __future__ import annotations
 
 import time
@@ -147,7 +148,7 @@ def compute_dca_next_price(
     """
     if buy_price <= 0 or drop_pct <= 0:
         return 0.0
-    effective_drop = drop_pct * (step_multiplier ** dca_level)
+    effective_drop = drop_pct * (step_multiplier**dca_level)
     return buy_price * (1 - effective_drop)
 
 

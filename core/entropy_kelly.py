@@ -111,24 +111,24 @@ def get_sizing_adjustment(
         - entropy_ratio: current Shannon entropy ratio
         - regime: 'predictable', 'normal', or 'chaotic'
     """
-    window = int(config.get('ENTROPY_KELLY_WINDOW', 60))
-    base = float(config.get('KELLY_FRACTION', 0.5))
-    threshold = float(config.get('ENTROPY_KELLY_THRESHOLD', 0.70))
+    window = int(config.get("ENTROPY_KELLY_WINDOW", 60))
+    base = float(config.get("KELLY_FRACTION", 0.5))
+    threshold = float(config.get("ENTROPY_KELLY_THRESHOLD", 0.70))
 
     ratio = shannon_entropy_ratio(closes, window)
     fraction = entropy_kelly_fraction(closes, base, window, entropy_threshold=threshold)
 
     if ratio is None:
-        regime = 'unknown'
+        regime = "unknown"
     elif ratio < 0.40:
-        regime = 'predictable'
+        regime = "predictable"
     elif ratio > threshold:
-        regime = 'chaotic'
+        regime = "chaotic"
     else:
-        regime = 'normal'
+        regime = "normal"
 
     return {
-        'fraction': round(fraction, 4),
-        'entropy_ratio': round(ratio, 4) if ratio is not None else None,
-        'regime': regime,
+        "fraction": round(fraction, 4),
+        "entropy_ratio": round(ratio, 4) if ratio is not None else None,
+        "regime": regime,
     }

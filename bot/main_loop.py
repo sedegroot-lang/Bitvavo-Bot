@@ -14,6 +14,7 @@ Public API:
                           driven by ``CONFIG['BOT_LOOP_INTERVAL']``
                           (default 25 s).
 """
+
 from __future__ import annotations
 
 import time
@@ -21,9 +22,11 @@ from typing import Any
 
 from modules.logging_utils import log
 
+
 # Lazy import to avoid heavy startup cost at import time.
 def _load_bot_loop():
     from trailing_bot import bot_loop  # type: ignore
+
     return bot_loop
 
 
@@ -36,6 +39,7 @@ def bot_loop(*args: Any, **kwargs: Any):
 def run(once: bool = False) -> None:
     """Run the main loop. ``once=True`` for tests/scripts; otherwise loops."""
     from modules.config import CONFIG  # local import: config may not be init'd yet
+
     if once:
         bot_loop()
         return

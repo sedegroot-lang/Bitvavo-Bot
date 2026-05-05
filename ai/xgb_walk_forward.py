@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -37,6 +36,7 @@ sys.path.insert(0, str(ROOT))
 
 try:
     from modules.config import load_config
+
     CONFIG = load_config() or {}
 except Exception:
     CONFIG = {}
@@ -59,7 +59,9 @@ def load_data(path: Path) -> pd.DataFrame:
 def detect_feature_cols(df: pd.DataFrame) -> List[str]:
     """Auto-detect feature columns (everything except label, timestamp, market)."""
     exclude = {"label", "timestamp", "market", "date", "ts"}
-    return [c for c in df.columns if c.lower() not in exclude and df[c].dtype in ("float64", "int64", "float32", "int32")]
+    return [
+        c for c in df.columns if c.lower() not in exclude and df[c].dtype in ("float64", "int64", "float32", "int32")
+    ]
 
 
 def walk_forward(
@@ -203,7 +205,7 @@ def main():
     with open(metrics_path, "w") as f:
         json.dump(result, f, indent=2)
 
-    print(f"\n  ═══ RESULTS ═══")
+    print("\n  ═══ RESULTS ═══")
     print(f"  Folds:          {result.get('num_folds', 0)}")
     print(f"  Avg Accuracy:   {result.get('avg_accuracy', 0):.2%} ± {result.get('std_accuracy', 0):.2%}")
     print(f"  Avg Precision:  {result.get('avg_precision', 0):.2%}")

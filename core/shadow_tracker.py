@@ -9,6 +9,7 @@ Data files:
   data/shadow_phantom.json    — active phantom trades (DMS) being tracked
   data/shadow_dms_watchlist.json — DMS top-50 opportunity markets
 """
+
 from __future__ import annotations
 
 import json
@@ -27,27 +28,28 @@ _PHANTOM_PATH = _DATA / "shadow_phantom.json"
 _DMS_PATH = _DATA / "shadow_dms_watchlist.json"
 
 # Phantom trade simulation parameters
-_TRAILING_STOP_PCT = 5.0        # close if price drops 5% from peak
-_TRAILING_TIGHT_PCT = 3.5       # tighten to 3.5% when +5% above entry
-_TRAILING_TIGHTER_PCT = 2.5     # tighten to 2.5% when +10% above entry
-_STOP_LOSS_PCT = 8.0            # hard stop loss at -8%
-_MAX_HOLD_HOURS = 72            # force close after 72 hours
-_MIN_LOG_SCORE = 3.0            # only log evaluations where score >= this
+_TRAILING_STOP_PCT = 5.0  # close if price drops 5% from peak
+_TRAILING_TIGHT_PCT = 3.5  # tighten to 3.5% when +5% above entry
+_TRAILING_TIGHTER_PCT = 2.5  # tighten to 2.5% when +10% above entry
+_STOP_LOSS_PCT = 8.0  # hard stop loss at -8%
+_MAX_HOLD_HOURS = 72  # force close after 72 hours
+_MIN_LOG_SCORE = 3.0  # only log evaluations where score >= this
 
 
 @dataclass
 class ShadowDecision:
     """One shadow evaluation result."""
+
     market: str
     timestamp: float
     score: float
     price: float
-    bot_decision: str           # "buy" or "skip"
-    shadow_decision: str        # "buy", "block_timing", "block_velocity", "skip"
-    timing_filter: str          # "boost", "block", "neutral"
-    velocity_filter: str        # "ok", "soft_block"
-    is_dms: bool                # True if from DMS scan (not in bot whitelist)
-    score_with_filters: float   # score after timing + velocity adjustments
+    bot_decision: str  # "buy" or "skip"
+    shadow_decision: str  # "buy", "block_timing", "block_velocity", "skip"
+    timing_filter: str  # "boost", "block", "neutral"
+    velocity_filter: str  # "ok", "soft_block"
+    is_dms: bool  # True if from DMS scan (not in bot whitelist)
+    score_with_filters: float  # score after timing + velocity adjustments
     reason: str
 
     def to_dict(self) -> dict:
@@ -91,9 +93,9 @@ class ShadowTracker:
         Block 13:00-17:00 UTC → score penalty -3.0
         Boost 00:00-06:00 UTC → score bonus  +0.5
         """
-        if 13 <= hour_utc <= 16:     # 13:00-16:59
+        if 13 <= hour_utc <= 16:  # 13:00-16:59
             return "block", -3.0
-        elif 0 <= hour_utc <= 5:     # 00:00-05:59
+        elif 0 <= hour_utc <= 5:  # 00:00-05:59
             return "boost", +0.5
         return "neutral", 0.0
 
@@ -170,10 +172,7 @@ class ShadowTracker:
 
         # Only log interesting evaluations (score near threshold, or decisions differ)
         dominated_by_noise = (
-            score < _MIN_LOG_SCORE
-            and adj_score < _MIN_LOG_SCORE
-            and not bot_would_buy
-            and not shadow_would_buy
+            score < _MIN_LOG_SCORE and adj_score < _MIN_LOG_SCORE and not bot_would_buy and not shadow_would_buy
         )
         if dominated_by_noise and not is_dms:
             return None
@@ -212,17 +211,20 @@ class ShadowTracker:
 
         # Track avoided trades (bot buys, shadow blocks)
         if bot_would_buy and not shadow_would_buy:
-            _append_jsonl({
-                "type": "avoided",
-                "market": market,
-                "ts": round(now, 1),
-                "entry_price": price,
-                "score": round(score, 2),
-                "adj_score": round(adj_score, 2),
-                "block_reason": shadow_label,
-                "timing": timing_label,
-                "velocity": velocity_label,
-            }, _LOG_PATH)
+            _append_jsonl(
+                {
+                    "type": "avoided",
+                    "market": market,
+                    "ts": round(now, 1),
+                    "entry_price": price,
+                    "score": round(score, 2),
+                    "adj_score": round(adj_score, 2),
+                    "block_reason": shadow_label,
+                    "timing": timing_label,
+                    "velocity": velocity_label,
+                },
+                _LOG_PATH,
+            )
 
         return decision
 
@@ -371,13 +373,15 @@ class ShadowTracker:
             # Opportunity = volatility × sqrt(volume_eur / 10000)
             opportunity = volatility * math.sqrt(vol_eur / 10000)
 
-            candidates.append({
-                "market": m,
-                "volume_eur": round(vol_eur),
-                "volatility_pct": round(volatility, 1),
-                "opportunity": round(opportunity, 1),
-                "price": float(t.get("last") or 0),
-            })
+            candidates.append(
+                {
+                    "market": m,
+                    "volume_eur": round(vol_eur),
+                    "volatility_pct": round(volatility, 1),
+                    "opportunity": round(opportunity, 1),
+                    "price": float(t.get("last") or 0),
+                }
+            )
 
         candidates.sort(key=lambda x: x["opportunity"], reverse=True)
         self._dms_watchlist = candidates[:50]
@@ -484,6 +488,7 @@ class ShadowTracker:
 # Helpers
 # ═══════════════════════════════════════════════════════════════════
 
+
 def _append_jsonl(entry: dict, path: Path):
     """Append a single JSON line to a JSONL file."""
     try:
@@ -507,6 +512,7 @@ def _parse_ts(val) -> float:
         for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
             try:
                 import datetime
+
                 dt = datetime.datetime.strptime(val, fmt)
                 return dt.timestamp()
             except ValueError:

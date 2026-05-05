@@ -216,11 +216,7 @@ def _fetch_trades_with_paging(
             new_items += 1
         if len(batch) < limit or new_items == 0:
             break
-        ts_values = [
-            _normalize_ts(item.get("timestamp"))
-            for item in batch
-            if item.get("timestamp") is not None
-        ]
+        ts_values = [_normalize_ts(item.get("timestamp")) for item in batch if item.get("timestamp") is not None]
         if not ts_values:
             break
         oldest = min(ts_values)

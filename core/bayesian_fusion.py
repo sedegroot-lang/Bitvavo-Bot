@@ -51,6 +51,7 @@ def _save_weights() -> None:
                 indent=2,
             )
         import os
+
         os.replace(str(tmp), str(_WEIGHTS_PATH))
     except Exception:
         pass

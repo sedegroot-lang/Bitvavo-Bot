@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import copy
 import json
-import time
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -23,8 +23,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 import bot.api as _api
-from core.indicators import close_prices, highs, lows, atr, ema
-from modules.logging_utils import log, locked_write_json
+from core.indicators import atr, close_prices, ema, highs, lows
+from modules.logging_utils import locked_write_json, log
 
 # ---------------------------------------------------------------------------
 # Module state – set by init()
@@ -78,12 +78,12 @@ def _profit_phase(profit_pct: float) -> int:
 def _phase_atr_multiplier(phase: int, base_atr_mult: float) -> float:
     """Adjust ATR multiplier based on profit phase."""
     if phase == 1:
-        return base_atr_mult * 1.25   # 25% wider in discovery
+        return base_atr_mult * 1.25  # 25% wider in discovery
     if phase == 2:
-        return base_atr_mult * 1.1    # 10% wider in trend riding
+        return base_atr_mult * 1.1  # 10% wider in trend riding
     if phase == 3:
-        return base_atr_mult * 0.85   # tighter in profit protection
-    return base_atr_mult * 1.2        # wider again for moon bag
+        return base_atr_mult * 0.85  # tighter in profit protection
+    return base_atr_mult * 1.2  # wider again for moon bag
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ def check_swing_momentum_gate(market: str, buy_price: float, current_price: floa
         # Find swing lows (local minima in 5-bar window)
         swing_lows = []
         for i in range(5, len(low_vals) - 5):
-            if low_vals[i] == min(low_vals[i - 5:i + 6]):
+            if low_vals[i] == min(low_vals[i - 5 : i + 6]):
                 swing_lows.append(low_vals[i])
 
         if len(swing_lows) < 2:
@@ -133,6 +133,7 @@ def check_swing_momentum_gate(market: str, buy_price: float, current_price: floa
         return higher_low and above_entry and momentum_ok
     except Exception:
         return False
+
 
 # ---------------------------------------------------------------------------
 # HTF candle cache — avoids 3 redundant API calls per trade per loop tick
@@ -156,6 +157,7 @@ def _get_htf_candles(market: str, interval: str, limit: int = 20) -> Optional[Li
         with _HTF_CACHE_LOCK:
             _HTF_CACHE[cache_key] = {"data": data, "ts": now}
     return data
+
 
 # ---------------------------------------------------------------------------
 # Partial TP state (module-owned)
@@ -188,6 +190,7 @@ def _load_partial_tp_stats_cache() -> None:
 # init()
 # ---------------------------------------------------------------------------
 
+
 def init(config: dict, *, open_trades_ref: dict | None = None) -> None:
     """Inject runtime dependencies.
 
@@ -213,6 +216,7 @@ def init(config: dict, *, open_trades_ref: dict | None = None) -> None:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _ensure_parent_dir(path: str) -> None:
     try:
@@ -250,6 +254,7 @@ def _partial_tp_levels() -> List[Tuple[float, float]]:
 # ---------------------------------------------------------------------------
 # Partial TP functions
 # ---------------------------------------------------------------------------
+
 
 def _ensure_tp_flags(trade: Dict[str, Any]) -> List[bool]:
     """Ensure partial-TP flags are initialised on *trade*.
@@ -360,6 +365,7 @@ def get_partial_tp_stats() -> Dict[str, Any]:
 # Adaptive TP
 # ---------------------------------------------------------------------------
 
+
 def calculate_adaptive_tp(market, entry_price, volatility=None, trend_strength=None):
     """Calculate adaptive take profit levels based on market conditions."""
     try:
@@ -400,6 +406,7 @@ def calculate_adaptive_tp(market, entry_price, volatility=None, trend_strength=N
 # Stop-loss
 # ---------------------------------------------------------------------------
 
+
 def check_stop_loss(market, trade, current_price, enabled=False):
     """Hard stop-loss override — DISABLED.
 
@@ -412,6 +419,7 @@ def check_stop_loss(market, trade, current_price, enabled=False):
 # ---------------------------------------------------------------------------
 # Advanced exit strategies
 # ---------------------------------------------------------------------------
+
 
 def check_advanced_exit_strategies(trade, current_price):
     """Advanced exit: partial TP, time-based exits, volatility spike exits.
@@ -480,6 +488,7 @@ def check_advanced_exit_strategies(trade, current_price):
 # ---------------------------------------------------------------------------
 # calculate_stop_levels (the big one)
 # ---------------------------------------------------------------------------
+
 
 def calculate_stop_levels(m, buy, high):  # noqa: C901
     """Calculate trailing stop, hard stop, and trend strength for a market.
@@ -565,7 +574,10 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                         float(trade.get("highest_since_activation") or 0.0), float(high or 0.0)
                     )
             except Exception as e:
-                log(f"[ERROR] Trailing activation flag update failed for {m if 'm' in dir() else '?'}: {e}", level="error")
+                log(
+                    f"[ERROR] Trailing activation flag update failed for {m if 'm' in dir() else '?'}: {e}",
+                    level="error",
+                )
 
             if activation_ok or (isinstance(trade, dict) and trade.get("trailing_activated")):
                 used_high = hw
@@ -581,8 +593,12 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                 #                         "stepped_levels": [{"profit_pct":..,"trailing_pct":..}, ...] } }
                 try:
                     _per_market = _cfg.get("MARKET_TRAILING_OVERRIDES") or {}
-                    _market_key = m if isinstance(m, str) else (trade.get("market") if isinstance(trade, dict) else None)
-                    _market_cfg = _per_market.get(_market_key) if isinstance(_per_market, dict) and _market_key else None
+                    _market_key = (
+                        m if isinstance(m, str) else (trade.get("market") if isinstance(trade, dict) else None)
+                    )
+                    _market_cfg = (
+                        _per_market.get(_market_key) if isinstance(_per_market, dict) and _market_key else None
+                    )
                     if isinstance(_market_cfg, dict):
                         _override_base = _market_cfg.get("base_trailing_pct")
                         if _override_base is not None and float(_override_base) > 0:
@@ -593,7 +609,9 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                 # ── Regime Engine: apply trailing_pct_override ──
                 try:
                     _regime_adj = _cfg.get("_REGIME_ADJ") or {}
-                    _trailing_override = _regime_adj.get("trailing_pct_override") if isinstance(_regime_adj, dict) else None
+                    _trailing_override = (
+                        _regime_adj.get("trailing_pct_override") if isinstance(_regime_adj, dict) else None
+                    )
                     if _trailing_override is not None and float(_trailing_override) > 0:
                         base_percent = float(_trailing_override)
                 except Exception:
@@ -601,21 +619,28 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
 
                 # Stepped trailing
                 try:
-                    stepped_levels = _cfg.get("STEPPED_TRAILING_LEVELS", [
-                        {"profit_pct": 0.02, "trailing_pct": 0.012},
-                        {"profit_pct": 0.04, "trailing_pct": 0.010},
-                        {"profit_pct": 0.06, "trailing_pct": 0.008},
-                        {"profit_pct": 0.08, "trailing_pct": 0.007},
-                        {"profit_pct": 0.12, "trailing_pct": 0.006},
-                        {"profit_pct": 0.18, "trailing_pct": 0.005},
-                        {"profit_pct": 0.25, "trailing_pct": 0.004},
-                        {"profit_pct": 0.35, "trailing_pct": 0.003},
-                    ])
+                    stepped_levels = _cfg.get(
+                        "STEPPED_TRAILING_LEVELS",
+                        [
+                            {"profit_pct": 0.02, "trailing_pct": 0.012},
+                            {"profit_pct": 0.04, "trailing_pct": 0.010},
+                            {"profit_pct": 0.06, "trailing_pct": 0.008},
+                            {"profit_pct": 0.08, "trailing_pct": 0.007},
+                            {"profit_pct": 0.12, "trailing_pct": 0.006},
+                            {"profit_pct": 0.18, "trailing_pct": 0.005},
+                            {"profit_pct": 0.25, "trailing_pct": 0.004},
+                            {"profit_pct": 0.35, "trailing_pct": 0.003},
+                        ],
+                    )
                     # Per-market stepped override wins if present
                     try:
                         _per_market = _cfg.get("MARKET_TRAILING_OVERRIDES") or {}
-                        _market_key = m if isinstance(m, str) else (trade.get("market") if isinstance(trade, dict) else None)
-                        _market_cfg = _per_market.get(_market_key) if isinstance(_per_market, dict) and _market_key else None
+                        _market_key = (
+                            m if isinstance(m, str) else (trade.get("market") if isinstance(trade, dict) else None)
+                        )
+                        _market_cfg = (
+                            _per_market.get(_market_key) if isinstance(_per_market, dict) and _market_key else None
+                        )
                         if isinstance(_market_cfg, dict):
                             _override_steps = _market_cfg.get("stepped_levels")
                             if isinstance(_override_steps, list) and _override_steps:
@@ -663,13 +688,16 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                 # 5-level trend adjustment
                 trend_mult = 1.0
                 try:
-                    trend_levels = _cfg.get("TREND_LEVELS", [
-                        {"threshold": 0.06, "multiplier": 0.6, "name": "strong_bull"},
-                        {"threshold": 0.03, "multiplier": 0.75, "name": "bull"},
-                        {"threshold": -0.03, "multiplier": 1.0, "name": "neutral"},
-                        {"threshold": -0.06, "multiplier": 1.25, "name": "bear"},
-                        {"threshold": -999, "multiplier": 1.4, "name": "strong_bear"},
-                    ])
+                    trend_levels = _cfg.get(
+                        "TREND_LEVELS",
+                        [
+                            {"threshold": 0.06, "multiplier": 0.6, "name": "strong_bull"},
+                            {"threshold": 0.03, "multiplier": 0.75, "name": "bull"},
+                            {"threshold": -0.03, "multiplier": 1.0, "name": "neutral"},
+                            {"threshold": -0.06, "multiplier": 1.25, "name": "bear"},
+                            {"threshold": -999, "multiplier": 1.4, "name": "strong_bear"},
+                        ],
+                    )
                     for level in trend_levels:
                         if trend_strength >= level["threshold"]:
                             trend_mult = level["multiplier"]
@@ -713,10 +741,19 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
 
                 # Profit velocity awareness
                 try:
-                    if _cfg.get("PROFIT_VELOCITY_ENABLED", True) and isinstance(trade, dict) and buy is not None and buy > 0:
+                    if (
+                        _cfg.get("PROFIT_VELOCITY_ENABLED", True)
+                        and isinstance(trade, dict)
+                        and buy is not None
+                        and buy > 0
+                    ):
                         buy_time = trade.get("buy_time") or trade.get("timestamp")
                         if buy_time:
-                            buy_dt = datetime.fromisoformat(buy_time) if isinstance(buy_time, str) else datetime.fromtimestamp(buy_time)
+                            buy_dt = (
+                                datetime.fromisoformat(buy_time)
+                                if isinstance(buy_time, str)
+                                else datetime.fromtimestamp(buy_time)
+                            )
                             hours_held = (datetime.utcnow() - buy_dt).total_seconds() / 3600
                             if hours_held > 0.1:
                                 profit_pct = (used_high - buy) / buy
@@ -739,13 +776,20 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
                     if _cfg.get("TIME_DECAY_ENABLED", True) and isinstance(trade, dict):
                         buy_time = trade.get("buy_time") or trade.get("timestamp")
                         if buy_time:
-                            buy_dt = datetime.fromisoformat(buy_time) if isinstance(buy_time, str) else datetime.fromtimestamp(buy_time)
+                            buy_dt = (
+                                datetime.fromisoformat(buy_time)
+                                if isinstance(buy_time, str)
+                                else datetime.fromtimestamp(buy_time)
+                            )
                             hours_held = (datetime.utcnow() - buy_dt).total_seconds() / 3600
-                            time_decay_levels = _cfg.get("TIME_DECAY_LEVELS", [
-                                {"hours": 24, "reduction_pct": 0.10},
-                                {"hours": 48, "reduction_pct": 0.15},
-                                {"hours": 72, "reduction_pct": 0.20},
-                            ])
+                            time_decay_levels = _cfg.get(
+                                "TIME_DECAY_LEVELS",
+                                [
+                                    {"hours": 24, "reduction_pct": 0.10},
+                                    {"hours": 48, "reduction_pct": 0.15},
+                                    {"hours": 72, "reduction_pct": 0.20},
+                                ],
+                            )
                             reduction = 0.0
                             for level in reversed(time_decay_levels):
                                 if hours_held >= level["hours"]:
@@ -849,6 +893,7 @@ def calculate_stop_levels(m, buy, high):  # noqa: C901
 # ---------------------------------------------------------------------------
 # Realized profit
 # ---------------------------------------------------------------------------
+
 
 def realized_profit(buy_price, sell_price, amount, buy_fee_pct=None, sell_fee_pct=None):
     """Calculate realized profit including trading fees."""

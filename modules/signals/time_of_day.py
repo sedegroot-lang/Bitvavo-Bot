@@ -7,7 +7,7 @@ Builds per-hour return statistics from recent candle data and adjusts entry scor
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Sequence
+from typing import Dict, List
 
 from .base import SignalContext, SignalResult, _safe_cfg_float, _safe_cfg_int
 

@@ -37,9 +37,7 @@ class MetaLearner:
         }
         self.eval_window = eval_window
         self.min_weight = min_weight
-        self.history: Dict[str, Deque[float]] = {
-            name: deque(maxlen=eval_window) for name in self.weights
-        }
+        self.history: Dict[str, Deque[float]] = {name: deque(maxlen=eval_window) for name in self.weights}
 
     def record_outcome(self, strategy: str, pnl: float) -> None:
         """Record PnL for a strategy from a completed trade."""
@@ -53,7 +51,7 @@ class MetaLearner:
             return 0.0
         mean = sum(returns) / len(returns)
         var = sum((r - mean) ** 2 for r in returns) / len(returns)
-        std = var ** 0.5
+        std = var**0.5
         if std < 1e-9:
             return mean * 10  # Almost zero vol → reward mean
         return mean / std
@@ -151,6 +149,7 @@ class MetaLearner:
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(self.to_dict(), f, indent=2)
             import os
+
             os.replace(str(tmp), str(p))
         except Exception:
             pass

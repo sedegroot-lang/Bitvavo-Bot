@@ -9,13 +9,14 @@ Checks:
   6. Closed trades have required fields (market, profit, reason, timestamp)
   7. Auto-repair: fix missing fields with safe defaults
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("data_integrity")
 
@@ -140,6 +141,7 @@ def validate_trade_log(
         try:
             backup = str(trade_path) + f".bak.{int(time.time())}"
             import shutil
+
             shutil.copy2(str(trade_path), backup)
             trade_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
             repairs.append(f"Saved repairs (backup: {backup})")
@@ -155,7 +157,9 @@ def validate_trade_log(
     if repairs:
         for repair in repairs[:10]:
             log(f"🔧 Auto-repair: {repair}")
-    log(f"Data integrity: {stats['open']} open, {stats['closed']} closed, "
-        f"{len(issues)} issues, {len(repairs)} repairs, valid={valid}")
+    log(
+        f"Data integrity: {stats['open']} open, {stats['closed']} closed, "
+        f"{len(issues)} issues, {len(repairs)} repairs, valid={valid}"
+    )
 
     return result

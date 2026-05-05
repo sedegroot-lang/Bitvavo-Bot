@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Tuple
-
 from .base import (
     SignalContext,
     SignalResult,
@@ -33,9 +31,7 @@ def ta_confirmation_signal(ctx: SignalContext) -> SignalResult:
     price = ctx.closes_1m[-1]
     ma_cross = short_ma and long_ma and short_ma > long_ma
     price_above_ema = ema_trend and price > ema_trend
-    candle_signal = detect_bullish_engulfing(ctx.closes_1m) or detect_hammer(
-        ctx.highs_1m, ctx.lows_1m, ctx.closes_1m
-    )
+    candle_signal = detect_bullish_engulfing(ctx.closes_1m) or detect_hammer(ctx.highs_1m, ctx.lows_1m, ctx.closes_1m)
 
     confirmations = [
         (bool(ma_cross), 1.0),
