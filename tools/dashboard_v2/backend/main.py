@@ -238,6 +238,18 @@ def _portfolio() -> Dict[str, Any]:
             except (TypeError, ValueError):
                 pass
 
+    # FIX #080: defensive fallback when overview's total_account_value_eur is stale/0
+    # but we have valid asset_value + eur_balance. Without this the dashboard shows
+    # "€0 totaal" while the user clearly has open positions.
+    if total_value <= 0:
+        try:
+            eur_avail = float(overview.get("eur_available") or hb.get("eur_balance") or 0)
+            asset_val_f = float(asset_value or 0)
+            if (eur_avail + asset_val_f) > 0:
+                total_value = round(eur_avail + asset_val_f, 2)
+        except (TypeError, ValueError):
+            pass
+
     return {
         "total_account_value_eur": total_value,
         "eur_balance": overview.get("eur_available", hb.get("eur_balance")),

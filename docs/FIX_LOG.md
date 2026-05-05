@@ -5,7 +5,40 @@
 
 ---
 
-## #079 — Whitelist support + extended blacklist + auto-blacklist learner (2026-05-05)
+## #080 — Heartbeat writer never started + dashboard "€0 totaal" + price-flash dead (2026-05-05)
+
+### Context
+User reported three dashboard issues simultaneously:
+1. "Totaal kapitaal €0,00 €-1.920,01 (-100%) sinds storting — Waarom staat er 0?" while bot clearly held €1557 in ENJ + RENDER positions.
+2. Live price did not flash green/red on changes.
+3. "Bot offline" pill shown even though `trailing_bot.py` PID 22280 was actively scanning markets and writing logs.
+
+### Diagnosis
+- `data/heartbeat.json` mtime was **13:54:30**, but the bot had been running since **14:07:55** — meaning the bot's heartbeat-writer thread was NEVER ticking after restart.
+- Root cause: `trailing_bot.py::initialize_managers()` creates `monitoring_manager = MonitoringManager(...)` as a **local variable** but never assigns it to `bot.shared.state.monitoring_manager`. The shim `bot/scheduler.py::start_heartbeat_writer()` does `mgr = getattr(state, "monitoring_manager", None) or globals().get("monitoring_manager")` → both return None → silent return → no thread starts.
+- This also broke `start_heartbeat_monitor` and `start_reservation_watchdog`.
+- `data/account_overview.json` had `total_account_value_eur: 0.0` while `open_trade_value_eur: 1647.92`. The overview file was 12 minutes stale because `bot/portfolio.py::write_account_overview` had `except Exception: return None` — silently swallowing whatever started failing intermittently. No log line, no traceback, impossible to diagnose.
+- Frontend `app.js` price-flash diff iterated `for (const tr of opens)` where `opens = this.t.open || []`. But `this.t.open` is a **dict keyed by market**, not an array. `for..of` over a plain object yields nothing → no price changes ever detected → no flash animation.
+
+### Changes
+- `trailing_bot.py` (~line 3845): after `monitoring_manager = MonitoringManager(...)`, register all three managers on `bot.shared.state` so the scheduler shims can find them. Added explicit info log "Background threads gestart: ...".
+- `bot/portfolio.py::write_account_overview`: replaced silent `except Exception: return None` with proper `S.log("[ERROR] write_account_overview failed: ...", level="error")` so future failures are visible.
+- `tools/dashboard_v2/backend/main.py::_portfolio()`: defensive fallback — when `total_account_value_eur <= 0` but `eur_available + open_trade_value_eur > 0`, sum them as the displayed total. Avoids "€0 totaal" when overview snapshot is briefly stale.
+- `tools/dashboard_v2/frontend/app.js` (~line 180): fixed `for..of` over dict bug. Now uses `Object.values(this.t.open || {})` (with array fallback for backwards compat). Live price flashes green/red on every change again.
+- Cache: `index.html` `?v=8 → ?v=9`, `sw.js` `VERSION 6 → 7`.
+
+### Verification
+- Restart bot to pick up `state.monitoring_manager` change. Verify `data/heartbeat.json` mtime refreshes every ~30s.
+- Verify dashboard topbar pill shows "online" within 3 minutes (180s threshold).
+- Verify dashboard "Totaal kapitaal" shows non-zero when EUR or asset value > 0.
+- Verify open-position row green/red flashes on live price tick.
+
+### Lesson
+Three independent silent-swallow bugs cascaded into "the dashboard is dead". Lesson: **never `except Exception: pass/return None`** without a log. The cost of one extra log line is negligible compared to spending 30 minutes diagnosing a stale snapshot file. Also: when refactoring a monolith into a `state` singleton, every locally-bound manager MUST be registered on `state` or every shim that consults `state.<manager>` becomes a no-op.
+
+---
+
+
 
 ### Context
 After Kill-Zone Filter (#078) shipped, user asked: "backtest al je ideeen, en we zijn nu alleen aan het blacklisten — niet aan het whitelisten. Misschien moet er soms een markt op de whitelist die veel potentie heeft."

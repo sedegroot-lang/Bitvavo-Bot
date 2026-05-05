@@ -177,8 +177,11 @@ function dash() {
         this.bh  = d.balance_history || {};
         this.sg  = d.signal_status || {};
         // ---- Diff live prices to drive flash animations ----
-        const opens = (this.t && this.t.open) || [];
+        // FIX #080: t.open is a DICT keyed by market, not an array — must iterate Object.values.
+        const openMap = (this.t && this.t.open) || {};
+        const opens = Array.isArray(openMap) ? openMap : Object.values(openMap);
         for (const tr of opens) {
+          if (!tr || typeof tr !== 'object') continue;
           const mk = tr.market;
           if (!mk) continue;
           const cur = +tr.current_price;

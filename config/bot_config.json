@@ -168,5 +168,28 @@
     "markets": 300,
     "assets": 300
   },
-  "MIN_BALANCE_RESERVE": 5
+  "MIN_BALANCE_RESERVE": 5,
+  "KILL_ZONE_ENABLED": true,
+  "KILL_ZONE_MARKETS": [
+    "USDC-EUR",
+    "DOT-EUR",
+    "ADA-EUR",
+    "INJ-EUR",
+    "SOL-EUR",
+    "AVAX-EUR",
+    "XRP-EUR",
+    "ZEUS-EUR"
+  ],
+  "KILL_ZONE_RSI_MAX": 45,
+  "KILL_ZONE_VOL_MIN": 5000,
+  "KILL_ZONE_PRICE_EXT": 1.8,
+  "TEST_PARAM": 123,
+  "KILL_ZONE_WHITELIST": [
+    "WIF-EUR",
+    "ACT-EUR",
+    "MOODENG-EUR",
+    "PTB-EUR"
+  ],
+  "WHITELIST_BOOST_ENABLED": true,
+  "WHITELIST_SCORE_BOOST": 4
 }

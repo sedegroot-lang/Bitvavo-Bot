@@ -2592,6 +2592,26 @@ async def bot_loop():
                 except Exception as _wl_err:
                     log(f"[WHITELIST] {m}: boost error: {_wl_err}", level='debug')
 
+                # ── Deep-Dip Hunter (FIX #080: catch -25%+ dumps that have stabilised)
+                try:
+                    if CONFIG.get('DEEP_DIP_HUNTER_ENABLED', True):
+                        from core.deep_dip_hunter import detect_deep_dip
+                        from core.kill_zone_filter import DEFAULT_BLACKLIST
+                        _ddh_candles = get_candles(m, '1h', 50)
+                        _ddh_vol = get_24h_volume_eur(m) or 0.0
+                        _ddh_bl = list(CONFIG.get('KILL_ZONE_MARKETS') or DEFAULT_BLACKLIST)
+                        _ddh_active, _ddh_boost, _ddh_reason, _ddh_details = detect_deep_dip(
+                            m, _ddh_candles, _ddh_vol, CONFIG, _ddh_bl
+                        )
+                        if _ddh_active and _ddh_boost > 0:
+                            score += _ddh_boost
+                            log(
+                                f"[DEEP_DIP] {m}: ACTIVE +{_ddh_boost:.1f} ({_ddh_reason}) score→{score:.2f}",
+                                level='info'
+                            )
+                except Exception as _ddh_err:
+                    log(f"[DEEP_DIP] {m}: error: {_ddh_err}", level='debug')
+
                 # Collect trade block reasons if score is below threshold
                 if score < min_score_threshold:
                     try:
@@ -3846,12 +3866,24 @@ def initialize_managers(force: bool = False) -> None:
         monitoring_manager = None
         log(f"Init monitoring manager mislukt: {exc}", level='error')
 
+    # FIX #080: register managers on shared.state so bot.scheduler shims can find them.
+    # Without this, _start_heartbeat_writer/_start_heartbeat_monitor silently no-op,
+    # causing data/heartbeat.json to never refresh and the dashboard to show "Bot offline".
+    try:
+        from bot.shared import state as _shared_state
+        _shared_state.monitoring_manager = monitoring_manager
+        _shared_state.liquidation_manager = liquidation_manager
+        _shared_state.risk_manager = risk_manager
+    except Exception as exc:
+        log(f"Manager registratie op shared.state mislukt: {exc}", level='error')
+
     if not _monitor_threads_started and not CONFIG.get('TEST_MODE', False) and not os.environ.get('PYTEST_CURRENT_TEST'):
         try:
             _start_heartbeat_writer(interval=30)
             _start_heartbeat_monitor()
             _start_reservation_watchdog(interval=30)
             _monitor_threads_started = True
+            log(f"Background threads gestart: heartbeat_writer, heartbeat_monitor, reservation_watchdog (mgr={'OK' if monitoring_manager else 'NONE'})", level='info')
         except Exception as exc:
             log(f"Heartbeat/monitor threads konden niet starten: {exc}", level='error')
 

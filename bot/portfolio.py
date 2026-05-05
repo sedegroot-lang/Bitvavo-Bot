@@ -336,5 +336,10 @@ def write_account_overview(
         )
         S.write_json_locked(str(S.ACCOUNT_OVERVIEW_FILE), overview)
         return overview
-    except Exception:
+    except Exception as exc:
+        # FIX #080: was silently swallowed → impossible to diagnose stale account_overview.
+        try:
+            S.log(f"[ERROR] write_account_overview failed: {exc}", level="error")
+        except Exception:
+            pass
         return None
