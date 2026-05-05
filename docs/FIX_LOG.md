@@ -5,6 +5,43 @@
 
 ---
 
+## #081 — Deep-Dip Hunter: catch -25%+ dumps that have stabilised (2026-05-05)
+
+### Context
+User observation: "ik kijk soms naar bitvavo, en dan kijk ik naar trades die heel erg ver zijn gezakt, wel 30%, soms koop ik die en is die erg winstgevend, zo is dat ook gegaan bij ZEUS. de bot doet hier niets mee."
+The standard signal pipeline INTENTIONALLY avoids these (looks like falling knife — MACD negative, regime BEARISH/HIGH_VOLATILITY → low score → blocked). Mostly correct, but selective dip-buys on quality markets that have stopped falling can yield 8-20% bounces in 24-72h.
+
+### Solution (deliberately conservative)
+New module `core/deep_dip_hunter.py` runs as a **score booster**, not a buy-trigger. All standard quality gates still apply (regime, correlation shield, kill-zone). The hunter only adds +5.0 score when ALL the following pass:
+- Drawdown peak→now in last 48h ≥ 25% (configurable)
+- Drawdown ≤ 60% (cap: avoid true rugs)
+- Last 4h: no new low (price has bottomed)
+- Last bar GREEN (close ≥ open OR close ≥ prev close)
+- Bounce from absolute low ≥ 1% (confirmation, not knife)
+- 24h volume ≥ €500k (no shitcoins)
+- Market NOT in kill_zone blacklist (those crashed for fundamental reasons)
+
+The +5.0 boost helps a depressed signal score (typically 13-15 in dump conditions) clear MIN_SCORE_TO_BUY=18 without globally lowering the bar.
+
+### Changes
+- `core/deep_dip_hunter.py` (NEW): `detect_deep_dip(market, candles_1h, volume_24h_eur, config, blacklist)` → `(active, boost, reason, details)`. Pure function, ~190 lines.
+- `trailing_bot.py` (line ~2598): wired call between whitelist boost and `min_score_threshold` check. Fetches 50× 1h candles + 24h volume, passes `KILL_ZONE_MARKETS` as blacklist. Logs `[DEEP_DIP] {m}: ACTIVE +5.0 (...) score→XX`.
+- `tests/test_deep_dip_hunter.py` (NEW): 14 tests across `TestDeepDipBasics`, `TestQualityGates`, `TestStabilisation`, `TestConfigOverrides`, `TestRobustness`. All passing.
+- Local config: added 7 keys (`DEEP_DIP_HUNTER_ENABLED`, `DEEP_DIP_LOOKBACK_HOURS=48`, `DEEP_DIP_MIN_DROP_PCT=25`, `DEEP_DIP_MAX_DROP_PCT=60`, `DEEP_DIP_STABILISE_HOURS=4`, `DEEP_DIP_MIN_VOLUME_EUR=500000`, `DEEP_DIP_SCORE_BOOST=5.0`).
+
+### Verification
+- 14/14 deep_dip tests PASSED
+- Position sizing & trailing stops are UNCHANGED (Phase 1: detection + boost only). If 30-day live data confirms edge, Phase 2 will add half-size BUY + wider trailing stop for dip entries.
+
+### Lesson
+Survivorship bias warning: user remembers ZEUS-style winners, not the 5 dips that became -50% rugs. Mitigated via (a) max-drop cap (-60%), (b) green-bar + bounce confirmation (price has actually stopped falling), (c) volume gate (no shitcoins), (d) blacklist veto (markets that crashed for real reasons stay blocked). The hunter does NOT lower MIN_SCORE_TO_BUY; it only helps qualifying dips reach the existing floor.
+
+### Related
+- Tiered scanning: `WHITELIST_MARKETS` (hot tier, ~18 markets, scanned every 25s) + `WATCHLIST_MARKETS` (warm tier, micro-mode entries) already exist. Auto-promotion from cold→warm based on Wilson stats is a separate future task — current `scripts/auto_blacklist_learner.py` only blocks/whitelists, doesn't promote unknowns to scan list.
+- Whitelist boost was bumped from +2.0 → +4.0 (proportional fix: MIN_SCORE_TO_BUY is 18, not 7.0 as instructions claimed; +4.0 on 18 = same relative weight as original +2.0 on 7.0).
+
+---
+
 ## #080 — Heartbeat writer never started + dashboard "€0 totaal" + price-flash dead (2026-05-05)
 
 ### Context
