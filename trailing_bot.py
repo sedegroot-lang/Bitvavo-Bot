@@ -3595,6 +3595,14 @@ async def open_trade_async(score, m, price_now, s_short, eur_balance, ml_info=No
         # Use TradeInvestment module — single source of truth for invested_eur
         from core.trade_investment import set_initial as _ti_set_initial
         _ti_set_initial(new_trade, float(actual_invested_eur), source="initial_buy")
+        # Persist entry metadata to disk so sync re-adoption can restore it
+        # (prevents score/regime loss when trade briefly drops out of open_trades).
+        try:
+            from core import entry_metadata as _em
+            new_trade['_entry_source'] = 'bot_initial_buy'
+            _em.record(m, new_trade)
+        except Exception as _em_err:
+            log(f"[entry_metadata] record failed for {m}: {_em_err}", level='debug')
         with trades_lock:
             # ATOMIC race guard: re-check MAX_OPEN_TRADES while holding the lock
             # to prevent TOCTOU (time-of-check-time-of-use) race conditions.

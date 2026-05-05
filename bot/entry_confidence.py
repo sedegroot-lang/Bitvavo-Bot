@@ -211,14 +211,20 @@ def _pillar_volume(volumes_1m: Sequence[float]) -> tuple[float, str]:
     last5_sum = sum(last5)
     last5_avg = last5_sum / 5.0
     ratio = last5_avg / median
-    # Sweet spot: 1.2x to 3.5x median (rising volume but not pump)
-    if 1.2 <= ratio <= 3.5:
-        return _clip01(0.7 + 0.1 * min(ratio - 1.2, 2.3)), f"vol_ratio_{ratio:.2f}"
+    # Quality-Hunter tightening (May 2026): require a real spike, not drift.
+    # Sweet spot: 2.0x to 4.0x median (clear "something is happening NOW",
+    # not a pump-and-dump). 1.5x-2.0x = mild interest, below 1.5x = drift.
+    if 2.0 <= ratio <= 4.0:
+        return _clip01(0.85 + 0.05 * min(ratio - 2.0, 2.0)), f"vol_spike_{ratio:.2f}"
+    if 1.5 <= ratio < 2.0:
+        return _clip01(0.55 + 0.6 * (ratio - 1.5)), f"vol_rising_{ratio:.2f}"
     if ratio < 0.6:
-        return 0.2, f"vol_dry_{ratio:.2f}"
+        return 0.15, f"vol_dry_{ratio:.2f}"
     if ratio > 5.0:
-        return 0.3, f"vol_pump_{ratio:.2f}"
+        return 0.25, f"vol_pump_{ratio:.2f}"
     if ratio < 1.2:
+        return 0.4, f"vol_low_{ratio:.2f}"
+    if ratio < 1.5:
         return 0.5, f"vol_ok_{ratio:.2f}"
     return 0.55, f"vol_high_{ratio:.2f}"
 

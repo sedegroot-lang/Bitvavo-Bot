@@ -299,7 +299,19 @@ def sync_with_bitvavo():
                     local.setdefault('dca_step_mult', float(CONFIG.get('DCA_STEP_MULTIPLIER', 1.0)))
                     local.setdefault('score', 0.0)
                     local.setdefault('volatility_at_entry', 0.0)
-                    local.setdefault('opened_regime', 'unknown')
+                    # Mark sync-attached trades distinctly so AI/analysis can
+                    # filter them out (vs real bot-initiated 'trending_up' etc.).
+                    local.setdefault('opened_regime', 'sync_attach')
+                    local.setdefault('_entry_source', 'sync_attach')
+                    # Try to restore real metadata if this market was previously
+                    # opened by the bot (cache survives auto_free_slot/restart).
+                    try:
+                        from core import entry_metadata as _em
+                        n_restored = _em.restore_into(m, local)
+                        if n_restored:
+                            log(f"[entry_metadata] {m}: restored {n_restored} fields from cache (was sync_attach)", level='info')
+                    except Exception:
+                        pass
 
                     if 'dca_max' not in local:
                         # FIX: dca_max ALWAYS from config, NEVER from buy_order_count
@@ -384,8 +396,18 @@ def sync_with_bitvavo():
                             'cost_buffer_pct': float(CONFIG.get('FEE_TAKER', 0.0025)) * 2 + float(CONFIG.get('SLIPPAGE_PCT', 0.001)),
                             'score': 0.0,
                             'volatility_at_entry': 0.0,
-                            'opened_regime': 'unknown',
+                            # Sync-attached new trade — distinct label for analysis
+                            'opened_regime': 'sync_attach',
+                            '_entry_source': 'sync_attach',
                         }
+                        # Restore from entry-metadata cache if bot opened this earlier.
+                        try:
+                            from core import entry_metadata as _em
+                            n_restored = _em.restore_into(m, new_local)
+                            if n_restored:
+                                log(f"[entry_metadata] {m}: restored {n_restored} fields on new_local (was lost from open_trades)", level='info')
+                        except Exception:
+                            pass
                     except Exception:
                         new_local = {'market': m, 'buy_price': entry.get('buy_price'), 'amount': entry.get('amount', 0.0), 'dca_buys': 0, 'dca_events': [], 'partial_tp_returned_eur': 0.0}
 

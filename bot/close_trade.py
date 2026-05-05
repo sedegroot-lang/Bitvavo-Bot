@@ -130,6 +130,13 @@ def finalize_close_trade(
         except Exception:
             pass
 
+    # Clear entry-metadata cache for this market (trade is closed).
+    try:
+        from core import entry_metadata as _em
+        _em.clear(market)
+    except Exception:
+        pass
+
     if do_save:
         try:
             fn = getattr(state, 'save_trades_fn', None)

@@ -5,6 +5,39 @@
 
 ---
 
+## #076 — Bot-opened trades lost score/regime/RSI/MACD metadata after sync re-adopt (2026-05-05)
+
+### Symptom
+Open trades that were demonstrably opened by the bot (e.g. `ENJ-EUR`, `RENDER-EUR`) showed `score=0.0`, `opened_regime='unknown'`, `volatility_at_entry=0.0`, `rsi_at_entry=None` after some hours/days. User: *"Ik heb deze trades niet geopend dit heeft de bot gedaan, ik denk dat de gegevens verloren raken door de sync"*. AI logs and downstream analytics treated these as "manual buy" entries with no entry intelligence.
+
+### Root cause
+Multiple legitimate paths can drop a trade from `state.open_trades` while the position still exists on Bitvavo:
+- `auto_free_slot` (low-PnL eviction, then sync re-adopts moments later)
+- atomic `trade_log.json` save failure mid-cycle
+- crash/restart between order-fill and `save_trades_atomic`
+
+When this happens, `bot/sync_engine.py` rebuilds the trade from balance + order history (`new_local` path) with **default sentinels**: `score=0.0`, `opened_regime='unknown'`, `volatility_at_entry=0.0`, no `rsi_at_entry`. The original entry context is gone forever — sync has no source for it.
+
+### Fix
+1. New `core/entry_metadata.py` — persistent JSON cache (`data/entry_metadata.json`) keyed by market with 30-day TTL, RLock-protected, atomic tmp+replace writes. Stores ~15 entry-time fields (score, regime, all `*_at_entry` indicators, volume_24h_eur, opened_ts, _entry_source).
+2. `trailing_bot.py` — after every successful initial buy, call `entry_metadata.record(market, trade)` to snapshot the rich entry context.
+3. `bot/sync_engine.py` — both sync paths (existing-local merge + `new_local` re-adopt) now call `entry_metadata.restore_into(market, trade)`. Restore only overwrites sentinel defaults (score==0.0, regime in {'unknown','sync_attach'}, vol==0.0) — never clobbers real values. Sets `_metadata_restored_from_cache=True` flag for traceability.
+4. `bot/close_trade.py` — calls `entry_metadata.clear(market)` after successful close to keep cache lean.
+5. Sync re-adopts now label `opened_regime='sync_attach'` (instead of `'unknown'`) and `_entry_source='sync_attach'` so true sync-orphans (no cache) are distinguishable from real bot entries.
+
+### Verification
+- 820 tests pass + 3 skipped (`pytest tests/ -q`).
+- No errors on changed files.
+- Manual test: closing a trade via `close_trade` removes its cache entry; opening a new trade writes a cache entry within the same loop tick.
+
+### Files changed
+- `core/entry_metadata.py` (NEW)
+- `trailing_bot.py` (~line 3596 — record after `_ti_set_initial`)
+- `bot/sync_engine.py` (both ~line 300 + ~line 388 paths)
+- `bot/close_trade.py` (~line 129)
+
+---
+
 ## #075 — `sync_validator` add-missing wiped reconciled DCA + trailing state on every cycle (2026-05-04)
 
 ### Symptom
