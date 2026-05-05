@@ -5,6 +5,45 @@
 
 ---
 
+## #084 — Persistent cost-basis cache for swaps / airdrops / recoveries (2026-05-05)
+
+### Context
+After FIX #083 recovered NOT-EUR with `buy_price=€0.000431, invested=€617.97`, the value kept resetting to `buy_price=current_price, invested=0` on every bot startup. Because NOT-EUR was acquired via an **ENJ→NOT swap**, `bv.trades('NOT-EUR')` returns no fills — so `derive_cost_basis()` returns None, the archive recovery returns None, and `sync_engine` falls back to "use current price as buy_price" with `invested_eur=0`. Result: dashboard shows "Geïnvesteerd: —", trailing/DCA decisions get wrong basis, P&L view broken. The user had to manually re-fix the file every restart.
+
+### Solution
+New `core/cost_basis_cache.py` — persistent JSON cache (`data/cost_basis_cache.json`), RLock-protected, atomic tmp+replace writes, no TTL. API: `get(market)`, `set(market, buy_price, invested_eur, amount, source)`, `remove(market)`, `restore_into(market, trade)`.
+
+`restore_into()` is the integration point: it writes cached cost-basis fields into a trade dict ONLY when those fields are unset/zero. Critically:
+- Never overwrites a valid existing buy_price/invested_eur.
+- Never lowers `highest_price` (preserves trailing high-water mark).
+- Returns False when cache empty → safe to call unconditionally.
+
+### Integration points (3 sync paths)
+1. `bot/sync_engine.py` existing-local merge: when `initial_invested_eur <= 0`, check cache first **before** calling `derive_cost_basis`.
+2. `bot/sync_engine.py` new_local re-adopt: same — cache lookup before derive.
+3. `modules/sync_validator.py auto_add_missing_positions`: cache lookup as the first cost-basis source, before derive_cost_basis / FIFO / archive fallbacks.
+
+### Cache seeded for current positions (one-off)
+- NOT-EUR: buy_price=€0.00043070, invested=€617.97, source=`enj_swap_2026-05-05`
+- ENJ-EUR: buy_price=€0.045344, invested=€660.14, source=`manual_recovery`
+- RENDER-EUR: buy_price=€1.573830, invested=€309.72, source=`manual_recovery`
+
+### Changes
+- `core/cost_basis_cache.py` (NEW, ~130 LOC).
+- `bot/sync_engine.py`: 2 cache-lookup blocks added (existing-local + new_local).
+- `modules/sync_validator.py`: cache lookup as 1st cost-basis source in `auto_add_missing_positions`.
+- `tests/test_cost_basis_cache.py` (NEW): 9 tests across `TestCacheCRUD` (4) + `TestRestoreInto` (5). All passing.
+- `data/cost_basis_cache.json` (NEW data file, seeded with 3 entries).
+
+### Verification
+- 15/15 tests pass (9 new + 4 phantom-safety + 2 dca-preserves).
+- After bot restart, NOT-EUR's cost basis survives sync.
+
+### Lesson
+For any "derived state" that can't be reconstructed from external truth (Bitvavo API), provide an authoritative override layer. `bv.trades()` is incomplete — swaps, airdrops, internal transfers, dust consolidations all leave coins with no order history. The cache is that override layer. Same pattern as `core/entry_metadata.py` (FIX #074): persistent JSON, RLock, restore-only-when-unset, never lower trailing high.
+
+---
+
 ## #083 — Phantom-fix nuked real positions on transient API hiccup (2026-05-05)
 
 ### Context

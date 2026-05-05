@@ -335,61 +335,80 @@ class SyncValidator:
                     initial_invested = None
                     total_invested = None
                     dca_buys = 1
-                    result = derive_cost_basis(self.bitvavo, market, amount, tolerance=0.10)
-                    if result:
-                        invested = round(result.invested_eur, 2)
-                        avg_buy_price = result.avg_price
-                        initial_invested = invested
-                        total_invested = invested
-                        # FIX #004: dca_buys=0 for newly synced positions.
-                        # buy_order_count includes ALL historical orders (old closed
-                        # positions too), so it is NOT a reliable DCA counter.
-                        # The bot has not tracked any DCAs for this new entry.
-                        dca_buys = 0
-                        self._log(
-                            f"Cost basis for {market}: €{avg_buy_price:.6f} ({dca_buys} buy order(s))",
-                            level="debug",
-                        )
-                    else:
-                        # Fallback: use FIFO cost basis from all trades (accounts for sells)
-                        try:
-                            from modules.cost_basis import _compute_cost_basis_from_fills
+                    # PERSISTENT CACHE FIRST (FIX #084): swaps / airdrops / manual recoveries
+                    try:
+                        from core import cost_basis_cache as _cbc
 
-                            trades = self.bitvavo.trades(market, {})
-                            if trades and isinstance(trades, list):
-                                fifo_result = _compute_cost_basis_from_fills(
-                                    trades,
-                                    market=market,
-                                    target_amount=amount,
-                                    tolerance=1.0,
-                                )
-                                if fifo_result and fifo_result.avg_price > 0:
-                                    avg_buy_price = fifo_result.avg_price
-                                    invested = round(fifo_result.invested_eur, 2)
-                                    initial_invested = invested
-                                    total_invested = invested
-                                    # FIX #004: same as above — don't use buy_order_count as DCA counter
-                                    dca_buys = 0
-                                    self._log(
-                                        f"Fallback FIFO cost basis for {market}: €{avg_buy_price:.6f} ({dca_buys} buy order(s))",
-                                        level="debug",
+                        _cached = _cbc.get(market)
+                        if _cached and float(_cached.get("buy_price") or 0) > 0:
+                            avg_buy_price = float(_cached["buy_price"])
+                            invested = round(float(_cached.get("invested_eur") or 0), 2)
+                            initial_invested = invested
+                            total_invested = invested
+                            dca_buys = 0
+                            self._log(
+                                f"Cost basis from CACHE for {market}: €{avg_buy_price:.8f} (source={_cached.get('source')})",
+                                level="info",
+                            )
+                    except Exception as _cbc_err:
+                        self._log(f"cost_basis_cache lookup failed for {market}: {_cbc_err}", level="debug")
+
+                    if avg_buy_price is None:
+                        result = derive_cost_basis(self.bitvavo, market, amount, tolerance=0.10)
+                        if result:
+                            invested = round(result.invested_eur, 2)
+                            avg_buy_price = result.avg_price
+                            initial_invested = invested
+                            total_invested = invested
+                            # FIX #004: dca_buys=0 for newly synced positions.
+                            # buy_order_count includes ALL historical orders (old closed
+                            # positions too), so it is NOT a reliable DCA counter.
+                            # The bot has not tracked any DCAs for this new entry.
+                            dca_buys = 0
+                            self._log(
+                                f"Cost basis for {market}: €{avg_buy_price:.6f} ({dca_buys} buy order(s))",
+                                level="debug",
+                            )
+                        else:
+                            # Fallback: use FIFO cost basis from all trades (accounts for sells)
+                            try:
+                                from modules.cost_basis import _compute_cost_basis_from_fills
+
+                                trades = self.bitvavo.trades(market, {})
+                                if trades and isinstance(trades, list):
+                                    fifo_result = _compute_cost_basis_from_fills(
+                                        trades,
+                                        market=market,
+                                        target_amount=amount,
+                                        tolerance=1.0,
                                     )
-                                else:
-                                    # Last resort: simple average of buy trades only
-                                    buy_trades = [t for t in trades if t.get("side") == "buy"]
-                                    if buy_trades:
-                                        total_cost = sum(
-                                            float(t.get("amount", 0)) * float(t.get("price", 0)) for t in buy_trades
+                                    if fifo_result and fifo_result.avg_price > 0:
+                                        avg_buy_price = fifo_result.avg_price
+                                        invested = round(fifo_result.invested_eur, 2)
+                                        initial_invested = invested
+                                        total_invested = invested
+                                        # FIX #004: same as above — don't use buy_order_count as DCA counter
+                                        dca_buys = 0
+                                        self._log(
+                                            f"Fallback FIFO cost basis for {market}: €{avg_buy_price:.6f} ({dca_buys} buy order(s))",
+                                            level="debug",
                                         )
-                                        total_amount = sum(float(t.get("amount", 0)) for t in buy_trades)
-                                        if total_amount > 0:
-                                            avg_buy_price = total_cost / total_amount
-                                            self._log(
-                                                f"Calculated avg buy price for {market}: €{avg_buy_price:.6f} from {len(buy_trades)} trades (WARNING: no sell history accounted)",
-                                                level="warning",
+                                    else:
+                                        # Last resort: simple average of buy trades only
+                                        buy_trades = [t for t in trades if t.get("side") == "buy"]
+                                        if buy_trades:
+                                            total_cost = sum(
+                                                float(t.get("amount", 0)) * float(t.get("price", 0)) for t in buy_trades
                                             )
-                        except Exception as te:
-                            self._log(f"Could not get trade history for {market}: {te}", level="debug")
+                                            total_amount = sum(float(t.get("amount", 0)) for t in buy_trades)
+                                            if total_amount > 0:
+                                                avg_buy_price = total_cost / total_amount
+                                                self._log(
+                                                    f"Calculated avg buy price for {market}: €{avg_buy_price:.6f} from {len(buy_trades)} trades (WARNING: no sell history accounted)",
+                                                    level="warning",
+                                                )
+                            except Exception as te:
+                                self._log(f"Could not get trade history for {market}: {te}", level="debug")
 
                     # FIX #020: Archive-based cost recovery for orphaned partial-TP positions
                     if avg_buy_price is None:

@@ -378,6 +378,21 @@ def sync_with_bitvavo():
                     initial_inv = float(local.get("initial_invested_eur", 0) or 0)
                     basis = None
                     if initial_inv <= 0:
+                        # PERSISTENT CACHE FIRST (FIX #084): handles swaps / airdrops
+                        # / manual recoveries where bv.trades() has no history.
+                        try:
+                            from core import cost_basis_cache as _cbc
+
+                            if _cbc.restore_into(m, local):
+                                log(
+                                    f"[cost_basis_cache] {m}: restored buy_price=€{local.get('buy_price')} "
+                                    f"invested=€{local.get('invested_eur')} from persistent cache",
+                                    level="info",
+                                )
+                                initial_inv = float(local.get("initial_invested_eur", 0) or 0)
+                        except Exception as _cbc_err:
+                            log(f"cost_basis_cache restore failed for {m}: {_cbc_err}", level="debug")
+                    if initial_inv <= 0:
                         try:
                             from core.trade_investment import set_initial as _ti_set_initial
 
@@ -468,13 +483,31 @@ def sync_with_bitvavo():
                     try:
                         from core.trade_investment import set_initial as _ti_set_initial
 
-                        basis = S.derive_cost_basis(bitvavo, m, float(entry.get("amount") or 0.0), tolerance=0.02)
+                        # PERSISTENT CACHE FIRST (FIX #084): handles swaps / airdrops
+                        # / manual recoveries where bv.trades() has no history.
+                        cache_hit = False
+                        try:
+                            from core import cost_basis_cache as _cbc
+
+                            if _cbc.restore_into(m, new_local):
+                                log(
+                                    f"[cost_basis_cache] {m}: restored buy_price=€{new_local.get('buy_price')} "
+                                    f"invested=€{new_local.get('invested_eur')} from persistent cache (new_local)",
+                                    level="info",
+                                )
+                                cache_hit = True
+                        except Exception as _cbc_err:
+                            log(f"cost_basis_cache restore failed for {m}: {_cbc_err}", level="debug")
+
+                        basis = None if cache_hit else S.derive_cost_basis(
+                            bitvavo, m, float(entry.get("amount") or 0.0), tolerance=0.02
+                        )
                         if basis and getattr(basis, "avg_price", 0) > 0:
                             new_local["buy_price"] = float(basis.avg_price)
                             _ti_set_initial(new_local, float(basis.invested_eur), source="sync_new_trade")
                             new_local["opened_ts"] = float(basis.earliest_timestamp or time.time())
                             log(f"Sync: NEW trade {m} detected with invested=€{basis.invested_eur:.2f}", level="info")
-                        else:
+                        elif not cache_hit:
                             # FIX #020: Archive fallback for orphaned partial-TP remainders
                             try:
                                 from modules.trade_archive import recover_cost_from_archive
