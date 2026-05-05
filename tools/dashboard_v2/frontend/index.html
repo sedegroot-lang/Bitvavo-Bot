@@ -9,7 +9,7 @@
   <title>Bitvavo Bot — Command Center</title>
   <link rel="preconnect" href="https://rsms.me/" crossorigin>
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
-  <link rel="stylesheet" href="/styles.css?v=6" />
+  <link rel="stylesheet" href="/styles.css?v=7" />
   <link rel="stylesheet" href="/styles-v2.css?v=4" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
@@ -50,14 +50,16 @@
       <header class="topbar">
         <div>
           <h1 x-text="currentTab().label"></h1>
-          <div class="subtitle" x-text="currentTab().subtitle || ''"></div>
+          <div class="subtitle"
+               x-text="(tab==='overview' && hb && hb.bot_online === false) ? 'Bot is offline — laatste snapshot ' + fmtAge(hb.age_seconds) + ' oud' : (currentTab().subtitle || '')"></div>
         </div>
         <div class="right">
           <span class="status-pill"
                 :class="hb.bot_online ? '' : 'bad'">
             <span class="live-pulse" x-show="hb.bot_online"></span>
             <span class="dot" x-show="!hb.bot_online"></span>
-            <span x-text="hb.bot_online ? ('Live · ' + fmtAge(secondsAgo)) : 'Bot offline'"></span>
+            <span x-show="hb.bot_online" x-text="'Live · ' + fmtAge(secondsAgo)"></span>
+            <span x-show="!hb.bot_online" x-text="hb.age_seconds != null ? 'offline · ' + fmtAge(hb.age_seconds) : 'offline'"></span>
           </span>
           <button class="btn icon" @click="toggleTheme()" :title="'Thema: ' + theme">
             <span x-text="theme === 'dark' ? '☀' : '☾'"></span>
@@ -979,6 +981,6 @@
   <!-- Toast -->
   <div class="toast" :class="toast.error ? 'error' : ''" x-show="toast.show" x-transition x-text="toast.msg"></div>
 
-  <script src="/app.js?v=6"></script>
+  <script src="/app.js?v=7"></script>
 </body>
 </html>
