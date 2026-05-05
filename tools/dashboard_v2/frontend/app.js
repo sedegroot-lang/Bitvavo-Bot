@@ -48,6 +48,15 @@ function dash() {
     // and toggled per refresh so the CSS animation re-triggers on each change.
     _prevPrices: {},
     priceFlash: {},   // market -> { dir: 'up'|'down', tick: number }
+    theme: (typeof localStorage !== 'undefined' && localStorage.getItem('bvb_theme')) || 'dark',
+
+    toggleTheme() {
+      this.theme = this.theme === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem('bvb_theme', this.theme); } catch {}
+      document.documentElement.setAttribute('data-theme', this.theme);
+      // Re-render charts so colors pick up new theme
+      this.$nextTick(() => this.renderCharts());
+    },
 
     currentTab() { return this.tabs.find(x => x.id === this.tab) || this.tabs[0]; },
 
@@ -129,6 +138,7 @@ function dash() {
 
     // ---------- bootstrap
     async boot() {
+      document.documentElement.setAttribute('data-theme', this.theme);
       if ('serviceWorker' in navigator) { try { await navigator.serviceWorker.register('/sw.js'); } catch {} }
       await this.refresh();
       this.refreshTimer = setInterval(() => this.refresh(), 2000);
@@ -272,7 +282,7 @@ function dash() {
           responsive: true, maintainAspectRatio: false,
           cutout: '65%',
           plugins: {
-            legend: { position: 'right', labels: { color: '#cbd5e1', font: { size: 11 }, boxWidth: 10 } },
+            legend: { position: 'right', labels: { color: this.theme === 'light' ? '#1A2238' : '#cbd5e1', font: { size: 11 }, boxWidth: 10 } },
             tooltip: { callbacks: { label: (c) => `${c.label}: ${eur.format(c.raw)}` } }
           }
         }
@@ -323,16 +333,24 @@ function dash() {
     },
 
     _opts({ legend = true, ticksX = 8 } = {}) {
+      const isLight = this.theme === 'light';
+      const tick = isLight ? '#5A6786' : '#94a3b8';
+      const lbl  = isLight ? '#1A2238' : '#cbd5e1';
+      const grid = isLight ? 'rgba(28,40,70,.08)' : 'rgba(148,163,184,.07)';
+      const ttipBg = isLight ? 'rgba(255,255,255,.97)' : 'rgba(15,23,42,.95)';
+      const ttipBd = isLight ? '#DDE4EE' : '#1f2937';
+      const ttipTitle = isLight ? '#1A2238' : '#fff';
+      const ttipBody  = isLight ? '#5A6786' : '#cbd5e1';
       return {
         responsive: true, maintainAspectRatio: false,
         animation: { duration: 250 },
         plugins: {
-          legend: { display: legend, labels: { color: '#cbd5e1', font: { size: 11 } } },
-          tooltip: { backgroundColor: 'rgba(15,23,42,.95)', borderColor: '#1f2937', borderWidth: 1, titleColor: '#fff', bodyColor: '#cbd5e1', padding: 10 }
+          legend: { display: legend, labels: { color: lbl, font: { size: 11 } } },
+          tooltip: { backgroundColor: ttipBg, borderColor: ttipBd, borderWidth: 1, titleColor: ttipTitle, bodyColor: ttipBody, padding: 10 }
         },
         scales: {
-          x: { ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: ticksX, autoSkip: true, maxRotation: 0 }, grid: { color: 'rgba(148,163,184,.07)' } },
-          y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,.07)' } }
+          x: { ticks: { color: tick, font: { size: 10 }, maxTicksLimit: ticksX, autoSkip: true, maxRotation: 0 }, grid: { color: grid } },
+          y: { ticks: { color: tick, font: { size: 10 } }, grid: { color: grid } }
         }
       };
     },

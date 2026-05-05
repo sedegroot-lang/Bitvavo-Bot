@@ -9,7 +9,7 @@
   <title>Bitvavo Bot — Command Center</title>
   <link rel="preconnect" href="https://rsms.me/" crossorigin>
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
-  <link rel="stylesheet" href="/styles.css?v=5" />
+  <link rel="stylesheet" href="/styles.css?v=6" />
   <link rel="stylesheet" href="/styles-v2.css?v=4" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
@@ -59,6 +59,9 @@
             <span class="dot" x-show="!hb.bot_online"></span>
             <span x-text="hb.bot_online ? ('Live · ' + fmtAge(secondsAgo)) : 'Bot offline'"></span>
           </span>
+          <button class="btn icon" @click="toggleTheme()" :title="'Thema: ' + theme">
+            <span x-text="theme === 'dark' ? '☀' : '☾'"></span>
+          </button>
           <button class="btn icon" @click="refresh()" title="Refresh">↻</button>
         </div>
       </header>
@@ -146,30 +149,6 @@
             <span class="chip">Beschikbaar <b x-text="fmtEur(sg.capacity?.eur_available)"></b></span>
             <span class="chip" x-show="sg.scan_stats?.adaptive_bump">Adaptive <b x-text="(sg.scan_stats?.adaptive_bump > 0 ? '+' : '') + (sg.scan_stats?.adaptive_bump ?? 0).toFixed(2)"></b></span>
             <span class="chip warn" x-show="sg.scan_stats?.cooldown_active_count">Cooldown <b x-text="sg.scan_stats?.cooldown_active_count + ' market(s)'"></b></span>
-          </div>
-        </div>
-
-        <!-- Charts row -->
-        <div class="row-2">
-          <div class="card">
-            <div class="card-head">
-              <div class="card-title">Equity curve</div>
-              <div class="card-action">
-                <select class="input" style="width:auto" x-model="periodEquity" @change="refreshBalanceHistory()">
-                  <option value="1d">24h</option>
-                  <option value="7d">7d</option>
-                  <option value="30d">30d</option>
-                  <option value="90d">90d</option>
-                  <option value="all">all</option>
-                </select>
-              </div>
-            </div>
-            <div class="chart-wrap"><canvas id="chartEquity"></canvas></div>
-          </div>
-
-          <div class="card">
-            <div class="card-head"><div class="card-title">Allocatie</div></div>
-            <div class="chart-wrap"><canvas id="chartAlloc"></canvas></div>
           </div>
         </div>
 
@@ -303,6 +282,40 @@
                 </div>
               </div>
             </template>
+          </div>
+        </div>
+
+        <!-- Charts row (below open positions) -->
+        <div class="row-2">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Equity curve</div>
+              <div class="card-action">
+                <select class="input" style="width:auto" x-model="periodEquity" @change="refreshBalanceHistory()">
+                  <option value="1d">24h</option>
+                  <option value="7d">7d</option>
+                  <option value="30d">30d</option>
+                  <option value="90d">90d</option>
+                  <option value="all">all</option>
+                </select>
+              </div>
+            </div>
+            <div class="chart-wrap" x-show="(bh.values || []).length > 1"><canvas id="chartEquity"></canvas></div>
+            <div class="empty-chart" x-show="(bh.values || []).length <= 1">
+              <div class="ec-icon">📉</div>
+              <div class="ec-title">Geen equity-historie</div>
+              <div class="ec-sub">Eerste meting wordt opgeslagen zodra de bot draait.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div class="card-title">Allocatie</div></div>
+            <div class="chart-wrap" x-show="Object.keys(t.open || {}).length || (p.eur_balance ?? 0) > 0.5"><canvas id="chartAlloc"></canvas></div>
+            <div class="empty-chart" x-show="!Object.keys(t.open || {}).length && (p.eur_balance ?? 0) <= 0.5">
+              <div class="ec-icon">🍩</div>
+              <div class="ec-title">Geen allocatie</div>
+              <div class="ec-sub">Open een trade om verdeling te zien.</div>
+            </div>
           </div>
         </div>
 
@@ -966,6 +979,6 @@
   <!-- Toast -->
   <div class="toast" :class="toast.error ? 'error' : ''" x-show="toast.show" x-transition x-text="toast.msg"></div>
 
-  <script src="/app.js?v=5"></script>
+  <script src="/app.js?v=6"></script>
 </body>
 </html>
