@@ -89,6 +89,37 @@ class AutomationScheduler:
         except Exception as e:
             logger.error(f"Error in backup job: {e}")
     
+    def job_cold_tier_scan(self):
+        """Job: scan cold tier (~400 EUR markets) and promote top-1 to WATCHLIST_MARKETS.
+
+        Uses scripts/cold_tier_scanner.py with --apply --n 1. Writes ONLY to local
+        config (%LOCALAPPDATA%/BotConfig/bot_config_local.json), so it cannot be
+        reverted by OneDrive sync. The bot's config hot-reload picks up the new
+        watchlist entry on the next loop iteration.
+        """
+        logger.info("🔭 Scheduled job: cold-tier scan (apply top-1)")
+        try:
+            import subprocess
+            scanner = self.project_root / "scripts" / "cold_tier_scanner.py"
+            python = sys.executable
+            result = subprocess.run(
+                [python, "-u", str(scanner), "--apply", "--n", "1"],
+                cwd=str(self.project_root),
+                capture_output=True,
+                text=True,
+                timeout=120,
+                encoding="utf-8",
+                errors="replace",
+            )
+            if result.returncode == 0:
+                # Show only the meaningful tail (header + ranked + apply result)
+                tail = "\n".join(result.stdout.splitlines()[-20:])
+                logger.info("✅ cold_tier_scanner OK\n" + tail)
+            else:
+                logger.error(f"❌ cold_tier_scanner failed (rc={result.returncode}): {result.stderr[:500]}")
+        except Exception as e:
+            logger.error(f"Error in cold-tier scan job: {e}")
+
     def job_health_check(self):
         """Job: Check bot health"""
         logger.info("🏥 Scheduled job: Health check")
@@ -136,6 +167,10 @@ class AutomationScheduler:
         # Health check: Every 15 minutes
         schedule.every(15).minutes.do(self.job_health_check)
         logger.info("  ✅ Health check: every 15 minutes")
+
+        # Cold-tier scan: every 4 hours, applies top-1 to local WATCHLIST_MARKETS
+        schedule.every(4).hours.do(self.job_cold_tier_scan)
+        logger.info("  ✅ Cold-tier scan: every 4 hours (apply top-1)")
         
         logger.info("=" * 60)
     
@@ -152,6 +187,7 @@ class AutomationScheduler:
         logger.info("🚀 Running initial tasks...")
         self.job_health_check()
         self.job_generate_metrics()
+        self.job_cold_tier_scan()
         
         logger.info("=" * 60)
         logger.info("⏰ Scheduler is now running - press Ctrl+C to stop")
