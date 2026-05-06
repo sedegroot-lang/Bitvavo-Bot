@@ -5,6 +5,37 @@
 
 ---
 
+## #088 — Dashboard data accuracy: deposit sync + fees capture (2026-05-06)
+
+### Context
+User reported three dashboard accuracy issues:
+1. **Total kapitaal off**: dashboard €1613,99 vs Bitvavo €1621,36 (~€7 diff).
+2. **Fees showing €0,00** everywhere ("Vandaag 1 trade · fees €0,00 / Deze week 6 trades · fees €0,00 / Deze maand 9 trades · fees €0,00").
+3. **"Sinds storting" base wrong**: dashboard used €1920,01 — `config/deposits.json` last synced 2026-04-29, missing 2 mei (€100) and 5 mei (€30) deposits.
+
+### Root cause
+1. **Deposits**: no scheduled job ever refreshed `config/deposits.json`. The file was a static one-shot snapshot.
+2. **Fees**: `bot/path_utils.py::append_trade_pnl_jsonl` did not write `fees_eur` at all. Dashboard backend reads `r.get("fees_eur", 0)` which returned 0 for every record (200/200 historical trades).
+3. **Capital**: minor — overview snapshot lags Bitvavo UI by a few seconds; the ~€7 delta is normal price drift, not a bug. Confirmed live `total_account_value_eur` ≈ €1624,64 ≈ Bitvavo €1621,36.
+
+### Solution
+- `scripts/sync_deposits.py` (NEW) — fetches `bv.depositHistory({symbol:'EUR'})`, normalizes (only completed deposits), atomically writes `config/deposits.json`. Run produced 22 deposits / €2050,01 (real total — user's manual sum was €100 short).
+- `bot/path_utils.py` — `append_trade_pnl_jsonl` now writes `fees_eur` per record. Uses `closed_entry["fees_eur"]` if present, else estimates `(invested + sell_value) * BITVAVO_TAKER_FEE` (default 0.25%).
+- `tools/dashboard_v2/backend/main.py::_portfolio` — when reading historical pnl rows lacking `fees_eur`, applies the same 0.25% estimate so legacy trades also show realistic fees.
+
+### Verification
+After restart: `/api/all` returns `total=€1624,64`, `deposited=€2050,01`, `total_fees=€83,51`, `trade_count=200`. Dashboard now matches Bitvavo within normal price drift, and fees aggregate correctly across daily/weekly/monthly buckets.
+
+### Files
+- `scripts/sync_deposits.py` (NEW)
+- `bot/path_utils.py` (fees_eur in record dict)
+- `tools/dashboard_v2/backend/main.py` (fallback estimate)
+
+### Follow-up (not blocking)
+Add `scripts/sync_deposits.py` to the scheduler (e.g. daily) so the file does not go stale again. For now: re-run manually after each EUR deposit.
+
+---
+
 ## #087 — Per-trade DCA action cooldown stops placement-spam loop (2026-05-06)
 
 ### Context

@@ -83,6 +83,20 @@ def append_trade_pnl_jsonl(closed_entry: Dict[str, Any], target_path: Union[str,
         except Exception:
             hold_seconds = None
 
+        # Fees: prefer real value when present on the closed_entry, else estimate
+        # using Bitvavo's standard 0.25% taker rate on (buy + sell) notional.
+        fees_eur = closed_entry.get("fees_eur") or closed_entry.get("fees")
+        if fees_eur in (None, 0, 0.0):
+            try:
+                invested_f = float(closed_entry.get("invested_eur") or 0)
+                amount_f = float(closed_entry.get("amount") or 0)
+                sell_px_f = float(closed_entry.get("sell_price") or 0)
+                sell_value = amount_f * sell_px_f
+                fee_rate = float(state.CONFIG.get("BITVAVO_TAKER_FEE", 0.0025) or 0.0025)
+                fees_eur = round((invested_f + sell_value) * fee_rate, 4)
+            except (TypeError, ValueError):
+                fees_eur = 0.0
+
         record = {
             "ts": time.time(),
             "market": closed_entry.get("market"),
@@ -92,6 +106,7 @@ def append_trade_pnl_jsonl(closed_entry: Dict[str, Any], target_path: Union[str,
             "amount": closed_entry.get("amount"),
             "buy_price": closed_entry.get("buy_price"),
             "sell_price": closed_entry.get("sell_price"),
+            "fees_eur": fees_eur,
             "opened_ts": opened_ts,
             "closed_ts": closed_ts,
             "hold_seconds": hold_seconds,

@@ -205,6 +205,16 @@ def _portfolio() -> Dict[str, Any]:
         try:
             pnl = float(r.get("net_pnl_eur", r.get("profit_eur", 0)) or 0)
             fees = float(r.get("fees_eur", 0) or 0)
+            if fees <= 0:
+                # Historical records (pre FIX #081) lack fees_eur. Estimate using
+                # Bitvavo's standard 0.25% taker rate on (buy + sell) notional.
+                try:
+                    inv = float(r.get("invested_eur") or 0)
+                    amt = float(r.get("amount") or 0)
+                    sp = float(r.get("sell_price") or 0)
+                    fees = round((inv + amt * sp) * 0.0025, 4)
+                except (TypeError, ValueError):
+                    fees = 0.0
             ts = float(r.get("ts") or r.get("closed_ts") or 0)
             if ts <= 0:
                 continue
