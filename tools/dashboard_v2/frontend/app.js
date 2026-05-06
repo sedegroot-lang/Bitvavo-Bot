@@ -17,6 +17,7 @@ const ICONS = {
   grid:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg>',
   hodl:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>',
   markets:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 18l6-8 4 4 8-10"/><path d="M14 4h7v7"/></svg>',
+  scores:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="13" width="3" height="7"/><rect x="10" y="8" width="3" height="12"/><rect x="16" y="4" width="3" height="16"/></svg>',
 };
 
 function dash() {
@@ -33,8 +34,9 @@ function dash() {
       { id: 'grid',       label: 'Grid',       subtitle: 'Grid trading per markt', icon: ICONS.grid },
       { id: 'hodl',       label: 'HODL',       subtitle: 'Lange-termijn posities', icon: ICONS.hodl },
       { id: 'markets',    label: 'Markten',    subtitle: 'Live markt-metrics', icon: ICONS.markets },
+      { id: 'scores',     label: 'Scores',     subtitle: 'Live + historische signal-scores per scan', icon: ICONS.scores },
     ],
-    p: {}, t: {}, perf: {}, a: {}, m: {}, s: {}, r: {}, hb: {}, gr: {}, hd: {}, par: {}, rd: {}, d: {}, mk: {}, bh: {}, sg: {},
+    p: {}, t: {}, perf: {}, a: {}, m: {}, s: {}, r: {}, hb: {}, gr: {}, hd: {}, par: {}, rd: {}, d: {}, mk: {}, bh: {}, sg: {}, sc: {},
     closedFilter: '',
     paramFilter: '',
     marketsFilter: '',
@@ -138,6 +140,29 @@ function dash() {
       return list.filter(m => (m.market || '').toLowerCase().includes(f));
     },
 
+    // ---------- scores tab helpers
+    scoreBuckets() {
+      const order = ['<5','5-7','7-9','9-12','12-15','15-18','>=18'];
+      const colors = ['#f87171','#fb923c','#fbbf24','#facc15','#a3e635','#4ade80','#22d3ee'];
+      const totals = (this.sc && this.sc.aggregate && this.sc.aggregate.buckets_total) || {};
+      const sum = order.reduce((s,k) => s + (+totals[k] || 0), 0) || 1;
+      return order.map((k,i) => ({
+        label: k,
+        count: +totals[k] || 0,
+        pct: ((+totals[k] || 0) / sum * 100).toFixed(1),
+        color: colors[i],
+      }));
+    },
+    topMarkets(row) {
+      const t5 = row && row.top5;
+      if (!Array.isArray(t5) || !t5.length) return '—';
+      return t5.slice(0,3).map(e => {
+        const m = e.m || e.market || '?';
+        const s = +(e.s ?? e.score ?? 0);
+        return m.replace('-EUR','') + ' ' + s.toFixed(1);
+      }).join(' · ');
+    },
+
     // ---------- bootstrap
     async boot() {
       document.documentElement.setAttribute('data-theme', this.theme);
@@ -176,6 +201,7 @@ function dash() {
         this.d   = d.deposits   || {};
         this.bh  = d.balance_history || {};
         this.sg  = d.signal_status || {};
+        this.sc  = d.scores || {};
         // ---- Diff live prices to drive flash animations ----
         // FIX #080: t.open is a DICT keyed by market, not an array — must iterate Object.values.
         const openMap = (this.t && this.t.open) || {};

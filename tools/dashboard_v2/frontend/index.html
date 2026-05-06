@@ -965,6 +965,115 @@
         </div>
       </section>
 
+      <!-- ============== SCORES ============== -->
+      <section x-show="tab==='scores'" class="stack">
+
+        <!-- KPI cards -->
+        <div class="grid-4">
+          <div class="card kpi">
+            <div class="kpi-label">Laatste scan</div>
+            <div class="kpi-value" x-text="sc.latest ? fmtDate(sc.latest.ts) : '—'"></div>
+            <div class="kpi-sub muted" x-text="sc.latest ? ((sc.latest.evaluated || 0) + ' markten · regime ' + (sc.latest.regime || '?')) : ''"></div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-label">Effectieve drempel</div>
+            <div class="kpi-value" x-text="sc.latest && sc.latest.threshold != null ? sc.latest.threshold.toFixed(2) : '—'"></div>
+            <div class="kpi-sub muted">MIN_SCORE_TO_BUY + regime adj</div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-label">Top score (laatste)</div>
+            <div class="kpi-value" :class="sc.latest && (sc.latest.max ?? 0) >= (sc.latest.threshold ?? 0) ? 'pos' : 'neg'"
+                 x-text="sc.latest && sc.latest.max != null ? sc.latest.max.toFixed(2) : '—'"></div>
+            <div class="kpi-sub muted" x-text="sc.latest_top && sc.latest_top.length ? sc.latest_top[0].market : ''"></div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-label">Pass-rate (window)</div>
+            <div class="kpi-value" x-text="sc.aggregate ? ((sc.aggregate.pass_rate * 100).toFixed(0) + '%') : '—'"></div>
+            <div class="kpi-sub muted" x-text="sc.aggregate ? (sc.aggregate.scans_with_pass + ' / ' + sc.aggregate.scans + ' scans')  : ''"></div>
+          </div>
+        </div>
+
+        <!-- Top-5 latest -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Top-5 markten · laatste scan</div>
+            <div class="card-action muted" x-text="sc.latest ? fmtDate(sc.latest.ts) : ''"></div>
+          </div>
+          <table class="tbl">
+            <thead><tr><th>#</th><th>Markt</th><th class="num">Score</th><th>vs drempel</th></tr></thead>
+            <tbody>
+              <template x-for="(row, idx) in sc.latest_top || []" :key="idx">
+                <tr>
+                  <td x-text="idx+1"></td>
+                  <td><strong x-text="row.market"></strong></td>
+                  <td class="num" :class="(sc.latest && row.score >= sc.latest.threshold) ? 'pos' : 'neg'" x-text="row.score.toFixed(2)"></td>
+                  <td>
+                    <span x-show="sc.latest && row.score >= sc.latest.threshold" class="status-pill">PASS · +<span x-text="(row.score - sc.latest.threshold).toFixed(2)"></span></span>
+                    <span x-show="!(sc.latest && row.score >= sc.latest.threshold)" class="muted" x-text="sc.latest ? ('-' + (sc.latest.threshold - row.score).toFixed(2)) : ''"></span>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="!(sc.latest_top || []).length"><td colspan="4" class="empty">Nog geen scan-data — wacht op eerstvolgende scan-cyclus.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Bucket distribution -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Score-distributie · som van laatste <span x-text="sc.aggregate ? sc.aggregate.scans : 0"></span> scans</div>
+          </div>
+          <div style="padding:8px 16px 16px">
+            <template x-for="bk in scoreBuckets()" :key="bk.label">
+              <div style="display:flex; align-items:center; gap:10px; margin:6px 0">
+                <div style="width:60px; font-size:12px" class="muted" x-text="bk.label"></div>
+                <div style="flex:1; height:18px; background:var(--bg-2,#1a1f2e); border-radius:4px; overflow:hidden">
+                  <div :style="'height:100%; width:' + bk.pct + '%; background:' + bk.color + '; transition:width .3s'"></div>
+                </div>
+                <div style="width:50px; text-align:right; font-size:12px" x-text="bk.count"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- History -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Scan-historie · <span class="muted" x-text="(sc.rows || []).length + ' scans'"></span></div>
+          </div>
+          <div style="max-height:60vh; overflow-y:auto">
+            <table class="tbl">
+              <thead><tr>
+                <th>Tijd</th>
+                <th>Regime</th>
+                <th class="num">Drempel</th>
+                <th class="num">Eval</th>
+                <th class="num">Max</th>
+                <th class="num">Mean</th>
+                <th class="num">Median</th>
+                <th>Top</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="(row, idx) in (sc.rows || []).slice().reverse()" :key="idx">
+                  <tr>
+                    <td x-text="fmtDate(row.ts)"></td>
+                    <td class="muted" x-text="row.regime || '?'"></td>
+                    <td class="num" x-text="(row.threshold ?? 0).toFixed(2)"></td>
+                    <td class="num muted" x-text="row.evaluated ?? 0"></td>
+                    <td class="num" :class="(row.max ?? 0) >= (row.threshold ?? 0) ? 'pos' : 'neg'" x-text="(row.max ?? 0).toFixed(2)"></td>
+                    <td class="num muted" x-text="(row.mean ?? 0).toFixed(2)"></td>
+                    <td class="num muted" x-text="(row.median ?? 0).toFixed(2)"></td>
+                    <td class="muted" style="font-size:11.5px" x-text="topMarkets(row)"></td>
+                  </tr>
+                </template>
+                <tr x-show="!(sc.rows || []).length"><td colspan="8" class="empty">Score-histogram leeg. Bot moet minstens één scan-cyclus draaien.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
     </main>
   </div>
 
@@ -981,6 +1090,6 @@
   <!-- Toast -->
   <div class="toast" :class="toast.error ? 'error' : ''" x-show="toast.show" x-transition x-text="toast.msg"></div>
 
-  <script src="/app.js?v=9"></script>
+  <script src="/app.js?v=10"></script>
 </body>
 </html>

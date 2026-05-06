@@ -1543,6 +1543,78 @@ def signal_status() -> Dict[str, Any]:
     return _signal_status()
 
 
+@app.get("/api/scores")
+def scores(limit: int = 200) -> Dict[str, Any]:
+    """Score histogram (FIX #085) — per-scan max/mean/median + buckets + top-5.
+
+    Returns last `limit` scans (default 200) plus aggregate stats and the
+    very latest snapshot for quick rendering on the dashboard.
+    """
+    rows = _read_jsonl(DATA / "score_histogram.jsonl", max_lines=max(50, min(limit, 5000)))
+    rows = rows[-limit:] if rows else []
+    latest = rows[-1] if rows else None
+    # Aggregates (across returned window)
+    maxes = [float(r.get("max") or 0) for r in rows if r.get("max") is not None]
+    means = [float(r.get("mean") or 0) for r in rows if r.get("mean") is not None]
+    medians = [float(r.get("median") or 0) for r in rows if r.get("median") is not None]
+    thrs = [float(r.get("threshold") or 0) for r in rows if r.get("threshold") is not None]
+    # Buckets summed across window
+    bucket_keys = ["<5", "5-7", "7-9", "9-12", "12-15", "15-18", ">=18"]
+    bucket_totals = {k: 0 for k in bucket_keys}
+    for r in rows:
+        bk = r.get("buckets") or {}
+        for k, v in bk.items():
+            if k in bucket_totals:
+                try:
+                    bucket_totals[k] += int(v or 0)
+                except Exception:
+                    pass
+    # Per-scan: did at least one market pass the threshold?
+    pass_count = 0
+    for r in rows:
+        thr = float(r.get("threshold") or 0)
+        bk = r.get("buckets") or {}
+        n = 0
+        for k, v in bk.items():
+            try:
+                lo = float(k.replace(">=", "").split("-")[0])
+            except Exception:
+                continue
+            if lo >= thr:
+                n += int(v or 0)
+        if n > 0:
+            pass_count += 1
+    # Latest top-5 with normalized shape
+    latest_top: List[Dict[str, Any]] = []
+    if latest:
+        for entry in latest.get("top5") or []:
+            if isinstance(entry, dict):
+                latest_top.append({
+                    "market": entry.get("m") or entry.get("market") or "?",
+                    "score": float(entry.get("s") or entry.get("score") or 0),
+                })
+    aggregate = {
+        "scans": len(rows),
+        "threshold_min": min(thrs) if thrs else None,
+        "threshold_max": max(thrs) if thrs else None,
+        "max_score_avg": (sum(maxes) / len(maxes)) if maxes else None,
+        "max_score_max": max(maxes) if maxes else None,
+        "mean_score_avg": (sum(means) / len(means)) if means else None,
+        "median_score_avg": (sum(medians) / len(medians)) if medians else None,
+        "buckets_total": bucket_totals,
+        "scans_with_pass": pass_count,
+        "pass_rate": (pass_count / len(rows)) if rows else 0,
+    }
+    return {
+        "ok": True,
+        "ts": time.time(),
+        "rows": rows,
+        "latest": latest,
+        "latest_top": latest_top,
+        "aggregate": aggregate,
+    }
+
+
 @app.get("/api/all")
 def all_payload() -> Dict[str, Any]:
     return {
@@ -1563,6 +1635,7 @@ def all_payload() -> Dict[str, Any]:
         "parameters": _parameters(),
         "roadmap": _roadmap(),
         "signal_status": _signal_status(),
+        "scores": scores(limit=200),
     }
 
 
