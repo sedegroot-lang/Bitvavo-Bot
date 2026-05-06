@@ -5,6 +5,47 @@
 
 ---
 
+## #087 — Per-trade DCA action cooldown stops placement-spam loop (2026-05-06)
+
+### Context
+User reported "Kritieke bug, bot blijft maar dca's uitvoeren" with a Telegram screenshot showing 8+ "DCA limit GEPLAATST 1/3 | ENJ-EUR" alerts in a few hours. Auditing `data/dca_audit.log`:
+
+- 8 `limit_order_resting` placements for ENJ-EUR in the last 12h, plus ~15 `order_failed` entries (price hit Bitvavo's "below market" wall repeatedly).
+- State oscillation between consecutive loop iterations: `dca_buys=0/amount=22073 ↔ dca_buys=7/amount=22604`. The `0` view comes from `data/trade_log.json` after FIX #075 sync_validator merge; the `7` view comes from FIX #074's `reconcile_trade()` recovering historical fills when an "invisible pending" is investigated.
+- Net result: every ~10 min cycle re-placed a fresh limit order, spamming Telegram and burning quota with `order_failed` retries between cycles.
+
+### Root cause
+The DCA placement pipeline has no per-trade rate-limit gate. After an `order_failed`, a `_clear_pending_dca` (timeout/cancel/invisible), or even a successful `_stash_pending_dca`, the very next `bot_loop` iteration (~25s later) is free to call `place_buy` again. Combined with the FIX #074 reconcile path occasionally inflating `dca_buys` to a cached historical value (only to be reverted by the next sync), the bot loops between "I have 0 DCAs, place one" → "order failed/timed out" → repeat.
+
+### Solution
+**Per-trade quiet period after ANY DCA-side action.** Added `DCA_ACTION_COOLDOWN_SECONDS` (default `300` = 5 min). Implementation in `modules/trading_dca.py`:
+
+1. **Gate at the top of `handle_trade`**: if `time.time() - trade["last_dca_action_ts"] < cooldown`, record `action_cooldown` audit and return — no `place_buy`, no Telegram alert.
+2. **Stamp `last_dca_action_ts` on every action site**:
+   - `_stash_pending_dca` (limit order placed)
+   - `_clear_pending_dca` (timeout / cancelled / invisible / dead)
+   - `_record_filled_dca` (fill applied)
+   - `_execute_fixed_dca` & `_execute_dynamic_dca` after `order_failed` audit
+3. Set `DCA_ACTION_COOLDOWN_SECONDS=0` to disable (legacy behaviour).
+
+The gate is independent from `DCA_SYNC_COOLDOWN_SEC` (which only applies to freshly synced positions) and from FIX #073's per-order timeout (which only governs a single in-flight order).
+
+### Live mitigation
+`tmp/stamp_dca_cooldown.py` stamps `last_dca_action_ts=now` on every open trade in `data/trade_log.json` so the new gate is active immediately on bot restart.
+
+### Files
+- `modules/trading_dca.py` — cooldown gate + 5 stamp sites (FIX #087 markers)
+- `tests/test_dca_action_cooldown.py` (NEW) — 7 tests covering the gate, the stamps, and `cooldown=0` opt-out. All passing.
+- `tmp/stamp_dca_cooldown.py` — one-off live patch.
+
+### Lesson
+Whenever multiple async paths can independently trigger the same external action (Bitvavo `place_buy`), an unconditional per-target cooldown is cheaper insurance than auditing every state-merge race. FIX #073 fixed cascading WITHIN a single iteration; FIX #074 fixed missed fills; FIX #087 closes the remaining gap BETWEEN iterations.
+
+### Open follow-up (not blocking)
+The dca_buys oscillation 0↔7 itself is still cosmetic (audit field). It originates from `core/dca_reconcile.reconcile_trade()` recovering historical orders that the persisted `dca_events: []` doesn't reflect (sync_engine clears events on amount-change re-derive, see `local["dca_events"] = []` in `bot/sync_engine.py` line ~406 NEW-trade branch — but the EXISTING-trade branch should NOT touch dca_events; needs deeper trace whether reconcile is being triggered with historical-bot orders pre-`opened_ts`). Cooldown stops the user-visible damage; the oscillation diagnosis is a separate ticket.
+
+---
+
 ## #086 — Crash-safe patch for `python_bitvavo_api` negative-sleep bug (2026-05-06)
 
 ### Context

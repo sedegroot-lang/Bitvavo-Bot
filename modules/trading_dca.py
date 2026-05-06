@@ -229,6 +229,31 @@ class DCAManager:
                 )
                 return
 
+        # FIX #087: per-trade DCA action cooldown to break placement/cancel/fail spam loops.
+        # After ANY DCA-side action (limit placed, order failed, fill applied, pending cleared),
+        # require a minimum quiet period before evaluating placement again.
+        # Default 300s (5 min). Set DCA_ACTION_COOLDOWN_SECONDS=0 to disable.
+        try:
+            _action_cooldown = float(self.ctx.config.get("DCA_ACTION_COOLDOWN_SECONDS", 300) or 0)
+        except Exception:
+            _action_cooldown = 300.0
+        if _action_cooldown > 0:
+            try:
+                _last_action_ts = float(trade.get("last_dca_action_ts", 0) or 0)
+            except Exception:
+                _last_action_ts = 0.0
+            if _last_action_ts > 0:
+                _age = _time_mod.time() - _last_action_ts
+                if _age < _action_cooldown:
+                    self._record_dca_audit(
+                        market,
+                        trade,
+                        "skip",
+                        "action_cooldown",
+                        {"age_s": round(_age, 1), "cooldown_s": _action_cooldown},
+                    )
+                    return
+
         ctx = self.ctx
         cfg = ctx.config
         log = ctx.log
@@ -647,6 +672,8 @@ class DCAManager:
                         self._release_reservation(reservation_id)
                 except Exception as e:
                     self._log(f"_release_reservation failed: {e}", level="warning")
+                # FIX #087: stamp action timestamp so cooldown gate kicks in next loop
+                trade["last_dca_action_ts"] = float(time.time())
                 self._record_dca_audit(
                     market, trade, "fail", "order_failed", {"eur_amount": eur_amount, "price": current_price}
                 )
@@ -912,6 +939,8 @@ class DCAManager:
                         self._release_reservation(reservation_id)
                 except Exception as e:
                     self._log(f"_release_reservation failed: {e}", level="warning")
+                # FIX #087: stamp action timestamp so cooldown gate kicks in next loop
+                trade["last_dca_action_ts"] = float(time.time())
                 self._record_dca_audit(
                     market, trade, "fail", "order_failed", {"eur_amount": eur_amount, "price": current_price}
                 )
@@ -1123,6 +1152,8 @@ class DCAManager:
             "pending_dca_order_market",
         ):
             trade.pop(k, None)
+        # FIX #087: stamp action timestamp so cooldown gate kicks in next loop
+        trade["last_dca_action_ts"] = float(time.time())
 
     def _stash_pending_dca(
         self,
@@ -1137,6 +1168,8 @@ class DCAManager:
         trade["pending_dca_order_eur"] = float(commit_eur)
         trade["pending_dca_order_price"] = float(limit_price)
         trade["pending_dca_order_market"] = market
+        # FIX #087: stamp action timestamp so we don't immediately retry placement
+        trade["last_dca_action_ts"] = float(time.time())
 
     def _cancel_order_safe(self, market: str, order_id: str) -> bool:
         """Cancel via Bitvavo, retrying with operatorId fallback (errorCode 203)."""
@@ -1195,6 +1228,8 @@ class DCAManager:
             drop_pct=float(settings.drop_pct),
             step_multiplier=float(settings.step_multiplier),
         )
+        # FIX #087: stamp action timestamp so cooldown gate kicks in next loop
+        trade["last_dca_action_ts"] = float(time.time())
         return int(st.dca_buys)
 
     def _send_dca_filled_alert(
