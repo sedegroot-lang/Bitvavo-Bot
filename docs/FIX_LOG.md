@@ -5,6 +5,71 @@
 
 ---
 
+## #090 — Backtest replay engine + portfolio Kelly + master roadmap (2026-05-06)
+
+### Context
+User asked: "maak een roadmap, hou alles bij, voer alles uit en backtest". The
+literal scope (~14 features incl. RL agent + paid on-chain APIs) is months of
+work. Plan B: build a **live status tracker** for everything + ship the gaps
+that are genuinely buildable today (backtest engine, portfolio Kelly), and
+explicitly mark the items requiring weeks of training or paid subscriptions as
+🚫 BLOCKED in the roadmap.
+
+### Discoveries during scoping
+A scan of `core/` and `modules/signals/` revealed many roadmap items already
+exist as full modules:
+- **MTF confluence** → `core/mtf_confluence.py`
+- **Order book imbalance** → `core/orderbook_imbalance.py`
+- **Cross-pair correlation** → `core/correlation_shield.py`
+- **Markov regime** → `core/markov_regime.py`
+- **Per-trade Kelly + Vol parity** → `core/kelly_sizing.py`
+- **Bayesian fusion / meta-learner** → `core/bayesian_fusion.py`, `core/meta_learner.py`
+- **Adaptive exit / Avellaneda-Stoikov** → `core/adaptive_exit.py`, `core/avellaneda_stoikov.py`
+
+These are now tagged 📦 EXISTS in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+### Solution
+1. **`docs/ROADMAP.md` (NEW)** — single source of truth with status per item
+   (DONE / EXISTS / PLANNED / BLOCKED). Replaces the ad-hoc backlog notes.
+2. **`backtest/replay_engine.py` (NEW)** — replays Bitvavo-style 1m candles
+   through the live `evaluate_signal_pack` and simulates a single-market
+   trailing-stop trade lifecycle deterministically. Returns equity curve +
+   summary stats. CLI usable: `python -m backtest.replay_engine --market BTC-EUR --candles file.json`.
+3. **`backtest/ab_runner.py` (NEW)** — runs the replay engine with two configs
+   (base vs challenger) and prints a side-by-side delta report.
+4. **`core/portfolio_optimizer.py` (NEW)** — pure cross-market Kelly +
+   correlation-aversion + portfolio volatility budget. Takes candidates and
+   held positions, returns a `PortfolioAllocation`. NOT yet wired into
+   `bot/orders_impl.py` — that needs a config flag rollout (separate sprint).
+5. **`tests/test_backtest_and_portfolio.py` (NEW)** — 13 tests: engine
+   lifecycle, A/B harness, portfolio optimizer (correlation, risk cap, held
+   position, min-EUR filter). All green.
+
+### Verification
+- `pytest tests/test_backtest_and_portfolio.py -v` → 13/13 passed.
+- Live demo run on 1000-bar synthetic candles (trend-up / range / dump /
+  recovery): production config (MIN_SCORE=18) yielded 0 trades (signal pack
+  appropriately selective). Stress run (MIN_SCORE=-1) yielded 48 trades,
+  exit-reason mix `{trailing_stop: 34, stop_loss: 13, end_of_data: 1}`,
+  proving the full lifecycle works.
+- A/B `tight trail 0.5% vs wide trail 2%` produced a clear, intuitive delta:
+  tight → many small losses (WR 76% but PnL -€43); wide → fewer trades, breakeven
+  (PnL +€0.32). Reports saved to `data/backtest_reports/`.
+
+### Files
+- `docs/ROADMAP.md` (NEW)
+- `backtest/replay_engine.py` (NEW)
+- `backtest/ab_runner.py` (NEW)
+- `core/portfolio_optimizer.py` (NEW)
+- `tests/test_backtest_and_portfolio.py` (NEW)
+
+### Explicitly BLOCKED (out of scope this session)
+- **3.3 On-chain (Glassnode)** — needs €30/mo subscription
+- **3.4 Sentiment (Twitter API)** — needs ~$100/mo paid tier
+- **4.1 RL agent** — 2-3 weeks GPU training; only worthwhile after live results from `replay_engine` show baseline gaps
+
+---
+
 ## #089 — Niveau 1 automation: weekly PnL report + regression alerter (2026-05-06)
 
 ### Context
