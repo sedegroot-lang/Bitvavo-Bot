@@ -24,6 +24,9 @@ import atexit
 from dotenv import load_dotenv
 load_dotenv()
 
+# FIX #086: monkey-patch python_bitvavo_api negative-sleep bug
+import modules.bitvavo_patch  # noqa: F401
+
 from modules.config import load_config
 from core.reservation_manager import ReservationManager
 import bot.api as _api
@@ -2223,6 +2226,7 @@ async def bot_loop():
         maybe_save_market_performance()
 
         scored = []
+        all_scores: list[tuple[str, float]] = []  # FIX #085: track every score for histogram
         markets_evaluated = 0
         markets_skipped = 0
         scan_started_ts = time.time()
@@ -2612,6 +2616,12 @@ async def bot_loop():
                 except Exception as _ddh_err:
                     log(f"[DEEP_DIP] {m}: error: {_ddh_err}", level='debug')
 
+                # FIX #085: track score for histogram (every evaluated market)
+                try:
+                    all_scores.append((m, float(score)))
+                except Exception:
+                    pass
+
                 # Collect trade block reasons if score is below threshold
                 if score < min_score_threshold:
                     try:
@@ -2779,6 +2789,59 @@ async def bot_loop():
             f"elapsed {scan_elapsed:.1f}s ({markets_per_second:.2f} markets/s)",
             level='info'
         )
+
+        # FIX #085: Score histogram + top-5 (helps tune MIN_SCORE_TO_BUY)
+        try:
+            if all_scores:
+                _scores_only = [s for _, s in all_scores]
+                _max_s = max(_scores_only)
+                _med_s = sorted(_scores_only)[len(_scores_only) // 2]
+                _buckets = {"<5": 0, "5-7": 0, "7-9": 0, "9-12": 0, "12-15": 0, "15-18": 0, ">=18": 0}
+                for _s in _scores_only:
+                    if _s < 5: _buckets["<5"] += 1
+                    elif _s < 7: _buckets["5-7"] += 1
+                    elif _s < 9: _buckets["7-9"] += 1
+                    elif _s < 12: _buckets["9-12"] += 1
+                    elif _s < 15: _buckets["12-15"] += 1
+                    elif _s < 18: _buckets["15-18"] += 1
+                    else: _buckets[">=18"] += 1
+                _top5 = sorted(all_scores, key=lambda x: -x[1])[:5]
+                _top_str = ", ".join(f"{m_}={s_:.2f}" for m_, s_ in _top5)
+                _bucket_str = " ".join(f"{k}={v}" for k, v in _buckets.items() if v > 0)
+                log(
+                    f"[SCORE HISTOGRAM] thr={min_score_threshold:.2f} max={_max_s:.2f} med={_med_s:.2f} "
+                    f"| {_bucket_str} | top5: {_top_str}",
+                    level='info'
+                )
+                # Persist to JSONL for offline analysis
+                try:
+                    import json as _json_hist
+                    _hist_path = os.path.join('data', 'score_histogram.jsonl')
+                    with open(_hist_path, 'a', encoding='utf-8') as _hf:
+                        _hf.write(_json_hist.dumps({
+                            'ts': time.time(),
+                            'threshold': float(min_score_threshold),
+                            'evaluated': len(_scores_only),
+                            'max': float(_max_s),
+                            'median': float(_med_s),
+                            'mean': float(sum(_scores_only) / len(_scores_only)),
+                            'buckets': _buckets,
+                            'top5': [{'m': m_, 's': float(s_)} for m_, s_ in _top5],
+                            'regime': (CONFIG.get('_REGIME_RESULT') or {}).get('regime'),
+                        }) + '\n')
+                except Exception as _hist_w_err:
+                    log(f"[SCORE HISTOGRAM] write failed: {_hist_w_err}", level='debug')
+                # Stash in CONFIG for dashboard
+                CONFIG['LAST_SCORE_HISTOGRAM'] = {
+                    'ts': time.time(),
+                    'threshold': float(min_score_threshold),
+                    'max': float(_max_s),
+                    'median': float(_med_s),
+                    'buckets': _buckets,
+                    'top5': [{'market': m_, 'score': float(s_)} for m_, s_ in _top5],
+                }
+        except Exception as _hist_err:
+            log(f"[SCORE HISTOGRAM] error: {_hist_err}", level='debug')
 
         # ── Shadow Mode: DMS scan + phantom trade price updates ──
         if CONFIG.get('SHADOW_MODE_ENABLED', True):

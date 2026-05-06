@@ -49,6 +49,16 @@ CONFIG_DIR = PROJECT_ROOT / "config"
 METRICS_DIR = PROJECT_ROOT / "metrics"
 STATIC = Path(__file__).resolve().parent.parent / "frontend"
 
+# FIX #086: monkey-patch python_bitvavo_api negative-sleep bug that crashes
+# the dashboard backend whenever a rate-limit ban is processed late.
+try:
+    import sys as _sys
+    if str(PROJECT_ROOT) not in _sys.path:
+        _sys.path.insert(0, str(PROJECT_ROOT))
+    import modules.bitvavo_patch  # noqa: F401
+except Exception:
+    pass
+
 LOCAL_CONFIG = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "BotConfig" / "bot_config_local.json"
 
 app = FastAPI(title="Bitvavo Bot Dashboard V2", version="2.1.0")
