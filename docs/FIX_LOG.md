@@ -5,6 +5,52 @@
 
 ---
 
+## #086 — Crash-safe patch for `python_bitvavo_api` negative-sleep bug (2026-05-06)
+
+### Context
+Dashboard backend (and any process using the Bitvavo lib) crashed silently around 22:47 with `ValueError: sleep length must be non-negative` originating from `python_bitvavo_api.bitvavo.rateLimitThread.waitForReset(waitTime)`. When the rate-limit reset window has already passed, `waitTime` becomes negative; `time.sleep(waitTime)` then raises and kills the rateLimitThread. The thread death cascades: WebSocket / REST callers hang, dashboard heartbeat freezes, watchdog also dies, port 5002 stops responding. User reported "Data in het dashboard is stale en klopt niet."
+
+### Solution
+- New `modules/bitvavo_patch.py` — module-level monkey-patch that wraps `rateLimitThread.waitForReset` to clamp the sleep duration with `max(0.0, float(waitTime or 0))`. Idempotent (`_PATCHED` flag). Auto-applies on import.
+- Imported once at the top of `trailing_bot.py` (right after `load_dotenv()`, before any module that may instantiate the Bitvavo client).
+- Imported once in `tools/dashboard_v2/backend/main.py` (after `STATIC = ...`) so the dashboard process is also protected.
+- Direct edit of `.venv/Lib/site-packages/python_bitvavo_api/bitvavo.py` for belt-and-braces (will not survive `pip install`, hence the runtime patch is the source of truth).
+
+### Verification
+- Verified `_PATCHED=True` and the new `waitForReset` source after import.
+- Dashboard backend restarted cleanly; `/api/health` returns `heartbeat_age_s=28.15`, `bot_online=true`, `ai_online=true`.
+
+### Files
+- `modules/bitvavo_patch.py` (NEW)
+- `trailing_bot.py` (1 import line)
+- `tools/dashboard_v2/backend/main.py` (try/except import block)
+
+---
+
+## #085 — Score histogram logging (MIN_SCORE realism observability) (2026-05-06)
+
+### Context
+User asked: "Is MIN_SCORE 18 wel realistisch — zal er ooit een trade 18 scoren?" There was no live observability of the score distribution per scan, so we could not see whether the bot was starving because of bad markets or because the threshold is mis-calibrated.
+
+### Solution
+In the entry scan loop in `trailing_bot.py` (just before the `if score < min_score_threshold` filter), accumulate `(market, score)` into `all_scores`. After the scan summary log, compute and emit:
+- Buckets: `<5`, `5-7`, `7-9`, `9-12`, `12-15`, `15-18`, `>=18`.
+- Aggregate stats: count evaluated, max, mean, median.
+- Top-5 markets by score.
+- Append a JSONL record to `data/score_histogram.jsonl` per scan: `{ts, threshold, evaluated, max, median, mean, buckets, top5, regime}`.
+- Stash latest snapshot to `CONFIG['LAST_SCORE_HISTOGRAM']` so the dashboard can surface it.
+
+### Findings (from archive analysis at fix time)
+- 51 trades had a score logged. Max=32.7, mean=15.3, median=13.2, p90=21.5.
+- Bucket distribution: `<7=0`, `7-9=1`, `9-12=17`, `12-15=10`, `15-18=8`, `>=18=15` (~29% of historical trades reach ≥18).
+- Live scan at fix time: 0 markets passing for >25 min — bot starving.
+
+### Files
+- `trailing_bot.py` (~60 LOC: `all_scores` accumulator + histogram block)
+- `data/score_histogram.jsonl` (new append-only log)
+
+---
+
 ## #084 — Persistent cost-basis cache for swaps / airdrops / recoveries (2026-05-05)
 
 ### Context
