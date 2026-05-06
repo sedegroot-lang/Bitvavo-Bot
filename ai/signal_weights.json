@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "generated_at": "2026-05-06T18:32:17.327407+00:00",
+  "n_trades_total": 873,
+  "n_markets": 26,
+  "default": {
+    "score_multiplier": 1.0,
+    "min_score_override": null
+  },
+  "markets": {
+    "LINK-EUR": {
+      "score_multiplier": 0.968,
+      "min_score_override": null,
+      "n": 56,
+      "wr": 0.75,
+      "expectancy_eur": -0.3167
+    },
+    "INJ-EUR": {
+      "score_multiplier": 0.6,
+      "min_score_override": 22.0,
+      "n": 21,
+      "wr": 0.2857,
+      "expectancy_eur": -4.2353
+    },
+    "UNI-EUR": {
+      "score_multiplier": 0.969,
+      "min_score_override": null,
+      "n": 26,
+      "wr": 0.7308,
+      "expectancy_eur": -0.3125
+    },
+    "SNX-EUR": {
+      "score_multiplier": 0.718,
+      "min_score_override": 22.0,
+      "n": 12,
+      "wr": 0.4167,
+      "expectancy_eur": -2.82
+    },
+    "DOT-EUR": {
+      "score_multiplier": 0.942,
+      "min_score_override": null,
+      "n": 61,
+      "wr": 0.1639,
+      "expectancy_eur": -0.5808
+    },
+    "XRP-EUR": {
+      "score_multiplier": 0.966,
+      "min_score_override": null,
+      "n": 37,
+      "wr": 0.5405,
+      "expectancy_eur": -0.3393
+    },
+    "ADA-EUR": {
+      "score_multiplier": 0.918,
+      "min_score_override": null,
+      "n": 21,
+      "wr": 0.2381,
+      "expectancy_eur": -0.8219
+    },
+    "OP-EUR": {
+      "score_multiplier": 0.964,
+      "min_score_override": null,
+      "n": 9,
+      "wr": 0.4444,
+      "expectancy_eur": -0.3634
+    },
+    "SOL-EUR": {
+      "score_multiplier": 0.885,
+      "min_score_override": 22.0,
+      "n": 26,
+      "wr": 0.4615,
+      "expectancy_eur": -1.1513
+    },
+    "ATOM-EUR": {
+      "score_multiplier": 0.816,
+      "min_score_override": 22.0,
+      "n": 12,
+      "wr": 0.0833,
+      "expectancy_eur": -1.8449
+    },
+    "AVAX-EUR": {
+      "score_multiplier": 0.958,
+      "min_score_override": null,
+      "n": 23,
+      "wr": 0.4783,
+      "expectancy_eur": -0.4157
+    },
+    "NEAR-EUR": {
+      "score_multiplier": 1.022,
+      "min_score_override": null,
+      "n": 16,
+      "wr": 0.6875,
+      "expectancy_eur": 0.2943
+    },
+    "ALGO-EUR": {
+      "score_multiplier": 1.015,
+      "min_score_override": null,
+      "n": 21,
+      "wr": 0.7619,
+      "expectancy_eur": 0.2046
+    },
+    "FET-EUR": {
+      "score_multiplier": 1.018,
+      "min_score_override": null,
+      "n": 14,
+      "wr": 0.5,
+      "expectancy_eur": 0.2451
+    },
+    "POL-EUR": {
+      "score_multiplier": 0.956,
+      "min_score_override": null,
+      "n": 8,
+      "wr": 0.5,
+      "expectancy_eur": -0.4402
+    },
+    "APT-EUR": {
+      "score_multiplier": 1.052,
+      "min_score_override": null,
+      "n": 13,
+      "wr": 0.5385,
+      "expectancy_eur": 0.6997
+    },
+    "RENDER-EUR": {
+      "score_multiplier": 1.069,
+      "min_score_override": null,
+      "n": 11,
+      "wr": 0.7273,
+      "expectancy_eur": 0.9204
+    },
+    "MOODENG-EUR": {
+      "score_multiplier": 1.109,
+      "min_score_override": null,
+      "n": 26,
+      "wr": 0.9231,
+      "expectancy_eur": 1.4479
+    },
+    "PTB-EUR": {
+      "score_multiplier": 1.223,
+      "min_score_override": null,
+      "n": 23,
+      "wr": 0.913,
+      "expectancy_eur": 2.9725
+    },
+    "WIF-EUR": {
+      "score_multiplier": 1.3,
+      "min_score_override": null,
+      "n": 95,
+      "wr": 1.0,
+      "expectancy_eur": 5.8099
+    },
+    "ACT-EUR": {
+      "score_multiplier": 1.066,
+      "min_score_override": null,
+      "n": 32,
+      "wr": 0.9688,
+      "expectancy_eur": 0.8765
+    },
+    "AAVE-EUR": {
+      "score_multiplier": 0.915,
+      "min_score_override": null,
+      "n": 8,
+      "wr": 0.25,
+      "expectancy_eur": -0.8509
+    },
+    "LTC-EUR": {
+      "score_multiplier": 1.121,
+      "min_score_override": null,
+      "n": 19,
+      "wr": 0.6316,
+      "expectancy_eur": 1.6104
+    },
+    "ZEUS-EUR": {
+      "score_multiplier": 1.3,
+      "min_score_override": null,
+      "n": 19,
+      "wr": 0.4211,
+      "expectancy_eur": 25.2898
+    },
+    "BCH-EUR": {
+      "score_multiplier": 1.04,
+      "min_score_override": null,
+      "n": 10,
+      "wr": 0.5,
+      "expectancy_eur": 0.536
+    },
+    "USDC-EUR": {
+      "score_multiplier": 1.0,
+      "min_score_override": null,
+      "n": 24,
+      "wr": 0.0,
+      "expectancy_eur": 0.0
+    }
+  }
+}

@@ -5,7 +5,66 @@
 
 ---
 
-## #090 — Backtest replay engine + portfolio Kelly + master roadmap (2026-05-06)
+## #091 — Per-market signal score profiles (sprint 2.5) (2026-05-06)
+
+### Context
+ROADMAP sprint 2.5 ("Per-market signal weight profiles"). Goal: bias entry
+threshold per market based on historical expectancy — markets that consistently
+made money should clear the entry bar more easily; markets that bled should
+need a higher score.
+
+### Constraint discovered
+`data/trade_archive.json` only persists the **aggregate** signal score per
+trade, not the per-provider breakdown. Learning per-provider weights is
+therefore not possible from the existing data without backfilling. The honest,
+ship-now design is a per-market **score multiplier** on the total score, plus
+an optional `min_score_override` for very bad markets.
+
+### Solution
+1. **`ai/signal_weight_profiler.py` (NEW)** — reads the archive, groups by
+   market, computes win-rate + expectancy, maps expectancy → multiplier in
+   `[0.60 .. 1.30]`, and writes `ai/signal_weights.json`. Markets with
+   < 8 trades get no entry (caller falls back to default 1.0).
+2. **`modules/signals/__init__.py` (PATCH)** — `evaluate_signal_pack` now
+   reads `USE_MARKET_SIGNAL_WEIGHTS` from `ctx.config`. When enabled, it
+   loads `ai/signal_weights.json` and multiplies `total_score` by the
+   per-market multiplier. **Default OFF, fully backwards-compatible.**
+3. **`tests/test_signal_weight_profiler.py` (NEW)** — 10 tests:
+   below-min-trades skipped, multiplier clamped, override threshold,
+   atomic JSON write, default fallback, end-to-end pack scaling.
+4. **Live run** — `python -m ai.signal_weight_profiler` over 873 archived
+   trades produced profiles for 26 markets. Top winners: WIF-EUR (1.30,
+   100% WR over 95 trades), ZEUS-EUR (1.30), MOODENG-EUR (1.11). Worst:
+   SNX-EUR (0.72 + override 22.0), ATOM-EUR (0.82 + override 22.0).
+
+### Why this respects the locks
+- `MIN_SCORE_TO_BUY = 18.0` is **not lowered** — multiplier acts on the raw
+  score (so good markets clear 18 sooner, bad markets effectively need
+  higher raw score). The optional `min_score_override` only ever **raises**
+  the bar (22.0 for the 3 worst markets).
+- Feature is gated behind `USE_MARKET_SIGNAL_WEIGHTS` flag — must be
+  explicitly enabled in local config to take effect.
+
+### Files touched
+- NEW: `ai/signal_weight_profiler.py`
+- NEW: `ai/signal_weights.json` (data; gitignored anyway under data/, but ai/ is tracked — included)
+- NEW: `tests/test_signal_weight_profiler.py`
+- PATCH: `modules/signals/__init__.py`
+- DOC: `docs/ROADMAP.md` (removed sprint 2.5 row), `docs/FIX_LOG.md` (this entry)
+
+### Tests
+10/10 passed (`pytest tests/test_signal_weight_profiler.py -v`).
+
+### How to enable in production
+1. (already done) `python -m ai.signal_weight_profiler` → writes `ai/signal_weights.json`
+2. Add to `%LOCALAPPDATA%/BotConfig/bot_config_local.json`:
+   ```json
+   { "USE_MARKET_SIGNAL_WEIGHTS": true }
+   ```
+3. Bot picks it up at next config reload (~25s).
+4. Re-run profiler weekly via scheduler (future sprint).
+
+
 
 ### Context
 User asked: "maak een roadmap, hou alles bij, voer alles uit en backtest". The

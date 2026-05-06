@@ -39,6 +39,27 @@ PROVIDERS: List[SignalProvider] = [
 ]
 
 
+def _resolve_score_multiplier(ctx: SignalContext) -> float:
+    """Look up a per-market score multiplier from ai/signal_weights.json.
+
+    Opt-in: only applied when ``USE_MARKET_SIGNAL_WEIGHTS`` is truthy in the
+    supplied config. Returns 1.0 when disabled, missing, or on any error.
+    """
+    cfg = ctx.config or {}
+    if not cfg.get("USE_MARKET_SIGNAL_WEIGHTS"):
+        return 1.0
+    try:
+        from ai.signal_weight_profiler import load_signal_weights, market_profile
+    except Exception:
+        return 1.0
+    try:
+        weights = load_signal_weights()
+        mult, _override = market_profile(weights, ctx.market)
+        return float(mult) if mult > 0 else 1.0
+    except Exception:
+        return 1.0
+
+
 def evaluate_signal_pack(ctx: SignalContext, providers: Iterable[SignalProvider] | None = None) -> SignalPackResult:
     active_providers = list(providers or PROVIDERS)
     results: List[SignalResult] = []
@@ -59,6 +80,9 @@ def evaluate_signal_pack(ctx: SignalContext, providers: Iterable[SignalProvider]
         results.append(result)
         if result.active:
             total += float(result.score)
+    multiplier = _resolve_score_multiplier(ctx)
+    if multiplier != 1.0:
+        total *= multiplier
     return SignalPackResult(total_score=total, results=results)
 
 
