@@ -120,6 +120,32 @@ class AutomationScheduler:
         except Exception as e:
             logger.error(f"Error in cold-tier scan job: {e}")
 
+    def job_weekly_report(self):
+        """Job: Weekly performance report (snapshot + Telegram)."""
+        logger.info("📅 Scheduled job: weekly PnL report")
+        try:
+            from bot.weekly_report import run as run_weekly
+            report, snapshot, sent = run_weekly(force=False, dry=False)
+            logger.info(f"✅ weekly report: snapshot={snapshot.name} sent={sent} pnl=€{report['current']['pnl_eur']:+.2f}")
+        except Exception as e:
+            logger.error(f"Error in weekly report job: {e}")
+
+    def job_regression_check(self):
+        """Job: Hourly check for performance regression — alert via Telegram."""
+        logger.info("🔎 Scheduled job: regression check")
+        try:
+            from bot.regression_alerter import run as run_regress
+            result, sent = run_regress(force=False, dry=False)
+            if result.get("skipped"):
+                logger.info(f"   skipped: {result.get('reason')}")
+            elif result.get("ok"):
+                logger.info(f"   ✅ healthy (n={result['n']} wr={result['win_rate']*100:.0f}% pnl=€{result['cum_pnl']:+.2f})")
+            else:
+                throttled = " (throttled)" if result.get("throttled") else ""
+                logger.warning(f"   ⚠️ regression detected{throttled}: {result['breaches']} sent={sent}")
+        except Exception as e:
+            logger.error(f"Error in regression check job: {e}")
+
     def job_health_check(self):
         """Job: Check bot health"""
         logger.info("🏥 Scheduled job: Health check")
@@ -171,6 +197,14 @@ class AutomationScheduler:
         # Cold-tier scan: every 4 hours, applies top-1 to local WATCHLIST_MARKETS
         schedule.every(4).hours.do(self.job_cold_tier_scan)
         logger.info("  ✅ Cold-tier scan: every 4 hours (apply top-1)")
+
+        # Weekly PnL report: Sunday 21:00
+        schedule.every().sunday.at("21:00").do(self.job_weekly_report)
+        logger.info("  ✅ Weekly PnL report: Sunday 21:00")
+
+        # Performance regression check: hourly
+        schedule.every(1).hours.do(self.job_regression_check)
+        logger.info("  ✅ Regression check: hourly")
         
         logger.info("=" * 60)
     

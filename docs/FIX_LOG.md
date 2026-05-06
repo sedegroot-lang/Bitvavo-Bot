@@ -5,6 +5,33 @@
 
 ---
 
+## #089 — Niveau 1 automation: weekly PnL report + regression alerter (2026-05-06)
+
+### Context
+Plan A delivery for the "voer 14 features uit" request. Auto-recovery already
+exists (`scripts/helpers/monitor.py` + `scripts/dashboard_v2_watchdog.py`), so
+only weekly reporting and regression detection were missing from Niveau 1.
+
+### Solution
+- `bot/weekly_report.py` (NEW) — aggregates last 7 days from `data/trade_archive.json`, writes JSON snapshot to `data/weekly_reports/YYYY-Www.json`, sends formatted Telegram. Idempotent via `.last_sent` marker.
+- `bot/regression_alerter.py` (NEW) — rolling 20-trade window. Triggers on win-rate < 50%, cumulative PnL < €-10, or loss streak ≥ 4. Throttled to one alert per 6 h via `data/regression_alert_state.json`. Thresholds overridable via `REGRESSION_ALERT_*` config keys.
+- `scripts/automation/scheduler.py` — added `job_weekly_report` (Sunday 21:00) and `job_regression_check` (hourly).
+- `tests/test_weekly_report_and_regression.py` (NEW) — 10 tests, all green.
+- `docs/PHASED_ROADMAP_NIVEAU2_3_4.md` (NEW) — sprint plan for the deferred Niveau 2/3/4 work so the user can pick chunks one at a time.
+
+### Verification
+`pytest tests/test_weekly_report_and_regression.py -v` → 10/10 passed.
+Live dry-run on real archive: weekly report week W18 = +€75.39 PnL / 9 trades / 100% WR; regression alerter healthy (WR 100%, cum €+116.59).
+
+### Files
+- `bot/weekly_report.py` (NEW)
+- `bot/regression_alerter.py` (NEW)
+- `scripts/automation/scheduler.py` (added 2 jobs + schedule entries)
+- `tests/test_weekly_report_and_regression.py` (NEW)
+- `docs/PHASED_ROADMAP_NIVEAU2_3_4.md` (NEW)
+
+---
+
 ## #088 — Dashboard data accuracy: deposit sync + fees capture (2026-05-06)
 
 ### Context
